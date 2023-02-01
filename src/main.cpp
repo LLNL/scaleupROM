@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include "mfem.hpp"
 
-int
-main(int argc, char* argv[])
+using namespace mfem;
+
+int main(int argc, char* argv[])
 {
   printf("Hello World\n");
   return 0;

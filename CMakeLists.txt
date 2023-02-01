@@ -20,6 +20,10 @@
 cmake_minimum_required(VERSION 3.12)
 cmake_policy(SET CMP0074 NEW) # Use <PackageName>_ROOT variables in find_package
 
+set(CMAKE_C_COMPILER mpicc)
+set(CMAKE_CXX_COMPILER mpicxx)
+set(CMAKE_Fortran_COMPILER mpif90)
+
 # Even though this project is a pure C++ library, the C language must be enabled
 # for MPI and HDF5 dependency checking. The Fortran language must be enabled
 # for Fortran-C name mangling convention detection.
@@ -110,20 +114,40 @@ find_package(Doxygen 1.8.5)
 find_package(GTest 1.6.0)
 
 # MFEM is required.
-find_library(MFEM mfem "${MFEM_DIR}/lib")
-find_library(HYPRE HYPRE "${HYPRE_DIR}/lib")
-find_library(PARMETIS parmetis "${PARMETIS_DIR}/lib")
-find_library(METIS metis "${METIS_DIR}/lib")
-find_path(MFEM_INCLUDES mfem.hpp "${MFEM_DIR}/include")
-find_path(HYPRE_INCLUDES HYPRE.h "${HYPRE_DIR}/include")
-find_path(PARMETIS_INCLUDES metis.h "${PARMETIS_DIR}/metis/include")
+find_library(MFEM mfem "$ENV{MFEM_DIR}/lib")
+find_library(HYPRE HYPRE "$ENV{HYPRE_DIR}/lib")
+find_library(PARMETIS parmetis "$ENV{PARMETIS_DIR}/lib")
+find_library(METIS metis "$ENV{METIS_DIR}/lib")
+find_path(MFEM_INCLUDES mfem.hpp "$ENV{MFEM_DIR}/include")
+find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
+find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 
 #add_subdirectory(src)
 
-#include_directories(include)
+include_directories(include)
 
 set(SOURCES src/main.cpp)
 add_executable(hello ${SOURCES})
+target_link_libraries(hello
+  PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
+  ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
+target_include_directories(hello
+  PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
+
+# target_link_libraries(ROM
+#   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
+#   ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS}
+#   PRIVATE ${ZLIB_LIBRARIES} ZLIB::ZLIB)
+
+# target_include_directories(ROM PUBLIC
+#   ${CMAKE_CURRENT_SOURCE_DIR}
+#   ${MFEM_INCLUDES}
+#   ${HYPRE_INCLUDES}
+#   ${PARMETIS_INCLUDES}
+#   ${HDF5_C_INCLUDE_DIRS}
+#   ${MPI_C_INCLUDE_DIRS}
+#   ${MFEM_C_INCLUDE_DIRS}
+#   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 ## Use the C++11 standard as an entire feature instead of
 ## enumerating individual compiler features for simplicity
