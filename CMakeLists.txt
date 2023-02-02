@@ -38,9 +38,9 @@ project(scaleupflow
 #list(APPEND CMAKE_MODULE_PATH ${libROM_CMAKE_MODULE_PATH})
 
 #option(USE_MFEM "Build libROM with MFEM" OFF)
-option(MFEM_USE_GSLIB "Build libROM with MFEM using GSLIB" OFF)
-option(BUILD_STATIC "Build libROM as a static library" OFF)
-option(ENABLE_EXAMPLES "Build examples and regression tests" OFF)
+# option(MFEM_USE_GSLIB "Build libROM with MFEM using GSLIB" OFF)
+# option(BUILD_STATIC "Build libROM as a static library" OFF)
+# option(ENABLE_EXAMPLES "Build examples and regression tests" OFF)
 
 ## Set a bunch of variables to generate a configure header
 # Enable assertion checking if debug symbols generated
@@ -48,37 +48,37 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(DEBUG_CHECK_ASSERTIONS "1")
 endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
-set(CAROM_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
-set(CAROM_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
-set(CAROM_VERSION_PATCHLEVEL "${PROJECT_VERSION_PATCH}")
-set(CAROM_PACKAGE ${CMAKE_PROJECT_NAME})
-set(CAROM_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-set(CAROM_PACKAGE_STRING "${CMAKE_PROJECT_NAME} ${CMAKE_PROJECT_VERSION}")
-set(CAROM_PACKAGE_TARNAME ${CMAKE_PROJECT_NAME})
-set(CAROM_PACKAGE_URL ${CMAKE_PROJECT_HOMEPAGE_URL})
-set(CAROM_PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
-set(CAROM_VERSION ${CMAKE_PROJECT_VERSION})
-
-include(CheckIncludeFiles)
-check_include_files(dlfcn.h CAROM_HAVE_DLFCN_H)
-check_include_files(inttypes.h CAROM_HAVE_INTTYPES_H)
-check_include_files(memory.h CAROM_HAVE_MEMORY_H)
-check_include_files(stdint.h CAROM_HAVE_STDINT_H)
-check_include_files(stdlib.h CAROM_HAVE_STDLIB_H)
-check_include_files(strings.h CAROM_HAVE_STRINGS_H)
-check_include_files(string.h CAROM_HAVE_STRING_H)
-check_include_files(sys/stat.h CAROM_HAVE_SYS_STAT_H)
-check_include_files(sys/types.h CAROM_HAVE_SYS_TYPES_H)
-check_include_files(unistd.h CAROM_HAVE_UNISTD_H)
-
-# Construct an expression consisting of the 24 ANSI C headers
-set(stdc_header_list "assert.h;complex.h;ctype.h;errno.h;fenv.h;float.h")
-set(stdc_header_list "${stdc_header_list};inttypes.h;iso646.h;limits.h")
-set(stdc_header_list "${stdc_header_list};locale.h;math.h;setjmp.h;signal.h")
-set(stdc_header_list "${stdc_header_list};stdarg.h;stdbool.h;stdint.h")
-set(stdc_header_list "${stdc_header_list};stddef.h;stdio.h;stdlib.h;string.h")
-set(stdc_header_list "${stdc_header_list};tgmath.h;time.h;wchar.h;wctype.h")
-check_include_files("${stdc_header_list}" CAROM_STDC_HEADERS)
+# set(CAROM_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+# set(CAROM_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+# set(CAROM_VERSION_PATCHLEVEL "${PROJECT_VERSION_PATCH}")
+# set(CAROM_PACKAGE ${CMAKE_PROJECT_NAME})
+# set(CAROM_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
+# set(CAROM_PACKAGE_STRING "${CMAKE_PROJECT_NAME} ${CMAKE_PROJECT_VERSION}")
+# set(CAROM_PACKAGE_TARNAME ${CMAKE_PROJECT_NAME})
+# set(CAROM_PACKAGE_URL ${CMAKE_PROJECT_HOMEPAGE_URL})
+# set(CAROM_PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
+# set(CAROM_VERSION ${CMAKE_PROJECT_VERSION})
+#
+# include(CheckIncludeFiles)
+# check_include_files(dlfcn.h CAROM_HAVE_DLFCN_H)
+# check_include_files(inttypes.h CAROM_HAVE_INTTYPES_H)
+# check_include_files(memory.h CAROM_HAVE_MEMORY_H)
+# check_include_files(stdint.h CAROM_HAVE_STDINT_H)
+# check_include_files(stdlib.h CAROM_HAVE_STDLIB_H)
+# check_include_files(strings.h CAROM_HAVE_STRINGS_H)
+# check_include_files(string.h CAROM_HAVE_STRING_H)
+# check_include_files(sys/stat.h CAROM_HAVE_SYS_STAT_H)
+# check_include_files(sys/types.h CAROM_HAVE_SYS_TYPES_H)
+# check_include_files(unistd.h CAROM_HAVE_UNISTD_H)
+#
+# # Construct an expression consisting of the 24 ANSI C headers
+# set(stdc_header_list "assert.h;complex.h;ctype.h;errno.h;fenv.h;float.h")
+# set(stdc_header_list "${stdc_header_list};inttypes.h;iso646.h;limits.h")
+# set(stdc_header_list "${stdc_header_list};locale.h;math.h;setjmp.h;signal.h")
+# set(stdc_header_list "${stdc_header_list};stdarg.h;stdbool.h;stdint.h")
+# set(stdc_header_list "${stdc_header_list};stddef.h;stdio.h;stdlib.h;string.h")
+# set(stdc_header_list "${stdc_header_list};tgmath.h;time.h;wchar.h;wctype.h")
+# check_include_files("${stdc_header_list}" CAROM_STDC_HEADERS)
 
 # Define variables for use in generating a configure file
 if(GTEST_FOUND)
@@ -124,15 +124,24 @@ find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 
 #add_subdirectory(src)
 
-include_directories(include)
+# include_directories(include)
 
-set(SOURCES src/main.cpp)
-add_executable(hello ${SOURCES})
+set(scaleupflowObj
+
+  include/test.hpp
+  src/test.cpp
+
+)
+
+add_library(testObj OBJECT ${scaleupflowObj})
+target_include_directories(testObj PRIVATE include)
+
+add_executable(hello src/main.cpp $<TARGET_OBJECTS:testObj>)
 target_link_libraries(hello
   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
-  ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
+         ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
 target_include_directories(hello
-  PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
+PUBLIC include ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
 
 # target_link_libraries(ROM
 #   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
