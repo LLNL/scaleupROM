@@ -122,26 +122,23 @@ find_path(MFEM_INCLUDES mfem.hpp "$ENV{MFEM_DIR}/include")
 find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
 find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 
-#add_subdirectory(src)
+include_directories(include)
 
-# include_directories(include)
+set(scaleupflowObj_SOURCES
 
-set(scaleupflowObj
-
-  include/test.hpp
-  src/test.cpp
+  include/navier_solver.hpp
+  src/navier_solver.cpp
 
 )
 
-add_library(testObj OBJECT ${scaleupflowObj})
-target_include_directories(testObj PRIVATE include)
-
-add_executable(hello src/main.cpp $<TARGET_OBJECTS:testObj>)
-target_link_libraries(hello
+add_library(scaleupflowObj OBJECT ${scaleupflowObj_SOURCES})
+target_link_libraries(scaleupflowObj
   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
          ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
-target_include_directories(hello
-PUBLIC include ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
+target_include_directories(scaleupflowObj
+  PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
+
+add_subdirectory(bin)
 
 # target_link_libraries(ROM
 #   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
