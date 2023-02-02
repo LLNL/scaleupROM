@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
    //    this mesh once in parallel to increase the resolution.
    ParMesh mesh(MPI_COMM_WORLD, serial_mesh);
    serial_mesh.Clear(); // the serial mesh is no longer needed
-   mesh.UniformRefinement();
+   // mesh.UniformRefinement();
 
    // 5. Define a finite element space on the mesh. Here we use H1 continuous
    //    high-order Lagrange finite elements of the given order.
@@ -95,6 +95,17 @@ int main(int argc, char *argv[])
    a.RecoverFEMSolution(X, b, x);
    x.Save("sol");
    mesh.Save("mesh");
+
+   // Save visualization in paraview output.
+   ParaViewDataCollection *paraviewColl = NULL;
+   paraviewColl = new ParaViewDataCollection("paraview_output", &mesh);
+   paraviewColl->SetLevelsOfDetail(order);
+   paraviewColl->SetHighOrderOutput(true);
+   paraviewColl->SetPrecision(8);
+
+   paraviewColl->RegisterField("solution", &x);
+   paraviewColl->SetOwnData(true);
+   paraviewColl->Save();
 
    return 0;
 }
