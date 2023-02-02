@@ -23,6 +23,8 @@ cmake_policy(SET CMP0074 NEW) # Use <PackageName>_ROOT variables in find_package
 set(CMAKE_C_COMPILER mpicc)
 set(CMAKE_CXX_COMPILER mpicxx)
 set(CMAKE_Fortran_COMPILER mpif90)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Even though this project is a pure C++ library, the C language must be enabled
 # for MPI and HDF5 dependency checking. The Fortran language must be enabled
@@ -33,52 +35,11 @@ project(scaleupflow
   HOMEPAGE_URL "https://github.com/dreamer2368/scaleupflow"
   LANGUAGES C CXX Fortran)
 
-#set(libROM_CMAKE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-#set(libROM_CMAKE_MODULE_PATH ${libROM_CMAKE_PATH}/modules)
-#list(APPEND CMAKE_MODULE_PATH ${libROM_CMAKE_MODULE_PATH})
-
-#option(USE_MFEM "Build libROM with MFEM" OFF)
-# option(MFEM_USE_GSLIB "Build libROM with MFEM using GSLIB" OFF)
-# option(BUILD_STATIC "Build libROM as a static library" OFF)
-# option(ENABLE_EXAMPLES "Build examples and regression tests" OFF)
-
 ## Set a bunch of variables to generate a configure header
 # Enable assertion checking if debug symbols generated
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(DEBUG_CHECK_ASSERTIONS "1")
 endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-
-# set(CAROM_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
-# set(CAROM_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
-# set(CAROM_VERSION_PATCHLEVEL "${PROJECT_VERSION_PATCH}")
-# set(CAROM_PACKAGE ${CMAKE_PROJECT_NAME})
-# set(CAROM_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-# set(CAROM_PACKAGE_STRING "${CMAKE_PROJECT_NAME} ${CMAKE_PROJECT_VERSION}")
-# set(CAROM_PACKAGE_TARNAME ${CMAKE_PROJECT_NAME})
-# set(CAROM_PACKAGE_URL ${CMAKE_PROJECT_HOMEPAGE_URL})
-# set(CAROM_PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
-# set(CAROM_VERSION ${CMAKE_PROJECT_VERSION})
-#
-# include(CheckIncludeFiles)
-# check_include_files(dlfcn.h CAROM_HAVE_DLFCN_H)
-# check_include_files(inttypes.h CAROM_HAVE_INTTYPES_H)
-# check_include_files(memory.h CAROM_HAVE_MEMORY_H)
-# check_include_files(stdint.h CAROM_HAVE_STDINT_H)
-# check_include_files(stdlib.h CAROM_HAVE_STDLIB_H)
-# check_include_files(strings.h CAROM_HAVE_STRINGS_H)
-# check_include_files(string.h CAROM_HAVE_STRING_H)
-# check_include_files(sys/stat.h CAROM_HAVE_SYS_STAT_H)
-# check_include_files(sys/types.h CAROM_HAVE_SYS_TYPES_H)
-# check_include_files(unistd.h CAROM_HAVE_UNISTD_H)
-#
-# # Construct an expression consisting of the 24 ANSI C headers
-# set(stdc_header_list "assert.h;complex.h;ctype.h;errno.h;fenv.h;float.h")
-# set(stdc_header_list "${stdc_header_list};inttypes.h;iso646.h;limits.h")
-# set(stdc_header_list "${stdc_header_list};locale.h;math.h;setjmp.h;signal.h")
-# set(stdc_header_list "${stdc_header_list};stdarg.h;stdbool.h;stdint.h")
-# set(stdc_header_list "${stdc_header_list};stddef.h;stdio.h;stdlib.h;string.h")
-# set(stdc_header_list "${stdc_header_list};tgmath.h;time.h;wchar.h;wctype.h")
-# check_include_files("${stdc_header_list}" CAROM_STDC_HEADERS)
 
 # Define variables for use in generating a configure file
 if(GTEST_FOUND)
@@ -122,7 +83,30 @@ find_path(MFEM_INCLUDES mfem.hpp "$ENV{MFEM_DIR}/include")
 find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
 find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 
-include_directories(include)
+include_directories(
+  include
+  ${MFEM_INCLUDES}
+  ${HYPRE_INCLUDES}
+  ${PARMETIS_INCLUDES}
+  ${HDF5_C_INCLUDE_DIRS}
+  ${MPI_C_INCLUDE_DIRS}
+  ${MFEM_C_INCLUDE_DIRS}
+)
+link_libraries(
+  ${MPI_C_LINK_FLAGS}
+  ${MPI_C_LIBRARIES}
+  MPI::MPI_C
+  ${MPI_FORTRAN_LINK_FLAGS}
+  ${MPI_FORTRAN_LIBRARIES}
+  MPI::MPI_Fortran
+  ${HDF5_LIBRARIES}
+  ${LAPACK_LIBRARIES}
+  ${BLAS_LIBRARIES}
+  ${MFEM}
+  ${HYPRE}
+  ${PARMETIS}
+  ${METIS}
+)
 
 set(scaleupflowObj_SOURCES
 
@@ -132,201 +116,14 @@ set(scaleupflowObj_SOURCES
 )
 
 add_library(scaleupflowObj OBJECT ${scaleupflowObj_SOURCES})
-target_link_libraries(scaleupflowObj
-  PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
-         ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
-target_include_directories(scaleupflowObj
-  PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
+# target_link_libraries(scaleupflowObj
+#   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
+#          ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
+# target_include_directories(scaleupflowObj
+#   PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
 
 add_subdirectory(bin)
-
-# target_link_libraries(ROM
-#   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
-#   ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS}
-#   PRIVATE ${ZLIB_LIBRARIES} ZLIB::ZLIB)
-
-# target_include_directories(ROM PUBLIC
-#   ${CMAKE_CURRENT_SOURCE_DIR}
-#   ${MFEM_INCLUDES}
-#   ${HYPRE_INCLUDES}
-#   ${PARMETIS_INCLUDES}
-#   ${HDF5_C_INCLUDE_DIRS}
-#   ${MPI_C_INCLUDE_DIRS}
-#   ${MFEM_C_INCLUDE_DIRS}
-#   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 ## Use the C++11 standard as an entire feature instead of
 ## enumerating individual compiler features for simplicity
 #target_compile_features(ROM PRIVATE cxx_std_11)
-
-#if (ENABLE_EXAMPLES)
-#  if (USE_MFEM)
-#    set(examples
-#      poisson_global_rom
-#      poisson_local_rom_greedy
-#      dg_advection_global_rom
-#      dg_advection_local_rom_matrix_interp
-#      mixed_nonlinear_diffusion
-#      nonlinear_elasticity_global_rom
-#      linear_elasticity_global_rom
-#      dg_advection
-#      nonlinear_elasticity
-#      heat_conduction
-#      wave_equation
-#      parametric_heat_conduction
-#      de_parametric_heat_conduction_greedy
-#      dg_euler
-#      local_tw_csv
-#      local_dw_csv
-#      parametric_tw_csv
-#      parametric_dw_csv)
-#    set(example_directories
-#      prom
-#      prom
-#      prom
-#      prom
-#      prom
-#      prom
-#      prom
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd
-#      dmd)
-#
-#    list(LENGTH examples len1)
-#    math(EXPR len2 "${len1} - 1")
-#
-#    foreach(val RANGE ${len2})
-#      list(GET examples ${val} name)
-#      list(GET example_directories ${val} example_dir)
-#      set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples/${example_dir})
-#      add_executable(${name} examples/${example_dir}/${name}.cpp)
-#
-#      target_link_libraries(${name}
-#        PRIVATE ROM ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran)
-#      target_include_directories(${name}
-#        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-#        ${MPI_C_INCLUDE_DIRS})
-#      target_compile_features(${name} PRIVATE cxx_std_11)
-#    endforeach() # IN LISTS examples
-#    file(COPY examples/data DESTINATION ${CMAKE_BINARY_DIR}/examples)
-#    file(COPY examples/dmd/heat_conduction_csv.sh DESTINATION ${CMAKE_BINARY_DIR}/examples/dmd)
-#    file(COPY examples/dmd/heat_conduction_hdf.sh DESTINATION ${CMAKE_BINARY_DIR}/examples/dmd)
-#  endif()
-#
-#  set(misc_example_names
-#    combine_samples)
-#
-#  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples/misc)
-#
-#  foreach(name IN LISTS misc_example_names)
-#    add_executable(${name} examples/misc/${name}.cpp)
-#
-#    target_link_libraries(${name}
-#      PRIVATE ROM ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran)
-#    target_include_directories(${name}
-#      PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-#      ${MPI_C_INCLUDE_DIRS})
-#    target_compile_features(${name} PRIVATE cxx_std_11)
-#  endforeach(name) # IN LISTS misc_exmaple_names
-#
-#  set(unit_test_names
-#    smoke_test
-#    test_include
-#    uneven_dist
-#    weak_scaling
-#    random_test
-#    smoke_static
-#    load_samples)
-#
-#  if (USE_MFEM)
-#    set(regression_test_names
-#      basisComparator
-#      checkError
-#      computeSpeedup
-#      solutionComparator
-#      fileComparator)
-#  endif()
-#
-#  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
-#
-#  foreach(name IN LISTS unit_test_names)
-#    add_executable(${name} unit_tests/${name}.cpp)
-#    target_link_libraries(${name}
-#      PRIVATE ROM ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran)
-#    target_include_directories(${name}
-#      PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-#      ${MPI_C_INCLUDE_DIRS})
-#    target_compile_features(${name} PRIVATE cxx_std_11)
-#  endforeach(name) # IN LISTS unit_test_names
-#
-#  if (USE_MFEM)
-#    foreach(name IN LISTS regression_test_names)
-#      add_executable(${name} regression_tests/${name}.cpp)
-#      target_link_libraries(${name}
-#        PRIVATE ROM ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran)
-#      target_include_directories(${name}
-#        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-#        ${MPI_C_INCLUDE_DIRS})
-#      target_compile_features(${name} PRIVATE cxx_std_11)
-#    endforeach(name) # IN LISTS regression_test_names
-#  endif()
-#endif(ENABLE_EXAMPLES)
-
-
-#if(GTEST_FOUND)
-#  set(unit_test_stems
-#    Vector
-#    Matrix
-#    DEIM
-#    DMD
-#    GNAT
-#    QDEIM
-#    S_OPT
-#    SVD
-#    StaticSVD
-#    RandomizedSVD
-#    IncrementalSVD
-#    GreedyCustomSampler)
-#  foreach(stem IN LISTS unit_test_stems)
-#    add_executable(test_${stem} unit_tests/test_${stem}.cpp)
-#    target_link_libraries(test_${stem} PRIVATE ROM
-#      ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran GTest::GTest)
-#    target_include_directories(test_${stem}
-#      PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-#      ${MPI_C_INCLUDE_DIRS})
-#    target_compile_features(test_${stem} PRIVATE cxx_std_11)
-#    target_compile_definitions(test_${stem} PRIVATE CAROM_HAS_GTEST)
-#  endforeach(stem) # IN LISTS unit_test_stems
-#endif(GTEST_FOUND)
-
-## NOTE(goxberry@gmail.com, oxberry1@llnl.gov): This code snippet
-## builds the Doxygen documentation, but outputs said documentation to
-## ${CMAKE_CURRENT_SOURCE_DIR}/docs)...
-#if(DOXYGEN_FOUND)
-#  set(doxyfile ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile)
-#
-#  add_custom_target(
-#    documentation ALL
-#    COMMAND ${DOXYGEN_EXECUTABLE} ${doxyfile}
-#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#    COMMENT "Generating API documentation with Doxygen"
-#    VERBATIM
-#    )
-#  add_dependencies(documentation ROM)
-#
-#  add_custom_target(
-#    doxygen_tagfile
-#    COMMAND ${CMAKE_COMMAND} -E copy
-#    ${CMAKE_CURRENT_SOURCE_DIR}/rom.tag
-#    ${CMAKE_CURRENT_BINARY_DIR}/docs/html/rom.tag)
-#  add_dependencies(doxygen_tagfile documentation)
-#
-#endif(DOXYGEN_FOUND)
