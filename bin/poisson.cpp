@@ -19,6 +19,9 @@
 using namespace std;
 using namespace mfem;
 
+double dbc1(const Vector &);
+double dbc3(const Vector &);
+
 int main(int argc, char *argv[])
 {
    // 1. Initialize MPI and HYPRE.
@@ -77,9 +80,9 @@ int main(int argc, char *argv[])
    Coefficient *bdrCoeffs[mesh.bdr_attributes.Max()];
    Array<int> bdrAttr(mesh.bdr_attributes.Max());
    bdrCoeffs[0] = new ConstantCoefficient(0.0);
-   bdrCoeffs[1] = new ConstantCoefficient(5.0e-2);
+   bdrCoeffs[1] = new FunctionCoefficient(dbc1);
    bdrCoeffs[2] = NULL;
-   bdrCoeffs[3] = new ConstantCoefficient(-5.0e-2);
+   bdrCoeffs[3] = new FunctionCoefficient(dbc3);
    for (int b = 0; b < mesh.bdr_attributes.Max(); b++) {
      // Determine which boundary attribute will use the b-th boundary coefficient.
      // Since all boundary attributes use different BCs, only one index is 'turned on'.
@@ -135,4 +138,14 @@ int main(int argc, char *argv[])
    paraviewColl->Save();
 
    return 0;
+}
+
+double dbc1(const Vector &x)
+{
+  return 0.1 - 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
+}
+
+double dbc3(const Vector &x)
+{
+  return -0.1 + 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
