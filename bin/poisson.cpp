@@ -58,10 +58,36 @@ int main(int argc, char *argv[])
    Array<int> boundary_dofs;
    fespace.GetBoundaryTrueDofs(boundary_dofs);
 
+   // Specify where Dirichlet BC is applied as essential boundary condition.
+   Array<int> ess_attr(mesh.bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   ess_attr = 1;
+   ess_attr[2] = 0;
+   Array<int> ess_tdof_list;
+   fespace.GetEssentialTrueDofs(ess_attr, ess_tdof_list);
+
    // 7. Define the solution x as a finite element grid function in fespace. Set
    //    the initial guess to zero, which also sets the boundary conditions.
    ParGridFunction x(&fespace);
    x = 0.0;
+
+   // add dirichlet boundary condition.
+   Coefficient *bdrCoeffs[mesh.bdr_attributes.Max()];
+   Array<int> bdrAttr(mesh.bdr_attributes.Max());
+   bdrCoeffs[0] = new ConstantCoefficient(0.0);
+   bdrCoeffs[1] = new ConstantCoefficient(5.0e-2);
+   bdrCoeffs[2] = NULL;
+   bdrCoeffs[3] = new ConstantCoefficient(-5.0e-2);
+   for (int b = 0; b < mesh.bdr_attributes.Max(); b++) {
+     // Determine which boundary attribute will use the b-th boundary coefficient.
+     // Since all boundary attributes use different BCs, only one index is 'turned on'.
+     bdrAttr = 0;
+     bdrAttr[b] = 1;
+     // Project the b-th boundary coefficient.
+     x.ProjectBdrCoefficient(*bdrCoeffs[b], bdrAttr);
+   }
 
    // 8. Set up the linear form b(.) corresponding to the right-hand side.
    ConstantCoefficient one(1.0);
@@ -78,7 +104,8 @@ int main(int argc, char *argv[])
    //     conditions, applying AMR constraints, parallel assembly, etc.
    HypreParMatrix A;
    Vector B, X;
-   a.FormLinearSystem(boundary_dofs, x, b, A, X, B);
+   // a.FormLinearSystem(boundary_dofs, x, b, A, X, B);
+   a.FormLinearSystem(ess_tdof_list, x, b, A, X, B);
 
    // 11. Solve the system using PCG with hypre's BoomerAMG preconditioner.
    HypreBoomerAMG M(A);
