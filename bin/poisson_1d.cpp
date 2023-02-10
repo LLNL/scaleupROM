@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
 
    // 3. Read the serial mesh from the given mesh file.
    Mesh mesh(mesh_file);
+   int globalNE = mesh.GetNE();
 
    // 5. Define a finite element space on the mesh. Here we use H1 continuous
    //    high-order Lagrange finite elements of the given order.
@@ -179,6 +180,12 @@ int main(int argc, char *argv[])
      std::string submesh_file(mesh_file);
      submesh_file = submesh_file.substr(0, submesh_file.find_last_of('.')) + ".submesh";
      Mesh mesh(submesh_file.c_str());
+     int subNE = mesh.GetNE();
+     if (globalNE % subNE != 0) {
+       printf("Number of elements in global domain cannot be divided by that of subdomain.");
+       exit(1);
+     }
+     int numSub = globalNE / subNE;
 
      H1_FECollection fec(order, mesh.Dimension());
      FiniteElementSpace fespace(&mesh, &fec);
@@ -186,25 +193,27 @@ int main(int argc, char *argv[])
      cout << "Number of unknowns: " << total_num_dofs << endl;
 
      // Specify where Dirichlet BC is applied as essential boundary condition.
-     Array<int> ess_attr1(mesh.bdr_attributes.Max()), ess_attr2(mesh.bdr_attributes.Max());
-     ess_attr1 = 1;
-     ess_attr2 = 1;
-     // Interface
-     ess_attr1[1] = 0;
-     ess_attr2[0] = 0;
-     Array<int> ess_tdof_list1, ess_tdof_list2;
-     fespace.GetEssentialTrueDofs(ess_attr1, ess_tdof_list1);
-     fespace.GetEssentialTrueDofs(ess_attr2, ess_tdof_list2);
+     std::vector<Array<int>> ess_attrs(numSub), ess_tdof_lists(numSub);
+     for (int i = 0; i < numSub; i++) {
+       ess_attrs[i].SetSize(mesh.bdr_attributes.Max());
+       ess_attrs[i] = 0;
+     }
+     ess_attrs[0][0] = 1;
+     ess_attrs[numSub - 1][1] = 1;
 
-     GridFunction x1(&fespace), x2(&fespace);
-     x1 = 0.0;
-     x2 = 0.0;
+     for (int i = 0; i < numSub; i++)
+       fespace.GetEssentialTrueDofs(ess_attrs[i], ess_tdof_lists[i]);
+
+     std::vector<GridFunction *> xs(numSub);
+     for (int i = 0; i < numSub; i++) {
+       xs[i] = new GridFunction(&fespace);
+       *(xs[i]) = 0.0;
+     }
 
      // add dirichlet boundary condition.
      Coefficient *bdrCoeffs[mesh.bdr_attributes.Max()];
      Array<int> bdrAttr(mesh.bdr_attributes.Max());
      bdrCoeffs[0] = new ConstantCoefficient(2.0);
-     // bdrCoeffs[1] = new FunctionCoefficient(dbc1);
      bdrCoeffs[1] = NULL;;
      for (int b = 0; b < mesh.bdr_attributes.Max(); b++) {
        // Determine which boundary attribute will use the b-th boundary coefficient.
@@ -212,75 +221,92 @@ int main(int argc, char *argv[])
        bdrAttr = 0;
        bdrAttr[b] = 1;
        // Project the b-th boundary coefficient.
-       x1.ProjectBdrCoefficient(*bdrCoeffs[b], bdrAttr);
+       xs[0]->ProjectBdrCoefficient(*bdrCoeffs[b], bdrAttr);
      }
 
      ConstantCoefficient one(1.0);
-     LinearForm b1(&fespace), b2(&fespace);
-     b1.AddDomainIntegrator(new DomainLFIntegrator(one));
-     b1.Assemble();
-     b2.AddDomainIntegrator(new DomainLFIntegrator(one));
-     b2.Assemble();
+     std::vector<LinearForm *> bs(numSub);
+     for (int i = 0; i < numSub; i++) {
+       bs[i] = new LinearForm(&fespace);
+       bs[i]->AddDomainIntegrator(new DomainLFIntegrator(one));
+       bs[i]->Assemble();
+     }
 
-     Array<int> block_offsets(4); // number of variables + 1
+     Array<int> block_offsets(numSub + 1 + 1); // number of subdomain + lagrangian (1) + 1
      block_offsets[0] = 0;
-     block_offsets[1] = fespace.GetVSize();
-     block_offsets[2] = fespace.GetVSize();
-     block_offsets[3] = 1;
+     for (int i = 0; i < numSub; i++) {
+       block_offsets[i + 1] = fespace.GetVSize();
+     }
+     block_offsets[numSub + 1] = numSub - 1; // number of interfaces
      block_offsets.PartialSum();
 
-     // std::cout << "***********************************************************\n";
-     // std::cout << "dim(R) = " << block_offsets[1] - block_offsets[0] << "\n";
-     // std::cout << "dim(W) = " << block_offsets[2] - block_offsets[1] << "\n";
-     // std::cout << "dim(R+W) = " << block_offsets.Last() << "\n";
-     // std::cout << "***********************************************************\n";
+     std::cout << "***********************************************************\n";
+     // // std::cout << "dim(R) = " << block_offsets[1] - block_offsets[0] << "\n";
+     // // std::cout << "dim(W) = " << block_offsets[2] - block_offsets[1] << "\n";
+     std::cout << "dim(R+W) = " << block_offsets.Last() << "\n";
+     std::cout << "***********************************************************\n";
      BlockOperator kktOp(block_offsets);
 
-     BilinearForm a1(&fespace), a2(&fespace);
-     a1.AddDomainIntegrator(new DiffusionIntegrator);
-     a1.Assemble();
-     a2.AddDomainIntegrator(new DiffusionIntegrator);
-     a2.Assemble();
+     std::vector<BilinearForm *> as(numSub);
+     for (int i = 0; i < numSub; i++) {
+       as[i] = new BilinearForm(&fespace);
+       as[i]->AddDomainIntegrator(new DiffusionIntegrator);
+       as[i]->Assemble();
+     }
 
-     SparseMatrix A1, A2;
-     Vector R1, R2, X1, X2;
-     // a1.FormSystemMatrix(ess_tdof_list1, A1);
-     a1.FormLinearSystem(ess_tdof_list1, x1, b1, A1, X, R1);
-     // for (int i = 0; i < R1.Size(); i++) {
-     //   printf("R1[%d] = %2.3f\n", i, R1[i]);
-     // }
-     // a2.FormSystemMatrix(ess_tdof_list2, A2);
-     a2.FormLinearSystem(ess_tdof_list2, x2, b2, A2, X, R2);
-     // for (int i = 0; i < R2.Size(); i++) {
-     //   printf("R2[%d] = %2.3f\n", i, R2[i]);
-     // }
-     kktOp.SetBlock(0,0, &A1);
-     kktOp.SetBlock(1,1, &A2);
+     std::vector<SparseMatrix> As(numSub);
+     std::vector<Vector> Bs(numSub), Xs(numSub);
+     for (int i = 0; i < numSub; i++) {
+       as[i]->FormLinearSystem(ess_tdof_lists[i], *(xs[i]), *(bs[i]), As[i], Xs[i], Bs[i]);
+       kktOp.SetBlock(i, i, &As[i]);
 
-     SparseMatrix B1(fespace.GetVSize(), 1), B2(fespace.GetVSize(), 1);
+       DenseMatrix Ad;
+       As[i].ToDenseMatrix(Ad);
+       printf("As[%d] (%d x %d)\n", i, Ad.Width(), Ad.Height());
+       for (int h = 0; h < Ad.Height(); h++) {
+         for (int w = 0; w < Ad.Width(); w++) {
+           printf("%2.3f\t", Ad(h, w));
+         }
+         printf(" | %2.3f \n", Bs[i](h));
+       }
+     }
+
+     std::vector<SparseMatrix *> BBs(numSub);
+     for (int i = 0; i < numSub; i++) {
+       BBs[i] = new SparseMatrix(fespace.GetVSize(), numSub - 1);
+     }
      Array<int> boundary_dofs;
      fespace.GetBoundaryTrueDofs(boundary_dofs);
-     B1.Set(boundary_dofs[1], 0, 1.0);
-     B2.Set(boundary_dofs[0], 0, -1.0);
-     B1.Finalize();
-     B2.Finalize();
+     for (int i = 0; i < numSub - 1; i++) {
+       BBs[i]->Set(boundary_dofs[1], 0, 1.0);
+       BBs[i+1]->Set(boundary_dofs[0], 0, -1.0);
+     }
 
-     TransposeOperator B1t(B1), B2t(B2);
+     for (int i = 0; i < numSub; i++) {
+       BBs[i]->Finalize();
+     }
 
-     kktOp.SetBlock(0,2, &B1);
-     kktOp.SetBlock(1,2, &B2);
-     kktOp.SetBlock(2,0, &B1t);
-     kktOp.SetBlock(2,1, &B2t);
+     std::vector<TransposeOperator *> BBst(numSub);
+     for (int i = 0; i < numSub; i++)
+       BBst[i] = new TransposeOperator(BBs[i]);
 
-     BlockVector XB(block_offsets), rhs(block_offsets);
-     Vector R(R1.Size() + R2.Size() + 1);
+     for (int i = 0; i < numSub; i++) {
+       kktOp.SetBlock(i, numSub, BBs[i]);
+       kktOp.SetBlock(numSub, i, BBst[i]);
+     }
+
+     BlockVector XB(block_offsets), RHS(block_offsets);
+     Vector R(block_offsets.Last());
      R = 0.0;
-     for (int i = 0; i < block_offsets[1]; i++) R(i) = R1(i);
-     for (int i = block_offsets[1]; i < block_offsets[2]; i++) R(i) = R2(i - block_offsets[1]);
-     rhs.Update(R, block_offsets);
-     // for (int i = 0; i < block_offsets[3]; i++) {
-     //   printf("rhs[%d] = %2.3f\n", i, rhs[i]);
-     // }
+     for (int i = 0; i < numSub; i++) {
+       for (int n = block_offsets[i]; n < block_offsets[i + 1]; n++) {
+         R(n) = Bs[i](n - block_offsets[i]);
+       }
+     }
+     RHS.Update(R, block_offsets);
+     for (int i = 0; i < block_offsets.Last(); i++) {
+       printf("RHS[%d] = %2.3f\n", i, RHS[i]);
+     }
 
      int maxIter(1000);
      double rtol(1.e-6);
@@ -295,9 +321,9 @@ int main(int argc, char *argv[])
      solver.SetPreconditioner(kktPrec);
      solver.SetPrintLevel(1);
      XB = 0.0;
-     solver.Mult(rhs, XB);
+     solver.Mult(RHS, XB);
 
-     for (int i = 0; i < block_offsets[3]; i++) {
+     for (int i = 0; i < block_offsets.Last(); i++) {
        printf("xb[%d] = %2.3f\n", i, XB[i]);
      }
 
