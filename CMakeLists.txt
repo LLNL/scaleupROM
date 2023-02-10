@@ -29,10 +29,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Even though this project is a pure C++ library, the C language must be enabled
 # for MPI and HDF5 dependency checking. The Fortran language must be enabled
 # for Fortran-C name mangling convention detection.
-project(scaleupflow
+project(scaleupROM
   VERSION 1.0.0
   DESCRIPTION "Model reduction application to scaleUP flow simulations."
-  HOMEPAGE_URL "https://github.com/dreamer2368/scaleupflow"
+  HOMEPAGE_URL "https://lc.llnl.gov/gitlab/chung28/scaleupROM.git"
   LANGUAGES C CXX Fortran)
 
 ## Set a bunch of variables to generate a configure header
@@ -108,18 +108,18 @@ link_libraries(
   ${METIS}
 )
 
-set(scaleupflowObj_SOURCES
+set(scaleupROMObj_SOURCES
 
   include/navier_solver.hpp
   src/navier_solver.cpp
 
 )
 
-add_library(scaleupflowObj OBJECT ${scaleupflowObj_SOURCES})
-# target_link_libraries(scaleupflowObj
+add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})
+# target_link_libraries(scaleupROMObj
 #   PUBLIC ${MPI_C_LINK_FLAGS} ${MPI_C_LIBRARIES} MPI::MPI_C ${MPI_FORTRAN_LINK_FLAGS} ${MPI_FORTRAN_LIBRARIES} MPI::MPI_Fortran ${HDF5_LIBRARIES}
 #          ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${MFEM} ${HYPRE} ${PARMETIS} ${METIS})
-# target_include_directories(scaleupflowObj
+# target_include_directories(scaleupROMObj
 #   PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
 
 add_subdirectory(bin)
