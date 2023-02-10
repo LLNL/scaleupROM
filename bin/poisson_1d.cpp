@@ -27,11 +27,13 @@ int main(int argc, char *argv[])
 
    // 2. Parse command line options.
    const char *mesh_file = "../data/star.mesh";
+   const char *dode_type = "feti";
    int order = 1;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&order, "-o", "--order", "Finite element polynomial degree");
+   args.AddOption(&dode_type, "-d", "--domain-decomposition", "Domain decomposition type: feti, ddlspg, ip.");
    args.ParseCheck();
 
    // 3. Read the serial mesh from the given mesh file.
@@ -174,9 +176,22 @@ int main(int argc, char *argv[])
    //   // TODO: figure out how to extract these index information out of subdomain attributes.
    // }
 
-   //Now solve with FETI method for two subdomains.
-   printf("Solving with FETI method.\n");
-   {
+   std::string dode_type_str(dode_type);
+   if (dode_type_str == "ddlspg") {
+
+     printf("DD-LSPG not implemented yet!\n");
+     exit(1);
+     
+   } else if (dode_type_str == "ip") {
+
+     printf("Interior penalty method not implemented yet!\n");
+     exit(1);
+
+   } else if (dode_type_str == "feti") {
+
+     //Now solve with FETI method for two subdomains.
+     printf("Solving with FETI method.\n");
+
      std::string submesh_file(mesh_file);
      submesh_file = submesh_file.substr(0, submesh_file.find_last_of('.')) + ".submesh";
      Mesh mesh(submesh_file.c_str());
@@ -327,6 +342,9 @@ int main(int argc, char *argv[])
        printf("xb[%d] = %2.3f\n", i, XB[i]);
      }
 
+   } else {
+     printf("Unknown domain decomposition type: %s!\n", dode_type);
+     exit(1);
    }
 
 
