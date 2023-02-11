@@ -179,9 +179,193 @@ int main(int argc, char *argv[])
    std::string dode_type_str(dode_type);
    if (dode_type_str == "ddlspg") {
 
-     printf("DD-LSPG not implemented yet!\n");
-     exit(1);
-     
+     // Use the same global mesh.
+     int numElem = mesh.GetNE();
+     if (numElem != 6) {
+       printf("This example is demonstrated only for 6 elements!");
+       exit(1);
+     }
+
+     int total_num_dofs = fespace.GetTrueVSize();
+     Array<bool> isInterfaceDof(total_num_dofs), isRes1Dof(total_num_dofs), isRes2Dof(total_num_dofs);
+     Array<bool> isInterior1Dof(total_num_dofs), isInterior2Dof(total_num_dofs);
+     isInterfaceDof = false;
+     isRes1Dof = false;
+     isRes2Dof = false;
+     isInterior1Dof = false;
+     isInterior2Dof = false;
+
+     Array<bool> isInterfaceElem(numElem), isDomain1Elem(numElem);
+     isInterfaceElem = false;
+     isInterfaceElem[2] = true;
+     isInterfaceElem[3] = true;
+
+     isDomain1Elem = false;
+     for (int i = 0; i < 3; i++) isDomain1Elem[i] = true;
+
+     printf("number of elements: %d\n", numElem);
+     for (int el = 0; el < numElem; el++) {
+       int attr = mesh.GetAttribute(el);
+       Vector center(2);
+       mesh.GetElementCenter(el, center);
+       printf("Element %d: %d - (%f, %f)\n", el, attr, center(0), center(1));
+
+       const FiniteElement *elem = fespace.GetFE(el);
+       const int eldDof = elem->GetDof();
+       Array<int> vdofs;
+       fespace.GetElementVDofs(el, vdofs);
+       // printf("%d =?= %d\n", eldDof, vdofs.Size());
+       printf("Element %d vdofs: ", el);
+       for (int k = 0; k < eldDof; k++) {
+         printf("%d ", vdofs[k]);
+         if (isInterfaceElem[el]) {
+           isInterfaceDof[vdofs[k]] = true;
+         }
+       }
+       printf("\n");
+     }
+
+     for (int el = 0; el < numElem; el++) {
+       const FiniteElement *elem = fespace.GetFE(el);
+       const int eldDof = elem->GetDof();
+       Array<int> vdofs;
+       fespace.GetElementVDofs(el, vdofs);
+
+       for (int k = 0; k < eldDof; k++) {
+         printf("vdof %d: ", vdofs[k]);
+         if (isDomain1Elem[el]) {
+           printf("residual 1, ");
+           isRes1Dof[vdofs[k]] = true;
+           if (!isInterfaceDof[vdofs[k]]) {
+             printf("interior, ");
+             isInterior1Dof[vdofs[k]] = true;
+           }
+         } else {
+           printf("residual 2, ");
+           isRes2Dof[vdofs[k]] = true;
+           if (!isInterfaceDof[vdofs[k]]) {
+             printf("interior, ");
+             isInterior2Dof[vdofs[k]] = true;
+           }
+         }
+         printf("\n");
+       }
+     }
+
+     Array<int> interfaceDofs(0), interior1Dofs(0), interior2Dofs(0), res1Dofs(0), res2Dofs(0);
+     for (int i = 0; i < total_num_dofs; i++) {
+       if (isInterfaceDof[i]) interfaceDofs.Append(i);
+       if (isInterior1Dof[i]) interior1Dofs.Append(i);
+       if (isInterior2Dof[i]) interior2Dofs.Append(i);
+       if (isRes1Dof[i]) res1Dofs.Append(i);
+       if (isRes2Dof[i]) res2Dofs.Append(i);
+     }
+
+     Array<int> domain1Dofs = interior1Dofs;
+     domain1Dofs.Append(interfaceDofs);
+     Array<int> domain2Dofs = interfaceDofs;
+     domain2Dofs.Append(interior2Dofs);
+
+     printf("Interior 1 dofs\n");
+     for (int i = 0; i < interior1Dofs.Size(); i++) printf("%d ", interior1Dofs[i]);
+     printf("\n");
+
+     printf("Interior 2 dofs\n");
+     for (int i = 0; i < interior2Dofs.Size(); i++) printf("%d ", interior2Dofs[i]);
+     printf("\n");
+
+     printf("Interface dofs\n");
+     for (int i = 0; i < interfaceDofs.Size(); i++) printf("%d ", interfaceDofs[i]);
+     printf("\n");
+
+     printf("Residual 1 dofs\n");
+     for (int i = 0; i < res1Dofs.Size(); i++) printf("%d ", res1Dofs[i]);
+     printf("\n");
+
+     printf("Residual 2 dofs\n");
+     for (int i = 0; i < res2Dofs.Size(); i++) printf("%d ", res2Dofs[i]);
+     printf("\n");
+
+     printf("Domain 1 dofs\n");
+     for (int i = 0; i < domain1Dofs.Size(); i++) printf("%d ", domain1Dofs[i]);
+     printf("\n");
+
+     printf("Domain 2 dofs\n");
+     for (int i = 0; i < domain2Dofs.Size(); i++) printf("%d ", domain2Dofs[i]);
+     printf("\n");
+
+     DenseMatrix res1(res1Dofs.Size(), domain1Dofs.Size()), res2(res2Dofs.Size(), domain2Dofs.Size());
+     A.GetSubMatrix(res1Dofs, domain1Dofs, res1);
+     for (int i = 0; i < res1Dofs.Size(); i++) {
+       for (int j = 0; j < domain1Dofs.Size(); j++) {
+         printf("%2.3f\t", res1(i, j));
+       }
+       printf("\n");
+     }
+
+     A.GetSubMatrix(res2Dofs, domain2Dofs, res2);
+     for (int i = 0; i < res2Dofs.Size(); i++) {
+       for (int j = 0; j < domain2Dofs.Size(); j++) {
+         printf("%2.3f\t", res2(i, j));
+       }
+       printf("\n");
+     }
+
+     // TODO: these are manual set up of compatibility constraints. Need to automate it.
+     SparseMatrix com1(interfaceDofs.Size(), domain1Dofs.Size()), com2(interfaceDofs.Size(), domain2Dofs.Size());
+     for (int i = 0; i < interfaceDofs.Size(); i++) {
+       com1.Set(i, interior1Dofs.Size() + i, 1.0);
+     }
+     com1.Finalize();
+     for (int i = 0; i < interfaceDofs.Size(); i++) {
+       com2.Set(i, i, -1.0);
+     }
+     com2.Finalize();
+
+     Array<int> row_offsets(4), col_offsets(3);
+     row_offsets[0] = 0;
+     row_offsets[1] = res1Dofs.Size();
+     row_offsets[2] = res2Dofs.Size();
+     row_offsets[3] = interfaceDofs.Size();
+     row_offsets.PartialSum();
+
+     col_offsets[0] = 0;
+     col_offsets[1] = domain1Dofs.Size();
+     col_offsets[2] = domain2Dofs.Size();
+     col_offsets.PartialSum();
+
+     BlockOperator Ap(row_offsets, col_offsets);
+     Ap.SetBlock(0, 0, &res1);
+     Ap.SetBlock(1, 1, &res2);
+     Ap.SetBlock(2, 0, &com1);
+     Ap.SetBlock(2, 1, &com2);
+
+     Vector tmp(row_offsets.Last());
+     for (int i = row_offsets[0]; i < row_offsets[1]; i++) tmp(i) = B(res1Dofs[i - row_offsets[0]]);
+     for (int i = row_offsets[1]; i < row_offsets[2]; i++) tmp(i) = B(res2Dofs[i - row_offsets[1]]);
+
+     BlockVector XB(col_offsets), RHS(row_offsets);
+     RHS.Update(tmp, row_offsets);
+
+     int maxIter(1000);
+     double rtol(1.e-6);
+     double atol(1.e-10);
+
+     // BlockDiagonalPreconditioner kktPrec(block_offsets);
+     GMRESSolver solver;
+     solver.SetAbsTol(atol);
+     solver.SetRelTol(rtol);
+     solver.SetMaxIter(maxIter);
+     solver.SetOperator(Ap);
+     // solver.SetPreconditioner(kktPrec);
+     solver.SetPrintLevel(1);
+     XB = 0.0;
+     solver.Mult(RHS, XB);
+
+     for (int i = 0; i < col_offsets.Last(); i++) {
+       printf("xb[%d] = %2.3f\n", i, XB[i]);
+     }
+
    } else if (dode_type_str == "ip") {
 
      printf("Interior penalty method not implemented yet!\n");
@@ -328,7 +512,7 @@ int main(int argc, char *argv[])
      double atol(1.e-10);
 
      BlockDiagonalPreconditioner kktPrec(block_offsets);
-     MINRESSolver solver;
+     GMRESSolver solver;
      solver.SetAbsTol(atol);
      solver.SetRelTol(rtol);
      solver.SetMaxIter(maxIter);
