@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
    Array<int> bdrAttr(mesh.bdr_attributes.Max());
    bdrCoeffs[0] = new ConstantCoefficient(2.0);
    // bdrCoeffs[1] = new FunctionCoefficient(dbc1);
-   bdrCoeffs[1] = NULL;;
+   bdrCoeffs[1] = new ConstantCoefficient(0.0);
    for (int b = 0; b < mesh.bdr_attributes.Max(); b++) {
      // Determine which boundary attribute will use the b-th boundary coefficient.
      // Since all boundary attributes use different BCs, only one index is 'turned on'.
@@ -395,17 +395,26 @@ int main(int argc, char *argv[])
      cout << "Number of unknowns in each subdomain: " << total_num_dofs << endl;
 
      // Dirichlet BC on the first and the last meshes.
+     bool strong_bc = false;
      Array<Array<int> *> ess_attrs(numSub);
      Array<Array<int> *> ess_tdof_lists(numSub);
      for (int m = 0; m < numSub; m++) {
        ess_attrs[m] = new Array<int>(2);
+       // turn off all essential dofs.
        (*ess_attrs[m]) = 0;
-       if (m == 0) (*ess_attrs[m])[0] = 1;
-       if (m == numSub - 1) (*ess_attrs[m])[1] = 1;
-       ess_tdof_lists[m] = new Array<int>;
 
+       if (strong_bc) {
+         if (m == 0) (*ess_attrs[m])[0] = 1;
+         if (m == numSub - 1) (*ess_attrs[m])[1] = 1;
+       }
+
+       ess_tdof_lists[m] = new Array<int>;
        fespaces[m]->GetEssentialTrueDofs((*ess_attrs[m]), (*ess_tdof_lists[m]));
      }
+
+     Array<Array<int> *> bdr_markers(2);
+     bdr_markers[0] = new Array<int>({1, 0});
+     bdr_markers[1] = new Array<int>({0, 1});
 
      // 7. Define the solution x as a finite element grid function in fespace. Set
      //    the initial guess to zero, which also sets the boundary conditions.
@@ -414,30 +423,41 @@ int main(int argc, char *argv[])
        xs[m] = new GridFunction(fespaces[m]);
        (*xs[m]) = 0.0;
      }
-     bdrAttr = 0;
-     bdrAttr[0] = 1;
-     xs[0]->ProjectBdrCoefficient(*bdrCoeffs[0], bdrAttr);
-     bdrAttr = 0;
-     bdrAttr[1] = 1;
-     xs[numSub-1]->ProjectBdrCoefficient(*bdrCoeffs[1], bdrAttr);
+     if (strong_bc) {
+       xs[0]->ProjectBdrCoefficient(*bdrCoeffs[0], *bdr_markers[0]);
+       xs[numSub-1]->ProjectBdrCoefficient(*bdrCoeffs[1], *bdr_markers[1]);
+     }
 
      // 8. Set up the linear form b(.) corresponding to the right-hand side.
      ConstantCoefficient one(1.0);
+     double sigma = -1.0;
+     double kappa = 2.0;
+
      Array<LinearForm *> bs(numSub);
      Array<BilinearForm *> as(numSub);
      for (int m = 0; m < numSub; m++) {
        bs[m] = new LinearForm(fespaces[m]);
        bs[m]->AddDomainIntegrator(new DomainLFIntegrator(one));
-       bs[m]->Assemble();
 
        as[m] = new BilinearForm(fespaces[m]);
        as[m]->AddDomainIntegrator(new DiffusionIntegrator);
+
+       if (!strong_bc) {
+         if (m == 0) {
+           bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[0], one, sigma, kappa), *bdr_markers[0]);
+           as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[0]);
+         }
+         if (m == numSub - 1) {
+           bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[1], one, sigma, kappa), *bdr_markers[1]);
+           as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[1]);
+         }
+       }
+
+       bs[m]->Assemble();
        as[m]->Assemble();
      }
 
      // Set up interior penalty integrator.
-     double sigma = -1.0;
-     double kappa = 2.0;
      InterfaceDGDiffusionIntegrator interface_integ(one, sigma, kappa);
      Array<SparseMatrix *> blockMats(numSub * numSub);
      for (int i = 0; i < numSub; i++) {
