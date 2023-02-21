@@ -13,6 +13,7 @@
 //              polynomial degrees can be specified by command line options.
 
 #include "mfem.hpp"
+#include "interfaceinteg.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -368,8 +369,208 @@ int main(int argc, char *argv[])
 
    } else if (dode_type_str == "ip") {
 
-     printf("Interior penalty method not implemented yet!\n");
-     exit(1);
+     printf("Solving with Interior Penalty method.\n");
+
+     std::string submesh_file(mesh_file);
+     submesh_file = submesh_file.substr(0, submesh_file.find_last_of('.')) + ".submesh";
+     Mesh submesh(submesh_file.c_str());
+     int subNE = submesh.GetNE();
+     if (globalNE % subNE != 0) {
+       printf("Number of elements in global domain cannot be divided by that of subdomain.");
+       exit(1);
+     }
+     int numSub = globalNE / subNE;
+
+     std::vector<Mesh *> meshes(numSub);
+     for (int m = 0; m < meshes.size(); m++) {
+       meshes[m] = new Mesh(submesh);
+     }
+
+     H1_FECollection fec(order, submesh.Dimension());
+     std::vector<FiniteElementSpace *> fespaces(numSub);
+     for (int m = 0; m < numSub; m++) {
+       fespaces[m] = new FiniteElementSpace(meshes[m], &fec);
+     }
+     int total_num_dofs = fespaces[0]->GetTrueVSize();
+     cout << "Number of unknowns in each subdomain: " << total_num_dofs << endl;
+
+     // Dirichlet BC on the first and the last meshes.
+     Array<Array<int> *> ess_attrs(numSub);
+     Array<Array<int> *> ess_tdof_lists(numSub);
+     for (int m = 0; m < numSub; m++) {
+       ess_attrs[m] = new Array<int>(2);
+       (*ess_attrs[m]) = 0;
+       if (m == 0) (*ess_attrs[m])[0] = 1;
+       if (m == numSub - 1) (*ess_attrs[m])[1] = 1;
+       ess_tdof_lists[m] = new Array<int>;
+
+       fespaces[m]->GetEssentialTrueDofs((*ess_attrs[m]), (*ess_tdof_lists[m]));
+     }
+
+     // 7. Define the solution x as a finite element grid function in fespace. Set
+     //    the initial guess to zero, which also sets the boundary conditions.
+     Array<GridFunction *> xs(numSub);
+     for (int m = 0; m < numSub; m++) {
+       xs[m] = new GridFunction(fespaces[m]);
+       (*xs[m]) = 0.0;
+     }
+     bdrAttr = 0;
+     bdrAttr[0] = 1;
+     xs[0]->ProjectBdrCoefficient(*bdrCoeffs[0], bdrAttr);
+     bdrAttr = 0;
+     bdrAttr[1] = 1;
+     xs[numSub-1]->ProjectBdrCoefficient(*bdrCoeffs[1], bdrAttr);
+
+     // 8. Set up the linear form b(.) corresponding to the right-hand side.
+     ConstantCoefficient one(1.0);
+     Array<LinearForm *> bs(numSub);
+     Array<BilinearForm *> as(numSub);
+     for (int m = 0; m < numSub; m++) {
+       bs[m] = new LinearForm(fespaces[m]);
+       bs[m]->AddDomainIntegrator(new DomainLFIntegrator(one));
+       bs[m]->Assemble();
+
+       as[m] = new BilinearForm(fespaces[m]);
+       as[m]->AddDomainIntegrator(new DiffusionIntegrator);
+       as[m]->Assemble();
+     }
+
+     // Set up interior penalty integrator.
+     double sigma = -1.0;
+     double kappa = 2.0;
+     InterfaceDGDiffusionIntegrator interface_integ(one, sigma, kappa);
+     Array<SparseMatrix *> blockMats(numSub * numSub);
+     for (int i = 0; i < numSub; i++) {
+       for (int j = 0; j < numSub; j++) {
+         // row major order.
+         int bidx = i * numSub + j;
+         if (i == j) {
+           blockMats[bidx] = &(as[i]->SpMat());
+         } else {
+           blockMats[bidx] = new SparseMatrix(fespaces[i]->GetTrueVSize(), fespaces[j]->GetTrueVSize());
+         }
+       }
+     }
+
+     // TODO: will need to loop over all interface boundary element pairs.
+     int skip_zeros = 1;
+     for (int m = 0; m < numSub - 1; m++) {
+       DenseMatrix elemmat;
+       FaceElementTransformations *tr1, *tr2;
+       const FiniteElement *fe1, *fe2;
+       Array<Array<int> *> vdofs(2);
+       vdofs[0] = new Array<int>;
+       vdofs[1] = new Array<int>;
+       tr1 = meshes[m]->GetBdrFaceTransformations(1);
+       tr2 = meshes[m+1]->GetBdrFaceTransformations(0);
+       if ((tr1 != NULL) && (tr2 != NULL))
+       {
+          fespaces[m]->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
+          fespaces[m+1]->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
+          // Both domains will have the adjacent element as Elem1.
+          fe1 = fespaces[m]->GetFE(tr1->Elem1No);
+          fe2 = fespaces[m+1]->GetFE(tr2->Elem1No);
+
+          interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmat);
+
+          DenseMatrix subelemmat;
+          Array<int> block_offsets(3);
+          block_offsets[0] = 0;
+          block_offsets[1] = fe1->GetDof();
+          block_offsets[2] = fe2->GetDof();
+          block_offsets.PartialSum();
+          for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+              elemmat.GetSubMatrix(block_offsets[i], block_offsets[i+1],
+                                   block_offsets[j], block_offsets[j+1], subelemmat);
+              blockMats[(m+i) * numSub + (m+j)]->AddSubMatrix(*vdofs[i], *vdofs[j], subelemmat, skip_zeros);
+            }
+          }
+       }
+     }
+
+     // Array<SparseMatrix *> As(numSub);
+     // DenseMatrix Ad;
+     // Vector B, X;
+     // // a.FormLinearSystem(boundary_dofs, x, b, A, X, B);
+     // a.FormLinearSystem(ess_tdof_list, x, b, A, X, B);
+
+     Array<SparseMatrix *> As(numSub);
+     Array<Vector *> Bs(numSub), Xs(numSub);
+     // TODO: higher dimension will need off-diagonal block matrix handling as well.
+     for (int i = 0; i < numSub; i++) {
+       As[i] = new SparseMatrix;
+       Bs[i] = new Vector;
+       Xs[i] = new Vector;
+       as[i]->FormLinearSystem(*ess_tdof_lists[i], *xs[i], *bs[i], *As[i], *Xs[i], *Bs[i]);
+     }
+
+     for (int i = 0; i < numSub; i++) {
+       for (int j = 0; j < numSub; j++) {
+         printf("Block matrix (%d, %d)", i, j);
+         // row major order.
+         int bidx = i * numSub + j;
+         DenseMatrix blockmat;
+         blockMats[bidx]->Finalize();
+         blockMats[bidx]->ToDenseMatrix(blockmat);
+         printf(": (%d x %d)\n", blockmat.Width(), blockmat.Height());
+
+         for (int h = 0; h < blockmat.Height(); h++) {
+           for (int w = 0; w < blockmat.Width(); w++) {
+             printf("%2.3f\t", blockmat(h, w));
+           }
+           printf("\n");
+         }
+       }
+     }
+
+     Array<int> block_offsets(numSub + 1); // number of subdomain + 1
+     block_offsets[0] = 0;
+     for (int i = 0; i < numSub; i++) {
+       block_offsets[i + 1] = fespaces[i]->GetTrueVSize();
+     }
+     block_offsets.PartialSum();
+
+     BlockOperator globalA(block_offsets);
+     for (int i = 0; i < numSub; i++) {
+       for (int j = 0; j < numSub; j++) {
+         // row major order.
+         int bidx = i * numSub + j;
+         globalA.SetBlock(i, j, blockMats[bidx]);
+       }
+     }
+
+     BlockVector globalX(block_offsets), globalRHS(block_offsets);
+     Vector R(block_offsets.Last());
+     R = 0.0;
+     for (int i = 0; i < numSub; i++) {
+       for (int n = block_offsets[i]; n < block_offsets[i + 1]; n++) {
+         R(n) = (*Bs[i])(n - block_offsets[i]);
+       }
+     }
+     globalRHS.Update(R, block_offsets);
+     for (int i = 0; i < block_offsets.Last(); i++) {
+       printf("RHS[%d] = %2.3f\n", i, globalRHS[i]);
+     }
+
+     int maxIter(1000);
+     double rtol(1.e-6);
+     double atol(1.e-10);
+
+     BlockDiagonalPreconditioner globalPrec(block_offsets);
+     GMRESSolver solver;
+     solver.SetAbsTol(atol);
+     solver.SetRelTol(rtol);
+     solver.SetMaxIter(maxIter);
+     solver.SetOperator(globalA);
+     solver.SetPreconditioner(globalPrec);
+     solver.SetPrintLevel(1);
+     globalX = 0.0;
+     solver.Mult(globalRHS, globalX);
+
+     for (int i = 0; i < block_offsets.Last(); i++) {
+       printf("xb[%d] = %2.3f\n", i, globalX[i]);
+     }
 
    } else if (dode_type_str == "feti") {
 

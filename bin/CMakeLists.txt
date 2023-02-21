@@ -1,6 +1,6 @@
-add_executable(main main.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+# add_executable(main main.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(poisson poisson.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(poisson_serial poisson_serial.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(poisson_1d poisson_1d.cpp $<TARGET_OBJECTS:scaleupROMObj>)
-add_executable(multidomain multidomain.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+# add_executable(multidomain multidomain.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(dode domain_decomposition.cpp $<TARGET_OBJECTS:scaleupROMObj>)

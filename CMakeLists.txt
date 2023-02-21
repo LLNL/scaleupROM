@@ -113,6 +113,9 @@ set(scaleupROMObj_SOURCES
   include/navier_solver.hpp
   src/navier_solver.cpp
 
+  include/interfaceinteg.hpp
+  src/interfaceinteg.cpp
+
 )
 
 add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})
