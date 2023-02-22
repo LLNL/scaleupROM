@@ -39,12 +39,17 @@ Ku = Ku / dx;
 uglobal = Kglobal \ bglobal(:);
 uglobal = reshape(uglobal,[Nx,Nsub]);
 figure(2)
-plot(xg, uglobal,'o-');
+plot(xg, uglobal,'o-','linewidth',1);
+set(gca,'fontsize',20,'ticklabelinterpreter','latex');
+xlabel('$x$','interpreter','latex');
+ylabel('$u(x)$','interpreter','latex');
+title('Interior Penalty FOM','interpreter','latex');
 
 %% Sample solutions
 Nsample = 100;
 
-ks = k1 * (1.0 + 0.6 * randn(Nsample,1));
+% ks = k1 * (1.0 + 0.6 * randn(Nsample,1));
+ks = k1 * (0.5 + 1.0 * rand(Nsample,1));
 offsets = 2.0 * pi / k1 * rand(Nsample,1);
 
 bs = zeros(Nx,Nsub,Nsample);
@@ -59,7 +64,7 @@ end
 %% LSPG with separate subdomain basis
 
 % POD over each subdomain
-Nbasis = 4;
+Nbasis = 6;
 
 Ublock = {};
 for k = 1:Nsub
@@ -85,16 +90,19 @@ w = KR \ bglobal(:);
 romU = reshape(P * w, [Nx, Nsub]);
 
 figure(3)
-plot(xg, fomU, 'r-', 'linewidth',3);
+plot(xg(:), fomU(:), 'r-', 'linewidth',3);
 hold on
-plot(xg, romU, 'bo-', 'linewidth', 1);
+plot(xg(:), romU(:), 'bo-', 'linewidth', 1);
 hold off
 title(strcat('$k = ',num2str(k2),'$'),'interpreter','latex');
+set(gca,'fontsize',20,'ticklabelinterpreter','latex');
+h=legend('FOM','ROM');
+set(h,'interpreter','latex');
 
 %% LSPG with unified subdomain basis
 
 % POD over each subdomain
-Nbasis = 5;
+Nbasis = 6;
 
 us_unified = reshape(us,[Nx,Nsub*Nsample]);
 us_mean = repmat(mean(us_unified,2),1,Nsub*Nsample);
@@ -112,8 +120,8 @@ end
 P = blkdiag(Ublock{:});
 
 % Produce a random FOM
-k2 = k1 * (1.0 + 0.6 * randn());
-offset2 = 2.0 * pi / k1 * rand();
+% k2 = k1 * (1.0 + 0.6 * randn());
+% offset2 = 2.0 * pi / k1 * rand();
 
 b2 = sinRHS(xg, dx, k2, offset2);
 [Kglobal, bglobal] = buildGlobalWithBdry(Ku, b2, bdr, dx, gamma);
@@ -124,12 +132,15 @@ KR = Kglobal * P;
 w = KR \ bglobal(:);
 romU = reshape(P * w, [Nx, Nsub]);
 
-figure(3)
-plot(xg, fomU, 'r-', 'linewidth',3);
+figure(4)
+plot(xg(:), fomU(:), 'r-', 'linewidth',3);
 hold on
-plot(xg, romU, 'bo-', 'linewidth', 1);
+plot(xg(:), romU(:), 'bo-', 'linewidth', 1);
 hold off
 title(strcat('$k = ',num2str(k2),'$'),'interpreter','latex');
+set(gca,'fontsize',20,'ticklabelinterpreter','latex');
+h=legend('FOM','ROM');
+set(h,'interpreter','latex');
 
 
 %% auxiliary functions

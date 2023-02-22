@@ -41,7 +41,11 @@ bglobal = [bk; zeros(Nsub-1,1)];
 uglobal = Kglobal \ bglobal;
 uglobal = reshape(uglobal(1:end-(Nsub-1)),[Nx,Nsub]);
 figure(2)
-plot(xg, uglobal,'o-');
+plot(xg, uglobal,'o-','linewidth',1);
+set(gca,'fontsize',20,'ticklabelinterpreter','latex');
+xlabel('$x$','interpreter','latex');
+ylabel('$u(x)$','interpreter','latex');
+title('FETI FOM','interpreter','latex');
 
 %% Sample solutions
 Nsample = 100;
@@ -64,7 +68,7 @@ end
 %% LSPG with separate subdomain basis, without interface
 
 % POD over each subdomain
-Nbasis = 4;
+Nbasis = 5;
 
 Ublock = {};
 for k = 1:Nsub
@@ -75,10 +79,10 @@ end
 P = blkdiag(Ublock{:});
 
 % Produce a random FOM
-% k2 = k1 * (1.0 + 0.6 * randn());
-% offset2 = 2.0 * pi / k1 * rand();
-k2 = 20.0;
-offset2 = 0.5;
+k2 = k1 * (1.0 + 0.6 * randn());
+offset2 = 2.0 * pi / k1 * rand();
+% k2 = 20.0;
+% offset2 = 0.5;
 
 b2 = sinRHS(xg, dx, k2, offset2);
 [Kk, bk, A] = buildGlobalWithBdry(Ku, b2, bdr, dx);
@@ -94,11 +98,14 @@ w = KR \ bglobal;
 romU = reshape(P * w(1:end-(Nsub-1)), [Nx, Nsub]);
 
 figure(3)
-plot(xg, fomU, 'r-', 'linewidth',3);
+plot(xg(:), fomU(:), 'r-', 'linewidth',3);
 hold on
-plot(xg, romU, 'bo-', 'linewidth', 1);
+plot(xg(:), romU(:), 'bo-', 'linewidth', 1);
 hold off
 title(strcat('$k = ',num2str(k2),'$'),'interpreter','latex');
+set(gca,'fontsize',20,'ticklabelinterpreter','latex');
+h=legend('FOM','ROM');
+set(h,'interpreter','latex');
 
 %% LSPG with unified subdomain basis
 
@@ -121,25 +128,33 @@ end
 P = blkdiag(Ublock{:});
 
 % Produce a random FOM
-k2 = k1 * (1.0 + 0.3 * randn());
-offset2 = 2.0 * pi / k1 * rand();
+% k2 = k1 * (1.0 + 0.6 * randn());
+% offset2 = 2.0 * pi / k1 * rand();
+% k2 = 20.0;
+% offset2 = 0.5;
 
 b2 = sinRHS(xg, dx, k2, offset2);
-[Kglobal, bglobal] = buildGlobalWithBdry(Ku, b2, bdr, dx, gamma);
-fomU = reshape(Kglobal \ bglobal(:), [Nx, Nsub]);
+[Kk, bk, A] = buildGlobalWithBdry(Ku, b2, bdr, dx);
+Kglobal = sparse([Kk A;A' zeros(Nsub-1,Nsub-1)]);
+bglobal = [bk; zeros(Nsub-1,1)];
+
+fomU = Kglobal \ bglobal;
+fomU = reshape(fomU(1:end-(Nsub-1)), [Nx, Nsub]);
 
 % LSPG projection
-KR = Kglobal * P;
-w = KR \ bglobal(:);
-romU = reshape(P * w, [Nx, Nsub]);
+KR = sparse([Kk * P A; A' * P zeros(Nsub-1,Nsub-1)]);
+w = KR \ bglobal;
+romU = reshape(P * w(1:end-(Nsub-1)), [Nx, Nsub]);
 
-figure(3)
-plot(xg, fomU, 'r-', 'linewidth',3);
+figure(4)
+plot(xg(:), fomU(:), 'r-', 'linewidth',3);
 hold on
-plot(xg, romU, 'bo-', 'linewidth', 1);
+plot(xg(:), romU(:), 'bo-', 'linewidth', 1);
 hold off
 title(strcat('$k = ',num2str(k2),'$'),'interpreter','latex');
-
+set(gca,'fontsize',20,'ticklabelinterpreter','latex');
+h=legend('FOM','ROM');
+set(h,'interpreter','latex');
 
 %% auxiliary functions
 
@@ -191,6 +206,6 @@ A = zeros(Nx*numBlocks,numBlocks-1);
 for k = 1:numBlocks-1
     A(k*Nx:k*Nx+1,k) = Ai;
 end
-A = A / dxi;
+% A = A / dxi;
 
 end
