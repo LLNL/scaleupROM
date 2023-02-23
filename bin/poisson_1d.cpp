@@ -28,12 +28,16 @@ int main(int argc, char *argv[])
 
    // 2. Parse command line options.
    const char *mesh_file = "../data/star.mesh";
-   const char *dode_type = "feti";
+   const char *dode_type = "no-dd";
    int order = 1;
+   double sigma = -1.0;
+   double kappa = 2.0;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&order, "-o", "--order", "Finite element polynomial degree");
+   args.AddOption(&sigma, "-s", "--sigma", "DG penalty parameter");
+   args.AddOption(&kappa, "-k", "--kappa", "DG penalty parameter");
    args.AddOption(&dode_type, "-d", "--domain-decomposition", "Domain decomposition type: feti, ddlspg, ip.");
    args.ParseCheck();
 
@@ -63,8 +67,8 @@ int main(int argc, char *argv[])
    // this array of integer essentially acts as the array of boolean:
    // If value is 0, then it is not Dirichlet.
    // If value is 1, then it is Dirichlet.
-   ess_attr = 1;
-   // ess_attr[1] = 0;
+   ess_attr = 0;
+  //  ess_attr[0] = 0;
    Array<int> ess_tdof_list;
    fespace.GetEssentialTrueDofs(ess_attr, ess_tdof_list);
    printf("Essential dofs\n");
@@ -93,15 +97,27 @@ int main(int argc, char *argv[])
      x.ProjectBdrCoefficient(*bdrCoeffs[b], bdrAttr);
    }
 
+   // boundary markers for each boundary attribute.
+   Array<Array<int> *> bdr_markers(mesh.bdr_attributes.Max());
+   for (int b = 0; b < bdr_markers.Size(); b++) {
+     bdr_markers[b] = new Array<int>(mesh.bdr_attributes.Max());
+     (*bdr_markers[b]) = 0;
+     (*bdr_markers[b])[b] = 1;
+   }
+
    // 8. Set up the linear form b(.) corresponding to the right-hand side.
    ConstantCoefficient one(1.0);
    LinearForm b(&fespace);
    b.AddDomainIntegrator(new DomainLFIntegrator(one));
+   b.AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[0], one, sigma, kappa), *bdr_markers[0]);
+   b.AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[1], one, sigma, kappa), *bdr_markers[1]);
    b.Assemble();
 
    // 9. Set up the bilinear form a(.,.) corresponding to the -Delta operator.
    BilinearForm a(&fespace);
    a.AddDomainIntegrator(new DiffusionIntegrator);
+   a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[0]);
+   a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[1]);
    a.Assemble();
 
    // 10. Form the linear system A X = B. This includes eliminating boundary
@@ -144,7 +160,8 @@ int main(int argc, char *argv[])
 
    // 9. Solve the system using PCG with symmetric Gauss-Seidel preconditioner.
    GSSmoother M(A);
-   PCG(A, M, B, X, 1, 200, 1e-12, 0.0);
+  //  PCG(A, M, B, X, 1, 200, 1e-12, 0.0);
+   GMRES(A, M, B, X, 1, 500, 10, 1e-12, 0.0);
 
    // 12. Recover the solution x as a grid function and save to file. The output
    //     can be viewed using GLVis as follows: "glvis -np <np> -m mesh -g sol"
@@ -412,10 +429,6 @@ int main(int argc, char *argv[])
        fespaces[m]->GetEssentialTrueDofs((*ess_attrs[m]), (*ess_tdof_lists[m]));
      }
 
-     Array<Array<int> *> bdr_markers(2);
-     bdr_markers[0] = new Array<int>({1, 0});
-     bdr_markers[1] = new Array<int>({0, 1});
-
      // 7. Define the solution x as a finite element grid function in fespace. Set
      //    the initial guess to zero, which also sets the boundary conditions.
      Array<GridFunction *> xs(numSub);
@@ -430,8 +443,6 @@ int main(int argc, char *argv[])
 
      // 8. Set up the linear form b(.) corresponding to the right-hand side.
      ConstantCoefficient one(1.0);
-     double sigma = -1.0;
-     double kappa = 2.0;
 
      Array<LinearForm *> bs(numSub);
      Array<BilinearForm *> as(numSub);
@@ -747,6 +758,8 @@ int main(int argc, char *argv[])
        printf("xb[%d] = %2.3f\n", i, XB[i]);
      }
 
+   } else if (dode_type_str == "no-dd") {
+     printf("No domain decomposition.\n");
    } else {
      printf("Unknown domain decomposition type: %s!\n", dode_type);
      exit(1);
