@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 
    // 2. Parse command line options.
    const char *mesh_file = "../data/star.mesh";
-   const char *dode_type = "ip";
+   const char *dode_type = "no-dd";
    int order = 1;
    bool printFOMMat = false;
 
@@ -104,7 +104,8 @@ int main(int argc, char *argv[])
    // If value is 0, then it is not Dirichlet.
    // If value is 1, then it is Dirichlet.
    ess_attr = 0;
-   // ess_attr[2] = 0;
+  //  ess_attr[0] = 0;
+   ess_attr[2] = 0;
    // ess_attr[3] = 0;
    Array<int> ess_tdof_list;
    fespace.GetEssentialTrueDofs(ess_attr, ess_tdof_list);
@@ -138,9 +139,9 @@ int main(int argc, char *argv[])
    }
 
    // boundary markers for each boundary attribute.
-   Array<Array<int> *> bdr_markers(meshes[0]->bdr_attributes.Max());
+   Array<Array<int> *> bdr_markers(mesh.bdr_attributes.Max());
    for (int b = 0; b < bdr_markers.Size(); b++) {
-     bdr_markers[b] = new Array<int>(meshes[0]->bdr_attributes.Max());
+     bdr_markers[b] = new Array<int>(mesh.bdr_attributes.Max());
      (*bdr_markers[b]) = 0;
      (*bdr_markers[b])[b] = 1;
    }
@@ -148,16 +149,20 @@ int main(int argc, char *argv[])
    // 8. Set up the linear form b(.) corresponding to the right-hand side.
    ConstantCoefficient one(1.0);
    double sigma = -1.0;
-   double kappa = 2.0;
+   double kappa = (order + 1) * (order + 1);
    LinearForm b(&fespace);
    b.AddDomainIntegrator(new DomainLFIntegrator(one));
    b.AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[0], one, sigma, kappa), *bdr_markers[0]);
-   as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[0]);
+   b.AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[1], one, sigma, kappa), *bdr_markers[1]);
+   b.AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[3], one, sigma, kappa), *bdr_markers[3]);
    b.Assemble();
 
    // 9. Set up the bilinear form a(.,.) corresponding to the -Delta operator.
    BilinearForm a(&fespace);
    a.AddDomainIntegrator(new DiffusionIntegrator);
+   a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[0]);
+   a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[1]);
+   a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[3]);
    a.Assemble();
 
    // 10. Form the linear system A X = B. This includes eliminating boundary
@@ -296,8 +301,6 @@ int main(int argc, char *argv[])
      }
 
      // 8. Set up the linear form b(.) corresponding to the right-hand side.
-     double sigma = -1.0;
-     double kappa = 2.0;
      Array<LinearForm *> bs(numSub);
      Array<BilinearForm *> as(numSub);
      for (int m = 0; m < numSub; m++) {
@@ -323,7 +326,7 @@ int main(int argc, char *argv[])
        bs[m]->Assemble();
        as[m]->Assemble();
      }
-
+     
      // Set up interior penalty integrator.
      InterfaceDGDiffusionIntegrator interface_integ(one, sigma, kappa);
      Array<SparseMatrix *> blockMats(numSub * numSub);
@@ -479,6 +482,8 @@ int main(int argc, char *argv[])
        paraviewColl->Save();
      }
 
+   } else if (dode_type_str == "no-dd") {
+     printf("No domain decomposition.\n");
    } else {
      printf("Unknown domain decomposition type: %s!\n", dode_type);
      exit(1);
