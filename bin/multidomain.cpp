@@ -86,8 +86,9 @@ int main(int argc, char *argv[])
       printf("submesh nfaces: %d\n", nfaces);
    }
 
-   int interface_attributes[numSub][numSub];
-   for (int i = 0; i < numSub; i++) for (int j = 0; j < numSub; j++) interface_attributes[i][j] = -1;
+   Array2D<int> interface_attributes(numSub, numSub);
+   interface_attributes = -1;
+   // for (int i = 0; i < numSub; i++) for (int j = 0; j < numSub; j++) interface_attributes[i][j] = -1;
 
    // interface attribute starts after the parent mesh boundary attributes.
    Array<InterfaceInfo> interface_infos(0);
