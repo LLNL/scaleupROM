@@ -12,6 +12,7 @@
 #include "mfem.hpp"
 #include <fstream>
 #include <iostream>
+// #include "multiblock_nonlinearform.hpp"
 
 using namespace mfem;
 
@@ -23,6 +24,9 @@ struct InterfaceInfo {
    int Attr;
    int Mesh1, Mesh2;
    int BE1, BE2;
+
+   // Inf = 64 * LocalFaceIndex + FaceOrientation
+   int Inf1, Inf2;
 };
 
 int main(int argc, char *argv[])
@@ -70,6 +74,11 @@ int main(int argc, char *argv[])
       BuildSubMeshBoundary2D(mesh, *submeshes[k], parent_face_map_2d[k]);
    }
 
+   Array<Array<int> *> parent_el_map(numSub);
+   for (int k = 0; k < numSub; k++) {
+      parent_el_map[k] = new Array<int>(submeshes[k]->GetParentElementIDMap());
+   }
+
    for (int i = 0; i < numSub; i++) {
       printf("Submesh %d\n", i);
       for (int k = 0; k < submeshes[i]->GetNBE(); k++) {
@@ -88,11 +97,10 @@ int main(int argc, char *argv[])
 
    Array2D<int> interface_attributes(numSub, numSub);
    interface_attributes = -1;
-   // for (int i = 0; i < numSub; i++) for (int j = 0; j < numSub; j++) interface_attributes[i][j] = -1;
-
    // interface attribute starts after the parent mesh boundary attributes.
-   Array<InterfaceInfo> interface_infos(0);
    int if_attr = mesh.bdr_attributes.Max() + 1;
+   Array<InterfaceInfo> interface_infos(0);
+   
    for (int i = 0; i < numSub; i++) {
       // printf("Submesh %d\n", i);
       for (int ib = 0; ib < submeshes[i]->GetNBE(); ib++) {
@@ -109,6 +117,41 @@ int main(int argc, char *argv[])
                      interface_attributes[i][j] = if_attr;
                      if_attr += 1;
                   }
+                  
+                  Array<int> Infs(2);
+                  {
+                     Mesh::FaceInformation face_info = mesh.GetFaceInformation(parent_face_i);
+                     
+                     int face_inf[2];
+                     mesh.GetFaceInfos(parent_face_i, &face_inf[0], &face_inf[1]);
+                     int eli, eli_info;
+                     submeshes[i]->GetBdrElementAdjacentElement(ib, eli, eli_info);
+                     eli = (*parent_el_map[i])[eli];
+                     int elj, elj_info;
+                     submeshes[j]->GetBdrElementAdjacentElement(jb, elj, elj_info);
+                     elj = (*parent_el_map[j])[elj];
+
+                     if (eli == face_info.element[0].index) {
+                        Infs[0] = face_inf[0];
+                        Infs[1] = face_inf[1];
+                     } else {
+                        Infs[0] = face_inf[1];
+                        Infs[1] = face_inf[0];
+                     }
+
+                     printf("pf %d\tel1\tel2\n", parent_face_i);
+                     printf("pm\t%d\t%d\n", face_info.element[0].index, face_info.element[1].index);
+                     printf("sm\t%d\t%d\n", eli, elj);
+                     printf("\n");
+                     printf("el1\tid\tori\n");
+                     printf("pm\t%d\t%d\n", face_info.element[0].local_face_id, face_info.element[0].orientation);
+                     printf("sm\t%d\t%d\n", eli_info / 64, eli_info % 64);
+                     printf("\n");
+                     printf("el2\tid\tori\n");
+                     printf("pm\t%d\t%d\n", face_info.element[1].local_face_id, face_info.element[1].orientation);
+                     printf("sm\t%d\t%d\n", elj_info / 64, elj_info % 64);
+                     printf("\n");
+                  }
 
                   submeshes[i]->SetBdrAttribute(ib, interface_attributes[i][j]);
                   submeshes[j]->SetBdrAttribute(jb, interface_attributes[i][j]);
@@ -117,7 +160,8 @@ int main(int argc, char *argv[])
                   // we limit to single-attribute case where attribute = index + 1;
                   interface_infos.Append(InterfaceInfo({.Attr = interface_attributes[i][j],
                                                         .Mesh1 = i, .Mesh2 = j,
-                                                        .BE1 = ib, .BE2 = jb}));
+                                                        .BE1 = ib, .BE2 = jb,
+                                                        .Inf1 = Infs[0], .Inf2 = Infs[1]}));
                }
             }
          }
