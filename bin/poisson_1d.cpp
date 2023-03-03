@@ -20,6 +20,8 @@
 using namespace std;
 using namespace mfem;
 
+void shiftMesh(const Vector &, Vector &);
+
 int main(int argc, char *argv[])
 {
    // // 1. Initialize MPI and HYPRE.
@@ -179,7 +181,7 @@ int main(int argc, char *argv[])
 
    // Save visualization in paraview output.
    ParaViewDataCollection *paraviewColl = NULL;
-   paraviewColl = new ParaViewDataCollection("paraview_output", &mesh);
+   paraviewColl = new ParaViewDataCollection("paraview_output_1d", &mesh);
    paraviewColl->SetLevelsOfDetail(order);
    paraviewColl->SetHighOrderOutput(true);
    paraviewColl->SetPrecision(8);
@@ -399,8 +401,10 @@ int main(int argc, char *argv[])
      int numSub = globalNE / subNE;
 
      std::vector<Mesh *> meshes(numSub);
-     for (int m = 0; m < meshes.size(); m++) {
-       meshes[m] = new Mesh(submesh);
+     meshes[0] = new Mesh(submesh);
+     for (int m = 1; m < meshes.size(); m++) {
+       meshes[m] = new Mesh(*meshes[m - 1]);
+       meshes[m]->Transform(&shiftMesh);
      }
 
      H1_FECollection fec(order, submesh.Dimension());
@@ -603,6 +607,23 @@ int main(int argc, char *argv[])
        printf("xb[%d] = %2.3f\n", i, globalX[i]);
      }
 
+     // Save visualization in paraview output.
+     for (int m = 0; m < numSub; m++) {
+       ostringstream oss;
+       oss << "paraview_output_1d_" << std::to_string(m);
+
+       ParaViewDataCollection *paraviewColl = NULL;
+       paraviewColl = new ParaViewDataCollection(oss.str().c_str(), meshes[m]);
+       paraviewColl->SetLevelsOfDetail(order);
+       paraviewColl->SetHighOrderOutput(true);
+       paraviewColl->SetPrecision(8);
+
+       *xs[m] = globalX.GetBlock(m);
+       paraviewColl->RegisterField("solution", xs[m]);
+       paraviewColl->SetOwnData(true);
+       paraviewColl->Save();
+     }
+
    } else if (dode_type_str == "feti") {
 
      //Now solve with FETI method for two subdomains.
@@ -767,4 +788,11 @@ int main(int argc, char *argv[])
 
 
    return 0;
+}
+
+void shiftMesh(const Vector &x, Vector &y)
+{
+  y.SetSize(x.Size());
+  y = x;
+  y(0) += 0.5;
 }
