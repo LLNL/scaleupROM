@@ -14,6 +14,7 @@
 
 #include "mfem.hpp"
 #include "interfaceinteg.hpp"
+// #include "multiblock_solver.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -73,7 +74,8 @@ int main(int argc, char *argv[])
   x = 0.0;
 
   // add dirichlet boundary condition.
-  Coefficient *bdrCoeffs[mesh.bdr_attributes.Max()];
+  // Coefficient *bdrCoeffs[mesh.bdr_attributes.Max()];
+  Array<Coefficient *> bdrCoeffs(mesh.bdr_attributes.Max());
   bdrCoeffs[0] = new ConstantCoefficient(0.0);
   bdrCoeffs[1] = new FunctionCoefficient(dbc1);
   // bdrCoeffs[1] = new ConstantCoefficient(2.0);
@@ -206,6 +208,20 @@ int main(int argc, char *argv[])
     exit(1);
   } else if (dode_type_str == "ip") {
     printf("Solving with Interior Penalty method.\n");
+
+    // MultiBlockSolver test(argc, argv);
+    // {
+    //   test.SetupBoundaryConditions(bdrCoeffs);
+
+    //   test.InitVariables();
+    //   test.InitVisualization();
+
+    //   test.BuildOperators();
+
+    //   test.SetupBCOperators();
+
+    //   test.Assemble();
+    // }
 
     DG_FECollection fec(order, mesh.Dimension());
 
@@ -429,7 +445,8 @@ int main(int argc, char *argv[])
 
       as[m] = new BilinearForm(fespaces[m]);
       as[m]->AddDomainIntegrator(new DiffusionIntegrator);
-      as[m]->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa));
+      // as[m]->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa));
+      as[m]->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
 
   printf("submesh boundaries: ");
   for (int k = 0; k < meshes[m]->bdr_attributes.Size(); k++) printf("%d\t", meshes[m]->bdr_attributes[k]);
@@ -444,8 +461,10 @@ int main(int argc, char *argv[])
   // printf("boundary %d\n", mesh.bdr_attributes[b]);
   // for (int k = 0; k < bdr_markers.Last()->Size(); k++) printf("bdr marker[%d] = %d\n", k, (*(bdr_markers.Last()))[k]);
 
-      bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[b], one, sigma, kappa), *bdr_markers[b]);
-      as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[b]);
+      // bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[b], one, sigma, kappa), *bdr_markers[b]);
+      // as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), *bdr_markers[b]);
+      bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdrCoeffs[b], sigma, kappa), *bdr_markers[b]);
+      as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), *bdr_markers[b]);
       }
 
     //  // Bottom boundary condition for all subdomains.
@@ -466,7 +485,8 @@ int main(int argc, char *argv[])
     }
 
     // Set up interior penalty integrator.
-    InterfaceDGDiffusionIntegrator interface_integ(one, sigma, kappa);
+    // InterfaceDGDiffusionIntegrator interface_integ(one, sigma, kappa);
+    InterfaceDGDiffusionIntegrator interface_integ(sigma, kappa);
     Array2D<SparseMatrix *> blockMats(numSub, numSub);
     for (int i = 0; i < numSub; i++) {
       for (int j = 0; j < numSub; j++) {
@@ -564,6 +584,7 @@ int main(int argc, char *argv[])
       // We cannot write a function that replaces this, since only Mesh can access to FaceElemTr.SetConfigurationMask.
       tr1 = mesh1->GetBdrFaceTransformations(interface_infos[bn].BE1);
       tr2 = mesh2->GetBdrFaceTransformations(interface_infos[bn].BE2);
+
       // Correcting the local face transformation if orientation needs correction.
       {
         int faceInf1, faceInf2;
@@ -720,6 +741,26 @@ int main(int argc, char *argv[])
         printf("%.3f\n", (*Bs[m])[k]);
       }
     }
+
+    // printf("From MultiBlock Solver.\n");
+    // for (int i = 0; i < numSub; i++) {
+    //   for (int j = 0; j < numSub; j++) {
+    //     DenseMatrix tmp;
+    //     test.mats(i, j)->ToDenseMatrix(tmp);
+    //     printf("Block[%d, %d] = (%d x %d) \n", i, j, tmp.Height(), tmp.Width());
+    //     for (int k = 0; k < tmp.Height(); k++) {
+    //       for (int l = 0; l < tmp.Width(); l++) {
+    //         printf("%.3f\t", tmp(k,l));
+    //       }
+    //       printf("\n");
+    //     }
+    //   }
+    // }
+
+    // printf("b.\n");
+    // for (int k = 0; k < test.RHS->Size(); k++) {
+    //   printf("%.3f\n", (*(test.RHS))[k]);
+    // }
   }
 
     BlockOperator globalA(block_offsets);

@@ -112,7 +112,7 @@ MultiBlockSolver::~MultiBlockSolver()
       delete paraviewColls[m];
       delete bs[m];
       delete as[m];
-      // delete us[m];
+      delete us[m];
       // shared ptr cannot be deleted?
       // delete meshes[m];
       delete parent_elem_map[m];
@@ -466,13 +466,6 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
       fes1 = fes[midx[0]];
       fes2 = fes[midx[1]];
 
-      // Mesh sets face element transformation based on the face_info.
-      // For boundary face, the adjacent element is always on element 1, and its orientation is "by convention" always zero.
-      // This is a problem for the interface between two meshes, where both element orientations are zero.
-      // At least one element should reflect a relative orientation with respect to the other.
-      // Currently this is done by hijacking global mesh face information in the beginning.
-      // If we would want to do more flexible global mesh building, e.g. rotating component submeshes,
-      // then we will need to figure out how to actually determine relative orientation.
       GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
 
       if ((tr1 != NULL) && (tr2 != NULL))
@@ -508,7 +501,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
 }
 
 void MultiBlockSolver::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
-                                                   FaceElementTransformations *tr1, FaceElementTransformations *tr2)
+                                                   FaceElementTransformations* &tr1, FaceElementTransformations* &tr2)
 {
    // We cannot write a function that replaces this, since only Mesh can access to FaceElemTr.SetConfigurationMask.
    tr1 = m1->GetBdrFaceTransformations(if_info->BE1);
@@ -582,7 +575,7 @@ void MultiBlockSolver::InitVisualization()
       paraviewColls[m]->SetPrecision(8);
 
       paraviewColls[m]->RegisterField("solution", us[m]);
-      paraviewColls[m]->SetOwnData(true);
+      paraviewColls[m]->SetOwnData(false);
    }
 }
 

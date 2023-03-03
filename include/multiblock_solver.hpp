@@ -135,8 +135,15 @@ public:
    // For bilinear case.
    void AssembleInterfaceMatrix();
 
+   // Mesh sets face element transformation based on the face_info.
+   // For boundary face, the adjacent element is always on element 1, and its orientation is "by convention" always zero.
+   // This is a problem for the interface between two meshes, where both element orientations are zero.
+   // At least one element should reflect a relative orientation with respect to the other.
+   // Currently this is done by hijacking global mesh face information in the beginning.
+   // If we would want to do more flexible global mesh building, e.g. rotating component submeshes,
+   // then we will need to figure out how to actually determine relative orientation.
    void GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
-                                    FaceElementTransformations *tr1, FaceElementTransformations *tr2);
+                                    FaceElementTransformations* &tr1, FaceElementTransformations* &tr2);
 
    void Solve();
 
