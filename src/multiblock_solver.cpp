@@ -25,17 +25,18 @@ MultiBlockSolver::MultiBlockSolver(int argc, char *argv[])
    const char *mesh_file = "../data/star.mesh";
    const char *dode_type = "no-dd";
    int order_ = 1;
-   bool printFOMMat = false;
+   bool full_dg_ = false;
 
    // TODO: replace with yaml input parser.
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&order_, "-o", "--order", "Finite element polynomial degree");
    args.AddOption(&dode_type, "-d", "--domain-decomposition", "Domain decomposition type: feti, ddlspg, ip.");
-   args.AddOption(&printFOMMat, "-p", "--print-fom", "-np", "--no-print-fom", "Print FOM matrix.");
+   args.AddOption(&full_dg_, "-dg", "--full-dg", "-ndg", "--no-full-dg", "Full DG discretization.");
    args.ParseCheck();
 
    order = order_;
+   full_dg = full_dg_;
    sigma = -1.0;
    kappa = (order + 1) * (order + 1);
 
