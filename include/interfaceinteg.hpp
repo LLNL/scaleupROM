@@ -18,23 +18,37 @@
 namespace mfem
 {
 
-class InterfaceBilinearFormIntegrator : public BilinearFormIntegrator
+class InterfaceNonlinearFormIntegrator : public NonlinearFormIntegrator
 {
 protected:
-  InterfaceBilinearFormIntegrator(const IntegrationRule *ir = NULL)
-      : BilinearFormIntegrator(ir) {}
+  InterfaceNonlinearFormIntegrator(const IntegrationRule *ir = NULL)
+      : NonlinearFormIntegrator(ir) {}
 public:
-  // FaceElementTransformations belongs to one mesh (having mesh pointer).
-  // In order to extract element/transformation from each mesh,
-  // two FaceElementTransformations are needed.
-  virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
+   // FaceElementTransformations belongs to one mesh (having mesh pointer).
+   // In order to extract element/transformation from each mesh,
+   // two FaceElementTransformations are needed.
+   virtual void AssembleInterfaceVector(const FiniteElement &el1,
+                                       const FiniteElement &el2,
+                                       FaceElementTransformations &Tr1,
+                                       FaceElementTransformations &Tr2,
+                                       const Vector &elfun, Vector &elvect);
+
+   /// @brief Assemble the local action of the gradient of the
+   /// NonlinearFormIntegrator resulting from a face integral term.
+   virtual void AssembleInterfaceGrad(const FiniteElement &el1,
+                                      const FiniteElement &el2,
+                                      FaceElementTransformations &Tr1,
+                                      FaceElementTransformations &Tr2,
+                                      const Vector &elfun, DenseMatrix &elmat);
+
+   virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
                                        const FiniteElement &el2,
                                        FaceElementTransformations &Trans1,
                                        FaceElementTransformations &Trans2,
                                        DenseMatrix &elmat);
 };
 
-class InterfaceDGDiffusionIntegrator : public InterfaceBilinearFormIntegrator
+class InterfaceDGDiffusionIntegrator : public InterfaceNonlinearFormIntegrator
 {
 protected:
   Coefficient *Q;
@@ -53,14 +67,13 @@ public:
       : Q(&q), MQ(NULL), sigma(s), kappa(k) { }
    InterfaceDGDiffusionIntegrator(MatrixCoefficient &q, const double s, const double k)
       : Q(NULL), MQ(&q), sigma(s), kappa(k) { }
-   using InterfaceBilinearFormIntegrator::AssembleInterfaceMatrix;
+
    virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
                                         const FiniteElement &el2,
                                         FaceElementTransformations &Trans1,
                                         FaceElementTransformations &Trans2,
                                         DenseMatrix &elmat);
 };
-
 
 } // namespace mfem
 

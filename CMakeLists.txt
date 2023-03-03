@@ -116,6 +116,15 @@ set(scaleupROMObj_SOURCES
   include/interfaceinteg.hpp
   src/interfaceinteg.cpp
 
+  # include/multiblock_nonlinearform.hpp
+  # src/multiblock_nonlinearform.cpp
+
+  # include/multiblock_bilinearform.hpp
+  # src/multiblock_bilinearform.cpp
+
+  include/multiblock_solver.hpp
+  src/multiblock_solver.cpp
+
 )
 
 add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})

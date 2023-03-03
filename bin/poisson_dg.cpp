@@ -14,7 +14,6 @@
 
 #include "mfem.hpp"
 #include "interfaceinteg.hpp"
-#include "multiblock_nonlinearform.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -379,8 +378,6 @@ int main(int argc, char *argv[])
       ess_tdof_lists[m] = new Array<int>;
       fespaces[m]->GetEssentialTrueDofs((*ess_attrs[m]), (*ess_tdof_lists[m]));
     }
-
-    MultiBlockNonlinearForm test(fespaces);
 
     Array<int> block_offsets(numSub + 1); // number of subdomain + 1
     block_offsets[0] = 0;

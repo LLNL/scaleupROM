@@ -20,22 +20,39 @@ using namespace std;
 namespace mfem
 {
 
-void InterfaceBilinearFormIntegrator::AssembleInterfaceMatrix(
+void InterfaceNonlinearFormIntegrator::AssembleInterfaceVector(
+  const FiniteElement &el1, const FiniteElement &el2,
+  FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+  const Vector &elfun, Vector &elvect)
+{
+   mfem_error("InterfaceNonlinearFormIntegrator::AssembleInterfaceVector\n"
+             "   is not implemented for this class.");
+}
+
+void InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad(
+  const FiniteElement &el1, const FiniteElement &el2,
+  FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+  const Vector &elfun, DenseMatrix &elmat)
+{
+   mfem_error("InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad\n"
+             "   is not implemented for this class.");
+}
+
+void InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix(
   const FiniteElement &el1, const FiniteElement &el2,
   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
   DenseMatrix &elmat)
 {
-  mfem_error("InterfaceBilinearFormIntegrator::AssembleFaceMatrix\n"
+   mfem_error("InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad\n"
              "   is not implemented for this class.");
 }
-
 
 void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
   const FiniteElement &el1, const FiniteElement &el2,
   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
   DenseMatrix &elmat)
 {
-  bool boundary = false;
+   bool boundary = false;
 
    int dim, ndof1, ndof2, ndofs;
    bool kappa_is_nonzero = (kappa != 0.);
@@ -101,6 +118,7 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
    for (int p = 0; p < ir->GetNPoints(); p++)
    {
       const IntegrationPoint &ip = ir->IntPoint(p);
+      // printf("ip\t%.3f\t%.3f\t%.3f\n", ip.x, ip.y, ip.z);
 
       // Set the integration point in the face and the neighboring elements
       Trans1.SetAllIntPoints(&ip);
@@ -110,29 +128,20 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
       // Note: eip1 and eip2 come from Element1 of Trans1 and Trans2 respectively.
       const IntegrationPoint &eip1 = Trans1.GetElement1IntPoint();
       const IntegrationPoint &eip2 = Trans2.GetElement1IntPoint();
+      // printf("\tx\ty\tz\n");
+      // printf("eip1\t%.3f\t%.3f\t%.3f\n", eip1.x, eip1.y, eip1.z);
+      // printf("eip2\t%.3f\t%.3f\t%.3f\n", eip2.x, eip2.y, eip2.z);
 
       // computing outward normal vectors.
       if (dim == 1)
       {
          nor(0) = 2*eip1.x - 1.0;
          nor2(0) = 2*eip2.x - 1.0;
-         printf("nor1: %f, nor2: %f\n", nor(0), nor2(0));
       }
       else
       {
          CalcOrtho(Trans1.Jacobian(), nor);
          CalcOrtho(Trans2.Jacobian(), nor2);
-         printf("nor1: ");
-         for (int d = 0; d < dim; d++) {
-           printf("%f\t", nor(d));
-         }
-         printf("\n");
-
-         printf("nor2: ");
-         for (int d = 0; d < dim; d++) {
-           printf("%f\t", nor2(d));
-         }
-         printf("\n");
       }
 
       el1.CalcShape(eip1, shape1);
