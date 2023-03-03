@@ -135,6 +135,7 @@ add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})
 #   PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
 
 add_subdirectory(bin)
+add_subdirectory(sketches)
 add_subdirectory(utils)
 
 ## Use the C++11 standard as an entire feature instead of
