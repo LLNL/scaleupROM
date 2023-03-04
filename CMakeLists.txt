@@ -83,6 +83,10 @@ find_path(MFEM_INCLUDES mfem.hpp "$ENV{MFEM_DIR}/include")
 find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
 find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 
+# yaml-cpp library
+find_library(YAML yaml-cpp "$ENV{YAML_DIR}/lib")
+find_path(YAML_INCLUDES yaml.h "$ENV{YAML_DIR}/include/yaml-cpp")
+
 include_directories(
   include
   ${MFEM_INCLUDES}
@@ -91,6 +95,7 @@ include_directories(
   ${HDF5_C_INCLUDE_DIRS}
   ${MPI_C_INCLUDE_DIRS}
   ${MFEM_C_INCLUDE_DIRS}
+  ${YAML_INCLUDES}
 )
 link_libraries(
   ${MPI_C_LINK_FLAGS}
@@ -106,6 +111,7 @@ link_libraries(
   ${HYPRE}
   ${PARMETIS}
   ${METIS}
+  ${YAML}
 )
 
 set(scaleupROMObj_SOURCES
@@ -124,6 +130,9 @@ set(scaleupROMObj_SOURCES
 
   include/multiblock_solver.hpp
   src/multiblock_solver.cpp
+
+  include/input_parser.hpp
+  src/input_parser.cpp
 
 )
 
