@@ -50,11 +50,16 @@ int main(int argc, char *argv[])
    Array<int> vec2 = test["vector"].as<Array<int>>();
    for (int k = 0; k < vec2.Size(); k++) printf("vec2[%d] = %d\n", k, vec2[k]);
 
-   int answer = config.GetRequiredOption<int>("california/livermore");
+   int answer = config.GetOption<int>("texas/austin", 78752);
+   printf("texas/austin: %d\n", answer);
+
+   answer = config.GetRequiredOption<int>("california/livermore");
    printf("california/livermore: %d\n", answer);
 
-   answer = config.GetOption<int>("texas/austin", 78752);
-   printf("texas/austin: %d\n", answer);
+   // YAML::Node boolnode = test["bool"];
+   YAML::Node boolnode = config.FindNode("test-result");
+   bool teststr = boolnode.as<bool>();
+   printf("test-result: %d\n", teststr);
    
    return 0;
 }

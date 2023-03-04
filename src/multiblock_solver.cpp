@@ -20,29 +20,17 @@ using namespace std;
 namespace mfem
 {
 
-MultiBlockSolver::MultiBlockSolver(int argc, char *argv[])
+MultiBlockSolver::MultiBlockSolver()
 {
-   const char *mesh_file = "../data/star.mesh";
-   const char *dode_type = "no-dd";
-   int order_ = 1;
-   bool full_dg_ = false;
-
-   // TODO: replace with yaml input parser.
-   OptionsParser args(argc, argv);
-   args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
-   args.AddOption(&order_, "-o", "--order", "Finite element polynomial degree");
-   args.AddOption(&dode_type, "-d", "--domain-decomposition", "Domain decomposition type: feti, ddlspg, ip.");
-   args.AddOption(&full_dg_, "-dg", "--full-dg", "-ndg", "--no-full-dg", "Full DG discretization.");
-   args.ParseCheck();
-
-   order = order_;
-   full_dg = full_dg_;
-   sigma = -1.0;
-   kappa = (order + 1) * (order + 1);
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+   order = config.GetOption<int>("discretization/order", 1);
+   full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
+   kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 
    // Initiate parent mesh.
    // TODO: initiate without parent mesh.
-   pmesh = new Mesh(mesh_file);
+   pmesh = new Mesh(mesh_file.c_str());
    dim = pmesh->Dimension();
 
    // Initiate SubMeshes based on attributes.

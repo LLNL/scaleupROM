@@ -1,6 +1,7 @@
 #include "mfem.hpp"
 #include "interfaceinteg.hpp"
 #include "multiblock_solver.hpp"
+#include "input_parser.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -12,7 +13,14 @@ double dbc3(const Vector &);
 
 int main(int argc, char *argv[])
 {
-   MultiBlockSolver test(argc, argv);
+   const char *input_file = "test.input";
+   OptionsParser args(argc, argv);
+   args.AddOption(&input_file, "-i", "--input", "Input file to use.");
+   args.ParseCheck();
+   config = InputParser(input_file);
+
+   // MultiBlockSolver test(argc, argv);
+   MultiBlockSolver test;
 
    // Boundary conditions are weakly constrained.
    // TODO: set up MultiBlockSolver internal routine that creates this Array.

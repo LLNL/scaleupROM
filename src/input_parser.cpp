@@ -16,15 +16,20 @@
 YAML::Node InputParser::FindNode(const std::string &keys)
 {
    // Per tutorial of yaml-cpp, operator= *seems* to be a shallow copy.
-   YAML::Node node = dict_;
+   // However, in fact they are deep copy, and the following recursive = operation screws up the dict.
+   // Now we store the node in a vector.
+   std::vector<YAML::Node> nodes(0);
+   nodes.push_back(dict_);
+
    std::istringstream key_iterator(keys);
+   int dd = 0;
    for (std::string s; std::getline(key_iterator, s, '/'); )
    {
-      node = node[s];
+      nodes.push_back(nodes.back()[s]);
 
-      if (!node) return node;
+      if (!(nodes.back())) return nodes.back();
    }
-   return node;
+   return nodes.back();
 }
 
 // template int InputParser::GetRequiredOption<int>(const std::string&);

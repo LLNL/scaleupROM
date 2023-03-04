@@ -12,6 +12,7 @@
 #ifndef SCALEUPROM_MULTIBLOCK_SOLVER_HPP
 #define SCALEUPROM_MULTIBLOCK_SOLVER_HPP
 
+#include "input_parser.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
 
@@ -97,10 +98,10 @@ public:
    Array<ParaViewDataCollection *> paraviewColls;
 
 public:
-   MultiBlockSolver() {};
+   MultiBlockSolver();
 
-   // constructor using command line inputs.
-   MultiBlockSolver(int argc, char *argv[]);
+   // // constructor using command line inputs.
+   // MultiBlockSolver(int argc, char *argv[]);
    // RubberOperator(Array<FiniteElementSpace *> &fes, Array<Array<int> *>&ess_bdr,
    //                Array<int> &block_trueOffsets, double rel_tol, double abs_tol,
    //                int iter, Coefficient &mu);
