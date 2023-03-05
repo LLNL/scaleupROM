@@ -95,6 +95,8 @@ public:
    double sigma = -1.0;
    double kappa = -1.0;
 
+   bool save_visual = false;
+   std::string visual_output;
    Array<ParaViewDataCollection *> paraviewColls;
 
 public:
@@ -125,12 +127,18 @@ public:
                                        const int imesh, const int ibe,
                                        const int jmesh, const int jbe);
 
+   void SetupBCVariables();
    // This class does not own these Coefficient objects!
-   void SetupBoundaryConditions(Array<Coefficient *> &bdr_coeffs_in);
+   void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
    void InitVariables();
 
    void BuildOperators();
    void SetupBCOperators();
+
+   void AddRHSFunction(std::function<double(const Vector &)> F)
+   { rhs_coeffs.Append(new FunctionCoefficient(F)); }
+   void AddRHSFunction(const double F)
+   { rhs_coeffs.Append(new ConstantCoefficient(F)); }
 
    void Assemble();
    // For bilinear case.
@@ -150,7 +158,7 @@ public:
 
    void InitVisualization();
    void SaveVisualization()
-   { for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
+   { if (save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
 };
 
 

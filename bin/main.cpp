@@ -8,8 +8,8 @@
 using namespace std;
 using namespace mfem;
 
-double dbc1(const Vector &);
-double dbc3(const Vector &);
+double dbc2(const Vector &);
+double dbc4(const Vector &);
 
 int main(int argc, char *argv[])
 {
@@ -22,17 +22,12 @@ int main(int argc, char *argv[])
    // MultiBlockSolver test(argc, argv);
    MultiBlockSolver test;
 
-   // Boundary conditions are weakly constrained.
-   // TODO: set up MultiBlockSolver internal routine that creates this Array.
-   Array<Coefficient *> bdrCoeffs(test.pmesh->bdr_attributes.Max());
-   bdrCoeffs[0] = new ConstantCoefficient(0.0);
-   bdrCoeffs[1] = new FunctionCoefficient(dbc1);
-   bdrCoeffs[2] = NULL;
-   bdrCoeffs[3] = new FunctionCoefficient(dbc3);
-   test.SetupBoundaryConditions(bdrCoeffs);
-
    test.InitVariables();
    test.InitVisualization();
+
+   test.AddBCFunction(dbc2, 2);
+   test.AddBCFunction(dbc4, 4);
+   test.AddRHSFunction(1.0);
 
    test.BuildOperators();
 
@@ -87,12 +82,13 @@ int main(int argc, char *argv[])
    //  }
 }
 
-double dbc1(const Vector &x)
+double dbc2(const Vector &x)
 {
    return 0.1 - 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
 
-double dbc3(const Vector &x)
+double dbc4(const Vector &x)
 {
    return -0.1 + 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
+

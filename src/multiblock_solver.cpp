@@ -93,12 +93,11 @@ MultiBlockSolver::~MultiBlockSolver()
 {
    delete U;
    delete RHS;
-
    delete interface_integ;
 
    for (int m = 0; m < numSub; m++)
    {
-      delete paraviewColls[m];
+      if (save_visual) delete paraviewColls[m];
       delete bs[m];
       delete as[m];
       delete us[m];
@@ -114,8 +113,15 @@ MultiBlockSolver::~MultiBlockSolver()
    delete fec;
    delete pmesh;
 
-   for (int k = 0; k < max_bdr_attr; k++)
+   for (int k = 0; k < bdr_markers.Size(); k++)
       delete bdr_markers[k];
+
+
+   for (int k = 0; k < bdr_coeffs.Size(); k++)
+      delete bdr_coeffs[k];
+      
+   for (int k = 0; k < rhs_coeffs.Size(); k++)
+      delete rhs_coeffs[k];
 }
 
 Array<int> MultiBlockSolver::BuildFaceMap2D(const Mesh& pm, const SubMesh& sm)
@@ -276,13 +282,13 @@ Array<int> MultiBlockSolver::FindParentInterfaceInfo(const int pface,
    return Infs;
 }
 
-void MultiBlockSolver::SetupBoundaryConditions(Array<Coefficient *> &bdr_coeffs_in)
+void MultiBlockSolver::SetupBCVariables()
 {
    int numBdr = pmesh->bdr_attributes.Max();
    MFEM_ASSERT(numBdr == bdr_coeffs_in.Size(), "MultiBlockSolver::SetupBoundaryConditions\n");
 
    bdr_coeffs.SetSize(numBdr);
-   bdr_coeffs = bdr_coeffs_in;
+   bdr_coeffs = NULL;
 
    // Boundary conditions are weakly constrained.
    ess_attrs.SetSize(numSub);
@@ -311,6 +317,18 @@ void MultiBlockSolver::SetupBoundaryConditions(Array<Coefficient *> &bdr_coeffs_
    }
 }
 
+void MultiBlockSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr)
+{
+   MFEM_ASSERT(bdr_coeffs.Size() > 0, "MultiBlockSolver::AddBCFunction\n");
+
+   int idx = (battr > 0) ? battr - 1 : 0;
+   bdr_coeffs[idx] = new FunctionCoefficient(F);
+
+   if (battr < 0)
+      for (int k = 1; k < bdr_coeffs.Size(); k++)
+         bdr_coeffs[k] = new FunctionCoefficient(F);
+}
+
 void MultiBlockSolver::InitVariables()
 {
    // set blocks by each subdomain.
@@ -321,6 +339,8 @@ void MultiBlockSolver::InitVariables()
       block_offsets[i + 1] = fes[i]->GetTrueVSize();
    }
    block_offsets.PartialSum();
+
+   SetupBCVariables();
 
    // Set up solution/rhs variables/
    U = new BlockVector(block_offsets);
@@ -336,16 +356,14 @@ void MultiBlockSolver::InitVariables()
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
+
+   rhs_coeffs.SetSize(0);
 }
 
 void MultiBlockSolver::BuildOperators()
 {
    bs.SetSize(numSub);
    as.SetSize(numSub);
-
-   // TODO: set up MultiBlockSolver internal routine that creates this rhs Coefficient.
-   rhs_coeffs.SetSize(0);
-   rhs_coeffs.Append(new ConstantCoefficient(1.0));
 
    double sigma = -1.0;
    double kappa = (order + 1.0) * (order + 1.0);
@@ -471,7 +489,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
          int ndof1 = fe1->GetDof();
          int ndof2 = fe2->GetDof();
 
-         // TODO: we do not need to take additional steps to split elemmat.
+         // TODO: we do not need to take these additional steps to split elemmat.
          // Need to assemble them directly from AssembleInterfaceMatrix.
          Array<int> block_offsets(3);
          block_offsets[0] = 0;
@@ -534,9 +552,10 @@ void MultiBlockSolver::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Int
 
 void MultiBlockSolver::Solve()
 {
-   int maxIter(1000);
-   double rtol(1.e-6);
-   double atol(1.e-10);
+   int maxIter = config.GetOption<int>("solver/max_iter", 1000);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-6);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   int print_level = config.GetOption<int>("solver/print_level", 1);
 
    // BlockDiagonalPreconditioner globalPrec(block_offsets);
    CGSolver solver;
@@ -545,18 +564,23 @@ void MultiBlockSolver::Solve()
    solver.SetMaxIter(maxIter);
    solver.SetOperator(*globalMat);
 //  solver.SetPreconditioner(globalPrec);
-   solver.SetPrintLevel(1);
+   solver.SetPrintLevel(print_level);
    *U = 0.0;
    solver.Mult(*RHS, *U);
 }
 
 void MultiBlockSolver::InitVisualization()
 {
+   save_visual = config.GetOption<bool>("visualization/enabled", false);
+   if (!save_visual) return;
+
+   visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
+
    paraviewColls.SetSize(numSub);
 
    for (int m = 0; m < numSub; m++) {
       ostringstream oss;
-      oss << "paraview_output_" << std::to_string(m);
+      oss << visual_output << "_" << std::to_string(m);
 
       paraviewColls[m] = new ParaViewDataCollection(oss.str().c_str(), &(*meshes[m]));
       paraviewColls[m]->SetLevelsOfDetail(order);

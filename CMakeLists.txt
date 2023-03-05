@@ -146,6 +146,7 @@ add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})
 add_subdirectory(bin)
 add_subdirectory(sketches)
 add_subdirectory(utils)
+add_subdirectory(test)
 
 ## Use the C++11 standard as an entire feature instead of
 ## enumerating individual compiler features for simplicity
