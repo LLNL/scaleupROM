@@ -1,9 +1,8 @@
-image: dreamer2368/librom_env:scaleuprom
+stages:
+  - build
 
 build:
   stage: build
+  image: dreamer2368/librom_env:scaleuprom
   script:
     - mkdir build
-    - cd build
-    - cmake ../
-    - make -j 16
