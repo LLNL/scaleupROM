@@ -28,20 +28,61 @@ MultiBlockSolver::MultiBlockSolver()
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 
+   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
+   if (dd_mode_str == "interior_penalty")
+   {
+      dd_mode = DecompositionMode::IP;
+   }
+   else if (dd_mode_str == "feti")
+   {
+      mfem_error("FETI not implemented!\n");
+   }
+   else if (dd_mode_str == "none")
+   {
+      dd_mode = DecompositionMode::NODD;
+   }
+   else
+   {
+      mfem_error("Unknown domain decomposition mode!\n");
+   }
+
    // Initiate parent mesh.
    // TODO: initiate without parent mesh.
    pmesh = new Mesh(mesh_file.c_str());
    dim = pmesh->Dimension();
 
+   // Uniform refinement if specified.
+   int num_refinement = config.GetOption<int>("mesh/uniform_refinement", 0);
+   for (int k = 0; k < num_refinement; k++)
+      pmesh->UniformRefinement();
+
    // Initiate SubMeshes based on attributes.
    // TODO: a sanity check?
-   numSub = pmesh->attributes.Max();
-   meshes.resize(numSub);
-   for (int k = 0; k < numSub; k++) {
-      Array<int> domain_attributes(1);
-      domain_attributes[0] = k+1;
+   switch (dd_mode)
+   {
+      case DecompositionMode::NODD:
+      {
+         numSub = 1;
+         meshes.resize(numSub);
+         Array<int> domain_attributes(pmesh->attributes.Max());
+         for (int k = 0; k < pmesh->attributes.Max(); k++) {
+            domain_attributes[k] = k+1;
+         }
+         meshes[0] = std::make_shared<SubMesh>(SubMesh::CreateFromDomain(*pmesh, domain_attributes));
+         break;
+      }
+      default:
+      {
+         numSub = pmesh->attributes.Max();
+         meshes.resize(numSub);
+         for (int k = 0; k < numSub; k++) {
+            Array<int> domain_attributes(1);
+            domain_attributes[0] = k+1;
 
-      meshes[k] = std::make_shared<SubMesh>(SubMesh::CreateFromDomain(*pmesh, domain_attributes));
+            meshes[k] = std::make_shared<SubMesh>(SubMesh::CreateFromDomain(*pmesh, domain_attributes));
+         }
+         break;
+      }
    }
 
    // Set up element mapping between submeshes and parent mesh.
@@ -555,16 +596,22 @@ void MultiBlockSolver::Solve()
    int maxIter = config.GetOption<int>("solver/max_iter", 1000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-6);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
-   int print_level = config.GetOption<int>("solver/print_level", 1);
+   int print_level = config.GetOption<int>("solver/print_level", 0);
 
-   // BlockDiagonalPreconditioner globalPrec(block_offsets);
    CGSolver solver;
    solver.SetAbsTol(atol);
    solver.SetRelTol(rtol);
    solver.SetMaxIter(maxIter);
    solver.SetOperator(*globalMat);
-//  solver.SetPreconditioner(globalPrec);
    solver.SetPrintLevel(print_level);
+
+   BlockDiagonalPreconditioner *globalPrec;
+   if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
+   {
+      globalPrec = new BlockDiagonalPreconditioner(block_offsets);
+      solver.SetPreconditioner(*globalPrec);
+   }
+
    *U = 0.0;
    solver.Mult(*RHS, *U);
 }

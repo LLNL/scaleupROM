@@ -19,6 +19,14 @@
 namespace mfem
 {
 
+enum DecompositionMode
+{
+   NODD,       // no decomposition
+   IP,         // interior penalty
+   FETI,       // finite-element tearing and interconnecting
+   NUM_DDMODE
+};
+
 class MultiBlockSolver
 {
 public:
@@ -35,8 +43,8 @@ public:
       int Inf1, Inf2;
    };
 
-// protected:
-public:
+protected:
+// public:
    int order = 1;
    // Finite element collection for all fe spaces.
    FiniteElementCollection *fec;
@@ -47,6 +55,7 @@ public:
    Array2D<SparseMatrix *> mats;
 
    bool full_dg = true;
+   DecompositionMode dd_mode;
 
    // Global parent mesh that will be decomposed.
    Mesh *pmesh;
@@ -116,6 +125,12 @@ public:
    // void Solve(Vector &xp) const;
 
    virtual ~MultiBlockSolver();
+
+   // access
+   const int GetNumSubdomains() { return numSub; }
+   Mesh* GetMesh(const int k) { return &(*meshes[k]); }
+   GridFunction* GetGridFunction(const int k) { return us[k]; }
+   const int GetDiscretizationOrder() { return order; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);

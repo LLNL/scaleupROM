@@ -46,9 +46,10 @@ struct convert<Array<T>> {
 class InputParser
 {
 protected:
-   YAML::Node dict_;
-
    std::string file_;
+
+public:
+   YAML::Node dict_;
 
 public:
    InputParser() {};

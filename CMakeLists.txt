@@ -41,22 +41,22 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(DEBUG_CHECK_ASSERTIONS "1")
 endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
-# Define variables for use in generating a configure file
-if(GTEST_FOUND)
-  set(CAROM_HAS_GTEST 1)
-endif(GTEST_FOUND)
+# # Define variables for use in generating a configure file
+# if(GTEST_FOUND)
+#   set(CAROM_HAS_GTEST 1)
+# endif(GTEST_FOUND)
 
-if(BLAS_FOUND)
-  set(CAROM_HAVE_BLAS 1)
-endif(BLAS_FOUND)
+# if(BLAS_FOUND)
+#   set(CAROM_HAVE_BLAS 1)
+# endif(BLAS_FOUND)
 
-if(LAPACK_FOUND)
-  set(CAROM_HAVE_LAPACK 1)
-endif(LAPACK_FOUND)
+# if(LAPACK_FOUND)
+#   set(CAROM_HAVE_LAPACK 1)
+# endif(LAPACK_FOUND)
 
-if(HDF5_FOUND)
-  set(CAROM_HAVE_HDF5 1)
-endif(HDF5_FOUND)
+# if(HDF5_FOUND)
+#   set(CAROM_HAVE_HDF5 1)
+# endif(HDF5_FOUND)
 
 # List minimum version requirements for dependencies where possible to make
 # packaging easier later.
@@ -72,7 +72,7 @@ find_package(ZLIB 1.2.3 REQUIRED)
 
 find_package(Doxygen 1.8.5)
 
-find_package(GTest 1.6.0)
+find_package(GTest 1.6.0 REQUIRED)
 
 # MFEM is required.
 find_library(MFEM mfem "$ENV{MFEM_DIR}/lib")
@@ -112,6 +112,7 @@ link_libraries(
   ${PARMETIS}
   ${METIS}
   ${YAML}
+  GTest::GTest
 )
 
 set(scaleupROMObj_SOURCES
