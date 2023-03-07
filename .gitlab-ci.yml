@@ -1,6 +1,18 @@
+variables:
+  CUSTOM_CI_BUILDS_DIR: "/usr/workspace/chung28/gitlab-runner"
+  GIT_SUBMODULE_STRATEGY: recursive
+
 stages:
   - build
 
-build:
+compile:
   stage: build
-  image: dreamer2368/librom_env:scaleuprom
+  tags:
+    - shell
+    - quartz
+  script:
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make -j 4
+
