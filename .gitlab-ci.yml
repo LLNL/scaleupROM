@@ -1,35 +1,9 @@
-name: CI
+image: dreamer2368/librom_env:scaleuprom
 
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-
-jobs:
-  magudi-unit:
-    runs-on: ubuntu-22.04
-    container:
-      image: dreamer2368/librom_env:scaleuprom
-      options: --user 1001 --privileged
-    name: CPU-test
-    steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Cmake
-        run: |
-          mkdir build
-          cd build
-          cmake ../
-      - name: Make
-        run: |
-          cd build
-          make -j 16
-      - name: Unit test
-        run: |
-          cd build/test
-          ./dd_mms
+build:
+  stage: build
+  script:
+    - mkdir build
+    - cd build
+    - cmake ../
+    - make -j 16
