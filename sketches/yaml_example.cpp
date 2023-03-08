@@ -18,6 +18,7 @@ using namespace mfem;
 
 int main(int argc, char *argv[])
 {
+   MPI_Init(&argc, &argv);
    YAML::Node test = YAML::LoadFile("test.yaml");
    config = InputParser("test.yaml");
 
@@ -60,6 +61,8 @@ int main(int argc, char *argv[])
    YAML::Node boolnode = config.FindNode("test-result");
    bool teststr = boolnode.as<bool>();
    printf("test-result: %d\n", teststr);
+
+   MPI_Finalize();
    
    return 0;
 }

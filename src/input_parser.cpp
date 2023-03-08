@@ -13,6 +13,46 @@
 
 #include "input_parser.hpp"
 
+InputParser::InputParser(const std::string &input_file)
+{
+   file_ = input_file;
+
+   int flag = 0;
+   MPI_Initialized(&flag);
+   if (flag)
+   {
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+   }
+   else
+   {
+      rank = 0;
+      dict_ = YAML::LoadFile(input_file.c_str());
+      return;
+   }
+
+   std::stringstream buffer;
+   std::string ss;
+   if (rank == 0)
+   {
+      std::ifstream file(input_file);
+      buffer << file.rdbuf();
+   }
+
+   int bufferSize = buffer.str().size();
+   MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+   if (rank == 0)
+      ss = buffer.str();
+   else
+      ss.resize(bufferSize);
+
+   MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, MPI_COMM_WORLD);
+
+   dict_ = YAML::Load(ss);
+
+   return;
+}
+
 YAML::Node InputParser::FindNode(const std::string &keys)
 {
    // Per tutorial of yaml-cpp, operator= *seems* to be a shallow copy.

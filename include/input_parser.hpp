@@ -48,14 +48,15 @@ class InputParser
 protected:
    std::string file_;
 
+   int rank;   // MPI rank
+
 public:
    YAML::Node dict_;
 
 public:
    InputParser() {};
 
-   InputParser(const std::string &input_file)
-   { file_ = input_file; dict_ = YAML::LoadFile(input_file.c_str()); }
+   InputParser(const std::string &input_file);
 
    template<class T>
    const T GetRequiredOption(const std::string &keys)
