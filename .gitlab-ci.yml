@@ -4,15 +4,30 @@ variables:
 
 stages:
   - build
+  - test
 
 compile:
   stage: build
+  artifacts:
+    paths:
+      - ci-build
   tags:
     - shell
     - quartz
   script:
-    - mkdir build
-    - cd build
+    - mkdir ci-build
+    - cd ci-build
     - cmake ..
     - make -j 4
+
+dd_mms:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./dd_mms
 
