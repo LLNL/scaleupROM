@@ -84,8 +84,8 @@ find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
 find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 
 # yaml-cpp library
-find_library(YAML yaml-cpp "$ENV{YAML_DIR}/lib")
-find_path(YAML_INCLUDES yaml.h "$ENV{YAML_DIR}/include/yaml-cpp")
+find_library(YAML yaml-cpp HINTS "$ENV{YAML_DIR}/lib")
+find_path(YAML_INCLUDES yaml.h HINTS "$ENV{YAML_DIR}/include/yaml-cpp")
 
 include_directories(
   include
