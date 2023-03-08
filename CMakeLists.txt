@@ -87,6 +87,10 @@ find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 find_library(YAML yaml-cpp HINTS "$ENV{YAML_DIR}/lib")
 find_path(YAML_INCLUDES yaml.h HINTS "$ENV{YAML_DIR}/include/yaml-cpp")
 
+# libROM
+find_library(LIBROM libROM.so HINTS "$ENV{LIBROM_DIR}/build/lib")
+find_path(LIBROM_INCLUDES librom.h HINTS "$ENV{LIBROM_DIR}/lib")
+
 include_directories(
   include
   ${MFEM_INCLUDES}
@@ -96,6 +100,7 @@ include_directories(
   ${MPI_C_INCLUDE_DIRS}
   ${MFEM_C_INCLUDE_DIRS}
   ${YAML_INCLUDES}
+  ${LIBROM_INCLUDES}
 )
 link_libraries(
   ${MPI_C_LINK_FLAGS}
@@ -113,6 +118,7 @@ link_libraries(
   ${METIS}
   ${YAML}
   GTest::GTest
+  ${LIBROM}
 )
 
 set(scaleupROMObj_SOURCES

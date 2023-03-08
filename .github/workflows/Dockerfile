@@ -13,5 +13,14 @@ RUN sudo ln -s ./ yaml-cpp
 # flags for libROM cmake
 ENV YAML_DIR=$LIB_DIR/yaml-cpp
 
+# install libROM for scaleupROM
+WORKDIR $LIB_DIR
+RUN sudo git clone https://github.com/LLNL/libROM.git
+WORKDIR ./libROM/build
+RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=${USE_MFEM} -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
+RUN sudo make
+
+ENV LIBROM_DIR=$LIB_DIR/libROM
+
 # create and switch to a user
 WORKDIR /home/$USERNAME
