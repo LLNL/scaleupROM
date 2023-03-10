@@ -19,7 +19,7 @@ TEST(ParameterizedProblemTest, Test_Parsing)
 {
    config = InputParser("inputs/test_param_prob.yml");
 
-   ParameterizedProblem test;
+   ParameterizedProblem test(MPI_COMM_WORLD);
 
    EXPECT_EQ(test.GetProblemName(), "custom_problem");
    EXPECT_EQ(test.GetNumParams(), 2);
@@ -36,11 +36,23 @@ TEST(ParameterizedProblemTest, Test_Parsing)
    for (int k = 0; k < test_y->Size(); k++)
       EXPECT_TRUE(abs((*test_y)[k] - true_y[k]) < 1.0e-15);
 
+   for (int s = 0; s < test.GetTotalSampleSize(); s++)
+   {
+      if (test.IsMyJob(s))
+      {
+         Array<int> local_idx = test.GetSampleIndex(s);
+         printf("%d: (%d, %d) - rank %d\n", s, local_idx[0], local_idx[1], test.GetProcRank());
+      }
+   }
+
    return;
 }
 
 int main(int argc, char* argv[])
 {
    ::testing::InitGoogleTest(&argc, argv);
-   return RUN_ALL_TESTS();
+   MPI_Init(&argc, &argv);
+   int result = RUN_ALL_TESTS();
+   MPI_Finalize();
+   return result;
 }

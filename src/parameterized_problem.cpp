@@ -40,11 +40,16 @@ double rhs(const Vector &x)
 
 }  // namespace function_factory
 
-ParameterizedProblem::ParameterizedProblem()
+ParameterizedProblem::ParameterizedProblem(MPI_Comm comm)
 {
+   MPI_Comm_size(comm, &num_procs);
+   MPI_Comm_rank(comm, &proc_rank);
+
    problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
 
-   std::string param_list_str("parameterized_problem/" + problem_name);
+   // TODO: currently combined with sample generation part.
+   // TODO: Separate with sample generation.
+   std::string param_list_str("sample_generation/" + problem_name);
    YAML::Node param_list = config.FindNode(param_list_str);
    MFEM_ASSERT(param_list, "ParameterizedProblem - cannot find the problem name!\n");
 
@@ -105,7 +110,13 @@ ParameterizedProblem::ParameterizedProblem()
             mfem_error("ParameterizedProblem - unsupported parameter type!\n");
             break;
       }
-   }
+   }  // for (int p = 0; p < param_num; p++)
+
+   total_samples = 1;
+   for (int p = 0; p < param_num; p++)
+      total_samples *= sampling_sizes[p];
+
+   DistributeSamples();
 }
 
 ParameterizedProblem::~ParameterizedProblem()
@@ -120,8 +131,61 @@ ParameterizedProblem::~ParameterizedProblem()
    }
 }
 
-Poisson0::Poisson0()
-   : ParameterizedProblem()
+void ParameterizedProblem::DistributeSamples()
+{
+   sample_offsets.SetSize(num_procs + 1);
+
+   int quotient = total_samples / num_procs;
+   sample_offsets = quotient;
+   sample_offsets[0] = 0;
+
+   int remainder = total_samples % num_procs;
+   for (int r = 0; r < remainder; r++)
+      sample_offsets[1+r] += 1;
+
+   sample_offsets.PartialSum();
+
+   assert(sample_offsets[0] == 0);
+   assert(sample_offsets[num_procs] == total_samples);
+}
+
+const int ParameterizedProblem::GetSampleIndex(const Array<int> &index)
+{
+   assert(index.Size() == param_num);
+
+   // compute global index, row-major.
+   int global_idx = index[0];
+   for (int p = 1; p < param_num; p++)
+   {
+      global_idx *= sampling_sizes[p];
+      global_idx += index[p];
+   }
+
+   assert((global_idx >= 0) && (global_idx < total_samples));
+   return global_idx;
+}
+
+const Array<int> ParameterizedProblem::GetSampleIndex(const int &index)
+{
+   Array<int> nested_idx(param_num);
+
+   // compute nested local index, row-major.
+   int tmp_idx = index;
+   for (int p = param_num - 1; p >= 0; p--)
+   {
+      int local_idx = tmp_idx % sampling_sizes[p];
+      assert(((local_idx >= 0) && (local_idx < sampling_sizes[p])));
+
+      nested_idx[p] = local_idx;
+      tmp_idx -= local_idx;
+      tmp_idx /= sampling_sizes[p];
+   }
+
+   return nested_idx;
+}
+
+Poisson0::Poisson0(MPI_Comm comm)
+   : ParameterizedProblem(comm)
 {
    scalar_rhs_ptr = &(function_factory::poisson0::rhs);
    
@@ -138,7 +202,7 @@ void Poisson0::SetParams(const Array<int> &index)
    MFEM_ASSERT(param_space_size > 0, "Poisson0::SetParams - Invalid parameter space index!\n");
    MFEM_ASSERT(param_num >= param_space_size, "Poisson0::SetParams - parameter space is not generated!\n");
 
-   local_sample_index = index;
+   local_sample_index = GetSampleIndex(index);
 
    if (k_idx >= 0)
       function_factory::poisson0::k = (*double_paramspace[k_idx])[index[k_idx]];

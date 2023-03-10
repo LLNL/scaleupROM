@@ -1,7 +1,7 @@
 #include "mfem.hpp"
 #include "interfaceinteg.hpp"
 #include "multiblock_solver.hpp"
-#include "input_parser.hpp"
+#include "parameterized_problem.hpp"
 #include <fstream>
 #include <iostream>
 #include "linalg/BasisGenerator.h"
@@ -15,7 +15,7 @@ double dbc2(const Vector &);
 double dbc4(const Vector &);
 
 void RunExample();
-void GenerateSamples();
+void GenerateSamples(MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
    config = InputParser(input_file);
    
    std::string mode = config.GetOption<std::string>("main/mode", "run_example");
-   // TODO: change this to run a single full-order simulation.
+   // TODO: change this to a single full-order simulation.
    if (mode == "run_example")
    {
       // TODO: make it parallel-run compatible.
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
    }
    else if (mode == "sample_generation")
    {
-      GenerateSamples();
+      GenerateSamples(MPI_COMM_WORLD);
    }
    else
    {
@@ -81,7 +81,41 @@ void RunExample()
    test.SaveVisualization();
 }
 
-void GenerateSamples()
+void GenerateSamples(MPI_Comm comm)
 {
+   std::string problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
 
+   ParameterizedProblem *problem = NULL;
+   MultiBlockSolver *test = NULL;
+
+   if (problem_name == "poisson0")
+   {
+      problem = new Poisson0(comm);
+   }
+   else
+   {
+      mfem_error("Unknown parameterized problem!\n");
+   }
+
+   for (int s = 0; s < problem->GetTotalSampleSize(); s++)
+   {
+      if (!problem->IsMyJob(s)) continue;
+
+      test = new MultiBlockSolver();
+      test->InitVariables();
+
+      problem->SetParams(s);
+      test->SetParameterizedProblem(problem);
+
+      test->InitVisualization();
+      test->BuildOperators();
+      test->SetupBCOperators();
+      test->Assemble();
+      test->Solve();
+      test->SaveVisualization();
+
+      delete test;
+   }
+
+   delete problem;
 }

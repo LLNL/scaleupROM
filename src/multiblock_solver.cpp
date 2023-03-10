@@ -171,6 +171,7 @@ void MultiBlockSolver::ParseInputs()
 
    save_visual = config.GetOption<bool>("visualization/enabled", false);
    if (save_visual)
+      // NOTE: this can be overriden in SetParameterizedProblem.
       visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 }
 
@@ -677,17 +678,12 @@ void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
       // parameter values are set in the namespace function_factory::poisson0.
       AddRHSFunction(*(problem->scalar_rhs_ptr));
+
       if (save_visual)
       {
-         const Array<int> index = problem->GetLocalSampleIndex();
+         const int index = problem->GetLocalSampleIndex();
          std::ostringstream oss;
-         oss << "paraview_poisson0_(";
-         for (int k = 0; k < index.Size(); k++)
-         {
-            oss << std::to_string(index[k]);
-            if (k < index.Size() - 1) oss << ",";
-         }
-         oss << ")";
+         oss << "paraview_poisson0_sample" << std::to_string(index);
 
          visual_output = oss.str();
       }

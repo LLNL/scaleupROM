@@ -32,9 +32,6 @@ namespace poisson0
 
    // TODO: function template?
    double rhs(const Vector &x);
-
-   // TODO: function template?
-   void SetParams(const double &k_, const double &offset_);
 }
 
 }
@@ -45,6 +42,10 @@ extern std::map<std::string, ParamType> ParamTypeMap;
 class ParameterizedProblem
 {
 protected:
+   int num_procs;
+   int proc_rank;
+   Array<int> sample_offsets;
+
    std::string problem_name;
 
    std::size_t param_num;
@@ -52,6 +53,7 @@ protected:
    Array<ParamType> param_types;
 
    Array<int> sampling_sizes;
+   int total_samples;
 
    // TODO: a way to incorporate all datatypes?
    // TODO: support other datatypes such as string?
@@ -59,16 +61,19 @@ protected:
    Array<Array<double> *> double_paramspace;
 
    // local sample index;
-   Array<int> local_sample_index;
+   int local_sample_index;
 
 public:
-   ParameterizedProblem();
+   ParameterizedProblem(MPI_Comm comm);
 
    ~ParameterizedProblem();
 
    const std::string GetProblemName() { return problem_name; }
-   const Array<int> GetLocalSampleIndex() { return local_sample_index; }
+   const int GetLocalSampleIndex() { return local_sample_index; }
    const int GetNumParams() { return param_num; }
+   const Array<int> GetSampleSizes() { return sampling_sizes; }
+   const int GetTotalSampleSize() { return total_samples; }
+   const int GetProcRank() { return proc_rank; }
 
    // These are made for tests, but are dangerous to be used elsewhere?
    Array<int>* GetIntParamSpace(const std::string &param_name) { return integer_paramspace[param_indexes[param_name]]; }
@@ -80,6 +85,17 @@ public:
 
    virtual void SetParams(const Array<int> &index)
    { mfem_error("ParameterizedProblem::SetParams is not implemented!\n"); }
+   virtual void SetParams(const int &index)
+   { SetParams(GetSampleIndex(index)); }
+
+   // Determine the given index is assigned to the current process.
+   void DistributeSamples();
+   const int GetSampleIndex(const Array<int> &index);
+   const Array<int> GetSampleIndex(const int &index);
+   bool IsMyJob(const Array<int> &index)
+   { return IsMyJob(GetSampleIndex(index)); }
+   bool IsMyJob(const int &index)
+   { return ((index >= sample_offsets[proc_rank]) && (index < sample_offsets[proc_rank+1])); }
 };
 
 class Poisson0 : public ParameterizedProblem
@@ -92,7 +108,7 @@ protected:
    int offset_idx = -1;
 
 public:
-   Poisson0();
+   Poisson0(MPI_Comm comm);
 
    // virtual double rhs(const Vector &x);
    virtual void SetParams(const Array<int> &index);
