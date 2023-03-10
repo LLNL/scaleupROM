@@ -15,6 +15,7 @@
 #include "input_parser.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
+#include "parameterized_problem.hpp"
 
 namespace mfem
 {
@@ -77,7 +78,6 @@ protected:
    bool strong_bc = false;
    Array<Array<int> *> ess_attrs;
    Array<Array<int> *> ess_tdof_lists;
-   // This class does not own these Coefficient objects!
    Array<Coefficient *> bdr_coeffs;
 
    int max_bdr_attr;
@@ -100,7 +100,7 @@ protected:
    // rhs coefficients
    Array<Coefficient *> rhs_coeffs;
 
-   // parameters specific to Poisson equation.
+   // DG parameters specific to Poisson equation.
    double sigma = -1.0;
    double kappa = -1.0;
 
@@ -126,6 +126,9 @@ public:
 
    virtual ~MultiBlockSolver();
 
+   // Parse some base input options. 
+   void ParseInputs();
+
    // access
    const int GetNumSubdomains() { return numSub; }
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
@@ -143,11 +146,12 @@ public:
                                        const int jmesh, const int jbe);
 
    void SetupBCVariables();
-   // This class does not own these Coefficient objects!
    void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
+   void AddBCFunction(const double &F, const int battr = -1);
    void InitVariables();
 
    void BuildOperators();
+   // TODO: support non-homogeneous Neumann condition.
    void SetupBCOperators();
 
    void AddRHSFunction(std::function<double(const Vector &)> F)
@@ -173,7 +177,10 @@ public:
 
    void InitVisualization();
    void SaveVisualization()
-   { if (save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
+   { if (!save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
+
+   // TODO: some other form of interface?
+   void SetParameterizedProblem(ParameterizedProblem *problem);
 };
 
 

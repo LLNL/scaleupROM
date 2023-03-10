@@ -59,9 +59,9 @@ public:
    InputParser(const std::string &input_file);
 
    template<class T>
-   const T GetRequiredOption(const std::string &keys)
+   const T GetRequiredOptionFromDict(const std::string &keys, YAML::Node input_dict)
    {
-      YAML::Node node = FindNode(keys);
+      YAML::Node node = FindNodeFromDict(keys, input_dict);
       if (!node)
       {
          printf("%s does not exist in the input file %s!\n", keys.c_str(), file_.c_str());
@@ -71,9 +71,9 @@ public:
    }
 
    template<class T>
-   const T GetOption(const std::string &keys, const T &fallback)
+   const T GetOptionFromDict(const std::string &keys, const T &fallback, YAML::Node input_dict)
    {
-      YAML::Node node = FindNode(keys);
+      YAML::Node node = FindNodeFromDict(keys, input_dict);
       if (!node)
       {
          return fallback;
@@ -81,7 +81,17 @@ public:
       return node.as<T>();
    }
 
-   YAML::Node FindNode(const std::string &keys);
+   YAML::Node FindNodeFromDict(const std::string &keys, YAML::Node input_dict);
+
+   template<class T>
+   const T GetRequiredOption(const std::string &keys)
+   { return GetRequiredOptionFromDict<T>(keys, dict_); }
+
+   template<class T>
+   const T GetOption(const std::string &keys, const T &fallback)
+   { return GetOptionFromDict<T>(keys, fallback, dict_); }
+
+   YAML::Node FindNode(const std::string &keys) { return FindNodeFromDict(keys, dict_); }
 
 };
 

@@ -1,0 +1,14 @@
+parameterized_problem:
+  name: custom_problem
+  custom_problem:
+    - parameter_name: x
+      type: double
+      sample_size: 5
+      minimum: 0.0
+      maximum: 4.0
+    - parameter_name: y
+      type: double
+      sample_size: 8
+      minimum: 1.0
+      maximum: 128.0
+      log_scale: true

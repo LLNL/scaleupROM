@@ -22,32 +22,11 @@ namespace mfem
 
 MultiBlockSolver::MultiBlockSolver()
 {
-   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
-   order = config.GetOption<int>("discretization/order", 1);
-   full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
-   sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
-   kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
-
-   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
-   if (dd_mode_str == "interior_penalty")
-   {
-      dd_mode = DecompositionMode::IP;
-   }
-   else if (dd_mode_str == "feti")
-   {
-      mfem_error("FETI not implemented!\n");
-   }
-   else if (dd_mode_str == "none")
-   {
-      dd_mode = DecompositionMode::NODD;
-   }
-   else
-   {
-      mfem_error("Unknown domain decomposition mode!\n");
-   }
+   ParseInputs();
 
    // Initiate parent mesh.
    // TODO: initiate without parent mesh.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
    pmesh = new Mesh(mesh_file.c_str());
    dim = pmesh->Dimension();
 
@@ -163,6 +142,36 @@ MultiBlockSolver::~MultiBlockSolver()
       
    for (int k = 0; k < rhs_coeffs.Size(); k++)
       delete rhs_coeffs[k];
+}
+
+void MultiBlockSolver::ParseInputs()
+{
+   order = config.GetOption<int>("discretization/order", 1);
+   full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
+   kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
+
+   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
+   if (dd_mode_str == "interior_penalty")
+   {
+      dd_mode = DecompositionMode::IP;
+   }
+   else if (dd_mode_str == "feti")
+   {
+      mfem_error("FETI not implemented!\n");
+   }
+   else if (dd_mode_str == "none")
+   {
+      dd_mode = DecompositionMode::NODD;
+   }
+   else
+   {
+      mfem_error("Unknown domain decomposition mode!\n");
+   }
+
+   save_visual = config.GetOption<bool>("visualization/enabled", false);
+   if (save_visual)
+      visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 }
 
 Array<int> MultiBlockSolver::BuildFaceMap2D(const Mesh& pm, const SubMesh& sm)
@@ -368,6 +377,18 @@ void MultiBlockSolver::AddBCFunction(std::function<double(const Vector &)> F, co
    if (battr < 0)
       for (int k = 1; k < bdr_coeffs.Size(); k++)
          bdr_coeffs[k] = new FunctionCoefficient(F);
+}
+
+void MultiBlockSolver::AddBCFunction(const double &F, const int battr)
+{
+   MFEM_ASSERT(bdr_coeffs.Size() > 0, "MultiBlockSolver::AddBCFunction\n");
+
+   int idx = (battr > 0) ? battr - 1 : 0;
+   bdr_coeffs[idx] = new ConstantCoefficient(F);
+
+   if (battr < 0)
+      for (int k = 1; k < bdr_coeffs.Size(); k++)
+         bdr_coeffs[k] = new ConstantCoefficient(F);
 }
 
 void MultiBlockSolver::InitVariables()
@@ -618,10 +639,7 @@ void MultiBlockSolver::Solve()
 
 void MultiBlockSolver::InitVisualization()
 {
-   save_visual = config.GetOption<bool>("visualization/enabled", false);
    if (!save_visual) return;
-
-   visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 
    paraviewColls.SetSize(numSub);
 
@@ -636,6 +654,47 @@ void MultiBlockSolver::InitVisualization()
 
       paraviewColls[m]->RegisterField("solution", us[m]);
       paraviewColls[m]->SetOwnData(false);
+   }
+}
+
+void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   // clean up rhs for parametrized problem.
+   if (rhs_coeffs.Size() > 0)
+   {
+      for (int k = 0; k < rhs_coeffs.Size(); k++) delete rhs_coeffs[k];
+      rhs_coeffs.SetSize(0);
+   }
+   // clean up boundary functions for parametrized problem.
+   bdr_coeffs = NULL;
+
+   std::string problem_name = problem->GetProblemName();
+
+   if (problem_name == "poisson0")
+   {
+      // This problem is set on homogenous Dirichlet BC.
+      AddBCFunction(0.0);
+
+      // parameter values are set in the namespace function_factory::poisson0.
+      AddRHSFunction(*(problem->scalar_rhs_ptr));
+      if (save_visual)
+      {
+         const Array<int> index = problem->GetLocalSampleIndex();
+         std::ostringstream oss;
+         oss << "paraview_poisson0_(";
+         for (int k = 0; k < index.Size(); k++)
+         {
+            oss << std::to_string(index[k]);
+            if (k < index.Size() - 1) oss << ",";
+         }
+         oss << ")";
+
+         visual_output = oss.str();
+      }
+   }
+   else
+   {
+      mfem_error("Unknown parameterized problem name!\n");
    }
 }
 

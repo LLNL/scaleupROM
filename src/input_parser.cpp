@@ -53,13 +53,13 @@ InputParser::InputParser(const std::string &input_file)
    return;
 }
 
-YAML::Node InputParser::FindNode(const std::string &keys)
+YAML::Node InputParser::FindNodeFromDict(const std::string &keys, YAML::Node input_dict)
 {
    // Per tutorial of yaml-cpp, operator= *seems* to be a shallow copy.
    // However, in fact they are deep copy, and the following recursive = operation screws up the dict.
    // Now we store the node in a vector.
    std::vector<YAML::Node> nodes(0);
-   nodes.push_back(dict_);
+   nodes.push_back(input_dict);
 
    std::istringstream key_iterator(keys);
    int dd = 0;
