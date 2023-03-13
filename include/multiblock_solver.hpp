@@ -16,6 +16,9 @@
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
+#include "linalg/BasisGenerator.h"
+#include "linalg/BasisReader.h"
+#include "mfem/Utilities.hpp"
 
 namespace mfem
 {
@@ -26,6 +29,13 @@ enum DecompositionMode
    IP,         // interior penalty
    FETI,       // finite-element tearing and interconnecting
    NUM_DDMODE
+};
+
+enum TrainMode
+{
+   INDIVIDUAL,
+   UNIVERSAL,
+   NUM_TRAINMODE
 };
 
 class MultiBlockSolver
@@ -104,9 +114,21 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
+   // visualization variables
    bool save_visual = false;
    std::string visual_output;
    Array<ParaViewDataCollection *> paraviewColls;
+
+   // rom variables.
+   CAROM::Options* rom_options;
+   CAROM::BasisGenerator *basis_generator;
+   CAROM::BasisReader *basis_reader;
+   std::string basis_prefix;
+   TrainMode train_mode;
+
+   int max_num_snapshots = 100;
+   bool update_right_SV = false;
+   bool incremental = false;
 
 public:
    MultiBlockSolver();
@@ -181,6 +203,10 @@ public:
 
    // TODO: some other form of interface?
    void SetParameterizedProblem(ParameterizedProblem *problem);
+
+   void SaveSnapshot(const int &sample_index);
+   void FormReducedBasis(const int &total_samples);
+   void ProjectOnReducedBasis();
 };
 
 

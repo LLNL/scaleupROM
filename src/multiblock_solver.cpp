@@ -173,6 +173,22 @@ void MultiBlockSolver::ParseInputs()
    if (save_visual)
       // NOTE: this can be overriden in SetParameterizedProblem.
       visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
+
+   // rom inputs.
+   basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
+   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
+   if (train_mode_str == "individual")
+   {
+      train_mode = TrainMode::INDIVIDUAL;
+   }
+   else if (train_mode_str == "universal")
+   {
+      train_mode = TrainMode::UNIVERSAL;
+   }
+   else
+   {
+      mfem_error("Unknown subdomain training mode!\n");
+   }
 }
 
 Array<int> MultiBlockSolver::BuildFaceMap2D(const Mesh& pm, const SubMesh& sm)
@@ -693,5 +709,100 @@ void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       mfem_error("Unknown parameterized problem name!\n");
    }
 }
+
+void MultiBlockSolver::SaveSnapshot(const int &sample_index)
+{
+   for (int m = 0; m < numSub; m++)
+   {
+      std::string filename(basis_prefix + "_sample" + std::to_string(sample_index) + "_dom" + std::to_string(m));
+      rom_options = new CAROM::Options(fes[m]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
+
+      bool addSample = basis_generator->takeSample(us[m]->GetData(), 0.0, 0.01);
+      basis_generator->writeSnapshot();
+
+      delete basis_generator;
+      delete rom_options;
+   }
+}
+
+void MultiBlockSolver::FormReducedBasis(const int &total_samples)
+{
+   std::string basis_name;
+
+   if (train_mode == TrainMode::UNIVERSAL)
+   {
+      basis_name = basis_prefix + "_universal";
+      rom_options = new CAROM::Options(fes[0]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+   }
+
+   for (int m = 0; m < numSub; m++)
+   {
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         basis_name = basis_prefix + "_dom" + std::to_string(m);
+         rom_options = new CAROM::Options(fes[m]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
+         basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
+      }
+
+      for (int s = 0; s < total_samples; s++)
+      {
+         std::string filename(basis_prefix + "_sample" + std::to_string(s) + "_dom" + std::to_string(m) + "_snapshot");
+         basis_generator->loadSamples(filename,"snapshot");
+      }
+
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         basis_generator->endSamples(); // save the merged basis file
+
+         delete basis_generator;
+         delete rom_options;
+      }
+   }
+
+   if (train_mode == TrainMode::UNIVERSAL)
+   {
+      basis_generator->endSamples(); // save the merged basis file
+
+      delete basis_generator;
+      delete rom_options;
+   }
+}
+
+// void MultiBlockSolver::ProjectOnReducedBasis()
+// {
+//    std::string basis_name;
+//    const CAROM::Matrix* spatialbasis;
+//    int numRowRB, numColumnRB;
+
+//    if (train_mode == TrainMode::UNIVERSAL)
+//    {
+//       basis_name = basis_prefix + "_universal";
+//       basis_reader = new CAROM::BasisReader(basis_name);
+//    }
+
+//    for (int m = 0; m < numSub; m++)
+//    {
+//       printf("Subdomain %d\n", m);
+
+//       if (train_mode == TrainMode::INDIVIDUAL)
+//       {
+//          basis_name = basis_prefix + "_dom" + std::to_string(m);
+//          basis_reader = new CAROM::BasisReader(basis_name);
+//       }
+
+//       spatialbasis = basis_reader->getSpatialBasis(0.0);
+//       numRowRB = spatialbasis->numRows();
+//       numColumnRB = spatialbasis->numColumns();
+//       printf("spatial basis dimension is %d x %d\n", numRowRB, numColumnRB);
+
+//       // libROM stores the matrix row-wise, so wrapping as a DenseMatrix in MFEM means it is transposed.
+//       DenseMatrix *reducedBasisT = new DenseMatrix(spatialbasis->getData(),
+//                                                    numColumnRB, numRowRB);
+
+
+
+//    }
 
 }

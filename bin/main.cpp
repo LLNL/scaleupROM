@@ -16,6 +16,7 @@ double dbc4(const Vector &);
 
 void RunExample();
 void GenerateSamples(MPI_Comm comm);
+void BuildROM(MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
@@ -41,6 +42,10 @@ int main(int argc, char *argv[])
    else if (mode == "sample_generation")
    {
       GenerateSamples(MPI_COMM_WORLD);
+   }
+   else if (mode == "build_rom")
+   {
+      BuildROM(MPI_COMM_WORLD);
    }
    else
    {
@@ -114,8 +119,41 @@ void GenerateSamples(MPI_Comm comm)
       test->Solve();
       test->SaveVisualization();
 
+      test->SaveSnapshot(s);
+
       delete test;
    }
 
+   delete problem;
+}
+
+void BuildROM(MPI_Comm comm)
+{
+   std::string problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
+
+   ParameterizedProblem *problem = NULL;
+   MultiBlockSolver *test = NULL;
+
+   if (problem_name == "poisson0")
+   {
+      problem = new Poisson0(comm);
+   }
+   else
+   {
+      mfem_error("Unknown parameterized problem!\n");
+   }
+
+   const int total_samples = problem->GetTotalSampleSize();
+
+   test = new MultiBlockSolver();
+   test->InitVariables();
+   test->BuildOperators();
+   test->SetupBCOperators();
+   test->Assemble();
+   
+   test->FormReducedBasis(total_samples);
+   // test->InitVariables();
+
+   delete test;
    delete problem;
 }
