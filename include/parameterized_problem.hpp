@@ -36,82 +36,61 @@ namespace poisson0
 
 }
 
-enum ParamType { INT, DOUBLE, NUM_TYPE };
-extern std::map<std::string, ParamType> ParamTypeMap;
-
 class ParameterizedProblem
 {
-protected:
-   int num_procs;
-   int proc_rank;
-   Array<int> sample_offsets;
+friend class SampleGenerator;
 
+protected:
    std::string problem_name;
 
    std::size_t param_num;
-   std::map<std::string, int> param_indexes;
-   Array<ParamType> param_types;
+   std::map<std::string, int> param_map;
 
-   Array<int> sampling_sizes;
-   int total_samples;
-
-   // TODO: a way to incorporate all datatypes?
-   // TODO: support other datatypes such as string?
-   Array<Array<int> *> integer_paramspace;
-   Array<Array<double> *> double_paramspace;
+   Array<double *> param_ptr; // address of parameters in function_factory.
 
    // local sample index;
    int local_sample_index;
 
 public:
-   ParameterizedProblem(MPI_Comm comm);
+   ParameterizedProblem()
+      : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name"))
+   {};
 
-   ~ParameterizedProblem();
+   ~ParameterizedProblem() {};
 
    const std::string GetProblemName() { return problem_name; }
-   const int GetLocalSampleIndex() { return local_sample_index; }
    const int GetNumParams() { return param_num; }
-   const Array<int> GetSampleSizes() { return sampling_sizes; }
-   const int GetTotalSampleSize() { return total_samples; }
-   const int GetProcRank() { return proc_rank; }
-
-   // These are made for tests, but are dangerous to be used elsewhere?
-   Array<int>* GetIntParamSpace(const std::string &param_name) { return integer_paramspace[param_indexes[param_name]]; }
-   Array<double>* GetDoubleParamSpace(const std::string &param_name) { return double_paramspace[param_indexes[param_name]]; }
+   const int GetLocalSampleIndex() { return local_sample_index; }
+   const int GetParamIndex(const std::string &name)
+   {
+      if (!(param_map.count(name))) printf("%s\n", name.c_str());
+      assert(param_map.count(name));
+      return param_map[name];
+   }
 
    // virtual member functions cannot be passed down as argument.
    // Instead use pointers to static functions.
    function_factory::scalar_rhs *scalar_rhs_ptr = NULL;
 
-   virtual void SetParams(const Array<int> &index)
-   { mfem_error("ParameterizedProblem::SetParams is not implemented!\n"); }
-   virtual void SetParams(const int &index)
-   { SetParams(GetSampleIndex(index)); }
-
-   // Determine the given index is assigned to the current process.
-   void DistributeSamples();
-   const int GetSampleIndex(const Array<int> &index);
-   const Array<int> GetSampleIndex(const int &index);
-   bool IsMyJob(const Array<int> &index)
-   { return IsMyJob(GetSampleIndex(index)); }
-   bool IsMyJob(const int &index)
-   { return ((index >= sample_offsets[proc_rank]) && (index < sample_offsets[proc_rank+1])); }
+   // TODO: use variadic function? what would be the best format?
+   // TODO: support other datatypes such as integer?
+   virtual void SetParams(const std::string &key, const double &value);
+   virtual void SetParams(const Array<int> &indexes, const Vector &values);
 };
 
 class Poisson0 : public ParameterizedProblem
 {
 protected:
-   // double k;
-   // double offset;
-
-   int k_idx = -1;
-   int offset_idx = -1;
+   // int k_idx = -1;
+   // int offset_idx = -1;
 
 public:
-   Poisson0(MPI_Comm comm);
+   Poisson0();
+   ~Poisson0() {};
 
    // virtual double rhs(const Vector &x);
-   virtual void SetParams(const Array<int> &index);
 };
+
+ParameterizedProblem* InitParameterizedProblem();
 
 #endif

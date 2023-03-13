@@ -2,6 +2,7 @@
 #include "interfaceinteg.hpp"
 #include "multiblock_solver.hpp"
 #include "parameterized_problem.hpp"
+#include "sample_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include "linalg/BasisGenerator.h"
@@ -88,28 +89,18 @@ void RunExample()
 
 void GenerateSamples(MPI_Comm comm)
 {
-   std::string problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
-
-   ParameterizedProblem *problem = NULL;
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
 
-   if (problem_name == "poisson0")
+   for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)
    {
-      problem = new Poisson0(comm);
-   }
-   else
-   {
-      mfem_error("Unknown parameterized problem!\n");
-   }
-
-   for (int s = 0; s < problem->GetTotalSampleSize(); s++)
-   {
-      if (!problem->IsMyJob(s)) continue;
+      if (!sample_generator->IsMyJob(s)) continue;
 
       test = new MultiBlockSolver();
       test->InitVariables();
 
-      problem->SetParams(s);
+      sample_generator->SetSampleParams(s);
       test->SetParameterizedProblem(problem);
 
       test->InitVisualization();
@@ -124,26 +115,17 @@ void GenerateSamples(MPI_Comm comm)
       delete test;
    }
 
+   delete sample_generator;
    delete problem;
 }
 
 void BuildROM(MPI_Comm comm)
 {
-   std::string problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
-
-   ParameterizedProblem *problem = NULL;
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
 
-   if (problem_name == "poisson0")
-   {
-      problem = new Poisson0(comm);
-   }
-   else
-   {
-      mfem_error("Unknown parameterized problem!\n");
-   }
-
-   const int total_samples = problem->GetTotalSampleSize();
+   const int total_samples = sample_generator->GetTotalSampleSize();
 
    test = new MultiBlockSolver();
    test->InitVariables();
@@ -155,5 +137,6 @@ void BuildROM(MPI_Comm comm)
    // test->InitVariables();
 
    delete test;
+   delete sample_generator;
    delete problem;
 }

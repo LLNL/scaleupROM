@@ -16,8 +16,6 @@
 using namespace mfem;
 using namespace std;
 
-std::map<std::string, ParamType> ParamTypeMap = {{"integer", ParamType::INT}, {"double", ParamType::DOUBLE}};
-
 namespace function_factory
 {
 
@@ -40,172 +38,58 @@ double rhs(const Vector &x)
 
 }  // namespace function_factory
 
-ParameterizedProblem::ParameterizedProblem(MPI_Comm comm)
+void ParameterizedProblem::SetParams(const std::string &key, const double &value)
 {
-   MPI_Comm_size(comm, &num_procs);
-   MPI_Comm_rank(comm, &proc_rank);
-
-   problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
-
-   // TODO: currently combined with sample generation part.
-   // TODO: Separate with sample generation.
-   std::string param_list_str("sample_generation/" + problem_name);
-   YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "ParameterizedProblem - cannot find the problem name!\n");
-
-   param_num = param_list.size();
-   integer_paramspace.SetSize(param_num);
-   integer_paramspace = NULL;
-   double_paramspace.SetSize(param_num);
-   double_paramspace = NULL;
-
-   sampling_sizes.SetSize(param_num);
-   sampling_sizes = -1;
-
-   param_types.SetSize(param_num);
-   param_types = ParamType::NUM_TYPE;
-
-   for (int p = 0; p < param_num; p++)
+   if (!param_map.count(key))
    {
-      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-      param_indexes[param_name] = p;
-
-      param_types[p] = ParamTypeMap[config.GetRequiredOptionFromDict<std::string>("type", param_list[p])];
-
-      sampling_sizes[p] = config.GetRequiredOptionFromDict<int>("sample_size", param_list[p]);
-
-      switch (param_types[p])
-      {
-         case ParamType::INT:
-         {
-            // integer_paramspace[p] = new Array<int>(sampling_sizes[p]);
-            mfem_error("ParameterizedProblem - integer parameters are not implemented yet!\n");
-            break;
-         }
-         case ParamType::DOUBLE:
-         {
-            double_paramspace[p] = new Array<double>(sampling_sizes[p]);
-            double minval = config.GetRequiredOptionFromDict<double>("minimum", param_list[p]);
-            double maxval = config.GetRequiredOptionFromDict<double>("maximum", param_list[p]);
-
-            bool log_scale = config.GetOptionFromDict<bool>("log_scale", false, param_list[p]);
-            if (log_scale)
-            {
-               double dp = log(maxval / minval) / (sampling_sizes[p] - 1);
-               dp = exp(dp);
-
-               (*double_paramspace[p])[0] = minval;
-               for (int s = 1; s < double_paramspace[p]->Size(); s++)
-                  (*double_paramspace[p])[s] = (*double_paramspace[p])[s-1] * dp;
-            }
-            else
-            {
-               double dp = (maxval - minval) / (sampling_sizes[p] - 1);
-               for (int s = 0; s < double_paramspace[p]->Size(); s++)
-                  (*double_paramspace[p])[s] = minval + s * dp;
-            }
-            break;
-         }
-         default:
-            mfem_error("ParameterizedProblem - unsupported parameter type!\n");
-            break;
-      }
-   }  // for (int p = 0; p < param_num; p++)
-
-   total_samples = 1;
-   for (int p = 0; p < param_num; p++)
-      total_samples *= sampling_sizes[p];
-
-   DistributeSamples();
-}
-
-ParameterizedProblem::~ParameterizedProblem()
-{
-   if (param_num > 0)
-   {
-      for (int p = 0; p < param_num; p++)
-      {
-         delete integer_paramspace[p];
-         delete double_paramspace[p];
-      }
-   }
-}
-
-void ParameterizedProblem::DistributeSamples()
-{
-   sample_offsets.SetSize(num_procs + 1);
-
-   int quotient = total_samples / num_procs;
-   sample_offsets = quotient;
-   sample_offsets[0] = 0;
-
-   int remainder = total_samples % num_procs;
-   for (int r = 0; r < remainder; r++)
-      sample_offsets[1+r] += 1;
-
-   sample_offsets.PartialSum();
-
-   assert(sample_offsets[0] == 0);
-   assert(sample_offsets[num_procs] == total_samples);
-}
-
-const int ParameterizedProblem::GetSampleIndex(const Array<int> &index)
-{
-   assert(index.Size() == param_num);
-
-   // compute global index, row-major.
-   int global_idx = index[0];
-   for (int p = 1; p < param_num; p++)
-   {
-      global_idx *= sampling_sizes[p];
-      global_idx += index[p];
+      mfem_error("Poisson0: unknown parameter name!\n");
    }
 
-   assert((global_idx >= 0) && (global_idx < total_samples));
-   return global_idx;
+   (*param_ptr[param_map[key]]) = value;
 }
 
-const Array<int> ParameterizedProblem::GetSampleIndex(const int &index)
+void ParameterizedProblem::SetParams(const Array<int> &indexes, const Vector &values)
 {
-   Array<int> nested_idx(param_num);
+   assert(indexes.Size() <= param_num);
+   assert(indexes.Size() == values.Size());
 
-   // compute nested local index, row-major.
-   int tmp_idx = index;
-   for (int p = param_num - 1; p >= 0; p--)
-   {
-      int local_idx = tmp_idx % sampling_sizes[p];
-      assert(((local_idx >= 0) && (local_idx < sampling_sizes[p])));
-
-      nested_idx[p] = local_idx;
-      tmp_idx -= local_idx;
-      tmp_idx /= sampling_sizes[p];
-   }
-
-   return nested_idx;
+   for (int idx = 0; idx < indexes.Size(); idx++)
+      (*param_ptr[indexes[idx]]) = values(idx);
 }
 
-Poisson0::Poisson0(MPI_Comm comm)
-   : ParameterizedProblem(comm)
+Poisson0::Poisson0()
+   : ParameterizedProblem()
 {
+   param_num = 2;
+
+   // pointer to static function.
    scalar_rhs_ptr = &(function_factory::poisson0::rhs);
-   
-   if (param_indexes.count("k")) k_idx = param_indexes["k"];
-   if (param_indexes.count("offset")) offset_idx = param_indexes["offset"];
 
-   if (k_idx < 0) function_factory::poisson0::k = 1.0;
-   if (offset_idx < 0) function_factory::poisson0::offset = 0.0;
+   // Default values.
+   function_factory::poisson0::k = 1.0;
+   function_factory::poisson0::offset = 0.0;
+
+   param_map["k"] = 0;
+   param_map["offset"] = 1;
+
+   param_ptr.SetSize(2);
+   param_ptr[0] = &(function_factory::poisson0::k);
+   param_ptr[1] = &(function_factory::poisson0::offset);
 }
 
-void Poisson0::SetParams(const Array<int> &index)
+ParameterizedProblem* InitParameterizedProblem()
 {
-   int param_space_size = index.Size();
-   MFEM_ASSERT(param_space_size > 0, "Poisson0::SetParams - Invalid parameter space index!\n");
-   MFEM_ASSERT(param_num >= param_space_size, "Poisson0::SetParams - parameter space is not generated!\n");
+   ParameterizedProblem *problem = NULL;
+   std::string problem_name = config.GetRequiredOption<std::string>("parameterized_problem/name");
 
-   local_sample_index = GetSampleIndex(index);
+   if (problem_name == "poisson0")
+   {
+      problem = new Poisson0();
+   }
+   else
+   {
+      mfem_error("Unknown parameterized problem name!\n");
+   }
 
-   if (k_idx >= 0)
-      function_factory::poisson0::k = (*double_paramspace[k_idx])[index[k_idx]];
-   if (offset_idx >= 0)
-      function_factory::poisson0::offset = (*double_paramspace[offset_idx])[index[offset_idx]];
+   return problem;
 }

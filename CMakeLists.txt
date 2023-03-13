@@ -144,6 +144,9 @@ set(scaleupROMObj_SOURCES
   include/parameterized_problem.hpp
   src/parameterized_problem.cpp
 
+  include/sample_generator.hpp
+  src/sample_generator.cpp
+
 )
 
 add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})

@@ -1,6 +1,7 @@
 #include<gtest/gtest.h>
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
+#include "sample_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -15,33 +16,34 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
-TEST(ParameterizedProblemTest, Test_Parsing)
+TEST(SampleGeneratorTest, Test_Parsing)
 {
    config = InputParser("inputs/test_param_prob.yml");
 
-   ParameterizedProblem test(MPI_COMM_WORLD);
+   ParameterizedProblem *test = InitParameterizedProblem();
+   SampleGenerator sample_gen(MPI_COMM_WORLD, test);
 
-   EXPECT_EQ(test.GetProblemName(), "custom_problem");
-   EXPECT_EQ(test.GetNumParams(), 2);
+   EXPECT_EQ(test->GetProblemName(), "poisson0");
+   EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
 
-   Array<double> *test_x = test.GetDoubleParamSpace("x");
-   Array<double> true_x({0.0, 1.0, 2.0, 3.0, 4.0});
+   Vector *test_x = sample_gen.GetDoubleParamSpace("k");
+   Vector true_x({0.0, 1.0, 2.0, 3.0, 4.0});
    EXPECT_EQ(test_x->Size(), 5);
    for (int k = 0; k < test_x->Size(); k++)
       EXPECT_TRUE(abs((*test_x)[k] - true_x[k]) < 1.0e-15);
 
-   Array<double> *test_y = test.GetDoubleParamSpace("y");
-   Array<double> true_y({1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0});
+   Vector *test_y = sample_gen.GetDoubleParamSpace("offset");
+   Vector true_y({1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0});
    EXPECT_EQ(test_y->Size(), 8);
    for (int k = 0; k < test_y->Size(); k++)
       EXPECT_TRUE(abs((*test_y)[k] - true_y[k]) < 1.0e-15);
 
-   for (int s = 0; s < test.GetTotalSampleSize(); s++)
+   for (int s = 0; s < sample_gen.GetTotalSampleSize(); s++)
    {
-      if (test.IsMyJob(s))
+      if (sample_gen.IsMyJob(s))
       {
-         Array<int> local_idx = test.GetSampleIndex(s);
-         printf("%d: (%d, %d) - rank %d\n", s, local_idx[0], local_idx[1], test.GetProcRank());
+         Array<int> local_idx = sample_gen.GetSampleIndex(s);
+         printf("%d: (%d, %d) - rank %d\n", s, local_idx[0], local_idx[1], sample_gen.GetProcRank());
       }
    }
 
