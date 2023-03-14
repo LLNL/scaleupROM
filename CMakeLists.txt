@@ -41,6 +41,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(DEBUG_CHECK_ASSERTIONS "1")
 endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
+option(BUILD_SKETCHES "Build sketch files" OFF)
+
 # # Define variables for use in generating a configure file
 # if(GTEST_FOUND)
 #   set(CAROM_HAS_GTEST 1)
@@ -160,9 +162,11 @@ add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})
 #   PUBLIC ${MFEM_INCLUDES} ${HYPRE_INCLUDES} ${PARMETIS_INCLUDES} ${HDF5_C_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS} ${MFEM_C_INCLUDE_DIRS})
 
 add_subdirectory(bin)
-add_subdirectory(sketches)
 add_subdirectory(utils)
 add_subdirectory(test)
+if(BUILD_SKETCHES)
+  add_subdirectory(sketches)
+endif(BUILD_SKETCHES)
 
 ## Use the C++11 standard as an entire feature instead of
 ## enumerating individual compiler features for simplicity
