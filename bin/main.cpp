@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
    }
    else if (mode == "build_rom")
    {
+      // TODO: need some refactoring to fully separate from single run.
       BuildROM(MPI_COMM_WORLD);
    }
    else
@@ -129,12 +130,40 @@ void BuildROM(MPI_Comm comm)
 
    test = new MultiBlockSolver();
    test->InitVariables();
+   test->InitVisualization();
+
+   // TODO: separate unto single run mode.
+   {
+      std::string problem_name = problem->GetProblemName();
+      std::string param_list_str("single_run/" + problem_name);
+      YAML::Node param_list = config.FindNode(param_list_str);
+      MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
+
+      size_t num_params = param_list.size();
+      for (int p = 0; p < num_params; p++)
+      {
+         std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+         double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+         problem->SetParams(param_name, value);
+      }
+
+      test->SetParameterizedProblem(problem);
+   }
+
    test->BuildOperators();
    test->SetupBCOperators();
    test->Assemble();
    
    test->FormReducedBasis(total_samples);
-   // test->InitVariables();
+   test->LoadReducedBasis();
+   // TODO: need to be able to save operator matrix.
+   test->ProjectOperatorOnReducedBasis();
+
+   // TODO: separate unto single run mode.
+   test->ProjectRHSOnReducedBasis();
+   test->SolveROM();
+
+   test->SaveVisualization();
 
    delete test;
    delete sample_generator;

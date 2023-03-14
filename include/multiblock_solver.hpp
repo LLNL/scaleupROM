@@ -120,6 +120,19 @@ protected:
    Array<ParaViewDataCollection *> paraviewColls;
 
    // rom variables.
+   int num_basis;
+   Array<const CAROM::Matrix*> spatialbasis;
+   bool basis_loaded;
+
+   BlockOperator *romMat;
+   Array2D<SparseMatrix *> rom_mats;
+   Array<int> rom_block_offsets;
+   
+   CAROM::Vector *reduced_rhs;
+
+   Array2D<CAROM::Matrix *> carom_mats;
+   CAROM::Matrix *romMat_inv;
+   
    CAROM::Options* rom_options;
    CAROM::BasisGenerator *basis_generator;
    CAROM::BasisReader *basis_reader;
@@ -206,7 +219,12 @@ public:
 
    void SaveSnapshot(const int &sample_index);
    void FormReducedBasis(const int &total_samples);
-   void ProjectOnReducedBasis();
+   void LoadReducedBasis();
+   const CAROM::Matrix* GetReducedBasis(const int &subdomain_index);
+   void AllocROMMat();  // allocate matrixes for rom.
+   void ProjectOperatorOnReducedBasis();
+   void ProjectRHSOnReducedBasis();
+   void SolveROM();
 };
 
 

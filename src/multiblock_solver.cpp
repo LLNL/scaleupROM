@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "multiblock_solver.hpp"
+#include "linalg_utils.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -21,6 +22,7 @@ namespace mfem
 {
 
 MultiBlockSolver::MultiBlockSolver()
+   : basis_loaded(false)
 {
    ParseInputs();
 
@@ -115,20 +117,17 @@ MultiBlockSolver::~MultiBlockSolver()
    delete RHS;
    delete interface_integ;
 
-   for (int m = 0; m < numSub; m++)
-   {
-      if (save_visual) delete paraviewColls[m];
-      delete bs[m];
-      delete as[m];
-      delete us[m];
-      // shared ptr cannot be deleted?
-      // delete meshes[m];
-      delete parent_elem_map[m];
-      delete parent_face_map[m];
-      delete fes[m];
-      delete ess_attrs[m];
-      delete ess_tdof_lists[m];
-   }
+   if (save_visual)
+      for (int k = 0; k < paraviewColls.Size(); k++) delete paraviewColls[k];
+
+   for (int k = 0; k < bs.Size(); k++) delete bs[k];
+   for (int k = 0; k < as.Size(); k++) delete as[k];
+   for (int k = 0; k < us.Size(); k++) delete us[k];
+   for (int k = 0; k < parent_elem_map.Size(); k++) delete parent_elem_map[k];
+   for (int k = 0; k < parent_face_map.Size(); k++) delete parent_face_map[k];
+   for (int k = 0; k < fes.Size(); k++) delete fes[k];
+   for (int k = 0; k < ess_attrs.Size(); k++) delete ess_attrs[k];
+   for (int k = 0; k < ess_tdof_lists.Size(); k++) delete ess_tdof_lists[k];
 
    delete fec;
    delete pmesh;
@@ -175,7 +174,10 @@ void MultiBlockSolver::ParseInputs()
       visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 
    // rom inputs.
+   num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
+
    basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
+   update_right_SV = config.GetOption<bool>("model_reduction/update_right_sv", false);
    std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
    if (train_mode_str == "individual")
    {
@@ -756,6 +758,12 @@ void MultiBlockSolver::FormReducedBasis(const int &total_samples)
       {
          basis_generator->endSamples(); // save the merged basis file
 
+         const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+         printf("Singular values: ");
+         for (int d = 0; d < rom_sv->dim(); d++)
+            printf("%.3f\t", rom_sv->item(d));
+         printf("\n");
+
          delete basis_generator;
          delete rom_options;
       }
@@ -765,44 +773,205 @@ void MultiBlockSolver::FormReducedBasis(const int &total_samples)
    {
       basis_generator->endSamples(); // save the merged basis file
 
+      const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+      printf("Singular values: ");
+      for (int d = 0; d < rom_sv->dim(); d++)
+         printf("%.3f\t", rom_sv->item(d));
+      printf("\n");
+
       delete basis_generator;
       delete rom_options;
    }
 }
 
-// void MultiBlockSolver::ProjectOnReducedBasis()
-// {
-//    std::string basis_name;
-//    const CAROM::Matrix* spatialbasis;
-//    int numRowRB, numColumnRB;
+void MultiBlockSolver::LoadReducedBasis()
+{
+   if (basis_loaded) return;
 
-//    if (train_mode == TrainMode::UNIVERSAL)
-//    {
-//       basis_name = basis_prefix + "_universal";
-//       basis_reader = new CAROM::BasisReader(basis_name);
-//    }
+   std::string basis_name;
+   int numRowRB, numColumnRB;
 
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       printf("Subdomain %d\n", m);
+   switch (train_mode)
+   {
+      case TrainMode::UNIVERSAL:
+      {  // TODO: when using more than one component domain.
+         spatialbasis.SetSize(1);
+         basis_name = basis_prefix + "_universal";
+         basis_reader = new CAROM::BasisReader(basis_name);
 
-//       if (train_mode == TrainMode::INDIVIDUAL)
-//       {
-//          basis_name = basis_prefix + "_dom" + std::to_string(m);
-//          basis_reader = new CAROM::BasisReader(basis_name);
-//       }
+         spatialbasis[0] = basis_reader->getSpatialBasis(0.0, num_basis);
+         numRowRB = spatialbasis[0]->numRows();
+         numColumnRB = spatialbasis[0]->numColumns();
+         printf("spatial basis dimension is %d x %d\n", numRowRB, numColumnRB);
 
-//       spatialbasis = basis_reader->getSpatialBasis(0.0);
-//       numRowRB = spatialbasis->numRows();
-//       numColumnRB = spatialbasis->numColumns();
-//       printf("spatial basis dimension is %d x %d\n", numRowRB, numColumnRB);
+         delete basis_reader;
+         break;
+      }
+      case TrainMode::INDIVIDUAL:
+      {
+         spatialbasis.SetSize(numSub);
+         for (int j = 0; j < numSub; j++)
+         {
+            basis_name = basis_prefix + "_dom" + std::to_string(j);
+            basis_reader = new CAROM::BasisReader(basis_name);
 
-//       // libROM stores the matrix row-wise, so wrapping as a DenseMatrix in MFEM means it is transposed.
-//       DenseMatrix *reducedBasisT = new DenseMatrix(spatialbasis->getData(),
-//                                                    numColumnRB, numRowRB);
+            spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis);
+            numRowRB = spatialbasis[j]->numRows();
+            numColumnRB = spatialbasis[j]->numColumns();
+            printf("%d domain spatial basis dimension is %d x %d\n", j, numRowRB, numColumnRB);
 
+            delete basis_reader;
+         }
+         break;
+      }
+      default:
+      {
+         mfem_error("LoadBasis: unknown TrainMode!\n");
+         break;
+      }
+   }  // switch (train_mode)
 
+   basis_loaded = true;
+}
 
-//    }
+const CAROM::Matrix* MultiBlockSolver::GetReducedBasis(const int &subdomain_index)
+{
+   MFEM_ASSERT(basis_loaded, "GetReducedBasis: reduced basis is not loaded!\n");
+
+   switch (train_mode)
+   {
+      case TrainMode::UNIVERSAL:
+      {
+         // TODO: when using more than one component domain.
+         return spatialbasis[0];
+         break;
+      }
+      case TrainMode::INDIVIDUAL:
+      {
+         return spatialbasis[subdomain_index];
+         break;
+      }
+      default:
+      {
+         mfem_error("LoadBasis: unknown TrainMode!\n");
+         return NULL;
+         break;
+      }
+   }  // switch (train_mode)
+}
+
+void MultiBlockSolver::ProjectOperatorOnReducedBasis()
+{
+   printf("Project Operators on reduced basis.\n");
+
+   if (!basis_loaded) LoadReducedBasis();
+
+   // Prepare matrixes.
+   AllocROMMat();
+
+   // Each basis is applied to the same column blocks.
+   const CAROM::Matrix *basis_i, *basis_j;
+   for (int i = 0; i < numSub; i++)
+   {
+      basis_i = GetReducedBasis(i);
+
+      for (int j = 0; j < numSub; j++)
+      {
+         basis_j = GetReducedBasis(j);
+         // 21. form inverse ROM operator
+         carom_mats(i,j) = new CAROM::Matrix(num_basis, num_basis, false);
+         CAROM::ComputeCtAB(*mats(i,j), *basis_j, *basis_i, *carom_mats(i,j));
+      }
+   }  // for (int j = 0; j < numSub; j++)
+
+   // Form inverse matrix
+   // TODO: which linear algbra utilities should I use? MFEM or CAROM?
+   for (int i = 0; i < numSub; i++)
+   {
+      for (int j = 0; j < numSub; j++)
+      {
+         CAROM::SetBlock(*carom_mats(i,j), rom_block_offsets[i], rom_block_offsets[i+1],
+                         rom_block_offsets[j], rom_block_offsets[j+1], *romMat_inv);
+      }
+   }
+
+   romMat_inv->inverse();
+
+}
+
+void MultiBlockSolver::AllocROMMat()
+{
+   // TODO: non-uniform subdomain cases.
+   rom_block_offsets.SetSize(numSub+1);
+   rom_block_offsets = 0;
+
+   for (int k = 1; k <= numSub; k++)
+   {
+      rom_block_offsets[k] = num_basis;
+   }
+   rom_block_offsets.PartialSum();
+
+   // TODO: If using MFEM linear algebra.
+   // rom_mats.SetSize(numSub, numSub);
+   // for (int i = 0; i < numSub; i++)
+   // {
+   //    for (int j = 0; j < numSub; j++)
+   //    {
+   //       rom_mats(i, j) = new SparseMatrix(num_basis, num_basis);
+   //    }
+   // }
+
+   // TODO: If using MFEM linear algebra.
+   // romMat = new BlockOperator(rom_block_offsets);
+   // for (int i = 0; i < numSub; i++)
+   //    for (int j = 0; j < numSub; j++)
+   //       romMat->SetBlock(i, j, rom_mats(i, j));
+
+   carom_mats.SetSize(numSub, numSub);
+   // TODO: parallelization.
+   romMat_inv = new CAROM::Matrix(numSub * num_basis, numSub * num_basis, false);
+}
+
+void MultiBlockSolver::ProjectRHSOnReducedBasis()
+{
+   printf("Project RHS on reduced basis.\n");
+   reduced_rhs = new CAROM::Vector(numSub * num_basis, false);
+
+   if (!basis_loaded) LoadReducedBasis();
+
+   // Each basis is applied to the same column blocks.
+   for (int i = 0; i < numSub; i++)
+   {
+      const CAROM::Matrix* basis_i = GetReducedBasis(i);
+
+      CAROM::Vector block_rhs_carom(RHS->GetBlock(i).GetData(), RHS->GetBlock(i).Size(), true, false);
+      CAROM::Vector *block_reduced_rhs = basis_i->transposeMult(&block_rhs_carom);
+
+      CAROM::SetBlock(*block_reduced_rhs, i * num_basis, (i+1) * num_basis, *reduced_rhs);
+   }
+}
+
+void MultiBlockSolver::SolveROM()
+{
+   printf("Solve ROM.\n");
+   CAROM::Vector reduced_sol(num_basis * numSub, false);
+   romMat_inv->mult(*reduced_rhs, reduced_sol);
+
+   // Each basis is applied to the same column blocks.
+   for (int i = 0; i < numSub; i++)
+   {
+      const CAROM::Matrix* basis_i = GetReducedBasis(i);
+
+      // 23. reconstruct FOM state
+      CAROM::Vector block_reduced_sol(num_basis, false);
+      const int offset = i * num_basis;
+      for (int k = 0; k < num_basis; k++)
+         block_reduced_sol(k) = reduced_sol(k + offset);
+
+      // This saves the data automatically to U.
+      CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
+      basis_i->mult(block_reduced_sol, U_block_carom);
+   }
+}
 
 }
