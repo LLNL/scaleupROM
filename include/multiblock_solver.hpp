@@ -230,6 +230,7 @@ public:
    void ProjectOperatorOnReducedBasis();
    void ProjectRHSOnReducedBasis();
    void SolveROM();
+   void CompareSolution();
 };
 
 

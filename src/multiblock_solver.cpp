@@ -199,6 +199,8 @@ void MultiBlockSolver::ParseInputs()
       {
          mfem_error("Unknown subdomain training mode!\n");
       }
+
+      max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
    }
 }
 
@@ -482,7 +484,6 @@ void MultiBlockSolver::SetupBCOperators()
    for (int m = 0; m < numSub; m++)
    {
       MFEM_ASSERT(as[m] && bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
-
       for (int b = 0; b < pmesh->bdr_attributes.Max(); b++) 
       {
          int idx = meshes[m]->bdr_attributes.Find(pmesh->bdr_attributes[b]);
@@ -662,7 +663,12 @@ void MultiBlockSolver::Solve()
    }
 
    *U = 0.0;
+   // The time for the setup above is much smaller than this Mult().
+   // StopWatch test;
+   // test.Start();
    solver.Mult(*RHS, *U);
+   // test.Stop();
+   // printf("test: %f seconds.\n", test.RealTime());
 }
 
 void MultiBlockSolver::InitVisualization()
@@ -988,6 +994,53 @@ void MultiBlockSolver::SolveROM()
       // This saves the data automatically to U.
       CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
       basis_i->mult(block_reduced_sol, U_block_carom);
+   }
+}
+
+void MultiBlockSolver::CompareSolution()
+{
+   // Copy the rom solution.
+   BlockVector romU(block_offsets);
+   romU = *U;
+   Array<GridFunction *> rom_us;
+   Array<GridFunctionCoefficient *> rom_u_coeffs;
+   ConstantCoefficient zero(0.0);
+   rom_us.SetSize(numSub);
+   rom_u_coeffs.SetSize(numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      rom_us[m] = new GridFunction(fes[m]);
+      rom_us[m]->MakeTRef(fes[m], romU.GetBlock(m), 0);
+
+      // BC's are weakly constrained and there is no essential dofs.
+      // Does this make any difference?
+      rom_us[m]->SetTrueVector();
+
+      rom_u_coeffs[m] = new GridFunctionCoefficient(rom_us[m]);
+   }
+
+   // TODO: right now we solve the full-order system to compare the solution.
+   // Need to implement loading the fom solution file?
+   StopWatch solveTimer;
+   solveTimer.Start();
+   Solve();
+   solveTimer.Stop();
+   printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+
+   // Compare the solution.
+   double norm = 0.0;
+   double error = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      norm += us[m]->ComputeLpError(2, zero);
+      error += us[m]->ComputeLpError(2, *rom_u_coeffs[m]);
+   }
+   printf("Relative error: %.5E\n", error / norm);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      delete rom_us[m];
+      delete rom_u_coeffs[m];
    }
 }
 

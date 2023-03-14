@@ -35,10 +35,8 @@ int main(int argc, char *argv[])
    config = InputParser(input_file);
    
    std::string mode = config.GetOption<std::string>("main/mode", "run_example");
-   // TODO: change this to a single full-order simulation.
    if (mode == "run_example")
    {
-      // TODO: make it parallel-run compatible.
       if (rank == 0) RunExample();
    }
    else if (mode == "sample_generation")
@@ -52,6 +50,7 @@ int main(int argc, char *argv[])
    }
    else if (mode == "single_run")
    {
+      // TODO: make it parallel-run compatible.
       SingleRun();
    }
    else
@@ -202,11 +201,17 @@ void SingleRun()
    test->BuildOperators();
    test->SetupBCOperators();
    test->Assemble();
-   
+
    if (test->UseRom())
    {
       test->AllocROMMat();
       test->LoadReducedBasis();
+   }
+
+   StopWatch solveTimer;
+   solveTimer.Start();
+   if (test->UseRom())
+   {
       test->ProjectRHSOnReducedBasis();
       test->SolveROM();
    }
@@ -214,8 +219,15 @@ void SingleRun()
    {
       test->Solve();
    }
+   solveTimer.Stop();
+   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
+   printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
    test->SaveVisualization();
+
+   bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
+   if (test->UseRom() && compare_sol)
+      test->CompareSolution();
 
    delete test;
    delete problem;
