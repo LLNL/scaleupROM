@@ -174,22 +174,26 @@ void MultiBlockSolver::ParseInputs()
       visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 
    // rom inputs.
-   num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
+   use_rom = config.GetOption<bool>("main/use_rom", false);
+   if (use_rom)
+   {
+      num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
 
-   basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
-   update_right_SV = config.GetOption<bool>("model_reduction/update_right_sv", false);
-   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
-   if (train_mode_str == "individual")
-   {
-      train_mode = TrainMode::INDIVIDUAL;
-   }
-   else if (train_mode_str == "universal")
-   {
-      train_mode = TrainMode::UNIVERSAL;
-   }
-   else
-   {
-      mfem_error("Unknown subdomain training mode!\n");
+      basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
+      update_right_SV = config.GetOption<bool>("model_reduction/update_right_sv", false);
+      std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
+      if (train_mode_str == "individual")
+      {
+         train_mode = TrainMode::INDIVIDUAL;
+      }
+      else if (train_mode_str == "universal")
+      {
+         train_mode = TrainMode::UNIVERSAL;
+      }
+      else
+      {
+         mfem_error("Unknown subdomain training mode!\n");
+      }
    }
 }
 

@@ -120,6 +120,9 @@ protected:
    Array<ParaViewDataCollection *> paraviewColls;
 
    // rom variables.
+   bool use_rom = false;
+   TrainMode train_mode = NUM_TRAINMODE;
+   std::string basis_prefix;
    int num_basis;
    Array<const CAROM::Matrix*> spatialbasis;
    bool basis_loaded;
@@ -136,8 +139,6 @@ protected:
    CAROM::Options* rom_options;
    CAROM::BasisGenerator *basis_generator;
    CAROM::BasisReader *basis_reader;
-   std::string basis_prefix;
-   TrainMode train_mode;
 
    int max_num_snapshots = 100;
    bool update_right_SV = false;
