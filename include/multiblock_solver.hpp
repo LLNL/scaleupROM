@@ -121,11 +121,14 @@ protected:
 
    // rom variables.
    bool use_rom = false;
+   bool save_proj_inv = false;
    TrainMode train_mode = NUM_TRAINMODE;
    std::string basis_prefix;
+   std::string proj_inv_prefix;
    int num_basis;
    Array<const CAROM::Matrix*> spatialbasis;
    bool basis_loaded;
+   bool proj_inv_loaded;
 
    BlockOperator *romMat;
    Array2D<SparseMatrix *> rom_mats;
@@ -170,6 +173,7 @@ public:
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() { return order; }
+   const bool UseRom() { return use_rom; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);

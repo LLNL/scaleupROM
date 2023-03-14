@@ -18,6 +18,7 @@ double dbc4(const Vector &);
 void RunExample();
 void GenerateSamples(MPI_Comm comm);
 void BuildROM(MPI_Comm comm);
+void SingleRun();
 
 int main(int argc, char *argv[])
 {
@@ -48,6 +49,10 @@ int main(int argc, char *argv[])
    {
       // TODO: need some refactoring to fully separate from single run.
       BuildROM(MPI_COMM_WORLD);
+   }
+   else if (mode == "single_run")
+   {
+      SingleRun();
    }
    else
    {
@@ -130,42 +135,88 @@ void BuildROM(MPI_Comm comm)
 
    test = new MultiBlockSolver();
    test->InitVariables();
-   test->InitVisualization();
+   // test->InitVisualization();
 
-   // TODO: separate unto single run mode.
-   {
-      std::string problem_name = problem->GetProblemName();
-      std::string param_list_str("single_run/" + problem_name);
-      YAML::Node param_list = config.FindNode(param_list_str);
-      MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
+   // // TODO: separate unto single run mode.
+   // {
+   //    std::string problem_name = problem->GetProblemName();
+   //    std::string param_list_str("single_run/" + problem_name);
+   //    YAML::Node param_list = config.FindNode(param_list_str);
+   //    MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
 
-      size_t num_params = param_list.size();
-      for (int p = 0; p < num_params; p++)
-      {
-         std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-         double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
-         problem->SetParams(param_name, value);
-      }
+   //    size_t num_params = param_list.size();
+   //    for (int p = 0; p < num_params; p++)
+   //    {
+   //       std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+   //       double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+   //       problem->SetParams(param_name, value);
+   //    }
 
-      test->SetParameterizedProblem(problem);
-   }
+   //    test->SetParameterizedProblem(problem);
+   // }
 
+   // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
    test->Assemble();
    
    test->FormReducedBasis(total_samples);
-   test->LoadReducedBasis();
+   // test->LoadReducedBasis();
    // TODO: need to be able to save operator matrix.
    test->ProjectOperatorOnReducedBasis();
 
-   // TODO: separate unto single run mode.
-   test->ProjectRHSOnReducedBasis();
-   test->SolveROM();
+   // // TODO: separate unto single run mode.
+   // test->ProjectRHSOnReducedBasis();
+   // test->SolveROM();
+
+   // test->SaveVisualization();
+
+   delete test;
+   delete sample_generator;
+   delete problem;
+}
+
+void SingleRun()
+{
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   MultiBlockSolver *test = new MultiBlockSolver();
+   test->InitVariables();
+   test->InitVisualization();
+
+   std::string problem_name = problem->GetProblemName();
+   std::string param_list_str("single_run/" + problem_name);
+   YAML::Node param_list = config.FindNode(param_list_str);
+   MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
+
+   size_t num_params = param_list.size();
+   for (int p = 0; p < num_params; p++)
+   {
+      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+      double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+      problem->SetParams(param_name, value);
+   }
+
+   test->SetParameterizedProblem(problem);
+
+   // TODO: there are skippable operations depending on rom/fom mode.
+   test->BuildOperators();
+   test->SetupBCOperators();
+   test->Assemble();
+   
+   if (test->UseRom())
+   {
+      test->AllocROMMat();
+      test->LoadReducedBasis();
+      test->ProjectRHSOnReducedBasis();
+      test->SolveROM();
+   }
+   else
+   {
+      test->Solve();
+   }
 
    test->SaveVisualization();
 
    delete test;
-   delete sample_generator;
    delete problem;
 }

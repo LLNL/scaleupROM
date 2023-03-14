@@ -22,7 +22,8 @@ namespace mfem
 {
 
 MultiBlockSolver::MultiBlockSolver()
-   : basis_loaded(false)
+   : basis_loaded(false),
+     proj_inv_loaded(false)
 {
    ParseInputs();
 
@@ -180,6 +181,10 @@ void MultiBlockSolver::ParseInputs()
       num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
 
       basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
+
+      save_proj_inv = config.GetOption<bool>("model_reduction/save_projected_inverse", true);
+      proj_inv_prefix = config.GetOption<std::string>("model_reduction/projected_inverse_filename", "proj_inv");
+
       update_right_SV = config.GetOption<bool>("model_reduction/update_right_sv", false);
       std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
       if (train_mode_str == "individual")
@@ -901,6 +906,8 @@ void MultiBlockSolver::ProjectOperatorOnReducedBasis()
 
    romMat_inv->inverse();
 
+   proj_inv_loaded = true;
+   if (save_proj_inv) romMat_inv->write(proj_inv_prefix);
 }
 
 void MultiBlockSolver::AllocROMMat()
@@ -958,6 +965,12 @@ void MultiBlockSolver::ProjectRHSOnReducedBasis()
 void MultiBlockSolver::SolveROM()
 {
    printf("Solve ROM.\n");
+   if (!proj_inv_loaded)
+   {
+      romMat_inv->read(proj_inv_prefix);
+      proj_inv_loaded = true;
+   }
+
    CAROM::Vector reduced_sol(num_basis * numSub, false);
    romMat_inv->mult(*reduced_rhs, reduced_sol);
 
