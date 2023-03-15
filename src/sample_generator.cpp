@@ -64,7 +64,7 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
       }
       else
       {
-         double dp = (maxval - minval) / (sampling_sizes[p] - 1);
+         double dp = (sampling_sizes[p] == 1) ? 0.0 : (maxval - minval) / (sampling_sizes[p] - 1);
          for (int s = 0; s < double_paramspace[p]->Size(); s++)
             (*double_paramspace[p])[s] = minval + s * dp;
       }

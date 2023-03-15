@@ -142,7 +142,6 @@ void BuildROM(MPI_Comm comm)
    //    std::string param_list_str("single_run/" + problem_name);
    //    YAML::Node param_list = config.FindNode(param_list_str);
    //    MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
-
    //    size_t num_params = param_list.size();
    //    for (int p = 0; p < num_params; p++)
    //    {
@@ -150,9 +149,11 @@ void BuildROM(MPI_Comm comm)
    //       double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
    //       problem->SetParams(param_name, value);
    //    }
-
-   //    test->SetParameterizedProblem(problem);
    // }
+
+   // NOTE: you need this to set bc/rhs coefficients!
+   // This case, we can use default parameter values of the problem.
+   test->SetParameterizedProblem(problem);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();

@@ -38,6 +38,13 @@ enum TrainMode
    NUM_TRAINMODE
 };
 
+// enum ProjectionMode
+// {
+//    GALERKIN,
+//    LSPG,
+//    NUM_PROJMODE
+// };
+
 class MultiBlockSolver
 {
 public:
@@ -122,7 +129,10 @@ protected:
    // rom variables.
    bool use_rom = false;
    bool save_proj_inv = false;
+   bool save_lspg_basis = false;
    TrainMode train_mode = NUM_TRAINMODE;
+   // ProjectionMode proj_mode = NUM_PROJMODE;
+   std::string sample_prefix;
    std::string basis_prefix;
    std::string proj_inv_prefix;
    int num_basis;
@@ -231,6 +241,8 @@ public:
    void ProjectRHSOnReducedBasis();
    void SolveROM();
    void CompareSolution();
+
+   void SanityCheckOnCoeffs();
 };
 
 

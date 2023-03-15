@@ -174,6 +174,11 @@ void MultiBlockSolver::ParseInputs()
       // NOTE: this can be overriden in SetParameterizedProblem.
       visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 
+   // sampler inputs.
+   std::string mode = config.GetOption<std::string>("main/mode", "");
+   if ((mode == "sample_generation") || (mode == "build_rom"))
+      sample_prefix = config.GetRequiredOption<std::string>("sample_generation/prefix");
+
    // rom inputs.
    use_rom = config.GetOption<bool>("main/use_rom", false);
    if (use_rom)
@@ -185,7 +190,6 @@ void MultiBlockSolver::ParseInputs()
       save_proj_inv = config.GetOption<bool>("model_reduction/save_projected_inverse", true);
       proj_inv_prefix = config.GetOption<std::string>("model_reduction/projected_inverse_filename", "proj_inv");
 
-      update_right_SV = config.GetOption<bool>("model_reduction/update_right_sv", false);
       std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
       if (train_mode_str == "individual")
       {
@@ -200,7 +204,25 @@ void MultiBlockSolver::ParseInputs()
          mfem_error("Unknown subdomain training mode!\n");
       }
 
+      // std::string proj_mode_str = config.GetOption<std::string>("model_reduction/projection_type", "lspg");
+      // if (proj_mode_str == "galerkin")
+      // {
+      //    proj_mode = ProjectionMode::GALERKIN;
+      // }
+      // else if (proj_mode_str == "lspg")
+      // {
+      //    proj_mode = ProjectionMode::LSPG;
+      // }
+      // else
+      // {
+      //    mfem_error("Unknown projection mode!\n");
+      // }
+
+      // if (proj_mode == ProjectionMode::LSPG)
+      //    save_lspg_basis = config.GetOption<bool>("model_reduction/lspg/save_lspg_basis", true);
+
       max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
+      update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
    }
 }
 
@@ -454,6 +476,8 @@ void MultiBlockSolver::InitVariables()
 
 void MultiBlockSolver::BuildOperators()
 {
+   SanityCheckOnCoeffs();
+
    bs.SetSize(numSub);
    as.SetSize(numSub);
 
@@ -478,6 +502,8 @@ void MultiBlockSolver::BuildOperators()
 
 void MultiBlockSolver::SetupBCOperators()
 {
+   SanityCheckOnCoeffs();
+
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
@@ -498,6 +524,8 @@ void MultiBlockSolver::SetupBCOperators()
 
 void MultiBlockSolver::Assemble()
 {
+   SanityCheckOnCoeffs();
+
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
@@ -731,7 +759,7 @@ void MultiBlockSolver::SaveSnapshot(const int &sample_index)
 {
    for (int m = 0; m < numSub; m++)
    {
-      std::string filename(basis_prefix + "_sample" + std::to_string(sample_index) + "_dom" + std::to_string(m));
+      std::string filename(sample_prefix + "_sample" + std::to_string(sample_index) + "_dom" + std::to_string(m));
       rom_options = new CAROM::Options(fes[m]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
@@ -765,7 +793,7 @@ void MultiBlockSolver::FormReducedBasis(const int &total_samples)
 
       for (int s = 0; s < total_samples; s++)
       {
-         std::string filename(basis_prefix + "_sample" + std::to_string(s) + "_dom" + std::to_string(m) + "_snapshot");
+         std::string filename(sample_prefix + "_sample" + std::to_string(s) + "_dom" + std::to_string(m) + "_snapshot");
          basis_generator->loadSamples(filename,"snapshot");
       }
 
@@ -791,7 +819,7 @@ void MultiBlockSolver::FormReducedBasis(const int &total_samples)
       const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
       printf("Singular values: ");
       for (int d = 0; d < rom_sv->dim(); d++)
-         printf("%.3f\t", rom_sv->item(d));
+         printf("%.3E\t", rom_sv->item(d));
       printf("\n");
 
       delete basis_generator;
@@ -1042,6 +1070,35 @@ void MultiBlockSolver::CompareSolution()
       delete rom_us[m];
       delete rom_u_coeffs[m];
    }
+}
+
+void MultiBlockSolver::SanityCheckOnCoeffs()
+{
+   if (rhs_coeffs.Size() == 0)
+      MFEM_WARNING("There is no right-hand side coeffcient assigned! Make sure to set rhs coefficients before BuildOperator.\n");
+
+   if (bdr_coeffs.Size() == 0)
+      MFEM_WARNING("There is no bc coeffcient assigned! Make sure to set bc coefficients before SetupBCOperator.\n");
+
+   bool all_null = true;
+   for (int i = 0; i < rhs_coeffs.Size(); i++)
+      if (rhs_coeffs[i] != NULL)
+      {
+         all_null = false;
+         break;
+      }
+   if (all_null)
+      MFEM_WARNING("All rhs coefficents are NULL! Make sure to set rhs coefficients before BuildOperator.\n");
+
+   all_null = false;
+   for (int i = 0; i < bdr_coeffs.Size(); i++)
+      if (bdr_coeffs[i] != NULL)
+      {
+         all_null = false;
+         break;
+      }
+   if (all_null)
+      MFEM_WARNING("All bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
 }
 
 }
