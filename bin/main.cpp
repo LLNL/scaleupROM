@@ -1,9 +1,13 @@
 #include "mfem.hpp"
 #include "interfaceinteg.hpp"
 #include "multiblock_solver.hpp"
-#include "input_parser.hpp"
+#include "parameterized_problem.hpp"
+#include "sample_generator.hpp"
 #include <fstream>
 #include <iostream>
+#include "linalg/BasisGenerator.h"
+#include "linalg/BasisReader.h"
+#include "mfem/Utilities.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -11,15 +15,64 @@ using namespace mfem;
 double dbc2(const Vector &);
 double dbc4(const Vector &);
 
+void RunExample();
+void GenerateSamples(MPI_Comm comm);
+void BuildROM(MPI_Comm comm);
+void SingleRun();
+
 int main(int argc, char *argv[])
 {
+   // 1. Initialize MPI.
+    int num_procs, rank;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
    const char *input_file = "test.input";
    OptionsParser args(argc, argv);
    args.AddOption(&input_file, "-i", "--input", "Input file to use.");
    args.ParseCheck();
    config = InputParser(input_file);
+   
+   std::string mode = config.GetOption<std::string>("main/mode", "run_example");
+   if (mode == "run_example")
+   {
+      if (rank == 0) RunExample();
+   }
+   else if (mode == "sample_generation")
+   {
+      GenerateSamples(MPI_COMM_WORLD);
+   }
+   else if (mode == "build_rom")
+   {
+      // TODO: need some refactoring to fully separate from single run.
+      BuildROM(MPI_COMM_WORLD);
+   }
+   else if (mode == "single_run")
+   {
+      // TODO: make it parallel-run compatible.
+      SingleRun();
+   }
+   else
+   {
+      if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());
+      exit(-1);
+   }
 
-   // MultiBlockSolver test(argc, argv);
+}
+
+double dbc2(const Vector &x)
+{
+   return 0.1 - 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
+}
+
+double dbc4(const Vector &x)
+{
+   return -0.1 + 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
+}
+
+void RunExample()
+{
    MultiBlockSolver test;
 
    test.InitVariables();
@@ -37,58 +90,146 @@ int main(int argc, char *argv[])
 
    test.Solve();
    test.SaveVisualization();
+}
 
-   // for (int i = 0; i < test.numSub; i++) {
-   //    printf("Submesh %d\n", i);
-   //    for (int k = 0; k < test.meshes[i]->GetNBE(); k++) {
-   //       printf("bdr element %d attribute: %d\n", k, test.meshes[i]->GetBdrAttribute(k));
+void GenerateSamples(MPI_Comm comm)
+{
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   MultiBlockSolver *test = NULL;
+
+   for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)
+   {
+      if (!sample_generator->IsMyJob(s)) continue;
+
+      test = new MultiBlockSolver();
+      test->InitVariables();
+
+      sample_generator->SetSampleParams(s);
+      test->SetParameterizedProblem(problem);
+
+      test->InitVisualization();
+      test->BuildOperators();
+      test->SetupBCOperators();
+      test->Assemble();
+      test->Solve();
+      test->SaveVisualization();
+
+      test->SaveSnapshot(s);
+
+      delete test;
+   }
+
+   delete sample_generator;
+   delete problem;
+}
+
+void BuildROM(MPI_Comm comm)
+{
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   MultiBlockSolver *test = NULL;
+
+   const int total_samples = sample_generator->GetTotalSampleSize();
+
+   test = new MultiBlockSolver();
+   test->InitVariables();
+   // test->InitVisualization();
+
+   // // TODO: separate unto single run mode.
+   // {
+   //    std::string problem_name = problem->GetProblemName();
+   //    std::string param_list_str("single_run/" + problem_name);
+   //    YAML::Node param_list = config.FindNode(param_list_str);
+   //    MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
+   //    size_t num_params = param_list.size();
+   //    for (int p = 0; p < num_params; p++)
+   //    {
+   //       std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+   //       double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+   //       problem->SetParams(param_name, value);
    //    }
-
-   //    // Setting a new boundary attribute does not append bdr_attributes.
-   //    printf("submesh nbe: %d\n", test.meshes[i]->GetNBE());
-   //    for (int k = 0; k < test.meshes[i]->bdr_attributes.Size(); k++) {
-   //       printf("bdr attribute %d: %d\n", k, test.meshes[i]->bdr_attributes[k]);
-   //    }
-
-   //    int nfaces = test.meshes[i]->GetNumFaces();
-   //    printf("submesh nfaces: %d\n", nfaces);
    // }
 
-   // for (int i = 0; i < test.numSub; i++) {
-   //    printf("Submesh %d\n", i);
-   //    for (int ib = 0; ib < test.meshes[i]->GetNBE(); ib++) {
-   //       int interface_attr = test.meshes[i]->GetBdrAttribute(ib);
-   //       if (interface_attr <= test.pmesh->bdr_attributes.Max()) continue;
+   // NOTE: you need this to set bc/rhs coefficients!
+   // This case, we can use default parameter values of the problem.
+   test->SetParameterizedProblem(problem);
 
-   //       int parent_face_i = (*test.parentFaceMap[i])[test.meshes[i]->GetBdrFace(ib)];
-         
-   //       for (int j = 0; j < test.numSub; j++) {
-   //          if (i == j) continue;
-   //          for (int jb = 0; jb < test.meshes[j]->GetNBE(); jb++) {
-   //             int parent_face_j = (*test.parentFaceMap[j])[test.meshes[j]->GetBdrFace(jb)];
-   //             if (parent_face_i == parent_face_j) {
-   //             printf("(BE %d, face %d) - parent face %d, attr %d - Submesh %d (BE %d, face %d)\n",
-   //                   ib, test.meshes[i]->GetBdrFace(ib), parent_face_i, interface_attr, j, jb, test.meshes[j]->GetBdrFace(jb));
-   //             }
-   //          }
-   //       }
-   //    }
-   // }
+   // TODO: there are skippable operations depending on rom/fom mode.
+   test->BuildOperators();
+   test->SetupBCOperators();
+   test->Assemble();
+   
+   test->FormReducedBasis(total_samples);
+   // test->LoadReducedBasis();
+   // TODO: need to be able to save operator matrix.
+   test->ProjectOperatorOnReducedBasis();
 
-   // for (int k = 0; k < test.interfaceInfos.Size(); k++) {
-   //      printf("(Mesh %d, BE %d) - Attr %d - (Mesh %d, BE %d)\n",
-   //            interface_infos[k].Mesh1, interface_infos[k].BE1, interface_infos[k].Attr,
-   //            interface_infos[k].Mesh2, interface_infos[k].BE2);
-   //  }
+   // // TODO: separate unto single run mode.
+   // test->ProjectRHSOnReducedBasis();
+   // test->SolveROM();
+
+   // test->SaveVisualization();
+
+   delete test;
+   delete sample_generator;
+   delete problem;
 }
 
-double dbc2(const Vector &x)
+void SingleRun()
 {
-   return 0.1 - 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
-}
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   MultiBlockSolver *test = new MultiBlockSolver();
+   test->InitVariables();
+   test->InitVisualization();
 
-double dbc4(const Vector &x)
-{
-   return -0.1 + 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
-}
+   std::string problem_name = problem->GetProblemName();
+   std::string param_list_str("single_run/" + problem_name);
+   YAML::Node param_list = config.FindNode(param_list_str);
+   MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
 
+   size_t num_params = param_list.size();
+   for (int p = 0; p < num_params; p++)
+   {
+      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+      double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+      problem->SetParams(param_name, value);
+   }
+
+   test->SetParameterizedProblem(problem);
+
+   // TODO: there are skippable operations depending on rom/fom mode.
+   test->BuildOperators();
+   test->SetupBCOperators();
+   test->Assemble();
+
+   if (test->UseRom())
+   {
+      test->AllocROMMat();
+      test->LoadReducedBasis();
+   }
+
+   StopWatch solveTimer;
+   solveTimer.Start();
+   if (test->UseRom())
+   {
+      test->ProjectRHSOnReducedBasis();
+      test->SolveROM();
+   }
+   else
+   {
+      test->Solve();
+   }
+   solveTimer.Stop();
+   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
+   printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
+
+   test->SaveVisualization();
+
+   bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
+   if (test->UseRom() && compare_sol)
+      test->CompareSolution();
+
+   delete test;
+   delete problem;
+}

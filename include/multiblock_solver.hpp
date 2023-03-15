@@ -15,6 +15,10 @@
 #include "input_parser.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
+#include "parameterized_problem.hpp"
+#include "linalg/BasisGenerator.h"
+#include "linalg/BasisReader.h"
+#include "mfem/Utilities.hpp"
 
 namespace mfem
 {
@@ -26,6 +30,20 @@ enum DecompositionMode
    FETI,       // finite-element tearing and interconnecting
    NUM_DDMODE
 };
+
+enum TrainMode
+{
+   INDIVIDUAL,
+   UNIVERSAL,
+   NUM_TRAINMODE
+};
+
+// enum ProjectionMode
+// {
+//    GALERKIN,
+//    LSPG,
+//    NUM_PROJMODE
+// };
 
 class MultiBlockSolver
 {
@@ -77,7 +95,6 @@ protected:
    bool strong_bc = false;
    Array<Array<int> *> ess_attrs;
    Array<Array<int> *> ess_tdof_lists;
-   // This class does not own these Coefficient objects!
    Array<Coefficient *> bdr_coeffs;
 
    int max_bdr_attr;
@@ -100,13 +117,45 @@ protected:
    // rhs coefficients
    Array<Coefficient *> rhs_coeffs;
 
-   // parameters specific to Poisson equation.
+   // DG parameters specific to Poisson equation.
    double sigma = -1.0;
    double kappa = -1.0;
 
+   // visualization variables
    bool save_visual = false;
    std::string visual_output;
    Array<ParaViewDataCollection *> paraviewColls;
+
+   // rom variables.
+   bool use_rom = false;
+   bool save_proj_inv = false;
+   bool save_lspg_basis = false;
+   TrainMode train_mode = NUM_TRAINMODE;
+   // ProjectionMode proj_mode = NUM_PROJMODE;
+   std::string sample_prefix;
+   std::string basis_prefix;
+   std::string proj_inv_prefix;
+   int num_basis;
+   Array<const CAROM::Matrix*> spatialbasis;
+   bool basis_loaded;
+   bool proj_inv_loaded;
+
+   BlockOperator *romMat;
+   Array2D<SparseMatrix *> rom_mats;
+   Array<int> rom_block_offsets;
+   
+   CAROM::Vector *reduced_rhs;
+
+   Array2D<CAROM::Matrix *> carom_mats;
+   CAROM::Matrix *romMat_inv;
+   
+   CAROM::Options* rom_options;
+   CAROM::BasisGenerator *basis_generator;
+   CAROM::BasisReader *basis_reader;
+
+   int max_num_snapshots = 100;
+   bool update_right_SV = false;
+   bool incremental = false;
 
 public:
    MultiBlockSolver();
@@ -126,11 +175,15 @@ public:
 
    virtual ~MultiBlockSolver();
 
+   // Parse some base input options. 
+   void ParseInputs();
+
    // access
    const int GetNumSubdomains() { return numSub; }
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() { return order; }
+   const bool UseRom() { return use_rom; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
@@ -143,11 +196,12 @@ public:
                                        const int jmesh, const int jbe);
 
    void SetupBCVariables();
-   // This class does not own these Coefficient objects!
    void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
+   void AddBCFunction(const double &F, const int battr = -1);
    void InitVariables();
 
    void BuildOperators();
+   // TODO: support non-homogeneous Neumann condition.
    void SetupBCOperators();
 
    void AddRHSFunction(std::function<double(const Vector &)> F)
@@ -173,7 +227,22 @@ public:
 
    void InitVisualization();
    void SaveVisualization()
-   { if (save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
+   { if (!save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
+
+   // TODO: some other form of interface?
+   void SetParameterizedProblem(ParameterizedProblem *problem);
+
+   void SaveSnapshot(const int &sample_index);
+   void FormReducedBasis(const int &total_samples);
+   void LoadReducedBasis();
+   const CAROM::Matrix* GetReducedBasis(const int &subdomain_index);
+   void AllocROMMat();  // allocate matrixes for rom.
+   void ProjectOperatorOnReducedBasis();
+   void ProjectRHSOnReducedBasis();
+   void SolveROM();
+   void CompareSolution();
+
+   void SanityCheckOnCoeffs();
 };
 
 

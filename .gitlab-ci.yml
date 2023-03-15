@@ -31,3 +31,14 @@ dd_mms:
     - cd ci-build/test
     - ./dd_mms
 
+param_prob:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./test_param_prob
+

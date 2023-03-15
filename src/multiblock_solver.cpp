@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "multiblock_solver.hpp"
+#include "linalg_utils.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -21,33 +22,14 @@ namespace mfem
 {
 
 MultiBlockSolver::MultiBlockSolver()
+   : basis_loaded(false),
+     proj_inv_loaded(false)
 {
-   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
-   order = config.GetOption<int>("discretization/order", 1);
-   full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
-   sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
-   kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
-
-   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
-   if (dd_mode_str == "interior_penalty")
-   {
-      dd_mode = DecompositionMode::IP;
-   }
-   else if (dd_mode_str == "feti")
-   {
-      mfem_error("FETI not implemented!\n");
-   }
-   else if (dd_mode_str == "none")
-   {
-      dd_mode = DecompositionMode::NODD;
-   }
-   else
-   {
-      mfem_error("Unknown domain decomposition mode!\n");
-   }
+   ParseInputs();
 
    // Initiate parent mesh.
    // TODO: initiate without parent mesh.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
    pmesh = new Mesh(mesh_file.c_str());
    dim = pmesh->Dimension();
 
@@ -136,20 +118,17 @@ MultiBlockSolver::~MultiBlockSolver()
    delete RHS;
    delete interface_integ;
 
-   for (int m = 0; m < numSub; m++)
-   {
-      if (save_visual) delete paraviewColls[m];
-      delete bs[m];
-      delete as[m];
-      delete us[m];
-      // shared ptr cannot be deleted?
-      // delete meshes[m];
-      delete parent_elem_map[m];
-      delete parent_face_map[m];
-      delete fes[m];
-      delete ess_attrs[m];
-      delete ess_tdof_lists[m];
-   }
+   if (save_visual)
+      for (int k = 0; k < paraviewColls.Size(); k++) delete paraviewColls[k];
+
+   for (int k = 0; k < bs.Size(); k++) delete bs[k];
+   for (int k = 0; k < as.Size(); k++) delete as[k];
+   for (int k = 0; k < us.Size(); k++) delete us[k];
+   for (int k = 0; k < parent_elem_map.Size(); k++) delete parent_elem_map[k];
+   for (int k = 0; k < parent_face_map.Size(); k++) delete parent_face_map[k];
+   for (int k = 0; k < fes.Size(); k++) delete fes[k];
+   for (int k = 0; k < ess_attrs.Size(); k++) delete ess_attrs[k];
+   for (int k = 0; k < ess_tdof_lists.Size(); k++) delete ess_tdof_lists[k];
 
    delete fec;
    delete pmesh;
@@ -163,6 +142,88 @@ MultiBlockSolver::~MultiBlockSolver()
       
    for (int k = 0; k < rhs_coeffs.Size(); k++)
       delete rhs_coeffs[k];
+}
+
+void MultiBlockSolver::ParseInputs()
+{
+   order = config.GetOption<int>("discretization/order", 1);
+   full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
+   kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
+
+   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
+   if (dd_mode_str == "interior_penalty")
+   {
+      dd_mode = DecompositionMode::IP;
+   }
+   else if (dd_mode_str == "feti")
+   {
+      mfem_error("FETI not implemented!\n");
+   }
+   else if (dd_mode_str == "none")
+   {
+      dd_mode = DecompositionMode::NODD;
+   }
+   else
+   {
+      mfem_error("Unknown domain decomposition mode!\n");
+   }
+
+   save_visual = config.GetOption<bool>("visualization/enabled", false);
+   if (save_visual)
+      // NOTE: this can be overriden in SetParameterizedProblem.
+      visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
+
+   // sampler inputs.
+   std::string mode = config.GetOption<std::string>("main/mode", "");
+   if ((mode == "sample_generation") || (mode == "build_rom"))
+      sample_prefix = config.GetRequiredOption<std::string>("sample_generation/prefix");
+
+   // rom inputs.
+   use_rom = config.GetOption<bool>("main/use_rom", false);
+   if (use_rom)
+   {
+      num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
+
+      basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
+
+      save_proj_inv = config.GetOption<bool>("model_reduction/save_projected_inverse", true);
+      proj_inv_prefix = config.GetOption<std::string>("model_reduction/projected_inverse_filename", "proj_inv");
+
+      std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
+      if (train_mode_str == "individual")
+      {
+         train_mode = TrainMode::INDIVIDUAL;
+      }
+      else if (train_mode_str == "universal")
+      {
+         train_mode = TrainMode::UNIVERSAL;
+      }
+      else
+      {
+         mfem_error("Unknown subdomain training mode!\n");
+      }
+
+      // std::string proj_mode_str = config.GetOption<std::string>("model_reduction/projection_type", "lspg");
+      // if (proj_mode_str == "galerkin")
+      // {
+      //    proj_mode = ProjectionMode::GALERKIN;
+      // }
+      // else if (proj_mode_str == "lspg")
+      // {
+      //    proj_mode = ProjectionMode::LSPG;
+      // }
+      // else
+      // {
+      //    mfem_error("Unknown projection mode!\n");
+      // }
+
+      // if (proj_mode == ProjectionMode::LSPG)
+      //    save_lspg_basis = config.GetOption<bool>("model_reduction/lspg/save_lspg_basis", true);
+
+      max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
+      update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
+   }
 }
 
 Array<int> MultiBlockSolver::BuildFaceMap2D(const Mesh& pm, const SubMesh& sm)
@@ -370,6 +431,18 @@ void MultiBlockSolver::AddBCFunction(std::function<double(const Vector &)> F, co
          bdr_coeffs[k] = new FunctionCoefficient(F);
 }
 
+void MultiBlockSolver::AddBCFunction(const double &F, const int battr)
+{
+   MFEM_ASSERT(bdr_coeffs.Size() > 0, "MultiBlockSolver::AddBCFunction\n");
+
+   int idx = (battr > 0) ? battr - 1 : 0;
+   bdr_coeffs[idx] = new ConstantCoefficient(F);
+
+   if (battr < 0)
+      for (int k = 1; k < bdr_coeffs.Size(); k++)
+         bdr_coeffs[k] = new ConstantCoefficient(F);
+}
+
 void MultiBlockSolver::InitVariables()
 {
    // set blocks by each subdomain.
@@ -403,6 +476,8 @@ void MultiBlockSolver::InitVariables()
 
 void MultiBlockSolver::BuildOperators()
 {
+   SanityCheckOnCoeffs();
+
    bs.SetSize(numSub);
    as.SetSize(numSub);
 
@@ -427,13 +502,14 @@ void MultiBlockSolver::BuildOperators()
 
 void MultiBlockSolver::SetupBCOperators()
 {
+   SanityCheckOnCoeffs();
+
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
    for (int m = 0; m < numSub; m++)
    {
       MFEM_ASSERT(as[m] && bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
-
       for (int b = 0; b < pmesh->bdr_attributes.Max(); b++) 
       {
          int idx = meshes[m]->bdr_attributes.Find(pmesh->bdr_attributes[b]);
@@ -448,6 +524,8 @@ void MultiBlockSolver::SetupBCOperators()
 
 void MultiBlockSolver::Assemble()
 {
+   SanityCheckOnCoeffs();
+
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
@@ -613,15 +691,17 @@ void MultiBlockSolver::Solve()
    }
 
    *U = 0.0;
+   // The time for the setup above is much smaller than this Mult().
+   // StopWatch test;
+   // test.Start();
    solver.Mult(*RHS, *U);
+   // test.Stop();
+   // printf("test: %f seconds.\n", test.RealTime());
 }
 
 void MultiBlockSolver::InitVisualization()
 {
-   save_visual = config.GetOption<bool>("visualization/enabled", false);
    if (!save_visual) return;
-
-   visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
 
    paraviewColls.SetSize(numSub);
 
@@ -637,6 +717,388 @@ void MultiBlockSolver::InitVisualization()
       paraviewColls[m]->RegisterField("solution", us[m]);
       paraviewColls[m]->SetOwnData(false);
    }
+}
+
+void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   // clean up rhs for parametrized problem.
+   if (rhs_coeffs.Size() > 0)
+   {
+      for (int k = 0; k < rhs_coeffs.Size(); k++) delete rhs_coeffs[k];
+      rhs_coeffs.SetSize(0);
+   }
+   // clean up boundary functions for parametrized problem.
+   bdr_coeffs = NULL;
+
+   std::string problem_name = problem->GetProblemName();
+
+   if (problem_name == "poisson0")
+   {
+      // This problem is set on homogenous Dirichlet BC.
+      AddBCFunction(0.0);
+
+      // parameter values are set in the namespace function_factory::poisson0.
+      AddRHSFunction(*(problem->scalar_rhs_ptr));
+
+      if (save_visual)
+      {
+         const int index = problem->GetLocalSampleIndex();
+         std::ostringstream oss;
+         oss << "paraview_poisson0_sample" << std::to_string(index);
+
+         visual_output = oss.str();
+      }
+   }
+   else
+   {
+      mfem_error("Unknown parameterized problem name!\n");
+   }
+}
+
+void MultiBlockSolver::SaveSnapshot(const int &sample_index)
+{
+   for (int m = 0; m < numSub; m++)
+   {
+      std::string filename(sample_prefix + "_sample" + std::to_string(sample_index) + "_dom" + std::to_string(m));
+      rom_options = new CAROM::Options(fes[m]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
+
+      bool addSample = basis_generator->takeSample(us[m]->GetData(), 0.0, 0.01);
+      basis_generator->writeSnapshot();
+
+      delete basis_generator;
+      delete rom_options;
+   }
+}
+
+void MultiBlockSolver::FormReducedBasis(const int &total_samples)
+{
+   std::string basis_name;
+
+   if (train_mode == TrainMode::UNIVERSAL)
+   {
+      basis_name = basis_prefix + "_universal";
+      rom_options = new CAROM::Options(fes[0]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+   }
+
+   for (int m = 0; m < numSub; m++)
+   {
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         basis_name = basis_prefix + "_dom" + std::to_string(m);
+         rom_options = new CAROM::Options(fes[m]->GetTrueVSize(), max_num_snapshots, 1, update_right_SV);
+         basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
+      }
+
+      for (int s = 0; s < total_samples; s++)
+      {
+         std::string filename(sample_prefix + "_sample" + std::to_string(s) + "_dom" + std::to_string(m) + "_snapshot");
+         basis_generator->loadSamples(filename,"snapshot");
+      }
+
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         basis_generator->endSamples(); // save the merged basis file
+
+         const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+         printf("Singular values: ");
+         for (int d = 0; d < rom_sv->dim(); d++)
+            printf("%.3f\t", rom_sv->item(d));
+         printf("\n");
+
+         delete basis_generator;
+         delete rom_options;
+      }
+   }
+
+   if (train_mode == TrainMode::UNIVERSAL)
+   {
+      basis_generator->endSamples(); // save the merged basis file
+
+      const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+      printf("Singular values: ");
+      for (int d = 0; d < rom_sv->dim(); d++)
+         printf("%.3E\t", rom_sv->item(d));
+      printf("\n");
+
+      delete basis_generator;
+      delete rom_options;
+   }
+}
+
+void MultiBlockSolver::LoadReducedBasis()
+{
+   if (basis_loaded) return;
+
+   std::string basis_name;
+   int numRowRB, numColumnRB;
+
+   switch (train_mode)
+   {
+      case TrainMode::UNIVERSAL:
+      {  // TODO: when using more than one component domain.
+         spatialbasis.SetSize(1);
+         basis_name = basis_prefix + "_universal";
+         basis_reader = new CAROM::BasisReader(basis_name);
+
+         spatialbasis[0] = basis_reader->getSpatialBasis(0.0, num_basis);
+         numRowRB = spatialbasis[0]->numRows();
+         numColumnRB = spatialbasis[0]->numColumns();
+         printf("spatial basis dimension is %d x %d\n", numRowRB, numColumnRB);
+
+         delete basis_reader;
+         break;
+      }
+      case TrainMode::INDIVIDUAL:
+      {
+         spatialbasis.SetSize(numSub);
+         for (int j = 0; j < numSub; j++)
+         {
+            basis_name = basis_prefix + "_dom" + std::to_string(j);
+            basis_reader = new CAROM::BasisReader(basis_name);
+
+            spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis);
+            numRowRB = spatialbasis[j]->numRows();
+            numColumnRB = spatialbasis[j]->numColumns();
+            printf("%d domain spatial basis dimension is %d x %d\n", j, numRowRB, numColumnRB);
+
+            delete basis_reader;
+         }
+         break;
+      }
+      default:
+      {
+         mfem_error("LoadBasis: unknown TrainMode!\n");
+         break;
+      }
+   }  // switch (train_mode)
+
+   basis_loaded = true;
+}
+
+const CAROM::Matrix* MultiBlockSolver::GetReducedBasis(const int &subdomain_index)
+{
+   MFEM_ASSERT(basis_loaded, "GetReducedBasis: reduced basis is not loaded!\n");
+
+   switch (train_mode)
+   {
+      case TrainMode::UNIVERSAL:
+      {
+         // TODO: when using more than one component domain.
+         return spatialbasis[0];
+         break;
+      }
+      case TrainMode::INDIVIDUAL:
+      {
+         return spatialbasis[subdomain_index];
+         break;
+      }
+      default:
+      {
+         mfem_error("LoadBasis: unknown TrainMode!\n");
+         return NULL;
+         break;
+      }
+   }  // switch (train_mode)
+}
+
+void MultiBlockSolver::ProjectOperatorOnReducedBasis()
+{
+   printf("Project Operators on reduced basis.\n");
+
+   if (!basis_loaded) LoadReducedBasis();
+
+   // Prepare matrixes.
+   AllocROMMat();
+
+   // Each basis is applied to the same column blocks.
+   const CAROM::Matrix *basis_i, *basis_j;
+   for (int i = 0; i < numSub; i++)
+   {
+      basis_i = GetReducedBasis(i);
+
+      for (int j = 0; j < numSub; j++)
+      {
+         basis_j = GetReducedBasis(j);
+         // 21. form inverse ROM operator
+         carom_mats(i,j) = new CAROM::Matrix(num_basis, num_basis, false);
+         CAROM::ComputeCtAB(*mats(i,j), *basis_j, *basis_i, *carom_mats(i,j));
+      }
+   }  // for (int j = 0; j < numSub; j++)
+
+   // Form inverse matrix
+   // TODO: which linear algbra utilities should I use? MFEM or CAROM?
+   for (int i = 0; i < numSub; i++)
+   {
+      for (int j = 0; j < numSub; j++)
+      {
+         CAROM::SetBlock(*carom_mats(i,j), rom_block_offsets[i], rom_block_offsets[i+1],
+                         rom_block_offsets[j], rom_block_offsets[j+1], *romMat_inv);
+      }
+   }
+
+   romMat_inv->inverse();
+
+   proj_inv_loaded = true;
+   if (save_proj_inv) romMat_inv->write(proj_inv_prefix);
+}
+
+void MultiBlockSolver::AllocROMMat()
+{
+   // TODO: non-uniform subdomain cases.
+   rom_block_offsets.SetSize(numSub+1);
+   rom_block_offsets = 0;
+
+   for (int k = 1; k <= numSub; k++)
+   {
+      rom_block_offsets[k] = num_basis;
+   }
+   rom_block_offsets.PartialSum();
+
+   // TODO: If using MFEM linear algebra.
+   // rom_mats.SetSize(numSub, numSub);
+   // for (int i = 0; i < numSub; i++)
+   // {
+   //    for (int j = 0; j < numSub; j++)
+   //    {
+   //       rom_mats(i, j) = new SparseMatrix(num_basis, num_basis);
+   //    }
+   // }
+
+   // TODO: If using MFEM linear algebra.
+   // romMat = new BlockOperator(rom_block_offsets);
+   // for (int i = 0; i < numSub; i++)
+   //    for (int j = 0; j < numSub; j++)
+   //       romMat->SetBlock(i, j, rom_mats(i, j));
+
+   carom_mats.SetSize(numSub, numSub);
+   // TODO: parallelization.
+   romMat_inv = new CAROM::Matrix(numSub * num_basis, numSub * num_basis, false);
+}
+
+void MultiBlockSolver::ProjectRHSOnReducedBasis()
+{
+   printf("Project RHS on reduced basis.\n");
+   reduced_rhs = new CAROM::Vector(numSub * num_basis, false);
+
+   if (!basis_loaded) LoadReducedBasis();
+
+   // Each basis is applied to the same column blocks.
+   for (int i = 0; i < numSub; i++)
+   {
+      const CAROM::Matrix* basis_i = GetReducedBasis(i);
+
+      CAROM::Vector block_rhs_carom(RHS->GetBlock(i).GetData(), RHS->GetBlock(i).Size(), true, false);
+      CAROM::Vector *block_reduced_rhs = basis_i->transposeMult(&block_rhs_carom);
+
+      CAROM::SetBlock(*block_reduced_rhs, i * num_basis, (i+1) * num_basis, *reduced_rhs);
+   }
+}
+
+void MultiBlockSolver::SolveROM()
+{
+   printf("Solve ROM.\n");
+   if (!proj_inv_loaded)
+   {
+      romMat_inv->read(proj_inv_prefix);
+      proj_inv_loaded = true;
+   }
+
+   CAROM::Vector reduced_sol(num_basis * numSub, false);
+   romMat_inv->mult(*reduced_rhs, reduced_sol);
+
+   // Each basis is applied to the same column blocks.
+   for (int i = 0; i < numSub; i++)
+   {
+      const CAROM::Matrix* basis_i = GetReducedBasis(i);
+
+      // 23. reconstruct FOM state
+      CAROM::Vector block_reduced_sol(num_basis, false);
+      const int offset = i * num_basis;
+      for (int k = 0; k < num_basis; k++)
+         block_reduced_sol(k) = reduced_sol(k + offset);
+
+      // This saves the data automatically to U.
+      CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
+      basis_i->mult(block_reduced_sol, U_block_carom);
+   }
+}
+
+void MultiBlockSolver::CompareSolution()
+{
+   // Copy the rom solution.
+   BlockVector romU(block_offsets);
+   romU = *U;
+   Array<GridFunction *> rom_us;
+   Array<GridFunctionCoefficient *> rom_u_coeffs;
+   ConstantCoefficient zero(0.0);
+   rom_us.SetSize(numSub);
+   rom_u_coeffs.SetSize(numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      rom_us[m] = new GridFunction(fes[m]);
+      rom_us[m]->MakeTRef(fes[m], romU.GetBlock(m), 0);
+
+      // BC's are weakly constrained and there is no essential dofs.
+      // Does this make any difference?
+      rom_us[m]->SetTrueVector();
+
+      rom_u_coeffs[m] = new GridFunctionCoefficient(rom_us[m]);
+   }
+
+   // TODO: right now we solve the full-order system to compare the solution.
+   // Need to implement loading the fom solution file?
+   StopWatch solveTimer;
+   solveTimer.Start();
+   Solve();
+   solveTimer.Stop();
+   printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+
+   // Compare the solution.
+   double norm = 0.0;
+   double error = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      norm += us[m]->ComputeLpError(2, zero);
+      error += us[m]->ComputeLpError(2, *rom_u_coeffs[m]);
+   }
+   printf("Relative error: %.5E\n", error / norm);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      delete rom_us[m];
+      delete rom_u_coeffs[m];
+   }
+}
+
+void MultiBlockSolver::SanityCheckOnCoeffs()
+{
+   if (rhs_coeffs.Size() == 0)
+      MFEM_WARNING("There is no right-hand side coeffcient assigned! Make sure to set rhs coefficients before BuildOperator.\n");
+
+   if (bdr_coeffs.Size() == 0)
+      MFEM_WARNING("There is no bc coeffcient assigned! Make sure to set bc coefficients before SetupBCOperator.\n");
+
+   bool all_null = true;
+   for (int i = 0; i < rhs_coeffs.Size(); i++)
+      if (rhs_coeffs[i] != NULL)
+      {
+         all_null = false;
+         break;
+      }
+   if (all_null)
+      MFEM_WARNING("All rhs coefficents are NULL! Make sure to set rhs coefficients before BuildOperator.\n");
+
+   all_null = false;
+   for (int i = 0; i < bdr_coeffs.Size(); i++)
+      if (bdr_coeffs[i] != NULL)
+      {
+         all_null = false;
+         break;
+      }
+   if (all_null)
+      MFEM_WARNING("All bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
 }
 
 }

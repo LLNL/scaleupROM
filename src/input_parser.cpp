@@ -13,13 +13,53 @@
 
 #include "input_parser.hpp"
 
-YAML::Node InputParser::FindNode(const std::string &keys)
+InputParser::InputParser(const std::string &input_file)
+{
+   file_ = input_file;
+
+   int flag = 0;
+   MPI_Initialized(&flag);
+   if (flag)
+   {
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+   }
+   else
+   {
+      rank = 0;
+      dict_ = YAML::LoadFile(input_file.c_str());
+      return;
+   }
+
+   std::stringstream buffer;
+   std::string ss;
+   if (rank == 0)
+   {
+      std::ifstream file(input_file);
+      buffer << file.rdbuf();
+   }
+
+   int bufferSize = buffer.str().size();
+   MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+   if (rank == 0)
+      ss = buffer.str();
+   else
+      ss.resize(bufferSize);
+
+   MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, MPI_COMM_WORLD);
+
+   dict_ = YAML::Load(ss);
+
+   return;
+}
+
+YAML::Node InputParser::FindNodeFromDict(const std::string &keys, YAML::Node input_dict)
 {
    // Per tutorial of yaml-cpp, operator= *seems* to be a shallow copy.
    // However, in fact they are deep copy, and the following recursive = operation screws up the dict.
    // Now we store the node in a vector.
    std::vector<YAML::Node> nodes(0);
-   nodes.push_back(dict_);
+   nodes.push_back(input_dict);
 
    std::istringstream key_iterator(keys);
    int dd = 0;
