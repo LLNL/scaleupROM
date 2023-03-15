@@ -104,12 +104,6 @@ MultiBlockSolver::MultiBlockSolver()
       fes[m] = new FiniteElementSpace(&(*meshes[m]), fec);
    }
 
-   // BuildOperators();
-
-   // SetupBCOperators();
-
-   // Assemble();
-
 }
 
 MultiBlockSolver::~MultiBlockSolver()
@@ -150,6 +144,9 @@ void MultiBlockSolver::ParseInputs()
    full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
+
+   // solver option;
+   use_monolithic = config.GetOption<bool>("solver/use_monolithic_operator", false);
 
    std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
    if (dd_mode_str == "interior_penalty")
@@ -557,7 +554,8 @@ void MultiBlockSolver::Assemble()
       as[m]->Finalize();
    }
 
-   globalMat = new BlockOperator(block_offsets);
+   // globalMat = new BlockOperator(block_offsets);
+   globalMat = new BlockMatrix(block_offsets);
    for (int i = 0; i < numSub; i++)
    {
       for (int j = 0; j < numSub; j++)
@@ -567,6 +565,9 @@ void MultiBlockSolver::Assemble()
          globalMat->SetBlock(i, j, mats(i, j));
       }
    }
+
+   if (use_monolithic)
+      globalMat_mono = globalMat->CreateMonolithic();
 }
 
 void MultiBlockSolver::AssembleInterfaceMatrix()
@@ -680,7 +681,16 @@ void MultiBlockSolver::Solve()
    solver.SetAbsTol(atol);
    solver.SetRelTol(rtol);
    solver.SetMaxIter(maxIter);
-   solver.SetOperator(*globalMat);
+   // Until now, did not find a meaningful speed difference between block matrix and sparse matrix.
+   if (use_monolithic)
+   {
+      assert(globalMat_mono != NULL);
+      solver.SetOperator(*globalMat_mono);
+   }
+   else
+   {
+      solver.SetOperator(*globalMat);
+   }
    solver.SetPrintLevel(print_level);
 
    BlockDiagonalPreconditioner *globalPrec;

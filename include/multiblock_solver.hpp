@@ -102,7 +102,10 @@ protected:
 
    Array<int> block_offsets;
    BlockVector *U, *RHS;
-   BlockOperator *globalMat;
+   // For nonlinear problem
+   // BlockOperator *globalMat;
+   BlockMatrix *globalMat;
+   SparseMatrix *globalMat_mono;
 
    Array<GridFunction *> us;
 
@@ -120,6 +123,9 @@ protected:
    // DG parameters specific to Poisson equation.
    double sigma = -1.0;
    double kappa = -1.0;
+
+   // MFEM solver options
+   bool use_monolithic;
 
    // visualization variables
    bool save_visual = false;
