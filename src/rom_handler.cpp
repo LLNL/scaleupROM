@@ -175,13 +175,13 @@ void ROMHandler::LoadReducedBasis()
    {
       case TrainMode::UNIVERSAL:
       {  // TODO: when using more than one component domain.
-         spatialbasis.SetSize(1);
+         carom_spatialbasis.SetSize(1);
          basis_name = basis_prefix + "_universal";
          basis_reader = new CAROM::BasisReader(basis_name);
 
-         spatialbasis[0] = basis_reader->getSpatialBasis(0.0, num_basis);
-         numRowRB = spatialbasis[0]->numRows();
-         numColumnRB = spatialbasis[0]->numColumns();
+         carom_spatialbasis[0] = basis_reader->getSpatialBasis(0.0, num_basis);
+         numRowRB = carom_spatialbasis[0]->numRows();
+         numColumnRB = carom_spatialbasis[0]->numColumns();
          printf("spatial basis dimension is %d x %d\n", numRowRB, numColumnRB);
 
          delete basis_reader;
@@ -189,15 +189,15 @@ void ROMHandler::LoadReducedBasis()
       }
       case TrainMode::INDIVIDUAL:
       {
-         spatialbasis.SetSize(numSub);
+         carom_spatialbasis.SetSize(numSub);
          for (int j = 0; j < numSub; j++)
          {
             basis_name = basis_prefix + "_dom" + std::to_string(j);
             basis_reader = new CAROM::BasisReader(basis_name);
 
-            spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis);
-            numRowRB = spatialbasis[j]->numRows();
-            numColumnRB = spatialbasis[j]->numColumns();
+            carom_spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis);
+            numRowRB = carom_spatialbasis[j]->numRows();
+            numColumnRB = carom_spatialbasis[j]->numColumns();
             printf("%d domain spatial basis dimension is %d x %d\n", j, numRowRB, numColumnRB);
 
             delete basis_reader;
@@ -214,7 +214,7 @@ void ROMHandler::LoadReducedBasis()
    basis_loaded = true;
 }
 
-const CAROM::Matrix* ROMHandler::GetReducedBasis(const int &subdomain_index)
+void ROMHandler::GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis)
 {
    MFEM_ASSERT(basis_loaded, "GetReducedBasis: reduced basis is not loaded!\n");
 
@@ -223,21 +223,23 @@ const CAROM::Matrix* ROMHandler::GetReducedBasis(const int &subdomain_index)
       case TrainMode::UNIVERSAL:
       {
          // TODO: when using more than one component domain.
-         return spatialbasis[0];
+         basis = carom_spatialbasis[0];
          break;
       }
       case TrainMode::INDIVIDUAL:
       {
-         return spatialbasis[subdomain_index];
+         basis = carom_spatialbasis[subdomain_index];
          break;
       }
       default:
       {
          mfem_error("LoadBasis: unknown TrainMode!\n");
-         return NULL;
+         basis = NULL;
          break;
       }
    }  // switch (train_mode)
+
+   return;
 }
 
 void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats)
@@ -255,11 +257,11 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mat
    const CAROM::Matrix *basis_i, *basis_j;
    for (int i = 0; i < numSub; i++)
    {
-      basis_i = GetReducedBasis(i);
+      GetReducedBasis(i, basis_i);
 
       for (int j = 0; j < numSub; j++)
       {
-         basis_j = GetReducedBasis(j);
+         GetReducedBasis(j, basis_j);
 
          // 21. form inverse ROM operator
          assert(mats(i,j) != NULL);
@@ -287,7 +289,7 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mat
    if (save_proj_inv) romMat_inv->write(proj_inv_prefix);
 }
 
-void ROMHandler::AllocROMMat()
+void ROMHandler::SetBlockSizes()
 {
    // TODO: non-uniform subdomain cases.
    rom_block_offsets.SetSize(numSub+1);
@@ -298,22 +300,11 @@ void ROMHandler::AllocROMMat()
       rom_block_offsets[k] = num_basis;
    }
    rom_block_offsets.PartialSum();
+}
 
-   // TODO: If using MFEM linear algebra.
-   // rom_mats.SetSize(numSub, numSub);
-   // for (int i = 0; i < numSub; i++)
-   // {
-   //    for (int j = 0; j < numSub; j++)
-   //    {
-   //       rom_mats(i, j) = new SparseMatrix(num_basis, num_basis);
-   //    }
-   // }
-
-   // TODO: If using MFEM linear algebra.
-   // romMat = new BlockOperator(rom_block_offsets);
-   // for (int i = 0; i < numSub; i++)
-   //    for (int j = 0; j < numSub; j++)
-   //       romMat->SetBlock(i, j, rom_mats(i, j));
+void ROMHandler::AllocROMMat()
+{
+   SetBlockSizes();
 
    carom_mats.SetSize(numSub, numSub);
    // TODO: parallelization.
@@ -322,6 +313,8 @@ void ROMHandler::AllocROMMat()
 
 void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
 {
+   assert(RHS->NumBlocks() == numSub);
+
    printf("Project RHS on reduced basis.\n");
    reduced_rhs = new CAROM::Vector(numSub * num_basis, false);
 
@@ -330,7 +323,10 @@ void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      const CAROM::Matrix* basis_i = GetReducedBasis(i);
+      assert(RHS->GetBlock(i).Size() == fom_num_dofs[i]);
+
+      const CAROM::Matrix* basis_i;
+      GetReducedBasis(i, basis_i);
 
       CAROM::Vector block_rhs_carom(RHS->GetBlock(i).GetData(), RHS->GetBlock(i).Size(), true, false);
       CAROM::Vector *block_reduced_rhs = basis_i->transposeMult(&block_rhs_carom);
@@ -354,7 +350,8 @@ void ROMHandler::Solve(BlockVector* U)
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      const CAROM::Matrix* basis_i = GetReducedBasis(i);
+      const CAROM::Matrix* basis_i;
+      GetReducedBasis(i, basis_i);
 
       // 23. reconstruct FOM state
       CAROM::Vector block_reduced_sol(num_basis, false);
@@ -365,6 +362,143 @@ void ROMHandler::Solve(BlockVector* U)
       // This saves the data automatically to U.
       CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
       basis_i->mult(block_reduced_sol, U_block_carom);
+   }
+}
+
+MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const Array<int> &input_num_dofs)
+   : ROMHandler(input_numSub, input_num_dofs)
+{
+   romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
+}
+
+void MFEMROMHandler::LoadReducedBasis()
+{
+   ROMHandler::LoadReducedBasis();
+
+   spatialbasis.SetSize(carom_spatialbasis.Size());
+   for (int k = 0; k < spatialbasis.Size(); k++)
+   {
+      assert(carom_spatialbasis[k] != NULL);
+      spatialbasis[k] = new DenseMatrix(carom_spatialbasis[k]->numRows(), carom_spatialbasis[k]->numColumns());
+      CAROM::CopyMatrix(*carom_spatialbasis[k], *spatialbasis[k]);
+   }
+
+   basis_loaded = true;
+}
+
+void MFEMROMHandler::GetReducedBasis(const int &subdomain_index, DenseMatrix* &basis)
+{
+   MFEM_ASSERT(basis_loaded, "GetReducedBasis: reduced basis is not loaded!\n");
+
+   switch (train_mode)
+   {
+      case TrainMode::UNIVERSAL:
+      {
+         // TODO: when using more than one component domain.
+         basis = spatialbasis[0];
+         break;
+      }
+      case TrainMode::INDIVIDUAL:
+      {
+         basis = spatialbasis[subdomain_index];
+         break;
+      }
+      default:
+      {
+         mfem_error("LoadBasis: unknown TrainMode!\n");
+         basis = NULL;
+         break;
+      }
+   }  // switch (train_mode)
+
+   return;
+}
+
+void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats)
+{
+   assert(mats.NumRows() == numSub);
+   assert(mats.NumCols() == numSub);
+
+   if (!basis_loaded) LoadReducedBasis();
+
+   // This is pretty much the same as Assemble().
+   // Each basis is applied to the same column blocks.
+   DenseMatrix *basis_i, *basis_j;
+   for (int i = 0; i < numSub; i++)
+   {
+      GetReducedBasis(i, basis_i);
+
+      Array<int> vdof_i(num_basis);
+      for (int k = 0; k < num_basis; k++) vdof_i[k] = k + i * num_basis;
+
+      for (int j = 0; j < numSub; j++)
+      {
+         GetReducedBasis(j, basis_j);
+
+         Array<int> vdof_j(num_basis);
+         for (int k = 0; k < num_basis; k++) vdof_j[k] = k + j * num_basis;
+         
+         DenseMatrix elemmat(num_basis, num_basis);
+         mfem::RtAP(*basis_i, *mats(i,j), *basis_j, elemmat);
+         romMat->SetSubMatrix(vdof_i, vdof_j, elemmat);
+      }
+   }  // for (int j = 0; j < numSub; j++)
+
+   romMat->Finalize();
+   proj_inv_loaded = false;
+}
+
+void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
+{
+   assert(RHS->NumBlocks() == numSub);
+
+   printf("Project RHS on reduced basis.\n");
+   reduced_rhs = new BlockVector(rom_block_offsets);
+
+   if (!basis_loaded) LoadReducedBasis();
+
+   // Each basis is applied to the same column blocks.
+   for (int i = 0; i < numSub; i++)
+   {
+      assert(RHS->GetBlock(i).Size() == fom_num_dofs[i]);
+
+      DenseMatrix* basis_i;
+      GetReducedBasis(i, basis_i);
+      basis_i->MultTranspose(RHS->GetBlock(i).GetData(), reduced_rhs->GetBlock(i).GetData());
+   }
+}
+
+void MFEMROMHandler::Solve(BlockVector* U)
+{
+   assert(U->NumBlocks() == numSub);
+
+   printf("Solve ROM.\n");
+   BlockVector reduced_sol(rom_block_offsets);
+
+   int maxIter = config.GetOption<int>("solver/max_iter", 1000);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-6);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   int print_level = config.GetOption<int>("solver/print_level", 0);
+
+   CGSolver solver;
+   solver.SetAbsTol(atol);
+   solver.SetRelTol(rtol);
+   solver.SetMaxIter(maxIter);
+   solver.SetOperator(*romMat);
+   solver.SetPrintLevel(print_level);
+
+   reduced_sol = 0.0;
+   solver.Mult(*reduced_rhs, reduced_sol);
+
+   for (int i = 0; i < numSub; i++)
+   {
+      assert(U->GetBlock(i).Size() == fom_num_dofs[i]);
+
+      DenseMatrix* basis_i;
+      GetReducedBasis(i, basis_i);
+
+      // 23. reconstruct FOM state
+      basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
    }
 }
 

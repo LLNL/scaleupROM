@@ -49,15 +49,6 @@ protected:
    int numSub;   // number of subdomains.
    Array<int> fom_num_dofs;
 
-   // Array<int> block_offsets;
-   // BlockVector *U, *RHS;
-   // // For nonlinear problem
-   // // BlockOperator *globalMat;
-   // BlockMatrix *globalMat;
-   // SparseMatrix *globalMat_mono;
-
-   // Array<GridFunction *> us;
-
    // rom options.
    bool save_proj_inv = false;
    bool save_lspg_basis = false;
@@ -72,12 +63,11 @@ protected:
 
    // rom variables.
    int num_basis;
-   Array<const CAROM::Matrix*> spatialbasis;
+   Array<const CAROM::Matrix*> carom_spatialbasis;
    bool basis_loaded;
    bool proj_inv_loaded;
 
-   // BlockOperator *romMat;
-   // Array2D<SparseMatrix *> rom_mats;
+   // SparseMatrix *romMat;
    Array<int> rom_block_offsets;
    
    CAROM::Vector *reduced_rhs;
@@ -105,8 +95,36 @@ public:
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
    virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   virtual const CAROM::Matrix* GetReducedBasis(const int &subdomain_index);
+   virtual void GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis);
+   virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
+   // TODO: extension to nonlinear operators.
+   virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
+   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
+   virtual void Solve(BlockVector* U);
+   // void CompareSolution();
+};
+
+class MFEMROMHandler : public ROMHandler
+{
+protected:
+   // rom variables.
+   Array<DenseMatrix*> spatialbasis;
+
+   SparseMatrix *romMat;
+   
+   mfem::BlockVector *reduced_rhs;
+
+public:
+   MFEMROMHandler(const int &input_numSub, const Array<int> &input_num_dofs);
+
+   virtual ~MFEMROMHandler() {};
+   
+   // cannot do const GridFunction* due to librom function definitions.
+   // virtual void FormReducedBasis(const int &total_samples);
+   virtual void LoadReducedBasis();
+   virtual void GetReducedBasis(const int &subdomain_index, DenseMatrix* &basis);
+   // virtual void AllocROMMat() override;  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);

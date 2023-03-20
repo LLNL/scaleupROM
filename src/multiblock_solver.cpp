@@ -134,6 +134,8 @@ MultiBlockSolver::~MultiBlockSolver()
       
    for (int k = 0; k < rhs_coeffs.Size(); k++)
       delete rhs_coeffs[k];
+
+   delete rom_handler;
 }
 
 void MultiBlockSolver::ParseInputs()
@@ -422,7 +424,7 @@ void MultiBlockSolver::InitVariables()
 
    rhs_coeffs.SetSize(0);
 
-   if (use_rom) rom_handler = new ROMHandler(numSub, num_dofs);
+   if (use_rom) InitROMHandler();
 }
 
 void MultiBlockSolver::BuildOperators()
@@ -716,6 +718,24 @@ void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    else
    {
       mfem_error("Unknown parameterized problem name!\n");
+   }
+}
+
+void MultiBlockSolver::InitROMHandler()
+{
+   std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
+
+   if (rom_handler_str == "base")
+   {
+      rom_handler = new ROMHandler(numSub, num_dofs);
+   }
+   else if (rom_handler_str == "mfem")
+   {
+      rom_handler = new MFEMROMHandler(numSub, num_dofs);
+   }
+   else
+   {
+      mfem_error("Unknown ROM handler type!\n");
    }
 }
 

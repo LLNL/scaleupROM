@@ -37,6 +37,18 @@ void SetBlock(const CAROM::Vector& blockVec,
                const int iStart, const int iEnd,
                CAROM::Vector& globalVec);
 
+void CopyMatrix(const CAROM::Matrix &carom_mat,
+                DenseMatrix &mfem_mat);
+
+}
+
+namespace mfem
+{
+    // Compute Rt * A * P
+    void RtAP(DenseMatrix& R,
+             const SparseMatrix& A,
+             DenseMatrix& P,
+             DenseMatrix& RAP);
 }
 
 #endif

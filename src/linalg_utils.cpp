@@ -95,4 +95,43 @@ void SetBlock(const CAROM::Vector& blockVec,
    }
 }
 
+void CopyMatrix(const CAROM::Matrix &carom_mat,
+                DenseMatrix &mfem_mat)
+{
+   const int num_row = carom_mat.numRows();
+   const int num_col = carom_mat.numColumns();
+
+   mfem_mat.SetSize(num_row, num_col);
+   // This copy is needed since their indexing orders are different.
+   for (int i = 0; i < num_row; i++)
+      for (int j = 0; j < num_col; j++)
+         mfem_mat(i,j) = carom_mat.item(i,j);
+}
+
+}
+
+namespace mfem
+{
+
+void RtAP(DenseMatrix& R,
+         const SparseMatrix& A,
+         DenseMatrix& P,
+         DenseMatrix& RtAP)
+{
+   assert(R.NumRows() == A.NumRows());
+   assert(A.NumCols() == P.NumRows());
+
+   const int num_row = R.NumCols();
+   const int num_col = P.NumCols();
+   RtAP.SetSize(num_row, num_col);
+   for (int i = 0; i < num_row; i++)
+      for (int j = 0; j < num_col; j++)
+      {
+         Vector vec_i, vec_j;
+         R.GetColumnReference(i, vec_i);
+         P.GetColumnReference(j, vec_j);
+         RtAP(i, j) = A.InnerProduct(vec_i, vec_j);
+      }
+}
+
 }

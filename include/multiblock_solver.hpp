@@ -199,6 +199,7 @@ public:
    // TODO: some other form of interface?
    void SetParameterizedProblem(ParameterizedProblem *problem);
 
+   void InitROMHandler();
    void SaveSnapshot(const int &sample_index)
    { rom_handler->SaveSnapshot(us, sample_index); }
    void FormReducedBasis(const int &total_samples)

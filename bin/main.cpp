@@ -207,6 +207,11 @@ void SingleRun()
    {
       // test->AllocROMMat();
       test->LoadReducedBasis();
+
+      // TODO: need to implement save/load sparse matrix and remove this line.
+      std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
+      if (rom_handler_str == "mfem")
+         test->ProjectOperatorOnReducedBasis();
    }
 
    StopWatch solveTimer;
