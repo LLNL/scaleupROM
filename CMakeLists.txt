@@ -152,6 +152,9 @@ set(scaleupROMObj_SOURCES
   include/linalg_utils.hpp
   src/linalg_utils.cpp
 
+  include/rom_handler.hpp
+  src/rom_handler.cpp
+
 )
 
 add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})

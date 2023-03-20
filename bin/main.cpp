@@ -205,7 +205,7 @@ void SingleRun()
 
    if (test->UseRom())
    {
-      test->AllocROMMat();
+      // test->AllocROMMat();
       test->LoadReducedBasis();
    }
 
