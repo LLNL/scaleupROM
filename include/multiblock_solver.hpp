@@ -15,14 +15,14 @@
 #include "input_parser.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
-#include "parameterized_problem.hpp"
+// #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
 #include "linalg/BasisGenerator.h"
 #include "linalg/BasisReader.h"
 #include "mfem/Utilities.hpp"
 
-namespace mfem
-{
+// By convention we only use mfem namespace as default, not CAROM.
+using namespace mfem;
 
 enum DecompositionMode
 {
@@ -34,6 +34,10 @@ enum DecompositionMode
 
 class MultiBlockSolver
 {
+
+friend class ParameterizedProblem;
+friend class Poisson0;
+
 public:
    struct InterfaceInfo {
       int Attr;
@@ -196,9 +200,6 @@ public:
    void SaveVisualization()
    { if (!save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
 
-   // TODO: some other form of interface?
-   void SetParameterizedProblem(ParameterizedProblem *problem);
-
    void InitROMHandler();
    void SaveSnapshot(const int &sample_index)
    { rom_handler->SaveSnapshot(us, sample_index); }
@@ -214,8 +215,5 @@ public:
 
    void SanityCheckOnCoeffs();
 };
-
-
-} // namespace mfem
 
 #endif

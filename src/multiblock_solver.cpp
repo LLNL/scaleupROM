@@ -17,9 +17,7 @@
 // #include <algorithm>
 
 using namespace std;
-
-namespace mfem
-{
+using namespace mfem;
 
 MultiBlockSolver::MultiBlockSolver()
 {
@@ -685,42 +683,6 @@ void MultiBlockSolver::InitVisualization()
    }
 }
 
-void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
-{
-   // clean up rhs for parametrized problem.
-   if (rhs_coeffs.Size() > 0)
-   {
-      for (int k = 0; k < rhs_coeffs.Size(); k++) delete rhs_coeffs[k];
-      rhs_coeffs.SetSize(0);
-   }
-   // clean up boundary functions for parametrized problem.
-   bdr_coeffs = NULL;
-
-   std::string problem_name = problem->GetProblemName();
-
-   if (problem_name == "poisson0")
-   {
-      // This problem is set on homogenous Dirichlet BC.
-      AddBCFunction(0.0);
-
-      // parameter values are set in the namespace function_factory::poisson0.
-      AddRHSFunction(*(problem->scalar_rhs_ptr));
-
-      if (save_visual)
-      {
-         const int index = problem->GetLocalSampleIndex();
-         std::ostringstream oss;
-         oss << "paraview_poisson0_sample" << std::to_string(index);
-
-         visual_output = oss.str();
-      }
-   }
-   else
-   {
-      mfem_error("Unknown parameterized problem name!\n");
-   }
-}
-
 void MultiBlockSolver::InitROMHandler()
 {
    std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
@@ -813,6 +775,4 @@ void MultiBlockSolver::SanityCheckOnCoeffs()
       }
    if (all_null)
       MFEM_WARNING("All bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
-}
-
 }

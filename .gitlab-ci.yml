@@ -17,7 +17,7 @@ compile:
   script:
     - mkdir ci-build
     - cd ci-build
-    - cmake ..
+    - cmake .. -DBUILD_SKETCHES=ON
     - make -j 4
 
 dd_mms:

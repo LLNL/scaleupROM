@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "parameterized_problem.hpp"
+#include "input_parser.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -75,6 +76,35 @@ Poisson0::Poisson0()
    param_ptr.SetSize(2);
    param_ptr[0] = &(function_factory::poisson0::k);
    param_ptr[1] = &(function_factory::poisson0::offset);
+}
+
+void Poisson0::SetParameterizedProblem(MultiBlockSolver *solver)
+{
+   // clean up rhs for parametrized problem.
+   if (solver->rhs_coeffs.Size() > 0)
+   {
+      for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
+      solver->rhs_coeffs.SetSize(0);
+   }
+   // clean up boundary functions for parametrized problem.
+   solver->bdr_coeffs = NULL;
+
+   // std::string problem_name = GetProblemName();
+
+   // This problem is set on homogenous Dirichlet BC.
+   solver->AddBCFunction(0.0);
+
+   // parameter values are set in the namespace function_factory::poisson0.
+   solver->AddRHSFunction(*scalar_rhs_ptr);
+
+   if (solver->save_visual)
+   {
+      const int index = GetLocalSampleIndex();
+      std::ostringstream oss;
+      oss << "paraview_poisson0_sample" << std::to_string(index);
+
+      solver->visual_output = oss.str();
+   }
 }
 
 ParameterizedProblem* InitParameterizedProblem()

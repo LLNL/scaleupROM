@@ -106,7 +106,7 @@ void GenerateSamples(MPI_Comm comm)
       test->InitVariables();
 
       sample_generator->SetSampleParams(s);
-      test->SetParameterizedProblem(problem);
+      problem->SetParameterizedProblem(test);
 
       test->InitVisualization();
       test->BuildOperators();
@@ -136,24 +136,9 @@ void BuildROM(MPI_Comm comm)
    test->InitVariables();
    // test->InitVisualization();
 
-   // // TODO: separate unto single run mode.
-   // {
-   //    std::string problem_name = problem->GetProblemName();
-   //    std::string param_list_str("single_run/" + problem_name);
-   //    YAML::Node param_list = config.FindNode(param_list_str);
-   //    MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
-   //    size_t num_params = param_list.size();
-   //    for (int p = 0; p < num_params; p++)
-   //    {
-   //       std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-   //       double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
-   //       problem->SetParams(param_name, value);
-   //    }
-   // }
-
    // NOTE: you need this to set bc/rhs coefficients!
    // This case, we can use default parameter values of the problem.
-   test->SetParameterizedProblem(problem);
+   problem->SetParameterizedProblem(test);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
@@ -196,7 +181,7 @@ void SingleRun()
       problem->SetParams(param_name, value);
    }
 
-   test->SetParameterizedProblem(problem);
+   problem->SetParameterizedProblem(test);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();

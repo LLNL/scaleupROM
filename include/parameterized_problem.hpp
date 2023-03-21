@@ -13,7 +13,7 @@
 #define PARAMETERIZED_PROBLEM_HPP
 
 #include "mfem.hpp"
-#include "input_parser.hpp"
+#include "multiblock_solver.hpp"
 
 using namespace mfem;
 
@@ -76,6 +76,9 @@ public:
    // TODO: support other datatypes such as integer?
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
+
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver)
+   { mfem_error("Abstract class method SetParameterizedProblem is executed!\n"); }
 };
 
 class Poisson0 : public ParameterizedProblem
@@ -88,7 +91,7 @@ public:
    Poisson0();
    ~Poisson0() {};
 
-   // virtual double rhs(const Vector &x);
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
 };
 
 ParameterizedProblem* InitParameterizedProblem();
