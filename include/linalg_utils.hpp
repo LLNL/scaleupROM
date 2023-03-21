@@ -40,15 +40,25 @@ void SetBlock(const CAROM::Vector& blockVec,
 void CopyMatrix(const CAROM::Matrix &carom_mat,
                 DenseMatrix &mfem_mat);
 
+void PrintMatrix(const CAROM::Matrix &mat,
+                 const std::string &filename);
+
 }
 
 namespace mfem
 {
-    // Compute Rt * A * P
-    void RtAP(DenseMatrix& R,
-             const SparseMatrix& A,
-             DenseMatrix& P,
-             DenseMatrix& RAP);
+// Compute Rt * A * P
+void RtAP(DenseMatrix& R,
+        const SparseMatrix& A,
+        DenseMatrix& P,
+        DenseMatrix& RAP);
+
+void PrintMatrix(const SparseMatrix &mat,
+                const std::string &filename);
+
+void PrintMatrix(const DenseMatrix &mat,
+                 const std::string &filename);
+
 }
 
 #endif

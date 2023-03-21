@@ -108,6 +108,23 @@ void CopyMatrix(const CAROM::Matrix &carom_mat,
          mfem_mat(i,j) = carom_mat.item(i,j);
 }
 
+// Does not support parallelization. for debugging.
+void PrintMatrix(const CAROM::Matrix &mat,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < mat.numRows(); i++)
+   {
+      for (int j = 0; j < mat.numColumns(); j++)
+         fprintf(fp, "%.15E\t", mat.item(i,j));
+      fprintf(fp, "\n");
+   }
+
+   fclose(fp);
+   return;
+}
+
 }
 
 namespace mfem
@@ -130,8 +147,33 @@ void RtAP(DenseMatrix& R,
          Vector vec_i, vec_j;
          R.GetColumnReference(i, vec_i);
          P.GetColumnReference(j, vec_j);
-         RtAP(i, j) = A.InnerProduct(vec_i, vec_j);
+         // NOTE: mfem::SparseMatrix.InnerProduct(x, y) computes y^t A x
+         RtAP(i, j) = A.InnerProduct(vec_j, vec_i);
       }
+}
+
+void PrintMatrix(const SparseMatrix &mat,
+                const std::string &filename)
+{
+   std::ofstream file(filename.c_str());
+   mat.PrintMatlab(file);
+}
+
+// Does not support parallelization. for debugging.
+void PrintMatrix(const DenseMatrix &mat,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < mat.NumRows(); i++)
+   {
+      for (int j = 0; j < mat.NumCols(); j++)
+         fprintf(fp, "%.15E\t", mat(i,j));
+      fprintf(fp, "\n");
+   }
+
+   fclose(fp);
+   return;
 }
 
 }
