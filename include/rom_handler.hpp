@@ -57,6 +57,7 @@ protected:
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
+   std::string sample_dir;
    std::string sample_prefix;
    std::string basis_prefix;
    std::string proj_inv_prefix;
@@ -103,6 +104,9 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
+   { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
 };
 
 class MFEMROMHandler : public ROMHandler

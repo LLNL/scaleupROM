@@ -96,15 +96,6 @@ void Poisson0::SetParameterizedProblem(MultiBlockSolver *solver)
 
    // parameter values are set in the namespace function_factory::poisson0.
    solver->AddRHSFunction(*scalar_rhs_ptr);
-
-   if (solver->save_visual)
-   {
-      const int index = GetLocalSampleIndex();
-      std::ostringstream oss;
-      oss << "paraview_poisson0_sample" << std::to_string(index);
-
-      solver->visual_output = oss.str();
-   }
 }
 
 ParameterizedProblem* InitParameterizedProblem()

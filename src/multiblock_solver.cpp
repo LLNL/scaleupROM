@@ -166,8 +166,11 @@ void MultiBlockSolver::ParseInputs()
 
    save_visual = config.GetOption<bool>("visualization/enabled", false);
    if (save_visual)
-      // NOTE: this can be overriden in SetParameterizedProblem.
-      visual_output = config.GetOption<std::string>("visualization/output_dir", "paraview_output");
+   {
+      // Default file path if no input file name is provided.
+      visual_dir = config.GetOption<std::string>("visualization/file_path/directory", ".");
+      visual_prefix = config.GetOption<std::string>("visualization/file_path/prefix", "paraview_output");
+   }
 
    // rom inputs.
    use_rom = config.GetOption<bool>("main/use_rom", false);
@@ -663,15 +666,26 @@ void MultiBlockSolver::Solve()
    // printf("test: %f seconds.\n", test.RealTime());
 }
 
-void MultiBlockSolver::InitVisualization()
+void MultiBlockSolver::InitVisualization(const std::string& output_path)
 {
    if (!save_visual) return;
 
    paraviewColls.SetSize(numSub);
 
+   std::string file_prefix;
+   if (output_path != "")
+      file_prefix = output_path;
+   else
+   {
+      assert(visual_prefix != "");
+      assert(visual_dir != "");
+      file_prefix = visual_dir + "/" + visual_prefix;
+   }
+
    for (int m = 0; m < numSub; m++) {
       ostringstream oss;
-      oss << visual_output << "_" << std::to_string(m);
+      // Each subdomain needs to be save separately.
+      oss << file_prefix << "_" << std::to_string(m);
 
       paraviewColls[m] = new ParaViewDataCollection(oss.str().c_str(), &(*meshes[m]));
       paraviewColls[m]->SetLevelsOfDetail(order);

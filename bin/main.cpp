@@ -108,7 +108,8 @@ void GenerateSamples(MPI_Comm comm)
       sample_generator->SetSampleParams(s);
       problem->SetParameterizedProblem(test);
 
-      test->InitVisualization();
+      const std::string visual_path = sample_generator->GetSamplePath(s, test->GetVisualizationPrefix());
+      test->InitVisualization(visual_path);
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();

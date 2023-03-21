@@ -120,7 +120,8 @@ protected:
 
    // visualization variables
    bool save_visual = false;
-   std::string visual_output;
+   std::string visual_dir = ".";
+   std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
 
    // rom variables.
@@ -155,6 +156,8 @@ public:
    const int GetDiscretizationOrder() { return order; }
    const bool UseRom() { return use_rom; }
    ROMHandler* GetROMHandler() { return rom_handler; }
+   const bool IsVisualizationSaved() { return save_visual; }
+   const std::string GetVisualizationPrefix() { return visual_prefix; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
@@ -196,7 +199,7 @@ public:
 
    void Solve();
 
-   void InitVisualization();
+   void InitVisualization(const std::string& output_dir = "");
    void SaveVisualization()
    { if (!save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
 

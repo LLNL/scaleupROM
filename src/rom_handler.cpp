@@ -44,7 +44,12 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
    }
 
    if ((mode == ROMHandlerMode::SAMPLE_GENERATION) || (mode == ROMHandlerMode::BUILD_ROM))
-      sample_prefix = config.GetRequiredOption<std::string>("sample_generation/prefix");
+   {
+      sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
+      sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", "");
+      if (sample_prefix == "")
+         sample_prefix = config.GetRequiredOption<std::string>("parameterized_problem/name");
+   }
 
    num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
 
@@ -96,7 +101,7 @@ void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
    
    for (int m = 0; m < numSub; m++)
    {
-      std::string filename(sample_prefix + "_sample" + std::to_string(sample_index) + "_dom" + std::to_string(m));
+      const std::string filename = GetSnapshotPrefix(sample_index, m);
       rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
@@ -130,7 +135,7 @@ void ROMHandler::FormReducedBasis(const int &total_samples)
 
       for (int s = 0; s < total_samples; s++)
       {
-         std::string filename(sample_prefix + "_sample" + std::to_string(s) + "_dom" + std::to_string(m) + "_snapshot");
+         const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
          basis_generator->loadSamples(filename,"snapshot");
       }
 

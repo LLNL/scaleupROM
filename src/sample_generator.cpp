@@ -22,7 +22,9 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
    MPI_Comm_size(comm, &num_procs);
    MPI_Comm_rank(comm, &proc_rank);
 
+   sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
    std::string problem_name = problem->GetProblemName();
+   sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", problem_name);
 
    // TODO: currently combined with sample generation part.
    // TODO: Separate with sample generation.
@@ -148,4 +150,16 @@ void SampleGenerator::SetSampleParams(const int &index)
    for (int p = 0; p < num_sampling_params; p++)
       params(p) = (*double_paramspace[p])[nested_idx[p]];
    problem->SetParams(sample2problem, params);
+}
+
+const std::string SampleGenerator::GetSamplePath(const int &idx, const std::string& prefix)
+{
+   std::string full_path = sample_dir;
+   full_path += "/sample" + std::to_string(idx) + "_";
+   if (prefix != "")
+      full_path += prefix;
+   else
+      full_path += sample_prefix;
+
+   return full_path;
 }

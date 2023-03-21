@@ -38,6 +38,10 @@ protected:
    // Array<Array<int> *> integer_paramspace;
    Array<Vector *> double_paramspace;
 
+   // file path
+   std::string sample_dir = ".";
+   std::string sample_prefix;
+
 public:
    SampleGenerator(MPI_Comm comm, ParameterizedProblem *target);
 
@@ -65,6 +69,8 @@ public:
    { return IsMyJob(GetSampleIndex(index)); }
    bool IsMyJob(const int &index)
    { return ((index >= sample_offsets[proc_rank]) && (index < sample_offsets[proc_rank+1])); }
+
+   const std::string GetSamplePath(const int& idx, const std::string &prefix = "");
 };
 
 #endif
