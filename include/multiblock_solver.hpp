@@ -16,6 +16,7 @@
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
+#include "rom_handler.hpp"
 #include "linalg/BasisGenerator.h"
 #include "linalg/BasisReader.h"
 #include "mfem/Utilities.hpp"
@@ -30,20 +31,6 @@ enum DecompositionMode
    FETI,       // finite-element tearing and interconnecting
    NUM_DDMODE
 };
-
-enum TrainMode
-{
-   INDIVIDUAL,
-   UNIVERSAL,
-   NUM_TRAINMODE
-};
-
-// enum ProjectionMode
-// {
-//    GALERKIN,
-//    LSPG,
-//    NUM_PROJMODE
-// };
 
 class MultiBlockSolver
 {
@@ -100,9 +87,12 @@ protected:
    int max_bdr_attr;
    Array<Array<int> *> bdr_markers;
 
-   Array<int> block_offsets;
+   Array<int> block_offsets, num_dofs;
    BlockVector *U, *RHS;
-   BlockOperator *globalMat;
+   // For nonlinear problem
+   // BlockOperator *globalMat;
+   BlockMatrix *globalMat;
+   SparseMatrix *globalMat_mono;
 
    Array<GridFunction *> us;
 
@@ -121,41 +111,17 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
+   // MFEM solver options
+   bool use_monolithic;
+
    // visualization variables
    bool save_visual = false;
    std::string visual_output;
    Array<ParaViewDataCollection *> paraviewColls;
 
    // rom variables.
+   ROMHandler *rom_handler = NULL;
    bool use_rom = false;
-   bool save_proj_inv = false;
-   bool save_lspg_basis = false;
-   TrainMode train_mode = NUM_TRAINMODE;
-   // ProjectionMode proj_mode = NUM_PROJMODE;
-   std::string sample_prefix;
-   std::string basis_prefix;
-   std::string proj_inv_prefix;
-   int num_basis;
-   Array<const CAROM::Matrix*> spatialbasis;
-   bool basis_loaded;
-   bool proj_inv_loaded;
-
-   BlockOperator *romMat;
-   Array2D<SparseMatrix *> rom_mats;
-   Array<int> rom_block_offsets;
-   
-   CAROM::Vector *reduced_rhs;
-
-   Array2D<CAROM::Matrix *> carom_mats;
-   CAROM::Matrix *romMat_inv;
-   
-   CAROM::Options* rom_options;
-   CAROM::BasisGenerator *basis_generator;
-   CAROM::BasisReader *basis_reader;
-
-   int max_num_snapshots = 100;
-   bool update_right_SV = false;
-   bool incremental = false;
 
 public:
    MultiBlockSolver();
@@ -184,6 +150,7 @@ public:
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() { return order; }
    const bool UseRom() { return use_rom; }
+   ROMHandler* GetROMHandler() { return rom_handler; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
@@ -232,14 +199,17 @@ public:
    // TODO: some other form of interface?
    void SetParameterizedProblem(ParameterizedProblem *problem);
 
-   void SaveSnapshot(const int &sample_index);
-   void FormReducedBasis(const int &total_samples);
-   void LoadReducedBasis();
-   const CAROM::Matrix* GetReducedBasis(const int &subdomain_index);
-   void AllocROMMat();  // allocate matrixes for rom.
-   void ProjectOperatorOnReducedBasis();
-   void ProjectRHSOnReducedBasis();
-   void SolveROM();
+   void InitROMHandler();
+   void SaveSnapshot(const int &sample_index)
+   { rom_handler->SaveSnapshot(us, sample_index); }
+   void FormReducedBasis(const int &total_samples)
+   { rom_handler->FormReducedBasis(total_samples); }
+   void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
+   void ProjectOperatorOnReducedBasis()
+   { rom_handler->ProjectOperatorOnReducedBasis(mats); }
+   void ProjectRHSOnReducedBasis()
+   { rom_handler->ProjectRHSOnReducedBasis(RHS); }
+   void SolveROM() { rom_handler->Solve(U); }
    void CompareSolution();
 
    void SanityCheckOnCoeffs();
