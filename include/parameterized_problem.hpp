@@ -34,6 +34,15 @@ namespace poisson0
    double rhs(const Vector &x);
 }
 
+namespace poisson_component
+{
+   extern Vector k, bdr_k;
+   extern double offset, bdr_offset;
+
+   double bdr(const Vector &x);
+   double rhs(const Vector &x);
+}
+
 }
 
 class ParameterizedProblem
@@ -71,6 +80,7 @@ public:
    // virtual member functions cannot be passed down as argument.
    // Instead use pointers to static functions.
    function_factory::scalar_rhs *scalar_rhs_ptr = NULL;
+   function_factory::scalar_rhs *scalar_bdr_ptr = NULL;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
@@ -83,13 +93,18 @@ public:
 
 class Poisson0 : public ParameterizedProblem
 {
-protected:
-   // int k_idx = -1;
-   // int offset_idx = -1;
-
 public:
    Poisson0();
    ~Poisson0() {};
+
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
+};
+
+class PoissonComponent : public ParameterizedProblem
+{
+public:
+   PoissonComponent();
+   ~PoissonComponent() {};
 
    virtual void SetParameterizedProblem(MultiBlockSolver *solver);
 };

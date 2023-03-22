@@ -37,6 +37,7 @@ class MultiBlockSolver
 
 friend class ParameterizedProblem;
 friend class Poisson0;
+friend class PoissonComponent;
 
 public:
    struct InterfaceInfo {

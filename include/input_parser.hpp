@@ -39,7 +39,29 @@ struct convert<Array<T>> {
 
       return true;
    }
-};
+}; // struct convert<Array<T>>
+
+template<>
+struct convert<Vector> {
+   static Node encode(const Vector& rhs) {
+      Node node;
+      for (int k = 0; k < rhs.Size(); k++)
+         node.push_back(rhs[k]);
+      return node;
+   }
+
+   static bool decode(const Node& node, Vector& rhs) {
+      if(!node.IsSequence()) {
+         return false;
+      }
+
+      rhs.SetSize(node.size());
+      for (int k = 0; k < node.size(); k++)
+         rhs[k] = node[k].as<double>();
+
+      return true;
+   }
+}; // struct convert<Vector>
 
 }
 
