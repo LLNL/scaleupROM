@@ -157,7 +157,7 @@ void BuildROM(MPI_Comm comm)
    // test->ProjectRHSOnReducedBasis();
    // test->SolveROM();
 
-   // test->SaveVisualization();
+   test->SaveBasisVisualization();
 
    delete test;
    delete sample_generator;

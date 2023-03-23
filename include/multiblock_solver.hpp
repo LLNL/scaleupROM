@@ -216,6 +216,8 @@ public:
    { rom_handler->ProjectRHSOnReducedBasis(RHS); }
    void SolveROM() { rom_handler->Solve(U); }
    void CompareSolution();
+   void SaveBasisVisualization()
+   { rom_handler->SaveBasisVisualization(fes); }
 
    void SanityCheckOnCoeffs();
 };

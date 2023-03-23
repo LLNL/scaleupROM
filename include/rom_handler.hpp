@@ -46,7 +46,8 @@ class ROMHandler
 {
 protected:
 // public:
-   int numSub;   // number of subdomains.
+   int numSub;          // number of subdomains.
+   int num_basis_sets;  // number of the basis sets.
    Array<int> fom_num_dofs;
 
    // rom options.
@@ -63,7 +64,8 @@ protected:
    std::string proj_inv_prefix;
 
    // rom variables.
-   int num_basis;
+   // TODO: need Array<int> for multi-component basis.
+   int num_basis;    // number of columns in a basis set
    Array<const CAROM::Matrix*> carom_spatialbasis;
    bool basis_loaded;
    bool proj_inv_loaded;
@@ -107,6 +109,9 @@ public:
 
    const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
    { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
+
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+   { mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 };
 
 class MFEMROMHandler : public ROMHandler
@@ -134,6 +139,8 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes);
 };
 
 

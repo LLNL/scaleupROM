@@ -62,10 +62,13 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
    if (train_mode_str == "individual")
    {
       train_mode = TrainMode::INDIVIDUAL;
+      num_basis_sets = numSub;
    }
    else if (train_mode_str == "universal")
    {
       train_mode = TrainMode::UNIVERSAL;
+      // TODO: multi-component basis.
+      num_basis_sets = 1;
    }
    else
    {
@@ -180,7 +183,7 @@ void ROMHandler::LoadReducedBasis()
    {
       case TrainMode::UNIVERSAL:
       {  // TODO: when using more than one component domain.
-         carom_spatialbasis.SetSize(1);
+         carom_spatialbasis.SetSize(num_basis_sets);
          basis_name = basis_prefix + "_universal";
          basis_reader = new CAROM::BasisReader(basis_name);
 
@@ -370,6 +373,10 @@ void ROMHandler::Solve(BlockVector* U)
    }
 }
 
+/*
+   MFEMROMHandler
+*/
+
 MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const Array<int> &input_num_dofs)
    : ROMHandler(input_numSub, input_num_dofs)
 {
@@ -504,6 +511,42 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
       // 23. reconstruct FOM state
       basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
+   }
+}
+
+void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+{
+   if (!config.GetOption<bool>("model_reduction/visualization/enabled", false)) return;
+   assert(basis_loaded);
+
+   std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
+   if (train_mode == TrainMode::UNIVERSAL)
+      visual_prefix += "_universal";
+
+   for (int m = 0; m < num_basis_sets; m++)
+   {
+      std::string file_prefix = visual_prefix;
+      file_prefix += "_" + std::to_string(m);
+
+      // TODO: Multi-component, universal basis case (index not necessarily matches the subdomain index.)
+      Mesh *mesh = fes[m]->GetMesh();
+      const int order = fes[m]->FEColl()->GetOrder();
+      ParaViewDataCollection *coll = new ParaViewDataCollection(file_prefix.c_str(), mesh);
+      coll->SetLevelsOfDetail(order);
+      coll->SetHighOrderOutput(true);
+      coll->SetPrecision(8);
+
+      Array<GridFunction*> basis_gf(num_basis);
+      basis_gf = NULL;
+      for (int k = 0; k < num_basis; k++)
+      {
+         std::string field_name = "basis_" + std::to_string(k);
+         basis_gf[k] = new GridFunction(fes[m], spatialbasis[m]->GetColumn(k));
+         coll->RegisterField(field_name.c_str(), basis_gf[k]);
+         coll->SetOwnData(false);
+      }
+
+      coll->Save();
    }
 }
 
