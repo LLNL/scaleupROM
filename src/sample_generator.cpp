@@ -89,8 +89,6 @@ void SampleGenerator::GenerateParamSpace()
    {
       assert(sampling_sizes[p] > 0);
 
-      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-
       double_paramspace[p] = new Vector(sampling_sizes[p]);
       double minval = config.GetRequiredOptionFromDict<double>("minimum", param_list[p]);
       double maxval = config.GetRequiredOptionFromDict<double>("maximum", param_list[p]);

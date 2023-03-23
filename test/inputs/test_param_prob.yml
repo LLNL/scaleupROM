@@ -2,6 +2,8 @@ parameterized_problem:
   name: poisson0
 
 sample_generation:
+  random_sample_generator:
+    number_of_samples: 7
   poisson0:
     - parameter_name: k
       sample_size: 5

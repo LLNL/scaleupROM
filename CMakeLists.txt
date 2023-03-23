@@ -149,6 +149,9 @@ set(scaleupROMObj_SOURCES
   include/sample_generator.hpp
   src/sample_generator.cpp
 
+  include/random_sample_generator.hpp
+  src/random_sample_generator.cpp
+
   include/linalg_utils.hpp
   src/linalg_utils.cpp
 

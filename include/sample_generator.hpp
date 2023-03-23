@@ -48,7 +48,7 @@ protected:
 public:
    SampleGenerator(MPI_Comm comm, ParameterizedProblem *target);
 
-   ~SampleGenerator();
+   virtual ~SampleGenerator();
 
    const int GetNumSampleParams() { return num_sampling_params; }
    const Array<int> GetSampleSizes() { return sampling_sizes; }
@@ -70,8 +70,8 @@ public:
 
    // Determine the given index is assigned to the current process.
    void DistributeSamples();
-   const int GetSampleIndex(const Array<int> &index);
-   const Array<int> GetSampleIndex(const int &index);
+   virtual const int GetSampleIndex(const Array<int> &index);
+   virtual const Array<int> GetSampleIndex(const int &index);
    bool IsMyJob(const Array<int> &index)
    { return IsMyJob(GetSampleIndex(index)); }
    bool IsMyJob(const int &index)

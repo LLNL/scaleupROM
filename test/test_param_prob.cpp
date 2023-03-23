@@ -1,7 +1,7 @@
 #include<gtest/gtest.h>
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
-#include "sample_generator.hpp"
+#include "random_sample_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -26,6 +26,8 @@ TEST(SampleGeneratorTest, Test_Parsing)
    EXPECT_EQ(test->GetProblemName(), "poisson0");
    EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
 
+   sample_gen.GenerateParamSpace();
+
    Vector *test_x = sample_gen.GetDoubleParamSpace("k");
    Vector true_x({0.0, 1.0, 2.0, 3.0, 4.0});
    EXPECT_EQ(test_x->Size(), 5);
@@ -44,6 +46,36 @@ TEST(SampleGeneratorTest, Test_Parsing)
       {
          Array<int> local_idx = sample_gen.GetSampleIndex(s);
          printf("%d: (%d, %d) - rank %d\n", s, local_idx[0], local_idx[1], sample_gen.GetProcRank());
+      }
+   }
+
+   return;
+}
+
+TEST(RandomSampleGeneratorTest, Test_Parsing)
+{
+   config = InputParser("inputs/test_param_prob.yml");
+
+   ParameterizedProblem *test = InitParameterizedProblem();
+   RandomSampleGenerator sample_gen(MPI_COMM_WORLD, test);
+
+   EXPECT_EQ(test->GetProblemName(), "poisson0");
+   EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
+
+   sample_gen.GenerateParamSpace();
+
+   Vector *test_x = sample_gen.GetDoubleParamSpace("k");
+   EXPECT_EQ(test_x->Size(), 7);
+
+   Vector *test_y = sample_gen.GetDoubleParamSpace("offset");
+   EXPECT_EQ(test_y->Size(), 7);
+
+   for (int s = 0; s < sample_gen.GetTotalSampleSize(); s++)
+   {
+      if (sample_gen.IsMyJob(s))
+      {
+         Array<int> local_idx = sample_gen.GetSampleIndex(s);
+         printf("%d: (%.4f, %.4f) - rank %d\n", s, (*test_x)[local_idx[0]], (*test_y)[local_idx[1]], sample_gen.GetProcRank());
       }
    }
 

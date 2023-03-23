@@ -48,6 +48,7 @@ namespace poisson_component
 class ParameterizedProblem
 {
 friend class SampleGenerator;
+friend class RandomSampleGenerator;
 
 protected:
    std::string problem_name;

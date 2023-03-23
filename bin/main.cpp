@@ -2,7 +2,7 @@
 #include "interfaceinteg.hpp"
 #include "multiblock_solver.hpp"
 #include "parameterized_problem.hpp"
-#include "sample_generator.hpp"
+#include "random_sample_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include "linalg/BasisGenerator.h"
