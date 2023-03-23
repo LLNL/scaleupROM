@@ -53,6 +53,7 @@ protected:
    // rom options.
    bool save_proj_inv = false;
    bool save_sv = false;
+   bool component_sampling = false;
    bool save_lspg_basis = false;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
@@ -94,10 +95,15 @@ public:
 
    // access
    const int GetNumSubdomains() { return numSub; }
+   const TrainMode GetTrainMode() { return train_mode; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
+
    virtual void FormReducedBasis(const int &total_samples);
+   virtual void FormReducedBasisUniversal(const int &total_samples);
+   virtual void FormReducedBasisIndividual(const int &total_samples);
+
    virtual void LoadReducedBasis();
    virtual void GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis);
    virtual void SetBlockSizes();

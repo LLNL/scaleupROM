@@ -37,7 +37,7 @@ void RandomSampleGenerator::SetParamSpaceSizes()
 void RandomSampleGenerator::GenerateParamSpace()
 {
    YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "SampleGenerator - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
    assert(num_sampling_params > 0);
 
    SetParamSpaceSizes();

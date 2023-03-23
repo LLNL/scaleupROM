@@ -15,6 +15,8 @@ using namespace mfem;
 double dbc2(const Vector &);
 double dbc4(const Vector &);
 
+SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem);
+
 void RunExample();
 void GenerateSamples(MPI_Comm comm);
 void BuildROM(MPI_Comm comm);
@@ -92,10 +94,32 @@ void RunExample()
    test.SaveVisualization();
 }
 
+SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem)
+{
+   SampleGenerator* generator = NULL;
+
+   std::string type = config.GetOption<std::string>("sample_generation/type", "base");
+
+   if (type == "base")
+   {
+      generator = new SampleGenerator(comm, problem);
+   }
+   else if (type == "random")
+   {
+      generator = new RandomSampleGenerator(comm, problem);
+   }
+   else
+   {
+      mfem_error("Unknown sample generator type!\n");
+   }
+
+   return generator;
+}
+
 void GenerateSamples(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
    sample_generator->GenerateParamSpace();
    MultiBlockSolver *test = NULL;
 
@@ -104,6 +128,7 @@ void GenerateSamples(MPI_Comm comm)
       if (!sample_generator->IsMyJob(s)) continue;
 
       test = new MultiBlockSolver();
+      if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
       sample_generator->SetSampleParams(s);
@@ -129,13 +154,14 @@ void GenerateSamples(MPI_Comm comm)
 void BuildROM(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
 
    sample_generator->SetParamSpaceSizes();
    const int total_samples = sample_generator->GetTotalSampleSize();
 
    test = new MultiBlockSolver();
+   if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
    test->InitVariables();
    // test->InitVisualization();
 

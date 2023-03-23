@@ -30,7 +30,7 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
    // TODO: Separate with sample generation.
    param_list_str = ("sample_generation/" + problem_name);
    YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "SampleGenerator - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
 
    num_sampling_params = param_list.size();
 
@@ -56,7 +56,7 @@ SampleGenerator::~SampleGenerator()
 void SampleGenerator::SetParamSpaceSizes()
 {
    YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "SampleGenerator - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
    assert(num_sampling_params > 0);
 
    sampling_sizes.SetSize(num_sampling_params);
@@ -76,7 +76,7 @@ void SampleGenerator::SetParamSpaceSizes()
 void SampleGenerator::GenerateParamSpace()
 {
    YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "SampleGenerator - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
    assert(num_sampling_params > 0);
 
    SetParamSpaceSizes();

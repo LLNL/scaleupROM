@@ -75,6 +75,10 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
       mfem_error("Unknown subdomain training mode!\n");
    }
 
+   component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
+   if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
+      mfem_error("Component sampling is only supported with universal basis!\n");
+
    // std::string proj_mode_str = config.GetOption<std::string>("model_reduction/projection_type", "lspg");
    // if (proj_mode_str == "galerkin")
    // {
@@ -120,23 +124,62 @@ void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
 
 void ROMHandler::FormReducedBasis(const int &total_samples)
 {
+   switch (train_mode)
+   {
+      case (TrainMode::UNIVERSAL):
+      {
+         FormReducedBasisUniversal(total_samples);
+         break;
+      }
+      case (TrainMode::INDIVIDUAL):
+      {
+         FormReducedBasisIndividual(total_samples);
+         break;
+      }
+      default:
+      {
+         mfem_error("ROMHandler: unknown train mode!\n");
+      }
+   }
+}
+
+void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
+{
+   assert(train_mode == TrainMode::UNIVERSAL);
    std::string basis_name;
 
-   if (train_mode == TrainMode::UNIVERSAL)
+   basis_name = basis_prefix + "_universal";
+   rom_options = new CAROM::Options(fom_num_dofs[0], max_num_snapshots, 1, update_right_SV);
+   basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+
+   int num_snapshot_sets = (component_sampling) ? num_basis_sets : numSub;
+   for (int m = 0; m < num_snapshot_sets; m++)
    {
-      basis_name = basis_prefix + "_universal";
-      rom_options = new CAROM::Options(fom_num_dofs[0], max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+      for (int s = 0; s < total_samples; s++)
+      {
+         // TODO: we still need multi-component case adjustment for prefix.
+         const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
+         basis_generator->loadSamples(filename,"snapshot");
+      }
    }
+
+   basis_generator->endSamples(); // save the merged basis file
+   SaveSV(basis_name);
+
+   delete basis_generator;
+   delete rom_options;
+}
+
+void ROMHandler::FormReducedBasisIndividual(const int &total_samples)
+{
+   assert(train_mode == TrainMode::INDIVIDUAL);
+   std::string basis_name;
 
    for (int m = 0; m < numSub; m++)
    {
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         basis_name = basis_prefix + "_dom" + std::to_string(m);
-         rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
-         basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
-      }
+      basis_name = basis_prefix + "_dom" + std::to_string(m);
+      rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
       for (int s = 0; s < total_samples; s++)
       {
@@ -144,18 +187,6 @@ void ROMHandler::FormReducedBasis(const int &total_samples)
          basis_generator->loadSamples(filename,"snapshot");
       }
 
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         basis_generator->endSamples(); // save the merged basis file
-         SaveSV(basis_name);
-
-         delete basis_generator;
-         delete rom_options;
-      }
-   }
-
-   if (train_mode == TrainMode::UNIVERSAL)
-   {
       basis_generator->endSamples(); // save the merged basis file
       SaveSV(basis_name);
 
@@ -375,6 +406,16 @@ void ROMHandler::SaveSV(const std::string& prefix)
    for (int d = 0; d < rom_sv->dim(); d++)
       printf("%.3E\t", rom_sv->item(d));
    printf("\n");
+
+   double coverage = 0.0;
+   double total = 0.0;
+   for (int d = 0; d < rom_sv->dim(); d++)
+   {
+      if (d == num_basis) coverage = total;
+      total += rom_sv->item(d);
+   }
+   coverage /= total;
+   printf("Coverage: %.7f%%\n", coverage * 100.0);
 
    // TODO: hdf5 format + parallel case.
    std::string filename = prefix + "_sv.txt";
