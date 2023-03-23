@@ -96,6 +96,7 @@ void GenerateSamples(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
    SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   sample_generator->GenerateParamSpace();
    MultiBlockSolver *test = NULL;
 
    for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)
@@ -131,6 +132,7 @@ void BuildROM(MPI_Comm comm)
    SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
 
+   sample_generator->SetParamSpaceSizes();
    const int total_samples = sample_generator->GetTotalSampleSize();
 
    test = new MultiBlockSolver();

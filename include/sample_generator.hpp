@@ -26,6 +26,9 @@ protected:
 
    ParameterizedProblem *problem;
 
+   // input path for parameter list
+   std::string param_list_str;
+
    std::size_t num_sampling_params;
    std::map<std::string, int> sample_param_map;
    Array<int> sample2problem;
@@ -51,6 +54,10 @@ public:
    const Array<int> GetSampleSizes() { return sampling_sizes; }
    const int GetTotalSampleSize() { return total_samples; }
    const int GetProcRank() { return proc_rank; }
+
+   // Generate parameter space as listed in sample_generation/problem_name.
+   virtual void SetParamSpaceSizes();
+   virtual void GenerateParamSpace();
 
    // These are made for tests, but are dangerous to be used elsewhere?
    // Array<int>* GetIntParamSpace(const std::string &param_name) { return integer_paramspace[param_indexes[param_name]]; }
