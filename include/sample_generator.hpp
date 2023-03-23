@@ -26,6 +26,9 @@ protected:
 
    ParameterizedProblem *problem;
 
+   // input path for parameter list
+   std::string param_list_str;
+
    std::size_t num_sampling_params;
    std::map<std::string, int> sample_param_map;
    Array<int> sample2problem;
@@ -38,15 +41,23 @@ protected:
    // Array<Array<int> *> integer_paramspace;
    Array<Vector *> double_paramspace;
 
+   // file path
+   std::string sample_dir = ".";
+   std::string sample_prefix;
+
 public:
    SampleGenerator(MPI_Comm comm, ParameterizedProblem *target);
 
-   ~SampleGenerator();
+   virtual ~SampleGenerator();
 
    const int GetNumSampleParams() { return num_sampling_params; }
    const Array<int> GetSampleSizes() { return sampling_sizes; }
    const int GetTotalSampleSize() { return total_samples; }
    const int GetProcRank() { return proc_rank; }
+
+   // Generate parameter space as listed in sample_generation/problem_name.
+   virtual void SetParamSpaceSizes();
+   virtual void GenerateParamSpace();
 
    // These are made for tests, but are dangerous to be used elsewhere?
    // Array<int>* GetIntParamSpace(const std::string &param_name) { return integer_paramspace[param_indexes[param_name]]; }
@@ -59,12 +70,14 @@ public:
 
    // Determine the given index is assigned to the current process.
    void DistributeSamples();
-   const int GetSampleIndex(const Array<int> &index);
-   const Array<int> GetSampleIndex(const int &index);
+   virtual const int GetSampleIndex(const Array<int> &index);
+   virtual const Array<int> GetSampleIndex(const int &index);
    bool IsMyJob(const Array<int> &index)
    { return IsMyJob(GetSampleIndex(index)); }
    bool IsMyJob(const int &index)
    { return ((index >= sample_offsets[proc_rank]) && (index < sample_offsets[proc_rank+1])); }
+
+   const std::string GetSamplePath(const int& idx, const std::string &prefix = "");
 };
 
 #endif

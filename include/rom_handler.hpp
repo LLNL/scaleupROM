@@ -46,23 +46,28 @@ class ROMHandler
 {
 protected:
 // public:
-   int numSub;   // number of subdomains.
+   int numSub;          // number of subdomains.
+   int num_basis_sets;  // number of the basis sets.
    Array<int> fom_num_dofs;
 
    // rom options.
    bool save_proj_inv = false;
+   bool save_sv = false;
+   bool component_sampling = false;
    bool save_lspg_basis = false;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
+   std::string sample_dir;
    std::string sample_prefix;
    std::string basis_prefix;
    std::string proj_inv_prefix;
 
    // rom variables.
-   int num_basis;
+   // TODO: need Array<int> for multi-component basis.
+   int num_basis;    // number of columns in a basis set
    Array<const CAROM::Matrix*> carom_spatialbasis;
    bool basis_loaded;
    bool proj_inv_loaded;
@@ -90,10 +95,15 @@ public:
 
    // access
    const int GetNumSubdomains() { return numSub; }
+   const TrainMode GetTrainMode() { return train_mode; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
+
    virtual void FormReducedBasis(const int &total_samples);
+   virtual void FormReducedBasisUniversal(const int &total_samples);
+   virtual void FormReducedBasisIndividual(const int &total_samples);
+
    virtual void LoadReducedBasis();
    virtual void GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis);
    virtual void SetBlockSizes();
@@ -103,6 +113,14 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
+   { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
+
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+   { mfem_error("Base ROMHandler does not support saving visualization!\n"); }
+
+   virtual void SaveSV(const std::string& prefix);
 };
 
 class MFEMROMHandler : public ROMHandler
@@ -130,6 +148,8 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes);
 };
 
 

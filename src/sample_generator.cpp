@@ -22,20 +22,17 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
    MPI_Comm_size(comm, &num_procs);
    MPI_Comm_rank(comm, &proc_rank);
 
+   sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
    std::string problem_name = problem->GetProblemName();
+   sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", problem_name);
 
    // TODO: currently combined with sample generation part.
    // TODO: Separate with sample generation.
-   std::string param_list_str("sample_generation/" + problem_name);
+   param_list_str = ("sample_generation/" + problem_name);
    YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "ParameterizedProblem - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
 
    num_sampling_params = param_list.size();
-   double_paramspace.SetSize(num_sampling_params);
-   double_paramspace = NULL;
-
-   sampling_sizes.SetSize(num_sampling_params);
-   sampling_sizes = -1;
 
    sample2problem.SetSize(num_sampling_params);
    sample2problem = -1;
@@ -45,8 +42,52 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
       std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
       sample_param_map[param_name] = p;
       sample2problem[p] = problem->GetParamIndex(param_name);
+   }  // for (int p = 0; p < num_sampling_params; p++)
+}
 
+SampleGenerator::~SampleGenerator()
+{
+   for (int p = 0; p < double_paramspace.Size(); p++)
+   {
+      delete double_paramspace[p];
+   }
+}
+
+void SampleGenerator::SetParamSpaceSizes()
+{
+   YAML::Node param_list = config.FindNode(param_list_str);
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
+   assert(num_sampling_params > 0);
+
+   sampling_sizes.SetSize(num_sampling_params);
+   sampling_sizes = -1;
+
+   for (int p = 0; p < num_sampling_params; p++)
       sampling_sizes[p] = config.GetRequiredOptionFromDict<int>("sample_size", param_list[p]);
+
+   total_samples = 1;
+   for (int p = 0; p < num_sampling_params; p++)
+      total_samples *= sampling_sizes[p];
+
+   // This does not need the actual samples. distributing only indexes.
+   DistributeSamples();
+}
+
+void SampleGenerator::GenerateParamSpace()
+{
+   YAML::Node param_list = config.FindNode(param_list_str);
+   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
+   assert(num_sampling_params > 0);
+
+   SetParamSpaceSizes();
+   assert(sampling_sizes.Size() == num_sampling_params);
+
+   double_paramspace.SetSize(num_sampling_params);
+   double_paramspace = NULL;
+
+   for (int p = 0; p < num_sampling_params; p++)
+   {
+      assert(sampling_sizes[p] > 0);
 
       double_paramspace[p] = new Vector(sampling_sizes[p]);
       double minval = config.GetRequiredOptionFromDict<double>("minimum", param_list[p]);
@@ -69,20 +110,6 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
             (*double_paramspace[p])[s] = minval + s * dp;
       }
    }  // for (int p = 0; p < num_sampling_params; p++)
-
-   total_samples = 1;
-   for (int p = 0; p < num_sampling_params; p++)
-      total_samples *= sampling_sizes[p];
-
-   DistributeSamples();
-}
-
-SampleGenerator::~SampleGenerator()
-{
-   for (int p = 0; p < double_paramspace.Size(); p++)
-   {
-      delete double_paramspace[p];
-   }
 }
 
 void SampleGenerator::DistributeSamples()
@@ -148,4 +175,16 @@ void SampleGenerator::SetSampleParams(const int &index)
    for (int p = 0; p < num_sampling_params; p++)
       params(p) = (*double_paramspace[p])[nested_idx[p]];
    problem->SetParams(sample2problem, params);
+}
+
+const std::string SampleGenerator::GetSamplePath(const int &idx, const std::string& prefix)
+{
+   std::string full_path = sample_dir;
+   full_path += "/sample" + std::to_string(idx) + "_";
+   if (prefix != "")
+      full_path += prefix;
+   else
+      full_path += sample_prefix;
+
+   return full_path;
 }

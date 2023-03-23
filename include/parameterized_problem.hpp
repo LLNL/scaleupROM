@@ -13,7 +13,7 @@
 #define PARAMETERIZED_PROBLEM_HPP
 
 #include "mfem.hpp"
-#include "input_parser.hpp"
+#include "multiblock_solver.hpp"
 
 using namespace mfem;
 
@@ -34,11 +34,21 @@ namespace poisson0
    double rhs(const Vector &x);
 }
 
+namespace poisson_component
+{
+   extern Vector k, bdr_k;
+   extern double offset, bdr_offset;
+
+   double bdr(const Vector &x);
+   double rhs(const Vector &x);
+}
+
 }
 
 class ParameterizedProblem
 {
 friend class SampleGenerator;
+friend class RandomSampleGenerator;
 
 protected:
    std::string problem_name;
@@ -71,24 +81,33 @@ public:
    // virtual member functions cannot be passed down as argument.
    // Instead use pointers to static functions.
    function_factory::scalar_rhs *scalar_rhs_ptr = NULL;
+   function_factory::scalar_rhs *scalar_bdr_ptr = NULL;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
+
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver)
+   { mfem_error("Abstract class method SetParameterizedProblem is executed!\n"); }
 };
 
 class Poisson0 : public ParameterizedProblem
 {
-protected:
-   // int k_idx = -1;
-   // int offset_idx = -1;
-
 public:
    Poisson0();
    ~Poisson0() {};
 
-   // virtual double rhs(const Vector &x);
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
+};
+
+class PoissonComponent : public ParameterizedProblem
+{
+public:
+   PoissonComponent();
+   ~PoissonComponent() {};
+
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
 };
 
 ParameterizedProblem* InitParameterizedProblem();

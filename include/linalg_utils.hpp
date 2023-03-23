@@ -43,6 +43,10 @@ void CopyMatrix(const CAROM::Matrix &carom_mat,
 void PrintMatrix(const CAROM::Matrix &mat,
                  const std::string &filename);
 
+// TODO: parallel version + hdf5 file format for larger basis dimension.
+void PrintVector(const CAROM::Vector &vec,
+                 const std::string &filename);
+
 }
 
 namespace mfem

@@ -11,6 +11,7 @@
 
 #include <fstream>
 #include <iostream>
+#include "random.hpp"
 #include "librom.h"
 #include "mfem.hpp"
 #include "linalg/svd/StaticSVD.h"
@@ -311,9 +312,4 @@ int main(int argc, char *argv[])
 
    // MPI_Finalize();
    return 0;
-}
-
-double UniformRandom()
-{
-   return static_cast<double> (rand()) / static_cast<double> (RAND_MAX);
 }

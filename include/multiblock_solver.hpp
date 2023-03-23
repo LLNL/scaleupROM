@@ -15,14 +15,14 @@
 #include "input_parser.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
-#include "parameterized_problem.hpp"
+// #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
 #include "linalg/BasisGenerator.h"
 #include "linalg/BasisReader.h"
 #include "mfem/Utilities.hpp"
 
-namespace mfem
-{
+// By convention we only use mfem namespace as default, not CAROM.
+using namespace mfem;
 
 enum DecompositionMode
 {
@@ -34,6 +34,11 @@ enum DecompositionMode
 
 class MultiBlockSolver
 {
+
+friend class ParameterizedProblem;
+friend class Poisson0;
+friend class PoissonComponent;
+
 public:
    struct InterfaceInfo {
       int Attr;
@@ -116,7 +121,8 @@ protected:
 
    // visualization variables
    bool save_visual = false;
-   std::string visual_output;
+   std::string visual_dir = ".";
+   std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
 
    // rom variables.
@@ -151,6 +157,8 @@ public:
    const int GetDiscretizationOrder() { return order; }
    const bool UseRom() { return use_rom; }
    ROMHandler* GetROMHandler() { return rom_handler; }
+   const bool IsVisualizationSaved() { return save_visual; }
+   const std::string GetVisualizationPrefix() { return visual_prefix; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
@@ -192,12 +200,9 @@ public:
 
    void Solve();
 
-   void InitVisualization();
+   void InitVisualization(const std::string& output_dir = "");
    void SaveVisualization()
    { if (!save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
-
-   // TODO: some other form of interface?
-   void SetParameterizedProblem(ParameterizedProblem *problem);
 
    void InitROMHandler();
    void SaveSnapshot(const int &sample_index)
@@ -211,11 +216,10 @@ public:
    { rom_handler->ProjectRHSOnReducedBasis(RHS); }
    void SolveROM() { rom_handler->Solve(U); }
    void CompareSolution();
+   void SaveBasisVisualization()
+   { rom_handler->SaveBasisVisualization(fes); }
 
    void SanityCheckOnCoeffs();
 };
-
-
-} // namespace mfem
 
 #endif

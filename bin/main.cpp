@@ -2,7 +2,7 @@
 #include "interfaceinteg.hpp"
 #include "multiblock_solver.hpp"
 #include "parameterized_problem.hpp"
-#include "sample_generator.hpp"
+#include "random_sample_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include "linalg/BasisGenerator.h"
@@ -14,6 +14,8 @@ using namespace mfem;
 
 double dbc2(const Vector &);
 double dbc4(const Vector &);
+
+SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem);
 
 void RunExample();
 void GenerateSamples(MPI_Comm comm);
@@ -92,10 +94,33 @@ void RunExample()
    test.SaveVisualization();
 }
 
+SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem)
+{
+   SampleGenerator* generator = NULL;
+
+   std::string type = config.GetOption<std::string>("sample_generation/type", "base");
+
+   if (type == "base")
+   {
+      generator = new SampleGenerator(comm, problem);
+   }
+   else if (type == "random")
+   {
+      generator = new RandomSampleGenerator(comm, problem);
+   }
+   else
+   {
+      mfem_error("Unknown sample generator type!\n");
+   }
+
+   return generator;
+}
+
 void GenerateSamples(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
+   sample_generator->GenerateParamSpace();
    MultiBlockSolver *test = NULL;
 
    for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)
@@ -103,12 +128,14 @@ void GenerateSamples(MPI_Comm comm)
       if (!sample_generator->IsMyJob(s)) continue;
 
       test = new MultiBlockSolver();
+      if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
       sample_generator->SetSampleParams(s);
-      test->SetParameterizedProblem(problem);
+      problem->SetParameterizedProblem(test);
 
-      test->InitVisualization();
+      const std::string visual_path = sample_generator->GetSamplePath(s, test->GetVisualizationPrefix());
+      test->InitVisualization(visual_path);
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
@@ -127,33 +154,20 @@ void GenerateSamples(MPI_Comm comm)
 void BuildROM(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = new SampleGenerator(comm, problem);
+   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
 
+   sample_generator->SetParamSpaceSizes();
    const int total_samples = sample_generator->GetTotalSampleSize();
 
    test = new MultiBlockSolver();
+   if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
    test->InitVariables();
    // test->InitVisualization();
 
-   // // TODO: separate unto single run mode.
-   // {
-   //    std::string problem_name = problem->GetProblemName();
-   //    std::string param_list_str("single_run/" + problem_name);
-   //    YAML::Node param_list = config.FindNode(param_list_str);
-   //    MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
-   //    size_t num_params = param_list.size();
-   //    for (int p = 0; p < num_params; p++)
-   //    {
-   //       std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-   //       double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
-   //       problem->SetParams(param_name, value);
-   //    }
-   // }
-
    // NOTE: you need this to set bc/rhs coefficients!
    // This case, we can use default parameter values of the problem.
-   test->SetParameterizedProblem(problem);
+   problem->SetParameterizedProblem(test);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
@@ -169,7 +183,7 @@ void BuildROM(MPI_Comm comm)
    // test->ProjectRHSOnReducedBasis();
    // test->SolveROM();
 
-   // test->SaveVisualization();
+   test->SaveBasisVisualization();
 
    delete test;
    delete sample_generator;
@@ -196,7 +210,7 @@ void SingleRun()
       problem->SetParams(param_name, value);
    }
 
-   test->SetParameterizedProblem(problem);
+   problem->SetParameterizedProblem(test);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();

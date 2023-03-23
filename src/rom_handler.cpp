@@ -44,7 +44,12 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
    }
 
    if ((mode == ROMHandlerMode::SAMPLE_GENERATION) || (mode == ROMHandlerMode::BUILD_ROM))
-      sample_prefix = config.GetRequiredOption<std::string>("sample_generation/prefix");
+   {
+      sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
+      sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", "");
+      if (sample_prefix == "")
+         sample_prefix = config.GetRequiredOption<std::string>("parameterized_problem/name");
+   }
 
    num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
 
@@ -57,15 +62,22 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
    if (train_mode_str == "individual")
    {
       train_mode = TrainMode::INDIVIDUAL;
+      num_basis_sets = numSub;
    }
    else if (train_mode_str == "universal")
    {
       train_mode = TrainMode::UNIVERSAL;
+      // TODO: multi-component basis.
+      num_basis_sets = 1;
    }
    else
    {
       mfem_error("Unknown subdomain training mode!\n");
    }
+
+   component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
+   if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
+      mfem_error("Component sampling is only supported with universal basis!\n");
 
    // std::string proj_mode_str = config.GetOption<std::string>("model_reduction/projection_type", "lspg");
    // if (proj_mode_str == "galerkin")
@@ -87,6 +99,8 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
    max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
 
+   save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
+
    AllocROMMat();
 }
 
@@ -96,7 +110,7 @@ void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
    
    for (int m = 0; m < numSub; m++)
    {
-      std::string filename(sample_prefix + "_sample" + std::to_string(sample_index) + "_dom" + std::to_string(m));
+      const std::string filename = GetSnapshotPrefix(sample_index, m);
       rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
@@ -110,54 +124,71 @@ void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
 
 void ROMHandler::FormReducedBasis(const int &total_samples)
 {
+   switch (train_mode)
+   {
+      case (TrainMode::UNIVERSAL):
+      {
+         FormReducedBasisUniversal(total_samples);
+         break;
+      }
+      case (TrainMode::INDIVIDUAL):
+      {
+         FormReducedBasisIndividual(total_samples);
+         break;
+      }
+      default:
+      {
+         mfem_error("ROMHandler: unknown train mode!\n");
+      }
+   }
+}
+
+void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
+{
+   assert(train_mode == TrainMode::UNIVERSAL);
    std::string basis_name;
 
-   if (train_mode == TrainMode::UNIVERSAL)
+   basis_name = basis_prefix + "_universal";
+   rom_options = new CAROM::Options(fom_num_dofs[0], max_num_snapshots, 1, update_right_SV);
+   basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+
+   int num_snapshot_sets = (component_sampling) ? num_basis_sets : numSub;
+   for (int m = 0; m < num_snapshot_sets; m++)
    {
-      basis_name = basis_prefix + "_universal";
-      rom_options = new CAROM::Options(fom_num_dofs[0], max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+      for (int s = 0; s < total_samples; s++)
+      {
+         // TODO: we still need multi-component case adjustment for prefix.
+         const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
+         basis_generator->loadSamples(filename,"snapshot");
+      }
    }
+
+   basis_generator->endSamples(); // save the merged basis file
+   SaveSV(basis_name);
+
+   delete basis_generator;
+   delete rom_options;
+}
+
+void ROMHandler::FormReducedBasisIndividual(const int &total_samples)
+{
+   assert(train_mode == TrainMode::INDIVIDUAL);
+   std::string basis_name;
 
    for (int m = 0; m < numSub; m++)
    {
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         basis_name = basis_prefix + "_dom" + std::to_string(m);
-         rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
-         basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
-      }
+      basis_name = basis_prefix + "_dom" + std::to_string(m);
+      rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
       for (int s = 0; s < total_samples; s++)
       {
-         std::string filename(sample_prefix + "_sample" + std::to_string(s) + "_dom" + std::to_string(m) + "_snapshot");
+         const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
          basis_generator->loadSamples(filename,"snapshot");
       }
 
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         basis_generator->endSamples(); // save the merged basis file
-
-         const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
-         printf("Singular values: ");
-         for (int d = 0; d < rom_sv->dim(); d++)
-            printf("%.3f\t", rom_sv->item(d));
-         printf("\n");
-
-         delete basis_generator;
-         delete rom_options;
-      }
-   }
-
-   if (train_mode == TrainMode::UNIVERSAL)
-   {
       basis_generator->endSamples(); // save the merged basis file
-
-      const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
-      printf("Singular values: ");
-      for (int d = 0; d < rom_sv->dim(); d++)
-         printf("%.3E\t", rom_sv->item(d));
-      printf("\n");
+      SaveSV(basis_name);
 
       delete basis_generator;
       delete rom_options;
@@ -175,7 +206,7 @@ void ROMHandler::LoadReducedBasis()
    {
       case TrainMode::UNIVERSAL:
       {  // TODO: when using more than one component domain.
-         carom_spatialbasis.SetSize(1);
+         carom_spatialbasis.SetSize(num_basis_sets);
          basis_name = basis_prefix + "_universal";
          basis_reader = new CAROM::BasisReader(basis_name);
 
@@ -365,6 +396,36 @@ void ROMHandler::Solve(BlockVector* U)
    }
 }
 
+void ROMHandler::SaveSV(const std::string& prefix)
+{
+   if (!save_sv) return;
+   assert(basis_generator != NULL);
+
+   const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+   printf("Singular values: ");
+   for (int d = 0; d < rom_sv->dim(); d++)
+      printf("%.3E\t", rom_sv->item(d));
+   printf("\n");
+
+   double coverage = 0.0;
+   double total = 0.0;
+   for (int d = 0; d < rom_sv->dim(); d++)
+   {
+      if (d == num_basis) coverage = total;
+      total += rom_sv->item(d);
+   }
+   coverage /= total;
+   printf("Coverage: %.7f%%\n", coverage * 100.0);
+
+   // TODO: hdf5 format + parallel case.
+   std::string filename = prefix + "_sv.txt";
+   CAROM::PrintVector(*rom_sv, filename);
+}
+
+/*
+   MFEMROMHandler
+*/
+
 MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const Array<int> &input_num_dofs)
    : ROMHandler(input_numSub, input_num_dofs)
 {
@@ -499,6 +560,42 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
       // 23. reconstruct FOM state
       basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
+   }
+}
+
+void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+{
+   if (!config.GetOption<bool>("model_reduction/visualization/enabled", false)) return;
+   assert(basis_loaded);
+
+   std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
+   if (train_mode == TrainMode::UNIVERSAL)
+      visual_prefix += "_universal";
+
+   for (int m = 0; m < num_basis_sets; m++)
+   {
+      std::string file_prefix = visual_prefix;
+      file_prefix += "_" + std::to_string(m);
+
+      // TODO: Multi-component, universal basis case (index not necessarily matches the subdomain index.)
+      Mesh *mesh = fes[m]->GetMesh();
+      const int order = fes[m]->FEColl()->GetOrder();
+      ParaViewDataCollection *coll = new ParaViewDataCollection(file_prefix.c_str(), mesh);
+      coll->SetLevelsOfDetail(order);
+      coll->SetHighOrderOutput(true);
+      coll->SetPrecision(8);
+
+      Array<GridFunction*> basis_gf(num_basis);
+      basis_gf = NULL;
+      for (int k = 0; k < num_basis; k++)
+      {
+         std::string field_name = "basis_" + std::to_string(k);
+         basis_gf[k] = new GridFunction(fes[m], spatialbasis[m]->GetColumn(k));
+         coll->RegisterField(field_name.c_str(), basis_gf[k]);
+         coll->SetOwnData(false);
+      }
+
+      coll->Save();
    }
 }
 
