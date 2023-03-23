@@ -12,9 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include "librom.h"
-
-// uniform random number in [0., 1.]
-double UniformRandom();
+#include "random.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -69,9 +67,4 @@ int main(int argc, char *argv[])
 
    MPI_Finalize();
    return 0;
-}
-
-double UniformRandom()
-{
-   return static_cast<double> (rand()) / static_cast<double> (RAND_MAX);
 }

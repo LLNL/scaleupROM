@@ -125,6 +125,9 @@ link_libraries(
 
 set(scaleupROMObj_SOURCES
 
+  include/random.hpp
+  src/random.cpp
+
   include/navier_solver.hpp
   src/navier_solver.cpp
 

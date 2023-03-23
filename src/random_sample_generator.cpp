@@ -12,15 +12,11 @@
 // Implementation of Bilinear Form Integrators
 
 #include "random_sample_generator.hpp"
+#include "random.hpp"
 #include "time.h"
 
 using namespace mfem;
 using namespace std;
-
-double UniformRandom()
-{
-   return static_cast<double> (rand()) / static_cast<double> (RAND_MAX);
-}
 
 void RandomSampleGenerator::SetParamSpaceSizes()
 {
