@@ -125,6 +125,18 @@ void PrintMatrix(const CAROM::Matrix &mat,
    return;
 }
 
+void PrintVector(const CAROM::Vector &vec,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < vec.dim(); i++)
+      fprintf(fp, "%.15E\n", vec.item(i));
+
+   fclose(fp);
+   return;
+}
+
 }
 
 namespace mfem

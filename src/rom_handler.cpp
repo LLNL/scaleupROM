@@ -95,6 +95,8 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
    max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
 
+   save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
+
    AllocROMMat();
 }
 
@@ -145,12 +147,7 @@ void ROMHandler::FormReducedBasis(const int &total_samples)
       if (train_mode == TrainMode::INDIVIDUAL)
       {
          basis_generator->endSamples(); // save the merged basis file
-
-         const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
-         printf("Singular values: ");
-         for (int d = 0; d < rom_sv->dim(); d++)
-            printf("%.3f\t", rom_sv->item(d));
-         printf("\n");
+         SaveSV(basis_name);
 
          delete basis_generator;
          delete rom_options;
@@ -160,12 +157,7 @@ void ROMHandler::FormReducedBasis(const int &total_samples)
    if (train_mode == TrainMode::UNIVERSAL)
    {
       basis_generator->endSamples(); // save the merged basis file
-
-      const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
-      printf("Singular values: ");
-      for (int d = 0; d < rom_sv->dim(); d++)
-         printf("%.3E\t", rom_sv->item(d));
-      printf("\n");
+      SaveSV(basis_name);
 
       delete basis_generator;
       delete rom_options;
@@ -371,6 +363,22 @@ void ROMHandler::Solve(BlockVector* U)
       CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
       basis_i->mult(block_reduced_sol, U_block_carom);
    }
+}
+
+void ROMHandler::SaveSV(const std::string& prefix)
+{
+   if (!save_sv) return;
+   assert(basis_generator != NULL);
+
+   const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+   printf("Singular values: ");
+   for (int d = 0; d < rom_sv->dim(); d++)
+      printf("%.3E\t", rom_sv->item(d));
+   printf("\n");
+
+   // TODO: hdf5 format + parallel case.
+   std::string filename = prefix + "_sv.txt";
+   CAROM::PrintVector(*rom_sv, filename);
 }
 
 /*

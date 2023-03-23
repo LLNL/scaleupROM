@@ -52,6 +52,7 @@ protected:
 
    // rom options.
    bool save_proj_inv = false;
+   bool save_sv = false;
    bool save_lspg_basis = false;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
@@ -112,6 +113,8 @@ public:
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
    { mfem_error("Base ROMHandler does not support saving visualization!\n"); }
+
+   virtual void SaveSV(const std::string& prefix);
 };
 
 class MFEMROMHandler : public ROMHandler
