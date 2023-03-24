@@ -54,15 +54,14 @@ public:
    };
 
 protected:
-// public:
+   /*
+      Base variables needed for all systems (potentially)
+   */
    int order = 1;
    // Finite element collection for all fe spaces.
    FiniteElementCollection *fec;
    // Finite element spaces
    Array<FiniteElementSpace *> fes;
-
-   // System matrix for Bilinear case.
-   Array2D<SparseMatrix *> mats;
 
    bool full_dg = true;
    DecompositionMode dd_mode;
@@ -76,6 +75,8 @@ protected:
 
    // Spatial dimension.
    int dim;
+   // Solution dimension, by default 1 (scalar).
+   int udim = 1;
 
    // face/element map from each subdomain to parent mesh.
    Array<Array<int> *> parent_face_map;
@@ -84,15 +85,13 @@ protected:
    Array<InterfaceInfo> interface_infos;
    // Array<int> interface_parent;
 
-   bool strong_bc = false;
-   Array<Array<int> *> ess_attrs;
-   Array<Array<int> *> ess_tdof_lists;
-   Array<Coefficient *> bdr_coeffs;
+   // interface integrator
+   InterfaceNonlinearFormIntegrator *interface_integ;
+   int skip_zeros = 1;
 
-   int max_bdr_attr;
-   Array<Array<int> *> bdr_markers;
-
-   Array<int> block_offsets, num_dofs;
+   Array<int> block_offsets;  // Size(numSub * udim + 1). each block corresponds to a component of vector solution.
+   Array<int> domain_offsets; // Size(numSub + 1). each block corresponds to the vector solution.
+   Array<int> num_vdofs;       // Size(numSub). number of vdofs of the vector solution in each subdomain.
    BlockVector *U, *RHS;
    // For nonlinear problem
    // BlockOperator *globalMat;
@@ -101,20 +100,13 @@ protected:
 
    Array<GridFunction *> us;
 
-   // operators
-   Array<LinearForm *> bs;
-   Array<BilinearForm *> as;
+   // boundary infos
+   bool strong_bc = false;
+   Array<Array<int> *> ess_attrs;
+   Array<Array<int> *> ess_tdof_lists;
 
-   // interface integrator
-   InterfaceNonlinearFormIntegrator *interface_integ;
-   int skip_zeros = 1;
-
-   // rhs coefficients
-   Array<Coefficient *> rhs_coeffs;
-
-   // DG parameters specific to Poisson equation.
-   double sigma = -1.0;
-   double kappa = -1.0;
+   int max_bdr_attr;
+   Array<Array<int> *> bdr_markers;
 
    // MFEM solver options
    bool use_monolithic;
@@ -132,6 +124,27 @@ protected:
    // rom variables.
    ROMHandler *rom_handler = NULL;
    bool use_rom = false;
+
+   /*
+      System-specific variables (will separated to derived classes)
+   */
+
+   // System matrix for Bilinear case.
+   Array2D<SparseMatrix *> mats;
+
+   // operators
+   Array<LinearForm *> bs;
+   Array<BilinearForm *> as;
+
+   // rhs coefficients
+   // The solution dimension is 1 by default, for which using VectorCoefficient is not allowed. (in LinearForm Assemble.)
+   // For a derived class for vector solution, this is the first one needs to be changed to Array<VectorCoefficient*>.
+   Array<Coefficient *> rhs_coeffs;
+   Array<Coefficient *> bdr_coeffs;
+
+   // DG parameters specific to Poisson equation.
+   double sigma = -1.0;
+   double kappa = -1.0;
 
 public:
    MultiBlockSolver();

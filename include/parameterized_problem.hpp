@@ -20,7 +20,7 @@ using namespace mfem;
 namespace function_factory
 {
 
-typedef double scalar_rhs(const Vector &);
+typedef double GeneralScalarFunction(const Vector &);
 
 // parameter space index;
 extern int index;
@@ -80,8 +80,8 @@ public:
 
    // virtual member functions cannot be passed down as argument.
    // Instead use pointers to static functions.
-   function_factory::scalar_rhs *scalar_rhs_ptr = NULL;
-   function_factory::scalar_rhs *scalar_bdr_ptr = NULL;
+   function_factory::GeneralScalarFunction *scalar_rhs_ptr = NULL;
+   function_factory::GeneralScalarFunction *scalar_bdr_ptr = NULL;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
