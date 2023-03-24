@@ -670,8 +670,6 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
 {
    if (!save_visual) return;
 
-   paraviewColls.SetSize(numSub);
-
    std::string file_prefix;
    if (output_path != "")
       file_prefix = output_path;
@@ -681,6 +679,18 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
       assert(visual_dir != "");
       file_prefix = visual_dir + "/" + visual_prefix;
    }
+
+   unified_paraview = config.GetOption<bool>("visualization/unified_paraview", true);
+
+   if (unified_paraview)
+      InitUnifiedParaview(file_prefix);
+   else
+      InitIndividualParaview(file_prefix);
+}
+
+void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
+{
+   paraviewColls.SetSize(numSub);
 
    for (int m = 0; m < numSub; m++) {
       ostringstream oss;
@@ -696,6 +706,42 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
       paraviewColls[m]->SetOwnData(false);
    }
 }
+
+void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
+{
+   // TODO: For truly bottom-up case, when the parent mesh does not exist?
+   mfem_warning("Paraview is unified. Any overlapped interface dof data will not be shown.\n");
+   paraviewColls.SetSize(1);
+
+   // grid function initialization for visual.
+   // TODO: for vector solution.
+   global_fes = new FiniteElementSpace(pmesh, fec);
+   global_us_visual = new GridFunction(global_fes);
+
+   paraviewColls[0] = new ParaViewDataCollection(file_prefix.c_str(), pmesh);
+   paraviewColls[0]->SetLevelsOfDetail(order);
+   paraviewColls[0]->SetHighOrderOutput(true);
+   paraviewColls[0]->SetPrecision(8);
+
+   paraviewColls[0]->RegisterField("solution", global_us_visual);
+   paraviewColls[0]->SetOwnData(false);
+}
+
+void MultiBlockSolver::SaveVisualization()
+{
+   if (!save_visual) return;
+
+   if (unified_paraview)
+   {
+      mfem_warning("Paraview is unified. Any overlapped interface dof data will not be shown.\n");
+      // TODO: For truly bottom-up case, when submesh is not used?
+      for (int m = 0; m < numSub; m++)
+         meshes[m]->Transfer(*us[m], *global_us_visual);
+   }
+
+   for (int m = 0; m < paraviewColls.Size(); m++)
+      paraviewColls[m]->Save();
+};
 
 void MultiBlockSolver::InitROMHandler()
 {

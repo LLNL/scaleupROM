@@ -121,9 +121,13 @@ protected:
 
    // visualization variables
    bool save_visual = false;
+   bool unified_paraview = false;
    std::string visual_dir = ".";
    std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
+   // Used only for the unified visualization.
+   FiniteElementSpace *global_fes = NULL;
+   GridFunction *global_us_visual = NULL;
 
    // rom variables.
    ROMHandler *rom_handler = NULL;
@@ -201,8 +205,9 @@ public:
    void Solve();
 
    void InitVisualization(const std::string& output_dir = "");
-   void SaveVisualization()
-   { if (!save_visual) return; for (int m = 0; m < numSub; m++) paraviewColls[m]->Save(); };
+   void InitUnifiedParaview(const std::string &file_prefix);
+   void InitIndividualParaview(const std::string &file_prefix);
+   void SaveVisualization();
 
    void InitROMHandler();
    void SaveSnapshot(const int &sample_index)
