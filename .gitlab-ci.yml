@@ -42,3 +42,14 @@ param_prob:
     - cd ci-build/test
     - ./test_param_prob
 
+workflow:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./test_workflow
+

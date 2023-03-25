@@ -220,7 +220,7 @@ public:
    void ProjectRHSOnReducedBasis()
    { rom_handler->ProjectRHSOnReducedBasis(RHS); }
    void SolveROM() { rom_handler->Solve(U); }
-   void CompareSolution();
+   double CompareSolution();
    void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes); }
 

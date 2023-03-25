@@ -161,6 +161,9 @@ set(scaleupROMObj_SOURCES
   include/rom_handler.hpp
   src/rom_handler.cpp
 
+  include/main_workflow.hpp
+  src/main_workflow.cpp
+
 )
 
 add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})

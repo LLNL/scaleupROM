@@ -101,6 +101,8 @@ ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs
 
    save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
 
+   save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
+
    AllocROMMat();
 }
 
@@ -565,7 +567,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
 void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
 {
-   if (!config.GetOption<bool>("model_reduction/visualization/enabled", false)) return;
+   if (!save_basis_visual) return;
    assert(basis_loaded);
 
    std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
