@@ -89,7 +89,7 @@ void GenerateSamples(MPI_Comm comm)
 
       sample_generator->SetSampleParams(s);
       problem->SetParameterizedProblem(test);
-printf("%.5E\n", function_factory::poisson0::k);
+
       const std::string visual_path = sample_generator->GetSamplePath(s, test->GetVisualizationPrefix());
       test->InitVisualization(visual_path);
       test->BuildOperators();
@@ -167,7 +167,7 @@ double SingleRun()
    }
 
    problem->SetParameterizedProblem(test);
-printf("%.5E\n", function_factory::poisson0::k);
+
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
