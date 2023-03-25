@@ -22,8 +22,7 @@ namespace function_factory
 
 typedef double GeneralScalarFunction(const Vector &);
 
-// parameter space index;
-extern int index;
+static const double pi = 4.0 * atan(1.0);
 
 namespace poisson0
 {
@@ -40,6 +39,13 @@ namespace poisson_component
    extern double offset, bdr_offset;
 
    double bdr(const Vector &x);
+   double rhs(const Vector &x);
+}
+
+namespace poisson_spiral
+{
+   static const int N = 4;
+   extern double L, Lw, k;
    double rhs(const Vector &x);
 }
 
@@ -106,6 +112,15 @@ class PoissonComponent : public ParameterizedProblem
 public:
    PoissonComponent();
    ~PoissonComponent() {};
+
+   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
+};
+
+class PoissonSpiral : public ParameterizedProblem
+{
+public:
+   PoissonSpiral();
+   ~PoissonSpiral() {};
 
    virtual void SetParameterizedProblem(MultiBlockSolver *solver);
 };

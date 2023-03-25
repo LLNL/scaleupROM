@@ -13,14 +13,13 @@
 
 #include "parameterized_problem.hpp"
 #include "input_parser.hpp"
+#include <cmath>
 
 using namespace mfem;
 using namespace std;
 
 namespace function_factory
 {
-
-int index;  // parameter space index
 
 namespace poisson0
 {
@@ -63,6 +62,32 @@ double rhs(const Vector &x)
 
 }  // namespace poisson_component
 
+namespace poisson_spiral
+{
+
+double L, Lw, k;
+
+double rhs(const Vector &x)
+{
+   double r = 0.0;
+   for (int d = 0; d < x.Size(); d++) r += (x(d) - 0.5 * L) * (x(d) - 0.5 * L);
+   r = sqrt(r);
+
+   double theta = atan2(x(1) - 0.5 * L, x(0) - 0.5 * L);
+   if (theta < 0.0) theta += 2.0 * pi; // in [0, 2*pi]
+
+   // r = theta * 0.9 * L / (2.0 * pi * N);
+   const double slope = 0.9 * L / (2.0 * pi * N);
+   double tmp = r - slope * theta;
+   double dist = abs(tmp);
+   for (int n = 1; n < N; n++)
+      dist = min(dist, abs(tmp - slope * 2.0 * pi * n));
+
+   return exp( - dist * dist / Lw / Lw ) * cos( k * dist );
+}
+
+}  // namespace poisson_spiral
+
 }  // namespace function_factory
 
 void ParameterizedProblem::SetParams(const std::string &key, const double &value)
@@ -96,6 +121,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "poisson_component")
    {
       problem = new PoissonComponent();
+   }
+   else if (problem_name == "poisson_spiral")
+   {
+      problem = new PoissonSpiral();
    }
    else
    {
@@ -202,5 +231,50 @@ void PoissonComponent::SetParameterizedProblem(MultiBlockSolver *solver)
    solver->AddBCFunction(*scalar_bdr_ptr);
 
    // parameter values are set in the namespace function_factory::poisson_component.
+   solver->AddRHSFunction(*scalar_rhs_ptr);
+}
+
+/*
+   PoissonSpiral
+*/
+
+PoissonSpiral::PoissonSpiral()
+   : ParameterizedProblem()
+{
+   param_num = 3;
+
+   // pointer to static function.
+   scalar_rhs_ptr = &(function_factory::poisson_spiral::rhs);
+
+   // Default values.
+   function_factory::poisson_spiral::L = 1.0;
+   function_factory::poisson_spiral::Lw = 0.2;
+   function_factory::poisson_spiral::k = 1.0;
+
+   param_map["L"] = 0;
+   param_map["Lw"] = 1;
+   param_map["k"] = 2;
+
+   param_ptr.SetSize(param_num);
+   param_ptr[0] = &(function_factory::poisson_spiral::L);
+   param_ptr[1] = &(function_factory::poisson_spiral::Lw);
+   param_ptr[2] = &(function_factory::poisson_spiral::k);
+}
+
+void PoissonSpiral::SetParameterizedProblem(MultiBlockSolver *solver)
+{
+   // clean up rhs for parametrized problem.
+   if (solver->rhs_coeffs.Size() > 0)
+   {
+      for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
+      solver->rhs_coeffs.SetSize(0);
+   }
+   // clean up boundary functions for parametrized problem.
+   solver->bdr_coeffs = NULL;
+
+   // This problem is set on homogenous Dirichlet BC.
+   solver->AddBCFunction(0.0);
+
+   // parameter values are set in the namespace function_factory::poisson0.
    solver->AddRHSFunction(*scalar_rhs_ptr);
 }
