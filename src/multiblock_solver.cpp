@@ -738,7 +738,7 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
 
    // grid function initialization for visual.
    // TODO: for vector solution.
-   global_fes = new FiniteElementSpace(pmesh, fec);
+   global_fes = new FiniteElementSpace(pmesh, fec, udim);
    global_us_visual = new GridFunction(global_fes);
 
    paraviewColls[0] = new ParaViewDataCollection(file_prefix.c_str(), pmesh);
