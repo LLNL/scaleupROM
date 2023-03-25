@@ -53,6 +53,7 @@ protected:
    // rom options.
    bool save_proj_inv = false;
    bool save_sv = false;
+   bool save_basis_visual = false;
    bool component_sampling = false;
    bool save_lspg_basis = false;
    ROMHandlerMode mode = NUM_HANDLERMODE;
@@ -118,7 +119,7 @@ public:
    { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
-   { mfem_error("Base ROMHandler does not support saving visualization!\n"); }
+   { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
    virtual void SaveSV(const std::string& prefix);
 };

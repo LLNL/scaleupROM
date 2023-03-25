@@ -761,7 +761,7 @@ void MultiBlockSolver::InitROMHandler()
    }
 }
 
-void MultiBlockSolver::CompareSolution()
+double MultiBlockSolver::CompareSolution()
 {
    // Copy the rom solution.
    BlockVector romU(block_offsets);
@@ -799,13 +799,16 @@ void MultiBlockSolver::CompareSolution()
       norm += us[m]->ComputeLpError(2, zero);
       error += us[m]->ComputeLpError(2, *rom_u_coeffs[m]);
    }
-   printf("Relative error: %.5E\n", error / norm);
+   error /= norm;
+   printf("Relative error: %.5E\n", error);
 
    for (int m = 0; m < numSub; m++)
    {
       delete rom_us[m];
       delete rom_u_coeffs[m];
    }
+
+   return error;
 }
 
 void MultiBlockSolver::SanityCheckOnCoeffs()
