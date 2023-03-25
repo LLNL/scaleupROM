@@ -22,9 +22,15 @@ using namespace std;
 namespace mfem
 {
 
-ROMHandler::ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs)
-   : numSub(input_numSub), fom_num_dofs(input_num_dofs), basis_loaded(false), proj_inv_loaded(false)
+ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs)
+   : numSub(input_numSub),
+     udim(input_udim),
+     fom_num_vdofs(input_num_vdofs),
+     basis_loaded(false),
+     proj_inv_loaded(false)
 {
+   assert(fom_num_vdofs.Size() == (numSub));
+
    std::string mode_str = config.GetOption<std::string>("main/mode", "");
    if (mode_str == "single_run")
    {
@@ -113,7 +119,7 @@ void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
    for (int m = 0; m < numSub; m++)
    {
       const std::string filename = GetSnapshotPrefix(sample_index, m);
-      rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
+      rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
       bool addSample = basis_generator->takeSample(us[m]->GetData(), 0.0, 0.01);
@@ -151,7 +157,7 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
    std::string basis_name;
 
    basis_name = basis_prefix + "_universal";
-   rom_options = new CAROM::Options(fom_num_dofs[0], max_num_snapshots, 1, update_right_SV);
+   rom_options = new CAROM::Options(fom_num_vdofs[0], max_num_snapshots, 1, update_right_SV);
    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
 
    int num_snapshot_sets = (component_sampling) ? num_basis_sets : numSub;
@@ -180,7 +186,7 @@ void ROMHandler::FormReducedBasisIndividual(const int &total_samples)
    for (int m = 0; m < numSub; m++)
    {
       basis_name = basis_prefix + "_dom" + std::to_string(m);
-      rom_options = new CAROM::Options(fom_num_dofs[m], max_num_snapshots, 1, update_right_SV);
+      rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
       for (int s = 0; s < total_samples; s++)
@@ -356,7 +362,7 @@ void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      assert(RHS->GetBlock(i).Size() == fom_num_dofs[i]);
+      assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       const CAROM::Matrix* basis_i;
       GetReducedBasis(i, basis_i);
@@ -370,6 +376,8 @@ void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
 
 void ROMHandler::Solve(BlockVector* U)
 {
+   assert(U->NumBlocks() == numSub);
+
    printf("Solve ROM.\n");
    if (!proj_inv_loaded)
    {
@@ -428,8 +436,8 @@ void ROMHandler::SaveSV(const std::string& prefix)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const Array<int> &input_num_dofs)
-   : ROMHandler(input_numSub, input_num_dofs)
+MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs)
+   : ROMHandler(input_numSub, input_udim, input_num_vdofs)
 {
    romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
 }
@@ -523,7 +531,7 @@ void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      assert(RHS->GetBlock(i).Size() == fom_num_dofs[i]);
+      assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       DenseMatrix* basis_i;
       GetReducedBasis(i, basis_i);
@@ -555,7 +563,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
    for (int i = 0; i < numSub; i++)
    {
-      assert(U->GetBlock(i).Size() == fom_num_dofs[i]);
+      assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       DenseMatrix* basis_i;
       GetReducedBasis(i, basis_i);

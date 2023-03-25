@@ -47,8 +47,9 @@ class ROMHandler
 protected:
 // public:
    int numSub;          // number of subdomains.
+   int udim;            // solution dimension.
    int num_basis_sets;  // number of the basis sets.
-   Array<int> fom_num_dofs;
+   Array<int> fom_num_vdofs;
 
    // rom options.
    bool save_proj_inv = false;
@@ -90,7 +91,7 @@ protected:
    bool incremental = false;
 
 public:
-   ROMHandler(const int &input_numSub, const Array<int> &input_num_dofs);
+   ROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
 
    virtual ~ROMHandler() {};
 
@@ -135,7 +136,7 @@ protected:
    mfem::BlockVector *reduced_rhs;
 
 public:
-   MFEMROMHandler(const int &input_numSub, const Array<int> &input_num_dofs);
+   MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler() {};
    

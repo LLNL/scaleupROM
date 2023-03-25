@@ -95,9 +95,11 @@ MultiBlockSolver::MultiBlockSolver()
       fec = new H1_FECollection(order, dim);
    }
    
+   // solution dimension is determined by initialization.
+   udim = 1;
    fes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
-      fes[m] = new FiniteElementSpace(&(*meshes[m]), fec);
+      fes[m] = new FiniteElementSpace(&(*meshes[m]), fec, udim);
    }
 
 }
@@ -395,27 +397,43 @@ void MultiBlockSolver::AddBCFunction(const double &F, const int battr)
 
 void MultiBlockSolver::InitVariables()
 {
-   // set blocks by each subdomain.
-   block_offsets.SetSize(numSub + 1);
-   num_dofs.SetSize(numSub);
+   // number of blocks = solution dimension * number of subdomain;
+   block_offsets.SetSize(udim * numSub + 1);
+   domain_offsets.SetSize(numSub + 1);
+   num_vdofs.SetSize(numSub);
    block_offsets[0] = 0;
+   domain_offsets[0] = 0;
    for (int i = 0; i < numSub; i++)
    {
-      block_offsets[i + 1] = fes[i]->GetTrueVSize();
-      num_dofs[i] = fes[i]->GetTrueVSize();
+      domain_offsets[i + 1] = fes[i]->GetTrueVSize();
+      num_vdofs[i] = fes[i]->GetTrueVSize();
+      for (int d = 0; d < udim; d++)
+      {
+         block_offsets[d + i * udim + 1] = fes[i]->GetNDofs();
+      }
    }
    block_offsets.PartialSum();
+   domain_offsets.PartialSum();
 
    SetupBCVariables();
 
    // Set up solution/rhs variables/
-   U = new BlockVector(block_offsets);
-   RHS = new BlockVector(block_offsets);
+   U = new BlockVector(domain_offsets);
+   RHS = new BlockVector(domain_offsets);
+   /* 
+      Note: for compatibility with ROM, it's better to split with domain_offsets.
+      For vector-component operations, can set up a view BlockVector like below:
+
+         BlockVector *U_blocks = new BlockVector(U->GetData(), block_offsets);
+
+      U_blocks does not own the data.
+      These are system-specific, therefore not defining it now.
+   */
+
    us.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
-      us[m] = new GridFunction(fes[m]);
-      us[m]->MakeTRef(fes[m], U->GetBlock(m), 0);
+      us[m] = new GridFunction(fes[m], U->GetBlock(m), 0);
       (*us[m]) = 0.0;
 
       // BC's are weakly constrained and there is no essential dofs.
@@ -438,10 +456,11 @@ void MultiBlockSolver::BuildOperators()
    double sigma = -1.0;
    double kappa = (order + 1.0) * (order + 1.0);
 
+   // These are heavily system-dependent.
+   // Based on scalar/vector system, different integrators/coefficients will be used.
    for (int m = 0; m < numSub; m++)
    {
-      bs[m] = new LinearForm();
-      bs[m]->Update(fes[m], RHS->GetBlock(m), 0);
+      bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
       for (int r = 0; r < rhs_coeffs.Size(); r++)
          bs[m]->AddDomainIntegrator(new DomainLFIntegrator(*rhs_coeffs[r]));
 
@@ -507,12 +526,16 @@ void MultiBlockSolver::Assemble()
 
    for (int m = 0; m < numSub; m++)
    {
+      // Do we really need SyncAliasMemory?
       bs[m]->SyncAliasMemory(*RHS);  // Synchronize with block vector RHS. What is different from SyncMemory?
       as[m]->Finalize();
    }
 
    // globalMat = new BlockOperator(block_offsets);
-   globalMat = new BlockMatrix(block_offsets);
+   // NOTE: currently, domain-decomposed system will have a significantly different sparsity pattern.
+   // This is especially true for vector solution, where ordering of component is changed.
+   // This is quite inevitable, but is it desirable?
+   globalMat = new BlockMatrix(domain_offsets);
    for (int i = 0; i < numSub; i++)
    {
       for (int j = 0; j < numSub; j++)
@@ -653,7 +676,7 @@ void MultiBlockSolver::Solve()
    BlockDiagonalPreconditioner *globalPrec;
    if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
    {
-      globalPrec = new BlockDiagonalPreconditioner(block_offsets);
+      globalPrec = new BlockDiagonalPreconditioner(domain_offsets);
       solver.SetPreconditioner(*globalPrec);
    }
 
@@ -715,7 +738,7 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
 
    // grid function initialization for visual.
    // TODO: for vector solution.
-   global_fes = new FiniteElementSpace(pmesh, fec);
+   global_fes = new FiniteElementSpace(pmesh, fec, udim);
    global_us_visual = new GridFunction(global_fes);
 
    paraviewColls[0] = new ParaViewDataCollection(file_prefix.c_str(), pmesh);
@@ -749,11 +772,11 @@ void MultiBlockSolver::InitROMHandler()
 
    if (rom_handler_str == "base")
    {
-      rom_handler = new ROMHandler(numSub, num_dofs);
+      rom_handler = new ROMHandler(numSub, udim, num_vdofs);
    }
    else if (rom_handler_str == "mfem")
    {
-      rom_handler = new MFEMROMHandler(numSub, num_dofs);
+      rom_handler = new MFEMROMHandler(numSub, udim, num_vdofs);
    }
    else
    {
@@ -764,23 +787,22 @@ void MultiBlockSolver::InitROMHandler()
 double MultiBlockSolver::CompareSolution()
 {
    // Copy the rom solution.
-   BlockVector romU(block_offsets);
+   BlockVector romU(domain_offsets);
    romU = *U;
    Array<GridFunction *> rom_us;
-   Array<GridFunctionCoefficient *> rom_u_coeffs;
+   Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
    ConstantCoefficient zero(0.0);
    rom_us.SetSize(numSub);
    rom_u_coeffs.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
-      rom_us[m] = new GridFunction(fes[m]);
-      rom_us[m]->MakeTRef(fes[m], romU.GetBlock(m), 0);
+      rom_us[m] = new GridFunction(fes[m], romU.GetBlock(m), 0);
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
       rom_us[m]->SetTrueVector();
 
-      rom_u_coeffs[m] = new GridFunctionCoefficient(rom_us[m]);
+      rom_u_coeffs[m] = new VectorGridFunctionCoefficient(rom_us[m]);
    }
 
    // TODO: right now we solve the full-order system to compare the solution.
