@@ -44,7 +44,7 @@ namespace poisson_component
 
 namespace poisson_spiral
 {
-   static const int N = 4;
+   static const int N = 2;
    extern double L, Lw, k;
    double rhs(const Vector &x);
 }

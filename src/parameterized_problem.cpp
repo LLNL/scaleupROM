@@ -76,14 +76,17 @@ double rhs(const Vector &x)
    double theta = atan2(x(1) - 0.5 * L, x(0) - 0.5 * L);
    if (theta < 0.0) theta += 2.0 * pi; // in [0, 2*pi]
 
-   // r = theta * 0.9 * L / (2.0 * pi * N);
-   const double slope = 0.9 * L / (2.0 * pi * N);
-   double tmp = r - slope * theta;
+   // r = theta * 0.6 * L / (2.0 * pi * N);
+   const double slope = 0.6 * L / (2.0 * pi * N);
+   double tmp = r - slope * (theta - 2.0 * pi);
    double dist = abs(tmp);
-   for (int n = 1; n < N; n++)
-      dist = min(dist, abs(tmp - slope * 2.0 * pi * n));
+   for (int n = 0; n < N; n++)
+   {
+      tmp -= 2.0 * pi * slope;
+      dist = min(dist, abs(tmp));
+   }
 
-   return exp( - dist * dist / Lw / Lw ) * cos( k * dist );
+   return exp( - 0.5 * dist * dist / Lw / Lw ) * cos( k * dist );
 }
 
 }  // namespace poisson_spiral
