@@ -131,6 +131,9 @@ set(scaleupROMObj_SOURCES
   include/navier_solver.hpp
   src/navier_solver.cpp
 
+  include/topology_handler.hpp
+  src/topology_handler.cpp
+
   include/interfaceinteg.hpp
   src/interfaceinteg.cpp
 

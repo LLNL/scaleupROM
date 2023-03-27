@@ -13,6 +13,7 @@
 #define SCALEUPROM_MULTIBLOCK_SOLVER_HPP
 
 #include "input_parser.hpp"
+#include "topology_handler.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
 // #include "parameterized_problem.hpp"
@@ -24,12 +25,10 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
-enum DecompositionMode
+enum TopologyHandlerMode
 {
-   NODD,       // no decomposition
-   IP,         // interior penalty
-   FETI,       // finite-element tearing and interconnecting
-   NUM_DDMODE
+   SUBMESH,
+   NUM_TOPOL_MODE
 };
 
 class MultiBlockSolver
@@ -39,20 +38,6 @@ friend class ParameterizedProblem;
 friend class Poisson0;
 friend class PoissonComponent;
 friend class PoissonSpiral;
-
-public:
-   struct InterfaceInfo {
-      int Attr;
-      int Mesh1, Mesh2;
-      int BE1, BE2;
-
-      // Inf = 64 * LocalFaceIndex + FaceOrientation
-      // From the parent mesh.
-      // Boundary face only have Elem1, and its orientation is always 0 by convention.
-      // This causes a problem for interface between two meshes.
-      // Thus stores orientation information from the parent mesh.
-      int Inf1, Inf2;
-   };
 
 protected:
    /*
@@ -65,26 +50,21 @@ protected:
    Array<FiniteElementSpace *> fes;
 
    bool full_dg = true;
-   DecompositionMode dd_mode;
 
-   // Global parent mesh that will be decomposed.
-   Mesh *pmesh;
+   TopologyHandlerMode topol_mode = NUM_TOPOL_MODE;
+   TopologyHandler *topol_handler = NULL;
 
-   // SubMesh does not allow creating Array of its pointers. Use std::shared_ptr.
-   std::vector<std::shared_ptr<SubMesh>> meshes;
+   // MultiBlockSolver does not own these. Owned by TopologyHandler.
+   Array<Mesh*> meshes;
+   Array<InterfaceInfo> *interface_infos = NULL;
+
+   // Informations received from Topology Handler.
    int numSub;   // number of subdomains.
+   int dim;      // Spatial dimension.
+   Array<int> global_bdr_attributes;   // boundary attributes of global system.
 
-   // Spatial dimension.
-   int dim;
    // Solution dimension, by default 1 (scalar).
    int udim = 1;
-
-   // face/element map from each subdomain to parent mesh.
-   Array<Array<int> *> parent_face_map;
-   Array<Array<int> *> parent_elem_map;
-
-   Array<InterfaceInfo> interface_infos;
-   // Array<int> interface_parent;
 
    // interface integrator
    InterfaceNonlinearFormIntegrator *interface_integ;
@@ -178,16 +158,6 @@ public:
    const bool IsVisualizationSaved() { return save_visual; }
    const std::string GetVisualizationPrefix() { return visual_prefix; }
 
-   // SubMesh does not support face mapping for 2d meshes.
-   Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
-   void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face_map=NULL);
-   void UpdateBdrAttributes(Mesh& m);
-
-   void BuildInterfaceInfos();
-   Array<int> FindParentInterfaceInfo(const int pface,
-                                       const int imesh, const int ibe,
-                                       const int jmesh, const int jbe);
-
    void SetupBCVariables();
    void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
    void AddBCFunction(const double &F, const int battr = -1);
@@ -205,16 +175,6 @@ public:
    void Assemble();
    // For bilinear case.
    void AssembleInterfaceMatrix();
-
-   // Mesh sets face element transformation based on the face_info.
-   // For boundary face, the adjacent element is always on element 1, and its orientation is "by convention" always zero.
-   // This is a problem for the interface between two meshes, where both element orientations are zero.
-   // At least one element should reflect a relative orientation with respect to the other.
-   // Currently this is done by hijacking global mesh face information in the beginning.
-   // If we would want to do more flexible global mesh building, e.g. rotating component submeshes,
-   // then we will need to figure out how to actually determine relative orientation.
-   void GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
-                                    FaceElementTransformations* &tr1, FaceElementTransformations* &tr2);
 
    void Solve();
 
