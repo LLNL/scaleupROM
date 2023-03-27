@@ -13,6 +13,7 @@
 #define SCALEUPROM_MULTIBLOCK_SOLVER_HPP
 
 #include "input_parser.hpp"
+#include "topology_handler.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
 // #include "parameterized_problem.hpp"
@@ -24,13 +25,13 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
-enum DecompositionMode
-{
-   NODD,       // no decomposition
-   IP,         // interior penalty
-   FETI,       // finite-element tearing and interconnecting
-   NUM_DDMODE
-};
+// enum DecompositionMode
+// {
+//    NODD,       // no decomposition
+//    IP,         // interior penalty
+//    FETI,       // finite-element tearing and interconnecting
+//    NUM_DDMODE
+// };
 
 class MultiBlockSolver
 {
@@ -40,19 +41,19 @@ friend class Poisson0;
 friend class PoissonComponent;
 friend class PoissonSpiral;
 
-public:
-   struct InterfaceInfo {
-      int Attr;
-      int Mesh1, Mesh2;
-      int BE1, BE2;
+// public:
+   // struct InterfaceInfo {
+   //    int Attr;
+   //    int Mesh1, Mesh2;
+   //    int BE1, BE2;
 
-      // Inf = 64 * LocalFaceIndex + FaceOrientation
-      // From the parent mesh.
-      // Boundary face only have Elem1, and its orientation is always 0 by convention.
-      // This causes a problem for interface between two meshes.
-      // Thus stores orientation information from the parent mesh.
-      int Inf1, Inf2;
-   };
+   //    // Inf = 64 * LocalFaceIndex + FaceOrientation
+   //    // From the parent mesh.
+   //    // Boundary face only have Elem1, and its orientation is always 0 by convention.
+   //    // This causes a problem for interface between two meshes.
+   //    // Thus stores orientation information from the parent mesh.
+   //    int Inf1, Inf2;
+   // };
 
 protected:
    /*
