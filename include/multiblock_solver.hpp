@@ -25,6 +25,12 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
+enum TopologyHandlerMode
+{
+   SUBMESH,
+   NUM_TOPOL_MODE
+};
+
 class MultiBlockSolver
 {
 
@@ -45,7 +51,8 @@ protected:
 
    bool full_dg = true;
 
-   SubMeshTopologyHandler *topol_handler = NULL;
+   TopologyHandlerMode topol_mode = NUM_TOPOL_MODE;
+   TopologyHandler *topol_handler = NULL;
 
    // MultiBlockSolver does not own these. Owned by TopologyHandler.
    Array<Mesh*> meshes;

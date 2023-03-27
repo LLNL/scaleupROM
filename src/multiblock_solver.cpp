@@ -24,7 +24,21 @@ MultiBlockSolver::MultiBlockSolver()
    ParseInputs();
 
    TopologyData topol_data;
-   topol_handler = new SubMeshTopologyHandler(meshes, interface_infos, topol_data);
+   switch (topol_mode)
+   {
+      case SUBMESH:
+      {
+         topol_handler = new SubMeshTopologyHandler(meshes, interface_infos, topol_data);
+         break;
+      }
+      default:
+      {
+         mfem_error("Unknown topology handler mode!\n");
+         break;
+      }
+   }
+   
+   // Receive topology info
    numSub = topol_data.numSub;
    dim = topol_data.dim;
    global_bdr_attributes = topol_data.global_bdr_attributes;
@@ -82,6 +96,17 @@ MultiBlockSolver::~MultiBlockSolver()
 
 void MultiBlockSolver::ParseInputs()
 {
+   std::string topol_str = config.GetOption<std::string>("mesh/topology_handler", "submesh");
+   if (topol_str == "submesh")
+   {
+      topol_mode = SUBMESH;
+   }
+   else
+   {
+      printf("%s\n", topol_str.c_str());
+      mfem_error("Unknown topology handler mode!\n");
+   }
+
    order = config.GetOption<int>("discretization/order", 1);
    full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);

@@ -16,6 +16,57 @@
 using namespace std;
 using namespace mfem;
 
+/*
+   TopologyHandler Base class
+*/
+
+void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
+                                                         FaceElementTransformations* &tr1, FaceElementTransformations* &tr2)
+{
+   // We cannot write a function that replaces this, since only Mesh can access to FaceElemTr.SetConfigurationMask.
+   tr1 = m1->GetBdrFaceTransformations(if_info->BE1);
+   tr2 = m2->GetBdrFaceTransformations(if_info->BE2);
+
+   // Correcting the local face1 transformation if orientation needs correction.
+   int faceInf1, faceInf2;
+   int face1 = m1->GetBdrFace(if_info->BE1);
+   m1->GetFaceInfos(face1, &faceInf1, &faceInf2);
+   if (faceInf1 != if_info->Inf1)
+   {
+      if ((faceInf1 / 64) != (if_info->Inf1 / 64))
+      {
+         MFEM_WARNING("Local face id from submesh and global mesh are different. This may cause inaccurate solutions.");
+      }
+
+      int face_type = m1->GetFaceElementType(face1);
+      int elem_type = m1->GetElementType(tr1->Elem1No);
+
+      m1->GetLocalFaceTransformation(face_type, elem_type,
+                                    tr1->Loc1.Transf, if_info->Inf1);
+   }
+
+   // Correcting the local face1 transformation if orientation needs correction.
+   int face2 = m2->GetBdrFace(if_info->BE2);
+   m2->GetFaceInfos(face2, &faceInf2, &faceInf1);
+   if (faceInf2 != if_info->Inf2)
+   {
+      if ((faceInf2 / 64) != (if_info->Inf2 / 64))
+      {
+         MFEM_WARNING("Local face id from submesh and global mesh are different. This may cause inaccurate solutions.");
+      }
+
+      int face_type = m2->GetFaceElementType(face2);
+      int elem_type = m2->GetElementType(tr2->Elem1No);
+
+      m2->GetLocalFaceTransformation(face_type, elem_type,
+                                    tr2->Loc1.Transf, if_info->Inf2);
+   }
+}
+
+/*
+   SubMeshTopologyHandler
+*/
+
 SubMeshTopologyHandler::SubMeshTopologyHandler()
 {
    std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
@@ -275,49 +326,6 @@ Array<int> SubMeshTopologyHandler::FindParentInterfaceInfo(const int pface,
    }
 
    return Infs;
-}
-
-void SubMeshTopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
-                                                         FaceElementTransformations* &tr1, FaceElementTransformations* &tr2)
-{
-   // We cannot write a function that replaces this, since only Mesh can access to FaceElemTr.SetConfigurationMask.
-   tr1 = m1->GetBdrFaceTransformations(if_info->BE1);
-   tr2 = m2->GetBdrFaceTransformations(if_info->BE2);
-
-   // Correcting the local face1 transformation if orientation needs correction.
-   int faceInf1, faceInf2;
-   int face1 = m1->GetBdrFace(if_info->BE1);
-   m1->GetFaceInfos(face1, &faceInf1, &faceInf2);
-   if (faceInf1 != if_info->Inf1)
-   {
-      if ((faceInf1 / 64) != (if_info->Inf1 / 64))
-      {
-         MFEM_WARNING("Local face id from submesh and global mesh are different. This may cause inaccurate solutions.");
-      }
-
-      int face_type = m1->GetFaceElementType(face1);
-      int elem_type = m1->GetElementType(tr1->Elem1No);
-
-      m1->GetLocalFaceTransformation(face_type, elem_type,
-                                    tr1->Loc1.Transf, if_info->Inf1);
-   }
-
-   // Correcting the local face1 transformation if orientation needs correction.
-   int face2 = m2->GetBdrFace(if_info->BE2);
-   m2->GetFaceInfos(face2, &faceInf2, &faceInf1);
-   if (faceInf2 != if_info->Inf2)
-   {
-      if ((faceInf2 / 64) != (if_info->Inf2 / 64))
-      {
-         MFEM_WARNING("Local face id from submesh and global mesh are different. This may cause inaccurate solutions.");
-      }
-
-      int face_type = m2->GetFaceElementType(face2);
-      int elem_type = m2->GetElementType(tr2->Elem1No);
-
-      m2->GetLocalFaceTransformation(face_type, elem_type,
-                                    tr2->Loc1.Transf, if_info->Inf2);
-   }
 }
 
 void SubMeshTopologyHandler::TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u)
