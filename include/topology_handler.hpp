@@ -39,6 +39,12 @@ struct InterfaceInfo {
    int Inf1, Inf2;
 };
 
+struct TopologyData {
+   int numSub = -1;
+   int dim = -1;
+   Array<int> global_bdr_attributes;
+};
+
 class SubMeshTopologyHandler
 {
 protected:
@@ -64,13 +70,14 @@ public:
    SubMeshTopologyHandler();
 
    // Export mesh pointers and interface info.
-   SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos);
+   SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data);
 
    virtual ~SubMeshTopologyHandler();
 
    // access
    const int GetNumSubdomains() { return numSub; }
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
+   Mesh* GetGlobalMesh() { return pmesh; }
 
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
@@ -91,6 +98,8 @@ public:
    // then we will need to figure out how to actually determine relative orientation.
    void GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
                                     FaceElementTransformations* &tr1, FaceElementTransformations* &tr2);
+
+   void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u);
 };
 
 #endif

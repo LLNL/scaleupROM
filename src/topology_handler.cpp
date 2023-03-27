@@ -98,7 +98,7 @@ SubMeshTopologyHandler::SubMeshTopologyHandler()
    BuildInterfaceInfos();
 }
 
-SubMeshTopologyHandler::SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos)
+SubMeshTopologyHandler::SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data)
    : SubMeshTopologyHandler()
 {
    mesh_ptrs.SetSize(numSub);
@@ -106,6 +106,10 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<In
       mesh_ptrs[m] = &(*meshes[m]);
 
    if_infos = &interface_infos;
+
+   topol_data.dim = dim;
+   topol_data.numSub = numSub;
+   topol_data.global_bdr_attributes = pmesh->bdr_attributes;
 }
 
 SubMeshTopologyHandler::~SubMeshTopologyHandler()
@@ -314,4 +318,10 @@ void SubMeshTopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, con
       m2->GetLocalFaceTransformation(face_type, elem_type,
                                     tr2->Loc1.Transf, if_info->Inf2);
    }
+}
+
+void SubMeshTopologyHandler::TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u)
+{
+   for (int m = 0; m < numSub; m++)
+      meshes[m]->Transfer(*us[m], *global_u);
 }
