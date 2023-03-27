@@ -395,7 +395,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
             }
          }
       }  // if ((tr1 != NULL) && (tr2 != NULL))
-    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 }
 
 void MultiBlockSolver::Solve()

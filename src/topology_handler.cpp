@@ -20,8 +20,30 @@ using namespace mfem;
    TopologyHandler Base class
 */
 
+TopologyHandler::TopologyHandler()
+{
+   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
+   if (dd_mode_str == "interior_penalty")
+   {
+      dd_mode = DecompositionMode::IP;
+   }
+   else if (dd_mode_str == "feti")
+   {
+      mfem_error("FETI not implemented!\n");
+   }
+   else if (dd_mode_str == "none")
+   {
+      dd_mode = DecompositionMode::NODD;
+   }
+   else
+   {
+      mfem_error("Unknown domain decomposition mode!\n");
+   }
+}
+
 void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
-                                                         FaceElementTransformations* &tr1, FaceElementTransformations* &tr2)
+                                                   FaceElementTransformations* &tr1,
+                                                   FaceElementTransformations* &tr2)
 {
    // We cannot write a function that replaces this, since only Mesh can access to FaceElemTr.SetConfigurationMask.
    tr1 = m1->GetBdrFaceTransformations(if_info->BE1);
@@ -68,25 +90,8 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
 */
 
 SubMeshTopologyHandler::SubMeshTopologyHandler()
+   : TopologyHandler()
 {
-   std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
-   if (dd_mode_str == "interior_penalty")
-   {
-      dd_mode = DecompositionMode::IP;
-   }
-   else if (dd_mode_str == "feti")
-   {
-      mfem_error("FETI not implemented!\n");
-   }
-   else if (dd_mode_str == "none")
-   {
-      dd_mode = DecompositionMode::NODD;
-   }
-   else
-   {
-      mfem_error("Unknown domain decomposition mode!\n");
-   }
-
    // Initiate parent mesh.
    std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
    pmesh = new Mesh(mesh_file.c_str());

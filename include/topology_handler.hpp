@@ -58,7 +58,7 @@ protected:
    Array<InterfaceInfo> interface_infos;
 
 public:
-   TopologyHandler() {};
+   TopologyHandler();
    TopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data)
    { mfem_error("Abstract base constructor TopologyHandler is called!\n"); }
 
