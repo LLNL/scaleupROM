@@ -171,18 +171,8 @@ double SingleRun()
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
+   // TODO: skip matrix assembly if use_rom.
    test->Assemble();
-
-   if (test->UseRom())
-   {
-      // test->AllocROMMat();
-      test->LoadReducedBasis();
-
-      // TODO: need to implement save/load sparse matrix and remove this line.
-      std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
-      if (rom_handler_str == "mfem")
-         test->ProjectOperatorOnReducedBasis();
-   }
 
    StopWatch solveTimer;
    solveTimer.Start();
@@ -193,6 +183,7 @@ double SingleRun()
    }
    else
    {
+      // TODO: move matrix assembly to here.
       test->Solve();
    }
    solveTimer.Stop();

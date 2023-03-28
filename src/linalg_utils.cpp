@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "linalg_utils.hpp"
+#include "utils/HDFDatabase.h"
 
 using namespace mfem;
 using namespace std;
@@ -186,6 +187,66 @@ void PrintMatrix(const DenseMatrix &mat,
 
    fclose(fp);
    return;
+}
+
+// TODO: support parallel I/O.
+SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename)
+{
+   bool success = false;
+   CAROM::HDFDatabase hdfIO;
+
+   success = hdfIO.open(filename, "r");
+   assert(success);
+
+   const int n_entry = hdfIO.getDoubleArraySize("data");
+   Array<int> i_read(n_entry), j_read(n_entry);
+   Vector data_read(n_entry);
+   hdfIO.getIntegerArray("I", i_read.Write(), n_entry);
+   hdfIO.getIntegerArray("J", j_read.Write(), n_entry);
+   hdfIO.getDoubleArray("data", data_read.Write(), n_entry);
+
+   int size[2];
+   hdfIO.getIntegerArray("size", &size[0], 2);
+
+   // Need to transfer the ownership to avoid segfault or double-free.
+   int *ip, *jp;
+   i_read.StealData(&ip);
+   j_read.StealData(&jp);
+
+   SparseMatrix *mat = new SparseMatrix(ip, jp, data_read.StealData(), size[0], size[1]);
+
+   success = hdfIO.close();
+   assert(success);
+
+   return mat;
+}
+
+void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename)
+{
+   assert(mat->Finalized());
+   
+   bool success = false;
+   CAROM::HDFDatabase hdfIO;
+
+   success = hdfIO.create(filename);
+   assert(success);
+
+   const int nnz = mat->NumNonZeroElems();
+   const int *i_idx = mat->ReadI();
+   const int *j_idx = mat->ReadJ();
+   const double *data = mat->ReadData();
+
+   hdfIO.putIntegerArray("I", i_idx, nnz);
+   hdfIO.putIntegerArray("J", j_idx, nnz);
+   hdfIO.putDoubleArray("data", data, nnz);
+
+   int size[2];
+   size[0] = mat->NumRows();
+   size[1] = mat->NumCols();
+   hdfIO.putIntegerArray("size", &size[0], 2);
+
+   success = hdfIO.close();
+   assert(success);
 }
 
 }

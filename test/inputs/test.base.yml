@@ -49,8 +49,9 @@ model_reduction:
   # individual/universal
   subdomain_training: individual
   number_of_basis: 3
-  save_projected_inverse: true
-  projected_inverse_filename: "proj_inv"
+  save_operator:
+    enabled: true
+    prefix: "proj_inv"
   compare_solution: true
   svd:
     save_spectrum: true
