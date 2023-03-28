@@ -27,7 +27,7 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
      udim(input_udim),
      fom_num_vdofs(input_num_vdofs),
      basis_loaded(false),
-     proj_inv_loaded(false)
+     operator_loaded(false)
 {
    assert(fom_num_vdofs.Size() == (numSub));
 
@@ -61,8 +61,11 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
 
    basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
 
-   save_proj_inv = config.GetOption<bool>("model_reduction/save_projected_inverse", true);
-   proj_inv_prefix = config.GetOption<std::string>("model_reduction/projected_inverse_filename", "proj_inv");
+   save_operator = config.GetOption<bool>("model_reduction/save_operator/enabled", false);
+   if (save_operator)
+      operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
+   // TODO: assemble on the fly if not save_operator.
+   assert(save_operator);
 
    std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
    if (train_mode_str == "individual")
@@ -324,8 +327,8 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mat
 
    romMat_inv->inverse();
 
-   proj_inv_loaded = true;
-   if (save_proj_inv) romMat_inv->write(proj_inv_prefix);
+   operator_loaded = true;
+   if (save_operator) romMat_inv->write(operator_prefix);
 }
 
 void ROMHandler::SetBlockSizes()
@@ -379,10 +382,11 @@ void ROMHandler::Solve(BlockVector* U)
    assert(U->NumBlocks() == numSub);
 
    printf("Solve ROM.\n");
-   if (!proj_inv_loaded)
-   {
-      romMat_inv->read(proj_inv_prefix);
-      proj_inv_loaded = true;
+   if (!operator_loaded)
+   {  // TODO: assembling on the fly if not save_operator.
+      assert(save_operator);
+      romMat_inv->read(operator_prefix);
+      operator_loaded = true;
    }
 
    CAROM::Vector reduced_sol(num_basis * numSub, false);
@@ -516,7 +520,13 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> 
    }  // for (int j = 0; j < numSub; j++)
 
    romMat->Finalize();
-   proj_inv_loaded = false;
+   operator_loaded = true;
+
+   if (save_operator)
+   {
+      std::string filename = operator_prefix + ".h5";
+      WriteSparseMatrixToHDF(romMat, filename);
+   }
 }
 
 void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
@@ -542,6 +552,14 @@ void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
 void MFEMROMHandler::Solve(BlockVector* U)
 {
    assert(U->NumBlocks() == numSub);
+
+   if (!operator_loaded)
+   {  // TODO: option of assembling on the fly if not save_operator.
+      assert(save_operator);
+      std::string filename = operator_prefix + ".h5";
+      romMat = ReadSparseMatrixFromHDF(filename);
+      operator_loaded = true;
+   }
 
    printf("Solve ROM.\n");
    BlockVector reduced_sol(rom_block_offsets);

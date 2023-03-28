@@ -52,7 +52,7 @@ protected:
    Array<int> fom_num_vdofs;
 
    // rom options.
-   bool save_proj_inv = false;
+   bool save_operator = false;
    bool save_sv = false;
    bool save_basis_visual = false;
    bool component_sampling = false;
@@ -65,14 +65,14 @@ protected:
    std::string sample_dir;
    std::string sample_prefix;
    std::string basis_prefix;
-   std::string proj_inv_prefix;
+   std::string operator_prefix;
 
    // rom variables.
    // TODO: need Array<int> for multi-component basis.
    int num_basis;    // number of columns in a basis set
    Array<const CAROM::Matrix*> carom_spatialbasis;
    bool basis_loaded;
-   bool proj_inv_loaded;
+   bool operator_loaded;
 
    // SparseMatrix *romMat;
    Array<int> rom_block_offsets;

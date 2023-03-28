@@ -63,6 +63,9 @@ void PrintMatrix(const SparseMatrix &mat,
 void PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename);
 
+SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename);
+void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename);
+
 }
 
 #endif
