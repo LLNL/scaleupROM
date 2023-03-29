@@ -53,7 +53,7 @@ protected:
    // Spatial dimension.
    int dim;
 
-   DecompositionMode dd_mode;
+   DecompositionMode dd_mode = NUM_DDMODE;
 
    Array<InterfaceInfo> interface_infos;
 
@@ -69,6 +69,9 @@ public:
    virtual Mesh* GetMesh(const int k) = 0;
    virtual Mesh* GetGlobalMesh() = 0;
 
+   // Export mesh pointers and interface info.
+   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data) = 0;
+
    // Mesh sets face element transformation based on the face_info.
    // For boundary face, the adjacent element is always on element 1, and its orientation is "by convention" always zero.
    // This is a problem for the interface between two meshes, where both element orientations are zero.
@@ -81,6 +84,10 @@ public:
                                              FaceElementTransformations* &tr2);
 
    virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u) = 0;
+
+protected:
+   virtual void UpdateAttributes(Mesh& m);
+   virtual void UpdateBdrAttributes(Mesh& m);
 };
 
 class SubMeshTopologyHandler : public TopologyHandler
@@ -97,10 +104,9 @@ protected:
    Array<Array<int> *> parent_elem_map;
 
 public:
+   SubMeshTopologyHandler(Mesh* pmesh_);
+   // Read mesh file from input.
    SubMeshTopologyHandler();
-
-   // Export mesh pointers and interface info.
-   SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data);
 
    virtual ~SubMeshTopologyHandler();
 
@@ -108,13 +114,15 @@ public:
    virtual Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    virtual Mesh* GetGlobalMesh() { return pmesh; }
 
+   // Export mesh pointers and interface info.
+   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data);
+
    virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u);
 
 protected:
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
    void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face_map=NULL);
-   void UpdateBdrAttributes(Mesh& m);
 
    void BuildInterfaceInfos();
    Array<int> FindParentInterfaceInfo(const int pface,

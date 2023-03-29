@@ -85,16 +85,37 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
    }
 }
 
+void TopologyHandler::UpdateAttributes(Mesh& m)
+{
+   m.attributes.DeleteAll();
+   for (int k = 0; k < m.GetNE(); k++)
+   {
+      int attr = m.GetAttribute(k);
+      int inBdrAttr = m.attributes.Find(attr);
+      if (inBdrAttr < 0) m.attributes.Append(attr);
+   }
+}
+
+void TopologyHandler::UpdateBdrAttributes(Mesh& m)
+{
+   m.bdr_attributes.DeleteAll();
+   for (int k = 0; k < m.GetNBE(); k++)
+   {
+      int attr = m.GetBdrAttribute(k);
+      int inBdrAttr = m.bdr_attributes.Find(attr);
+      if (inBdrAttr < 0) m.bdr_attributes.Append(attr);
+   }
+}
+
 /*
    SubMeshTopologyHandler
 */
 
-SubMeshTopologyHandler::SubMeshTopologyHandler()
-   : TopologyHandler()
+SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
+   : TopologyHandler(), pmesh(pmesh_)
 {
-   // Initiate parent mesh.
-   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
-   pmesh = new Mesh(mesh_file.c_str());
+   // Input meshes may not have up-to-date attributes array.
+   UpdateAttributes(*pmesh);
    dim = pmesh->Dimension();
 
    // Uniform refinement if specified.
@@ -154,8 +175,16 @@ SubMeshTopologyHandler::SubMeshTopologyHandler()
    BuildInterfaceInfos();
 }
 
-SubMeshTopologyHandler::SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data)
-   : SubMeshTopologyHandler()
+SubMeshTopologyHandler::SubMeshTopologyHandler()
+{
+   // Initiate parent mesh.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+   SubMeshTopologyHandler(new Mesh(mesh_file.c_str()));
+}
+
+void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
+                                       Array<InterfaceInfo>* &if_infos,
+                                       TopologyData &topol_data)
 {
    mesh_ptrs.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
@@ -241,17 +270,6 @@ void SubMeshTopologyHandler::BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm,
    }
 
    UpdateBdrAttributes(sm);
-}
-
-void SubMeshTopologyHandler::UpdateBdrAttributes(Mesh& m)
-{
-   m.bdr_attributes.DeleteAll();
-   for (int k = 0; k < m.GetNBE(); k++)
-   {
-      int attr = m.GetBdrAttribute(k);
-      int inBdrAttr = m.bdr_attributes.Find(attr);
-      if (inBdrAttr < 0) m.bdr_attributes.Append(attr);
-   }
 }
 
 void SubMeshTopologyHandler::BuildInterfaceInfos()

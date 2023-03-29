@@ -28,7 +28,7 @@ MultiBlockSolver::MultiBlockSolver()
    {
       case SUBMESH:
       {
-         topol_handler = new SubMeshTopologyHandler(meshes, interface_infos, topol_data);
+         topol_handler = new SubMeshTopologyHandler();
          break;
       }
       default:
@@ -37,6 +37,7 @@ MultiBlockSolver::MultiBlockSolver()
          break;
       }
    }
+   topol_handler->ExportInfo(meshes, interface_infos, topol_data);
    
    // Receive topology info
    numSub = topol_data.numSub;
