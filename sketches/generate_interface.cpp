@@ -13,26 +13,9 @@
 #include <iostream>
 #include "utils/HDFDatabase.h"
 #include "mfem.hpp"
-#include "topology_handler.hpp"
+#include "component_topology_handler.hpp"
 
 using namespace mfem;
-
-class BlockMesh : public Mesh
-{
-public:
-   BlockMesh(const char *filename) : Mesh(filename) {};
-   BlockMesh(const Mesh &mesh) : Mesh(mesh) {};
-
-   // these protected members are needed to be public for GenerateInterfaces.
-   // using Mesh::AddPointFaceElement;
-   // using Mesh::AddSegmentFaceElement;
-   // using Mesh::AddTriangleFaceElement;
-   // using Mesh::AddQuadFaceElement;
-   using Mesh::GetTriOrientation;
-   using Mesh::GetQuadOrientation;
-   using Mesh::GetTetOrientation;
-
-};
 
 int main(int argc, char *argv[])
 {
@@ -325,6 +308,8 @@ int main(int argc, char *argv[])
          printf("\n");
       }  // Array<InterfaceInfo> comp_if_info(0);
 
+      config = InputParser("inputs/gen_interface.yml");
+      ComponentTopologyHandler comp_topol;
 
    }  // 2 dimension
 

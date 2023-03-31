@@ -128,11 +128,16 @@ set(scaleupROMObj_SOURCES
   include/random.hpp
   src/random.cpp
 
+  include/hdf5_utils.hpp
+
   include/navier_solver.hpp
   src/navier_solver.cpp
 
   include/topology_handler.hpp
   src/topology_handler.cpp
+
+  include/component_topology_handler.hpp
+  src/component_topology_handler.cpp
 
   include/interfaceinteg.hpp
   src/interfaceinteg.cpp
