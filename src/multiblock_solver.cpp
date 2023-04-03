@@ -42,8 +42,8 @@ MultiBlockSolver::MultiBlockSolver()
    // Receive topology info
    numSub = topol_data.numSub;
    dim = topol_data.dim;
-   global_bdr_attributes = topol_data.global_bdr_attributes;
-   
+   global_bdr_attributes = *(topol_data.global_bdr_attributes);
+ 
    // Set up FE collection/spaces.
    if (full_dg)
    {
@@ -349,7 +349,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
       InterfaceInfo *if_info = &((*interface_infos)[bn]);
       Mesh *mesh1, *mesh2;
       FiniteElementSpace *fes1, *fes2;
-      DenseMatrix elemmat;
+      Array2D<DenseMatrix*> elemmats;
       FaceElementTransformations *tr1, *tr2;
       const FiniteElement *fe1, *fe2;
       Array<Array<int> *> vdofs(2);
@@ -375,24 +375,15 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
          fe1 = fes1->GetFE(tr1->Elem1No);
          fe2 = fes2->GetFE(tr2->Elem1No);
 
-         interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmat);
+         interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
 
-         DenseMatrix subelemmat;
+         // DenseMatrix subelemmat;
          int ndof1 = fe1->GetDof();
          int ndof2 = fe2->GetDof();
 
-         // TODO: we do not need to take these additional steps to split elemmat.
-         // Need to assemble them directly from AssembleInterfaceMatrix.
-         Array<int> block_offsets(3);
-         block_offsets[0] = 0;
-         block_offsets[1] = fe1->GetDof();
-         block_offsets[2] = fe2->GetDof();
-         block_offsets.PartialSum();
          for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
-               elemmat.GetSubMatrix(block_offsets[i], block_offsets[i+1],
-                                    block_offsets[j], block_offsets[j+1], subelemmat);
-               mats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], subelemmat, skip_zeros);
+               mats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
             }
          }
       }  // if ((tr1 != NULL) && (tr2 != NULL))

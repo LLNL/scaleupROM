@@ -42,16 +42,16 @@ struct InterfaceInfo {
 struct TopologyData {
    int numSub = -1;
    int dim = -1;
-   Array<int> global_bdr_attributes;
+   Array<int> *global_bdr_attributes = NULL;
 };
 
 class TopologyHandler
 {
 protected:
-   int numSub;   // number of subdomains.
+   int numSub = -1;   // number of subdomains.
 
    // Spatial dimension.
-   int dim;
+   int dim = -1;
 
    DecompositionMode dd_mode = NUM_DDMODE;
 

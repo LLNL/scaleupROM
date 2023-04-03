@@ -176,10 +176,9 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
 }
 
 SubMeshTopologyHandler::SubMeshTopologyHandler()
+   : SubMeshTopologyHandler(new Mesh(config.GetRequiredOption<std::string>("mesh/filename").c_str()))
 {
-   // Initiate parent mesh.
-   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
-   SubMeshTopologyHandler(new Mesh(mesh_file.c_str()));
+   // Do not use *this = SubMeshTopologyHandler(...), unless you define operator=!
 }
 
 void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
@@ -190,11 +189,13 @@ void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
    for (int m = 0; m < numSub; m++)
       mesh_ptrs[m] = &(*meshes[m]);
 
+   if (if_infos == NULL) if_infos = new Array<InterfaceInfo>;
+   if_infos->SetSize(interface_infos.Size());
    if_infos = &interface_infos;
 
    topol_data.dim = dim;
    topol_data.numSub = numSub;
-   topol_data.global_bdr_attributes = pmesh->bdr_attributes;
+   topol_data.global_bdr_attributes = &pmesh->bdr_attributes;
 }
 
 SubMeshTopologyHandler::~SubMeshTopologyHandler()

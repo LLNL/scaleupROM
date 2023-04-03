@@ -557,7 +557,7 @@ int main(int argc, char *argv[])
 
       Mesh *mesh1, *mesh2;
       FiniteElementSpace *fes1, *fes2;
-      DenseMatrix elemmat;
+      Array2D<DenseMatrix*> elemmats;
       FaceElementTransformations *tr1, *tr2;
       const FiniteElement *fe1, *fe2;
       Array<Array<int> *> vdofs(2);
@@ -669,7 +669,7 @@ int main(int argc, char *argv[])
         fe1 = fes1->GetFE(tr1->Elem1No);
         fe2 = fes2->GetFE(tr2->Elem1No);
 
-        interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmat);
+        interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
         if (printFOMMat)
         {
           printf("vdof1\n");
@@ -682,27 +682,26 @@ int main(int argc, char *argv[])
             printf("%d\t", (*vdofs[1])[i]);
           }
           printf("\n");
-          printf("elemmat\n");
-          for (int i = 0; i < elemmat.Height(); i++) {
-            for (int j = 0; j < elemmat.Width(); j++) {
-              printf("%.3f\t", elemmat(i,j));
-            }
-            printf("\n");
-          }
+          for (int I = 0; I < 2; I++)
+          {
+            for (int J = 0; J < 2; J++)
+            {
+              printf("elemmat(%d,%d)\n", I, J);
+              DenseMatrix *elemmat = elemmats(I,J);
+              for (int i = 0; i < elemmat->NumRows(); i++) {
+                for (int j = 0; j < elemmat->NumCols(); j++) {
+                  printf("%.3f\t", (*elemmat)(i,j));
+                }
+                printf("\n");
+              }
+            } // for (int J = 0; J < 2; J++)
+          } // for (int I = 0; I < 2; I++)
         }
 
-        DenseMatrix subelemmat;
-        Array<int> block_offsets(3);
-        block_offsets[0] = 0;
-        block_offsets[1] = fe1->GetDof();
-        block_offsets[2] = fe2->GetDof();
-        block_offsets.PartialSum();
         for (int i = 0; i < 2; i++) {
           for (int j = 0; j < 2; j++) {
-            elemmat.GetSubMatrix(block_offsets[i], block_offsets[i+1],
-                                  block_offsets[j], block_offsets[j+1], subelemmat);
             // TODO: can change to Array2D.
-            blockMats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], subelemmat, skip_zeros);
+            blockMats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
           }
         }
       }  // if ((tr1 != NULL) && (tr2 != NULL))

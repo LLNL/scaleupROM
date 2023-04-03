@@ -41,7 +41,7 @@ void InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad(
 void InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix(
   const FiniteElement &el1, const FiniteElement &el2,
   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
-  DenseMatrix &elmat)
+  Array2D<DenseMatrix*> &elmats)
 {
    mfem_error("InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad\n"
              "   is not implemented for this class.");
@@ -50,7 +50,7 @@ void InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix(
 void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
   const FiniteElement &el1, const FiniteElement &el2,
   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
-  DenseMatrix &elmat)
+  Array2D<DenseMatrix*> &elmats)
 {
    bool boundary = false;
 
@@ -85,15 +85,34 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
      dshape2.SetSize(ndof2, dim);
      dshape2dn.SetSize(ndof2);
    }
+   // do not allow 0 ndof2 for now.
+   assert(ndof2 > 0);
 
    ndofs = ndof1 + ndof2;
-   elmat.SetSize(ndofs);
-   elmat = 0.0;
+   elmats.SetSize(2,2);
+   elmats(0,0) = new DenseMatrix(ndof1, ndof1);
+   elmats(0,1) = new DenseMatrix(ndof1, ndof2);
+   elmats(1,0) = new DenseMatrix(ndof2, ndof1);
+   elmats(1,1) = new DenseMatrix(ndof2, ndof2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) *elmats(i,j) = 0.0;
+   // elmat.SetSize(ndofs);
+   // elmat = 0.0;
    if (kappa_is_nonzero)
    {
-      jmat.SetSize(ndofs);
-      jmat = 0.;
+      jmats.SetSize(2,2);
+      jmats(0,0) = new DenseMatrix(ndof1, ndof1);
+      // only the lower-triangular part of jmat is assembled.
+      jmats(0,1) = NULL;
+      jmats(1,0) = new DenseMatrix(ndof2, ndof1);
+      jmats(1,1) = new DenseMatrix(ndof2, ndof2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j <= i; j++) *jmats(i,j) = 0.0;
+      // jmat.SetSize(ndofs);
+      // jmat = 0.;
    }
+
+   DenseMatrix *elmat = NULL, *jmat = NULL;
 
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
@@ -183,10 +202,11 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
       // For interior faces: q_e/h_e=(q1/h1+q2/h2)/2.
 
       dshape1.Mult(nh, dshape1dn);
+      elmat = elmats(0,0);
       for (int i = 0; i < ndof1; i++)
          for (int j = 0; j < ndof1; j++)
          {
-            elmat(i, j) += shape1(i) * dshape1dn(j);
+            (*elmat)(i, j) += shape1(i) * dshape1dn(j);
          }
 
       if (ndof2)
@@ -218,22 +238,25 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
 
          dshape2.Mult(nh, dshape2dn);
 
+         elmat = elmats(0,1);
          for (int i = 0; i < ndof1; i++)
             for (int j = 0; j < ndof2; j++)
             {
-               elmat(i, ndof1 + j) += shape1(i) * dshape2dn(j);
+               (*elmat)(i, j) += shape1(i) * dshape2dn(j);
             }
 
+         elmat = elmats(1,0);
          for (int i = 0; i < ndof2; i++)
             for (int j = 0; j < ndof1; j++)
             {
-               elmat(ndof1 + i, j) -= shape2(i) * dshape1dn(j);
+               (*elmat)(i, j) -= shape2(i) * dshape1dn(j);
             }
 
+         elmat = elmats(1,1);
          for (int i = 0; i < ndof2; i++)
             for (int j = 0; j < ndof2; j++)
             {
-               elmat(ndof1 + i, ndof1 + j) -= shape2(i) * dshape2dn(j);
+               (*elmat)(i, j) -= shape2(i) * dshape2dn(j);
             }
       }
 
@@ -241,27 +264,29 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
       {
          // only assemble the lower triangular part of jmat
          wq *= kappa;
+         jmat = jmats(0,0);
          for (int i = 0; i < ndof1; i++)
          {
             const double wsi = wq*shape1(i);
             for (int j = 0; j <= i; j++)
             {
-               jmat(i, j) += wsi * shape1(j);
+               (*jmat)(i, j) += wsi * shape1(j);
             }
          }
          if (ndof2)
          {
             for (int i = 0; i < ndof2; i++)
             {
-               const int i2 = ndof1 + i;
                const double wsi = wq*shape2(i);
+               jmat = jmats(1,0);
                for (int j = 0; j < ndof1; j++)
                {
-                  jmat(i2, j) -= wsi * shape1(j);
+                  (*jmat)(i, j) -= wsi * shape1(j);
                }
+               jmat = jmats(1,1);
                for (int j = 0; j <= i; j++)
                {
-                  jmat(i2, ndof1 + j) += wsi * shape2(j);
+                  (*jmat)(i, j) += wsi * shape2(j);
                }
             }
          }
@@ -269,32 +294,69 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
    }
 
    // elmat := -elmat + sigma*elmat^t + jmat
+   Array<int> ndof_array(2);
+   ndof_array[0] = ndof1;
+   ndof_array[1] = ndof2;
+   DenseMatrix *elmat12 = NULL;
    if (kappa_is_nonzero)
    {
-      for (int i = 0; i < ndofs; i++)
+      for (int I = 0; I < 2; I++)
       {
-         for (int j = 0; j < i; j++)
+         elmat = elmats(I,I);
+         jmat = jmats(I,I); 
+         for (int i = 0; i < ndof_array[I]; i++)
          {
-            double aij = elmat(i,j), aji = elmat(j,i), mij = jmat(i,j);
-            elmat(i,j) = sigma*aji - aij + mij;
-            elmat(j,i) = sigma*aij - aji + mij;
-         }
-         elmat(i,i) = (sigma - 1.)*elmat(i,i) + jmat(i,i);
-      }
-   }
+            for (int j = 0; j < i; j++)
+            {
+               double aij = (*elmat)(i,j), aji = (*elmat)(j,i), mij = (*jmat)(i,j);
+               (*elmat)(i,j) = sigma*aji - aij + mij;
+               (*elmat)(j,i) = sigma*aij - aji + mij;
+            }
+            (*elmat)(i,i) = (sigma - 1.) * (*elmat)(i,i) + (*jmat)(i,i);
+         }  // for (int i = 0; i < ndofs_array[I]; i++)
+      }  // for (int I = 0; I < 2; I++)
+      elmat = elmats(1,0);
+      jmat = jmats(1,0);
+      assert(jmat != NULL);
+      elmat12 = elmats(0,1);
+      for (int i = 0; i < ndof2; i++)
+      {
+         for (int j = 0; j < ndof1; j++)
+         {
+            double aij = (*elmat)(i,j), aji = (*elmat12)(j,i), mij = (*jmat)(i,j);
+            (*elmat)(i,j) = sigma*aji - aij + mij;
+            (*elmat12)(j,i) = sigma*aij - aji + mij;
+         }  // for (int j = 0; j < ndofs1; j++)
+      }  // for (int i = 0; i < ndofs2; i++)
+   }  // if (kappa_is_nonzero)
    else
    {
-      for (int i = 0; i < ndofs; i++)
+      for (int I = 0; I < 2; I++)
       {
-         for (int j = 0; j < i; j++)
+         elmat = elmats(I,I);
+         for (int i = 0; i < ndof_array[I]; i++)
          {
-            double aij = elmat(i,j), aji = elmat(j,i);
-            elmat(i,j) = sigma*aji - aij;
-            elmat(j,i) = sigma*aij - aji;
-         }
-         elmat(i,i) *= (sigma - 1.);
-      }
-   }
+            for (int j = 0; j < i; j++)
+            {
+               double aij = (*elmat)(i,j), aji = (*elmat)(j,i);
+               (*elmat)(i,j) = sigma*aji - aij;
+               (*elmat)(j,i) = sigma*aij - aji;
+            }
+            (*elmat)(i,i) *= (sigma - 1.);
+         }  // for (int i = 0; i < ndofs_array[I]; i++)
+      }  // for (int I = 0; I < 2; I++)
+      elmat = elmats(1,0);
+      elmat12 = elmats(0,1);
+      for (int i = 0; i < ndof2; i++)
+      {
+         for (int j = 0; j < ndof1; j++)
+         {
+            double aij = (*elmat)(i,j), aji = (*elmat12)(j,i);
+            (*elmat)(i,j) = sigma*aji - aij;
+            (*elmat12)(j,i) = sigma*aij - aji;
+         }  // for (int j = 0; j < ndofs1; j++)
+      }  // for (int i = 0; i < ndofs2; i++)
+   }  // not if (kappa_is_nonzero)
 }
 
 }

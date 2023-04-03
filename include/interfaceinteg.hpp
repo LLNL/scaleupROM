@@ -45,7 +45,7 @@ public:
                                        const FiniteElement &el2,
                                        FaceElementTransformations &Trans1,
                                        FaceElementTransformations &Trans2,
-                                       DenseMatrix &elmat);
+                                       Array2D<DenseMatrix*> &elmats);
 };
 
 class InterfaceDGDiffusionIntegrator : public InterfaceNonlinearFormIntegrator
@@ -57,8 +57,9 @@ protected:
 
   // these are not thread-safe!
   Vector shape1, shape2, dshape1dn, dshape2dn, nor, nh, ni;
-  DenseMatrix jmat, dshape1, dshape2, mq, adjJ;
+  DenseMatrix dshape1, dshape2, mq, adjJ;
   Vector nor2;
+  Array2D<DenseMatrix*> jmats;
 
 public:
    InterfaceDGDiffusionIntegrator(const double s, const double k)
@@ -72,7 +73,7 @@ public:
                                         const FiniteElement &el2,
                                         FaceElementTransformations &Trans1,
                                         FaceElementTransformations &Trans2,
-                                        DenseMatrix &elmat);
+                                        Array2D<DenseMatrix*> &elmats);
 };
 
 } // namespace mfem
