@@ -39,20 +39,25 @@ if __name__ == "__main__":
         grp = f.create_group("components")
         grp.attrs["number_of_components"] = 1
         grp.attrs["0"] = "square"
-        grp = f.create_group("ports")
-        grp.attrs["number_of_references"] = 2
-        grp.attrs["0"] = "port1"
-        grp.attrs["1"] = "port2"
-
-        # meshes
-        grp = f.create_group("meshes")
         # component index of each mesh
-        grp.create_dataset("component", (4,), data=[0,0,0,0])
+        grp.create_dataset("meshes", (4,), data=[0,0,0,0])
         # 3-dimension vector for translation / rotation
         grp.create_dataset("configuration", (4,6), data=[[0.,0.,0.,0.,0.,0.],
                                                          [1.,0.,0.,0.,0.,0.],
                                                          [0.,1.,0.,0.,0.,0.],
                                                          [1.,1.,0.,0.,0.,0.]])
+
+        grp = f.create_group("ports")
+        grp.attrs["number_of_references"] = 2
+        grp.attrs["0"] = "port1"
+        grp.attrs["1"] = "port2"
+        # interface data
+        # mesh1 / mesh2 / battr1 / battr2 / port_idx
+        if_data = [[0, 1, 2, 4, 1],
+                   [0, 2, 3, 1, 0],
+                   [1, 3, 3, 1, 0],
+                   [2, 3, 2, 4, 0]]
+        grp.create_dataset("interface", (4,5), data=if_data)
 
         # boundary attributes
         # global_battr / mesh_idx / comp_battr
@@ -66,10 +71,4 @@ if __name__ == "__main__":
                     [4, 0, 4]]
         f.create_dataset("boundary", (8,3), data=bdr_data)
 
-        # interface data
-        # mesh1 / mesh2 / battr1 / battr2 / port_idx
-        if_data = [[0, 1, 2, 4, 1],
-                   [0, 2, 3, 1, 0],
-                   [1, 3, 3, 1, 0],
-                   [2, 3, 2, 4, 0]]
-        f.create_dataset("interface", (4,5), data=if_data)
+

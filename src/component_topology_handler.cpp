@@ -33,10 +33,12 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    if (num_ref_ports > 0)
       SetupReferencePorts();
 
+   // Do we really need to copy all meshes?
    SetupMeshes();
 
    SetupReferenceInterfaces();
 
+   // Do we really need to set boundary attributes of all meshes?
    SetupBoundaries();
 }
 
@@ -110,6 +112,26 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
          comp_names[tmp] = c;
       }
 
+      // Mesh list.
+      hdf5_utils::ReadDataset(grp_id, "meshes", mesh_types);
+
+      // Configuration (translation, rotation) of meshes.
+      Array2D<double> tmp;
+      hdf5_utils::ReadDataset(grp_id, "configuration", tmp);
+      assert(mesh_types.Size() == tmp.NumRows());
+      numSub = mesh_types.Size();
+
+      mesh_configs.SetSize(numSub);
+      for (int m = 0; m < numSub; m++)
+      {
+         const double *m_cf = tmp.GetRow(m);
+         for (int d = 0; d < 3; d++)
+         {
+            mesh_configs[m].trans[d] = m_cf[d];
+            mesh_configs[m].rotate[d] = m_cf[d + 3];
+         }
+      }
+
       errf = H5Gclose(grp_id);
       assert(errf >= 0);
    }
@@ -127,29 +149,21 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
          port_names[tmp] = p;
       }
 
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
-   }
+      // Global interface port data.
+      Array2D<int> tmp;
+      hdf5_utils::ReadDataset(grp_id, "interface", tmp);
+      num_ports = tmp.NumRows();
+      port_infos.SetSize(num_ports);
+      port_types.SetSize(num_ports);
 
-   {  // Mesh list.
-      grp_id = H5Gopen2(file_id, "meshes", H5P_DEFAULT);
-      assert(grp_id >= 0);
-
-      hdf5_utils::ReadDataset(grp_id, "component", mesh_types);
-      Array2D<double> tmp;
-      hdf5_utils::ReadDataset(grp_id, "configuration", tmp);
-      assert(mesh_types.Size() == tmp.NumRows());
-      numSub = mesh_types.Size();
-
-      mesh_configs.SetSize(numSub);
-      for (int m = 0; m < numSub; m++)
+      for (int p = 0; p < num_ports; p++)
       {
-         const double *m_cf = tmp.GetRow(m);
-         for (int d = 0; d < 3; d++)
-         {
-            mesh_configs[m].trans[d] = m_cf[d];
-            mesh_configs[m].rotate[d] = m_cf[d + 3];
-         }
+         const int *p_data = tmp.GetRow(p);
+         port_infos[p].Mesh1 = p_data[0];
+         port_infos[p].Mesh2 = p_data[1];
+         port_infos[p].Attr1 = p_data[2];
+         port_infos[p].Attr2 = p_data[3];
+         port_types[p] = p_data[4];
       }
 
       errf = H5Gclose(grp_id);
@@ -171,24 +185,6 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
 
          int idx = bdr_attributes.Find(b_data[0]);
          if (idx < 0) bdr_attributes.Append(b_data[0]);
-      }
-   }
-
-   {  // Port data.
-      Array2D<int> tmp;
-      hdf5_utils::ReadDataset(file_id, "interface", tmp);
-      num_ports = tmp.NumRows();
-      port_infos.SetSize(num_ports);
-      port_types.SetSize(num_ports);
-
-      for (int p = 0; p < num_ports; p++)
-      {
-         const int *p_data = tmp.GetRow(p);
-         port_infos[p].Mesh1 = p_data[0];
-         port_infos[p].Mesh2 = p_data[1];
-         port_infos[p].Attr1 = p_data[2];
-         port_infos[p].Attr2 = p_data[3];
-         port_types[p] = p_data[4];
       }
    }
 
