@@ -182,16 +182,12 @@ SubMeshTopologyHandler::SubMeshTopologyHandler()
 }
 
 void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
-                                       Array<InterfaceInfo>* &if_infos,
+                                       // Array<InterfaceInfo>* &if_infos,
                                        TopologyData &topol_data)
 {
    mesh_ptrs.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
       mesh_ptrs[m] = &(*meshes[m]);
-
-   if (if_infos == NULL) if_infos = new Array<InterfaceInfo>;
-   if_infos->SetSize(interface_infos.Size());
-   if_infos = &interface_infos;
 
    topol_data.dim = dim;
    topol_data.numSub = numSub;
@@ -277,8 +273,11 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
 {
    Array2D<int> interface_attributes(numSub, numSub);
    interface_attributes = -1;
+   Array2D<int> interface_map(numSub, numSub);
+   interface_attributes = -1;
+
    interface_infos.SetSize(0);
-   // interface_parent.SetSize(0);
+   port_infos.SetSize(0);
 
    // interface attribute starts after the parent mesh boundary attributes.
    int if_attr = pmesh->bdr_attributes.Max() + 1;
@@ -298,12 +297,21 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
                int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrFace(jb)];
                if (parent_face_i != parent_face_j) continue;
 
-               MFEM_ASSERT(meshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE,
-                           "This interface element has been already set!");
+               assert(meshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE);
+
                if (interface_attributes[i][j] <= 0) {
                   interface_attributes[i][j] = if_attr;
+                  interface_map[i][j] = port_infos.Size();
+                  // NOTE: for SubMehs, component boundary attribute is simply SubMesh::GENERATED_ATTRIBUTE,
+                  // which is not informative at all.
+                  port_infos.Append(PortInfo({.PortAttr = if_attr,
+                                              .Mesh1 = i, .Mesh2 = j,
+                                              .Attr1 = if_attr, .Attr2 = if_attr}));
+                  interface_infos.Append(new Array<InterfaceInfo>(0));
+
                   if_attr += 1;
                }
+               assert(interface_map[i][j] >= 0);
 
                Array<int> Infs = FindParentInterfaceInfo(parent_face_i, i, ib, j, jb);
 
@@ -312,16 +320,15 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
 
                // submesh usually can inherit multiple attributes from parent.
                // we limit to single-attribute case where attribute = index + 1;
-               interface_infos.Append(InterfaceInfo({.Attr = interface_attributes[i][j],
-                                                   .Mesh1 = i, .Mesh2 = j,
-                                                   .BE1 = ib, .BE2 = jb,
-                                                   .Inf1 = Infs[0], .Inf2 = Infs[1]}));
+               interface_infos[interface_map[i][j]]->Append(
+                  InterfaceInfo({.BE1 = ib, .BE2 = jb, .Inf1 = Infs[0], .Inf2 = Infs[1]}));
                // interface_parent.Append(parent_face_i);
-            }
-         }
-      }
-   }
+            }  // for (int jb = 0; jb < meshes[j]->GetNBE(); jb++)
+         }  // for (int j = i+1; j < numSub; j++)
+      }  // for (int ib = 0; ib < meshes[i]->GetNBE(); ib++)
+   }  // for (int i = 0; i < numSub; i++)
 
+   num_ports = port_infos.Size();
    for (int i = 0; i < numSub; i++) UpdateBdrAttributes(*meshes[i]);
 }
 

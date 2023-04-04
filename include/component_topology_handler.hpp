@@ -53,7 +53,7 @@ protected:
    // Component index for each block.
    Array<int> mesh_types;
 
-   struct RefPortInfo {
+   struct PortData {
       int Component1, Component2;   // component mesh indexes.
       int Attr1, Attr2;             // boundary attribute of each component mesh sharing the port.
 
@@ -62,19 +62,12 @@ protected:
    };
 
    // Reference ports between components.
-   int num_port;
+   int num_ref_ports = -1;
    std::unordered_map<std::string, int> port_names;
-   Array<RefPortInfo*> ref_ports;
+   Array<PortData*> ref_ports;
    Array<Array<InterfaceInfo>*> ref_interfaces;   // mesh indexes are replaced with component indexes.
 
-   // Port information for global configuration.
-   struct PortInfo {
-      int Mesh1, Mesh2;    // Mesh indexes in global configuration
-      int Attr1, Attr2;    // boundary attribute of each mesh sharing the port.
-   };
-
    // Global port configuration
-   Array<PortInfo> ports;
    Array<int> port_types;
 
    // Boundary information for global configuration.
@@ -99,7 +92,7 @@ public:
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
 
    // Export mesh pointers and interface info.
-   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data) {}
+   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data) {}
 
    virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u) {}
 

@@ -37,7 +37,7 @@ MultiBlockSolver::MultiBlockSolver()
          break;
       }
    }
-   topol_handler->ExportInfo(meshes, interface_infos, topol_data);
+   topol_handler->ExportInfo(meshes, topol_data);
    
    // Receive topology info
    numSub = topol_data.numSub;
@@ -344,50 +344,52 @@ void MultiBlockSolver::Assemble()
 
 void MultiBlockSolver::AssembleInterfaceMatrix()
 {
-   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
-      InterfaceInfo *if_info = &((*interface_infos)[bn]);
-      Mesh *mesh1, *mesh2;
-      FiniteElementSpace *fes1, *fes2;
-      Array2D<DenseMatrix*> elemmats;
-      FaceElementTransformations *tr1, *tr2;
-      const FiniteElement *fe1, *fe2;
-      Array<Array<int> *> vdofs(2);
-      vdofs[0] = new Array<int>;
-      vdofs[1] = new Array<int>;
+      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
       Array<int> midx(2);
-      midx[0] = if_info->Mesh1;
-      midx[1] = if_info->Mesh2;
+      midx[0] = pInfo->Mesh1;
+      midx[1] = pInfo->Mesh2;
 
-      mesh1 = &(*meshes[midx[0]]);
-      mesh2 = &(*meshes[midx[1]]);
-      fes1 = fes[midx[0]];
-      fes2 = fes[midx[1]];
-
-      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-
-      if ((tr1 != NULL) && (tr2 != NULL))
+      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
+      for (int bn = 0; bn < interface_infos->Size(); bn++)
       {
-         fes1->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
-         fes2->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
-         // Both domains will have the adjacent element as Elem1.
-         fe1 = fes1->GetFE(tr1->Elem1No);
-         fe2 = fes2->GetFE(tr2->Elem1No);
+         InterfaceInfo *if_info = &((*interface_infos)[bn]);
+         Mesh *mesh1, *mesh2;
+         FiniteElementSpace *fes1, *fes2;
+         Array2D<DenseMatrix*> elemmats;
+         FaceElementTransformations *tr1, *tr2;
+         const FiniteElement *fe1, *fe2;
+         Array<Array<int> *> vdofs(2);
+         vdofs[0] = new Array<int>;
+         vdofs[1] = new Array<int>;
 
-         interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
+         mesh1 = &(*meshes[midx[0]]);
+         mesh2 = &(*meshes[midx[1]]);
+         fes1 = fes[midx[0]];
+         fes2 = fes[midx[1]];
 
-         // DenseMatrix subelemmat;
-         int ndof1 = fe1->GetDof();
-         int ndof2 = fe2->GetDof();
+         topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
 
-         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 2; j++) {
-               mats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
+         if ((tr1 != NULL) && (tr2 != NULL))
+         {
+            fes1->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
+            fes2->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
+            // Both domains will have the adjacent element as Elem1.
+            fe1 = fes1->GetFE(tr1->Elem1No);
+            fe2 = fes2->GetFE(tr2->Elem1No);
+
+            interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
+
+            for (int i = 0; i < 2; i++) {
+               for (int j = 0; j < 2; j++) {
+                  mats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
+               }
             }
-         }
-      }  // if ((tr1 != NULL) && (tr2 != NULL))
-   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+         }  // if ((tr1 != NULL) && (tr2 != NULL))
+      }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 }
 
 void MultiBlockSolver::Solve()

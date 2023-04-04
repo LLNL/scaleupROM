@@ -156,7 +156,7 @@ double SingleRun()
    std::string problem_name = problem->GetProblemName();
    std::string param_list_str("single_run/" + problem_name);
    YAML::Node param_list = config.FindNode(param_list_str);
-   MFEM_ASSERT(param_list, "Single Run - cannot find the problem name!\n");
+   if (!param_list) printf("Single Run - cannot find the problem name!\n");
 
    size_t num_params = param_list.size();
    for (int p = 0; p < num_params; p++)

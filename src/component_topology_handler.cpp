@@ -30,7 +30,7 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    // Assume all components have the same spatial dimension.
    dim = components[0]->Dimension();
 
-   if (num_port > 0)
+   if (num_ref_ports > 0)
       SetupReferencePorts();
 
    SetupMeshes();
@@ -66,9 +66,9 @@ void ComponentTopologyHandler::SetupComponents()
 
 void ComponentTopologyHandler::SetupReferencePorts()
 {
-   assert(num_port > 0);
+   assert(num_ref_ports > 0);
 
-   ref_ports.SetSize(num_port);
+   ref_ports.SetSize(num_ref_ports);
    ref_ports = NULL;
 
    YAML::Node port_list = config.FindNode("mesh/component-wise/ports");
@@ -118,9 +118,9 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
       grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
       assert(grp_id >= 0);
 
-      hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_port);
+      hdf5_utils::ReadAttribute(grp_id, "number_of_references", num_ref_ports);
       // // hdf5_utils::ReadDataset(file_id, "ports", ports);
-      for (int p = 0; p < num_port; p++)
+      for (int p = 0; p < num_ref_ports; p++)
       {
          std::string tmp;
          hdf5_utils::ReadAttribute(grp_id, std::to_string(p).c_str(), tmp);
@@ -177,16 +177,17 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
    {  // Port data.
       Array2D<int> tmp;
       hdf5_utils::ReadDataset(file_id, "interface", tmp);
-      ports.SetSize(tmp.NumRows());
-      port_types.SetSize(tmp.NumRows());
+      num_ports = tmp.NumRows();
+      port_infos.SetSize(num_ports);
+      port_types.SetSize(num_ports);
 
-      for (int p = 0; p < ports.Size(); p++)
+      for (int p = 0; p < num_ports; p++)
       {
          const int *p_data = tmp.GetRow(p);
-         ports[p].Mesh1 = p_data[0];
-         ports[p].Mesh2 = p_data[1];
-         ports[p].Attr1 = p_data[2];
-         ports[p].Attr2 = p_data[3];
+         port_infos[p].Mesh1 = p_data[0];
+         port_infos[p].Mesh2 = p_data[1];
+         port_infos[p].Attr1 = p_data[2];
+         port_infos[p].Attr2 = p_data[3];
          port_types[p] = p_data[4];
       }
    }
@@ -202,6 +203,7 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
    file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
    assert(file_id >= 0);
 
+   // number of ports stored in the given hdf5 file.
    int size = -1;
    hdf5_utils::ReadAttribute(file_id, "number_of_ports", size);
    assert(size > 0);
@@ -263,8 +265,8 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
       assert(errf >= 0);
 
       int port_idx = port_names[port_name];
-      ref_ports[port_idx] = new RefPortInfo;
-      RefPortInfo *port = ref_ports[port_idx];
+      ref_ports[port_idx] = new PortData;
+      PortData *port = ref_ports[port_idx];
       port->Component1 = comp1;
       port->Component2 = comp2;
       port->Attr1 = battr1;
@@ -331,9 +333,9 @@ void ComponentTopologyHandler::SetupBoundaries()
 
 void ComponentTopologyHandler::SetupReferenceInterfaces()
 {
-   ref_interfaces.SetSize(num_port);
+   ref_interfaces.SetSize(num_ref_ports);
    
-   for (int i = 0; i < num_port; i++)
+   for (int i = 0; i < num_ref_ports; i++)
    {
       Array2D<int> *be_pairs = &(ref_ports[i]->be_pairs);
       std::unordered_map<int,int> *vtx2to1 = &(ref_ports[i]->vtx2to1);
@@ -347,12 +349,6 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
       for (int be = 0; be < be_pairs->NumRows(); be++)
       {
          InterfaceInfo tmp;
-
-         // Actual attribute will be determined for each global port.
-         tmp.Attr = -1;
-         // Component indexes instead of global meshes.
-         tmp.Mesh1 = comp1;
-         tmp.Mesh2 = comp2;
 
          int *pair = be_pairs->GetRow(be);
          tmp.BE1 = pair[0];
@@ -368,8 +364,8 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
 
          // determine orientation of the face with respect to mesh2/elem2.
          Array<int> vtx1, vtx2;
-         components[tmp.Mesh1]->GetBdrElementVertices(tmp.BE1, vtx1);
-         components[tmp.Mesh2]->GetBdrElementVertices(tmp.BE2, vtx2);
+         components[comp1]->GetBdrElementVertices(tmp.BE1, vtx1);
+         components[comp2]->GetBdrElementVertices(tmp.BE2, vtx2);
          for (int v = 0; v < vtx2.Size(); v++) vtx2[v] = (*vtx2to1)[vtx2[v]];
          switch (dim)
          {
@@ -411,10 +407,10 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
       for (int k = 0; k < ref_interfaces[i]->Size(); k++)
       {
          InterfaceInfo *tmp = &(*ref_interfaces[i])[k];
-         printf(format.c_str(), tmp->Attr, tmp->Mesh1, tmp->Mesh2,
+         printf(format.c_str(), -1, comp1, comp2,
                               tmp->BE1, tmp->BE2, tmp->Inf1 / 64,
                               tmp->Inf1 % 64, tmp->Inf2 / 64, tmp->Inf2 % 64);
       }
       printf("\n");
-   }  // for (int i = 0; i < num_ports; i++)
+   }  // for (int i = 0; i < num_ref_ports; i++)
 }

@@ -40,7 +40,7 @@ if __name__ == "__main__":
         grp.attrs["number_of_components"] = 1
         grp.attrs["0"] = "square"
         grp = f.create_group("ports")
-        grp.attrs["number_of_ports"] = 2
+        grp.attrs["number_of_references"] = 2
         grp.attrs["0"] = "port1"
         grp.attrs["1"] = "port2"
 

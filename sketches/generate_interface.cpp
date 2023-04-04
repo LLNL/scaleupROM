@@ -34,10 +34,9 @@ int main(int argc, char *argv[])
       // }
 
       Array<Mesh*> meshes;
-      Array<InterfaceInfo> *if_info = NULL;
       TopologyData topol_data;
       SubMeshTopologyHandler *submesh = new SubMeshTopologyHandler(&mesh);
-      submesh->ExportInfo(meshes, if_info, topol_data);
+      submesh->ExportInfo(meshes, topol_data);
 
       for (int m = 0; m < meshes.Size(); m++)
       {
@@ -64,22 +63,28 @@ int main(int argc, char *argv[])
             printf("\n");
          }
       }
-
-      assert(if_info != NULL);
       printf("numSub: %d\n", topol_data.numSub);
 
       std::string format = "";
       for (int k = 0; k < 8; k++) format += "%d\t";
       format += "%d\n";
-      printf("Interface informations\n");
-      printf("Attr\tMesh1\tMesh2\tBE1\tBE2\tIdx1\tOri1\tIdx2\tOri2\n");
-      for (int k = 0; k < if_info->Size(); k++)
+
+      for (int p = 0; p < submesh->GetNumPorts(); p++)
       {
-         printf(format.c_str(), (*if_info)[k].Attr, (*if_info)[k].Mesh1, (*if_info)[k].Mesh2,
-                                (*if_info)[k].BE1, (*if_info)[k].BE2, (*if_info)[k].Inf1 / 64,
-                                (*if_info)[k].Inf1 % 64, (*if_info)[k].Inf2 / 64, (*if_info)[k].Inf2 % 64);
+         const PortInfo *pInfo = submesh->GetPortInfo(p);
+         Array<InterfaceInfo>* const if_info = submesh->GetInterfaceInfos(p);
+         assert(if_info != NULL);
+      
+         printf("Interface informations\n");
+         printf("Attr\tMesh1\tMesh2\tBE1\tBE2\tIdx1\tOri1\tIdx2\tOri2\n");
+         for (int k = 0; k < if_info->Size(); k++)
+         {
+            printf(format.c_str(), pInfo->PortAttr, pInfo->Mesh1, pInfo->Mesh2,
+                                 (*if_info)[k].BE1, (*if_info)[k].BE2, (*if_info)[k].Inf1 / 64,
+                                 (*if_info)[k].Inf1 % 64, (*if_info)[k].Inf2 / 64, (*if_info)[k].Inf2 % 64);
+         }
+         printf("\n");
       }
-      printf("\n");
 
       // assert(nx_ % dx == 0);
       printf("Component mesh.\n");
@@ -236,76 +241,76 @@ int main(int argc, char *argv[])
 
       Array<InterfaceInfo> comp_if_info(0);
       {
-         for (int i = 0; i < global_if_pairs; i++)
-         {
-            int if_pair_type = global_if_type[i];
-            Array<std::pair<int,int>> *be_pair = be_pairs[if_pair_type];
-            std::map<int,int> *if_vtx2to1 = vtx_2to1[if_pair_type];
-            for (int be = 0; be < be_pair->Size(); be++)
-            {
-               InterfaceInfo tmp;
+      //    for (int i = 0; i < global_if_pairs; i++)
+      //    {
+      //       int if_pair_type = global_if_type[i];
+      //       Array<std::pair<int,int>> *be_pair = be_pairs[if_pair_type];
+      //       std::map<int,int> *if_vtx2to1 = vtx_2to1[if_pair_type];
+      //       for (int be = 0; be < be_pair->Size(); be++)
+      //       {
+      //          InterfaceInfo tmp;
 
-               // TODO: read value from hdf5 file.
-               tmp.Attr = i + 5;
-               tmp.Mesh1 = global_idx1[i];
-               tmp.Mesh2 = global_idx2[i];
+      //          // TODO: read value from hdf5 file.
+      //          tmp.Attr = i + 5;
+      //          tmp.Mesh1 = global_idx1[i];
+      //          tmp.Mesh2 = global_idx2[i];
 
-               tmp.BE1 = (*be_pair)[be].first;
-               tmp.BE2 = (*be_pair)[be].second;
+      //          tmp.BE1 = (*be_pair)[be].first;
+      //          tmp.BE2 = (*be_pair)[be].second;
 
-               // use the face index from each component mesh.
-               int f1 = meshes[tmp.Mesh1]->GetBdrFace(tmp.BE1);
-               int f2 = meshes[tmp.Mesh2]->GetBdrFace(tmp.BE2);
-               int Inf1, Inf2, dump;
-               meshes[tmp.Mesh1]->GetFaceInfos(f1, &Inf1, &dump);
-               meshes[tmp.Mesh2]->GetFaceInfos(f2, &Inf2, &dump);
-               tmp.Inf1 = Inf1;
+      //          // use the face index from each component mesh.
+      //          int f1 = meshes[tmp.Mesh1]->GetBdrFace(tmp.BE1);
+      //          int f2 = meshes[tmp.Mesh2]->GetBdrFace(tmp.BE2);
+      //          int Inf1, Inf2, dump;
+      //          meshes[tmp.Mesh1]->GetFaceInfos(f1, &Inf1, &dump);
+      //          meshes[tmp.Mesh2]->GetFaceInfos(f2, &Inf2, &dump);
+      //          tmp.Inf1 = Inf1;
 
-               // determine orientation of the face with respect to mesh2/elem2.
-               Array<int> vtx1, vtx2;
-               meshes[tmp.Mesh1]->GetBdrElementVertices(tmp.BE1, vtx1);
-               meshes[tmp.Mesh2]->GetBdrElementVertices(tmp.BE2, vtx2);
-               for (int v = 0; v < vtx2.Size(); v++) vtx2[v] = (*if_vtx2to1)[vtx2[v]];
-               switch (dim)
-               {
-                  case 1:
-                  {
-                     break;
-                  }
-                  case 2:
-                  {
-                     if ((vtx1[1] == vtx2[0]) && (vtx1[0] == vtx2[1]))
-                     {
-                        tmp.Inf2 = 64 * (Inf2 / 64) + 1;
-                     }
-                     else if ((vtx1[0] == vtx2[0]) && (vtx1[1] == vtx2[1]))
-                     {
-                        tmp.Inf2 = 64 * (Inf2 / 64);
-                     }
-                     else
-                     {
-                        mfem_error("orientation error!\n");
-                     }
-                     break;
-                  }
-                  case 3:
-                  {
-                     break;
-                  }
-               }  // switch (dim)
-               comp_if_info.Append(tmp);
-            }  // for (int be = 0; be < be_pair->Size(); be++)
-         }  // for (int i = 0; i < global_if_pairs; i++)
+      //          // determine orientation of the face with respect to mesh2/elem2.
+      //          Array<int> vtx1, vtx2;
+      //          meshes[tmp.Mesh1]->GetBdrElementVertices(tmp.BE1, vtx1);
+      //          meshes[tmp.Mesh2]->GetBdrElementVertices(tmp.BE2, vtx2);
+      //          for (int v = 0; v < vtx2.Size(); v++) vtx2[v] = (*if_vtx2to1)[vtx2[v]];
+      //          switch (dim)
+      //          {
+      //             case 1:
+      //             {
+      //                break;
+      //             }
+      //             case 2:
+      //             {
+      //                if ((vtx1[1] == vtx2[0]) && (vtx1[0] == vtx2[1]))
+      //                {
+      //                   tmp.Inf2 = 64 * (Inf2 / 64) + 1;
+      //                }
+      //                else if ((vtx1[0] == vtx2[0]) && (vtx1[1] == vtx2[1]))
+      //                {
+      //                   tmp.Inf2 = 64 * (Inf2 / 64);
+      //                }
+      //                else
+      //                {
+      //                   mfem_error("orientation error!\n");
+      //                }
+      //                break;
+      //             }
+      //             case 3:
+      //             {
+      //                break;
+      //             }
+      //          }  // switch (dim)
+      //          comp_if_info.Append(tmp);
+      //       }  // for (int be = 0; be < be_pair->Size(); be++)
+      //    }  // for (int i = 0; i < global_if_pairs; i++)
 
-         printf("Component Interface informations\n");
-         printf("Attr\tMesh1\tMesh2\tBE1\tBE2\tIdx1\tOri1\tIdx2\tOri2\n");
-         for (int k = 0; k < comp_if_info.Size(); k++)
-         {
-            printf(format.c_str(), comp_if_info[k].Attr, comp_if_info[k].Mesh1, comp_if_info[k].Mesh2,
-                                 comp_if_info[k].BE1, comp_if_info[k].BE2, comp_if_info[k].Inf1 / 64,
-                                 comp_if_info[k].Inf1 % 64, comp_if_info[k].Inf2 / 64, comp_if_info[k].Inf2 % 64);
-         }
-         printf("\n");
+      //    printf("Component Interface informations\n");
+      //    printf("Attr\tMesh1\tMesh2\tBE1\tBE2\tIdx1\tOri1\tIdx2\tOri2\n");
+      //    for (int k = 0; k < comp_if_info.Size(); k++)
+      //    {
+      //       printf(format.c_str(), comp_if_info[k].Attr, comp_if_info[k].Mesh1, comp_if_info[k].Mesh2,
+      //                            comp_if_info[k].BE1, comp_if_info[k].BE2, comp_if_info[k].Inf1 / 64,
+      //                            comp_if_info[k].Inf1 % 64, comp_if_info[k].Inf2 / 64, comp_if_info[k].Inf2 % 64);
+      //    }
+      //    printf("\n");
       }  // Array<InterfaceInfo> comp_if_info(0);
 
       config = InputParser("inputs/gen_interface.yml");

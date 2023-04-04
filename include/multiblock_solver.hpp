@@ -56,7 +56,6 @@ protected:
 
    // MultiBlockSolver does not own these. Owned by TopologyHandler.
    Array<Mesh*> meshes;
-   Array<InterfaceInfo> *interface_infos = NULL;
 
    // Informations received from Topology Handler.
    int numSub;   // number of subdomains.
@@ -74,10 +73,6 @@ protected:
    Array<int> domain_offsets; // Size(numSub + 1). each block corresponds to the vector solution.
    Array<int> num_vdofs;       // Size(numSub). number of vdofs of the vector solution in each subdomain.
    BlockVector *U, *RHS;
-   // For nonlinear problem
-   // BlockOperator *globalMat;
-   BlockMatrix *globalMat;
-   SparseMatrix *globalMat_mono;
 
    Array<GridFunction *> us;
 
@@ -112,6 +107,10 @@ protected:
 
    // System matrix for Bilinear case.
    Array2D<SparseMatrix *> mats;
+   // For nonlinear problem
+   // BlockOperator *globalMat;
+   BlockMatrix *globalMat;
+   SparseMatrix *globalMat_mono;
 
    // operators
    Array<LinearForm *> bs;
