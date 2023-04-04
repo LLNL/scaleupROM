@@ -71,11 +71,6 @@ protected:
    Array<int> port_types;
 
    // Boundary information for global configuration.
-   // struct BdrInfo {
-   //    int Attr_g;    // Global boundary attribute.
-   //    int Mesh;      // Mesh indexes in global configuration
-   //    int Attr_c;    // Component boundary attribute.
-   // };
    Array<std::unordered_map<int,int>*> bdr_c2g;
    Array<int> bdr_attributes;
 
@@ -105,6 +100,7 @@ protected:
    void SetupMeshes();
    void SetupBoundaries();
    void SetupReferenceInterfaces();
+   void SetupPorts();
 };
 
 namespace mesh_config

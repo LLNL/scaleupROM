@@ -38,6 +38,8 @@ ComponentTopologyHandler::ComponentTopologyHandler()
 
    SetupReferenceInterfaces();
 
+   SetupPorts();
+
    // Do we really need to set boundary attributes of all meshes?
    SetupBoundaries();
 }
@@ -409,4 +411,47 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
       }
       printf("\n");
    }  // for (int i = 0; i < num_ref_ports; i++)
+}
+
+void ComponentTopologyHandler::SetupPorts()
+{
+   assert(num_ports > 0);
+   assert(port_infos.Size() == num_ports);
+   assert(port_types.Size() == num_ports);
+
+   // Port attribute will be setup with a value that does not overlap with any component boundary attribute.
+   int attr_offset = 0;
+   for (int c = 0; c < num_comp; c++)
+      attr_offset = max(attr_offset, components[c]->bdr_attributes.Max());
+   // Also does not overlap with global boundary attributes.
+   attr_offset = max(attr_offset, bdr_attributes.Max());
+   attr_offset += 1;
+
+   interface_infos.SetSize(num_ports);
+   for (int p = 0; p < num_ports; p++)
+   {
+      PortData *ref_port = ref_ports[port_types[p]];
+      assert(ref_port != NULL);
+      assert(mesh_types[port_infos[p].Mesh1] == ref_port->Component1);
+      assert(mesh_types[port_infos[p].Mesh2] == ref_port->Component2);
+      assert(port_infos[p].Attr1 == ref_port->Attr1);
+      assert(port_infos[p].Attr2 == ref_port->Attr2);
+
+      port_infos[p].PortAttr = attr_offset;
+
+      interface_infos[p] = ref_interfaces[port_types[p]];
+
+      Mesh *mesh1 = meshes[port_infos[p].Mesh1];
+      Mesh *mesh2 = meshes[port_infos[p].Mesh2];
+      for (int b = 0; b < interface_infos[p]->Size(); b++)
+      {
+         InterfaceInfo *b_info = &((*interface_infos[p])[b]);
+         mesh1->SetBdrAttribute(b_info->BE1, attr_offset);
+         mesh2->SetBdrAttribute(b_info->BE2, attr_offset);
+      }
+
+      attr_offset += 1;
+   }
+
+   for (int p = 0; p < interface_infos.Size(); p++) assert(interface_infos[p] != NULL);
 }

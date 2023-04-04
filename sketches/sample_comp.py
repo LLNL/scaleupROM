@@ -56,7 +56,7 @@ if __name__ == "__main__":
         if_data = [[0, 1, 2, 4, 1],
                    [0, 2, 3, 1, 0],
                    [1, 3, 3, 1, 0],
-                   [2, 3, 2, 4, 0]]
+                   [2, 3, 2, 4, 1]]
         grp.create_dataset("interface", (4,5), data=if_data)
 
         # boundary attributes
