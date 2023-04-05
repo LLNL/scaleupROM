@@ -14,9 +14,17 @@
 #include "component_topology_handler.hpp"
 #include "hdf5.h"
 #include "hdf5_utils.hpp"
+#include <fstream>
 
 using namespace std;
 using namespace mfem;
+
+inline bool FileExists(const std::string& name)
+{
+   std::ifstream f(name.c_str());
+   return f.good();
+   // ifstream f will be closed upon the end of the function.
+}
 
 ComponentTopologyHandler::ComponentTopologyHandler()
    : TopologyHandler()
@@ -85,7 +93,10 @@ void ComponentTopologyHandler::SetupReferencePorts()
          // Read hdf5 files.
          std::string filename = config.GetRequiredOptionFromDict<std::string>("file", port_list[p]);
 
-         ReadPortsFromFile(filename);
+         if (FileExists(filename))
+            ReadPortsFromFile(filename);
+         else
+            BuildPortFromInput(port_list[p]);
       }
    }
    
@@ -175,6 +186,7 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
    {  // Boundary data.
       Array2D<int> tmp;
       hdf5_utils::ReadDataset(file_id, "boundary", tmp);
+
       bdr_c2g.SetSize(numSub);
       for (int m = 0; m < numSub; m++) bdr_c2g[m] = new std::unordered_map<int,int>;
       bdr_attributes.SetSize(0);
@@ -454,4 +466,176 @@ void ComponentTopologyHandler::SetupPorts()
    }
 
    for (int p = 0; p < interface_infos.Size(); p++) assert(interface_infos[p] != NULL);
+}
+
+void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
+{
+   std::string port_name = config.GetRequiredOptionFromDict<std::string>("name", port_dict);
+   if (!port_names.count(port_name))
+      return;
+
+   int port_idx = port_names[port_name];
+   ref_ports[port_idx] = new PortData;
+   PortData *port = ref_ports[port_idx];
+
+   assert(num_comp > 0);
+   assert(components.Size() == num_comp);
+   std::string name1 = config.GetRequiredOptionFromDict<std::string>("comp1/name", port_dict);
+   std::string name2 = config.GetRequiredOptionFromDict<std::string>("comp2/name", port_dict);
+   if (!comp_names.count(name1))
+      mfem_error("component 1 for the port building does not exist!\n");
+   if (!comp_names.count(name2))
+      mfem_error("component 2 for the port building does not exist!\n");
+   
+   int idx1 = comp_names[name1];
+   int idx2 = comp_names[name2];
+   Mesh *comp1 = components[idx1];
+   Mesh *comp2 = components[idx2];
+   assert(comp1 != NULL);
+   assert(comp2 != NULL);
+
+   int attr1 = config.GetRequiredOptionFromDict<int>("comp1/attr", port_dict);
+   int attr2 = config.GetRequiredOptionFromDict<int>("comp2/attr", port_dict);
+   int exists = comp1->bdr_attributes.Find(attr1);
+   if (exists < 0) mfem_error("BuildPortFromInput: specified boundary attribute for component 1 does not exist!\n");
+   exists = comp2->bdr_attributes.Find(attr2);
+   if (exists < 0) mfem_error("BuildPortFromInput: specified boundary attribute for component 2 does not exist!\n");
+
+   port->Component1 = idx1;
+   port->Component2 = idx2;
+   port->Attr1 = attr1;
+   port->Attr2 = attr2;
+
+   Vector trnsf2 = config.GetRequiredOptionFromDict<Vector>("comp2_configuration", port_dict);
+   assert(trnsf2.Size() == 6);
+   for (int d = 0; d < 3; d++)
+   {
+      mesh_config::trans[d] = trnsf2[d];
+      mesh_config::rotate[d] = trnsf2[d + 3];
+   }
+
+   Array<int> be1(0), be2(0);
+   for (int b = 0; b < comp1->GetNBE(); b++)
+      if (comp1->GetBdrAttribute(b) == attr1) be1.Append(b);
+   for (int b = 0; b < comp2->GetNBE(); b++)
+      if (comp2->GetBdrAttribute(b) == attr2) be2.Append(b);
+   assert(be1.Size() == be2.Size());
+   port->be_pairs.SetSize(be1.Size(), 2);
+   port->be_pairs = -1;
+
+   Array<int> vtx1(0), vtx2(0);
+   for (int b1 = 0; b1 < be1.Size(); b1++)
+   {
+      Array<int> b_vtx;
+      comp1->GetBdrElementVertices(be1[b1], b_vtx);
+      for (int v = 0; v < b_vtx.Size(); v++)
+         if (vtx1.Find(b_vtx[v]) < 0) vtx1.Append(b_vtx[v]);
+   }
+   for (int b2 = 0; b2 < be2.Size(); b2++)
+   {
+      Array<int> b_vtx;
+      comp2->GetBdrElementVertices(be2[b2], b_vtx);
+      for (int v = 0; v < b_vtx.Size(); v++)
+         if (vtx2.Find(b_vtx[v]) < 0) vtx2.Append(b_vtx[v]);
+   }
+   assert(vtx1.Size() == vtx2.Size());
+
+   // Since comp2 mesh's nodes are already set up,
+   // Mesh::Transform transforms the node coordinates, instead of vertices.
+   // For actual meshes, this does not matter.
+   // comp2->Transform(mesh_config::Transform2D);
+   Array<Vector*> x2_trns(vtx2.Size());
+   x2_trns = NULL;
+   for (int v2 = 0; v2 < vtx2.Size(); v2++)
+   {
+      double *x2 = comp2->GetVertex(vtx2[v2]);
+      Vector tmp(x2, dim);
+      x2_trns[v2] = new Vector;
+      mesh_config::Transform2D(tmp, *x2_trns[v2]);
+   }
+
+   double threshold = 1.e-10;
+   for (int v1 = 0; v1 < vtx1.Size(); v1++)
+   {
+      double *x1 = comp1->GetVertex(vtx1[v1]);
+      bool found_match = false;
+
+      for (int v2 = 0; v2 < vtx2.Size(); v2++)
+      {
+         if (port->vtx2to1.count(vtx2[v2])) continue;
+
+         // double *x2 = comp2->GetVertex(vtx2[v2]);
+         const double *x2 = x2_trns[v2]->Read();
+
+         bool match = true;
+         for (int d = 0; d < dim; d++)
+         {
+            match = (abs(x1[d] - x2[d]) < threshold);
+            if (!match) break;
+         }
+
+         if (match)
+         {
+            port->vtx2to1[vtx2[v2]] = vtx1[v1];
+            found_match = true;
+            break;
+         }
+      }  // for (int v2 = 0; v2 < vtx2.Size(); v2++)
+
+      if (!found_match) mfem_error("BuildPortFromInput: Cannot find the matching vertex!\n");
+   }  // for (int v1 = 0; v1 < vtx1.Size(); v1++)
+
+   for (int b2 = 0; b2 < be2.Size(); b2++)
+   {
+      Array<int> b_vtx2;
+      comp2->GetBdrElementVertices(be2[b2], b_vtx2);
+
+      Array<int> b2_vtx1(b_vtx2.Size());
+      for (int v = 0; v < b2_vtx1.Size(); v++)
+      {
+         assert(port->vtx2to1.count(b_vtx2[v]));
+         b2_vtx1[v] = port->vtx2to1[b_vtx2[v]];
+      }
+      b2_vtx1.Sort();
+
+      for (int b1 = 0; b1 < be1.Size(); b1++)
+      {
+         Array<int> b1_vtx1;
+         comp1->GetBdrElementVertices(be1[b1], b1_vtx1);
+
+         assert(b2_vtx1.Size() == b1_vtx1.Size());
+         b1_vtx1.Sort();
+
+         bool match = true;
+         for (int v = 0; v < b1_vtx1.Size(); v++)
+            if (b1_vtx1[v] != b2_vtx1[v])
+            {
+               match = false;
+               break;
+            }
+         
+         if (match)
+         {
+            int *be_pair = port->be_pairs.GetRow(b2);
+            be_pair[0] = be1[b1];
+            be_pair[1] = be2[b2];
+            break;
+         }
+      }  // for (int b1 = 0; b1 < be1.Size(); b1++)
+   }  // for (int b2 = 0; b2 < be2.Size(); b2++)
+
+   for (int i = 0; i < port->be_pairs.NumRows(); i++)
+      for (int j = 0; j < port->be_pairs.NumCols(); j++)
+         assert(port->be_pairs(i,j) >= 0);
+
+   printf("port %s\n", port_name.c_str());
+   printf("comp: %d %d\n", port->Component1, port->Component2);
+   printf("attr: %d %d\n", port->Attr1, port->Attr2);
+   printf("be1\tbe2\n");
+   for (int i = 0; i < port->be_pairs.NumRows(); i++)
+      printf("%d\t%d\n", port->be_pairs(i,0), port->be_pairs(i,1));
+   printf("vtx2 -> vtx1\n");
+   for (auto m : port->vtx2to1)
+      printf("%d\t%d\n", m.first, m.second);
+   printf("\n");
 }

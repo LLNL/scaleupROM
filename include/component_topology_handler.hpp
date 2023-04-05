@@ -17,6 +17,44 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
+namespace mesh_config
+{
+
+static double trans[3], rotate[3];
+
+static void Transform2D(const Vector &x, Vector &y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(2);
+   double sint = sin(mesh_config::rotate[0]);
+   double cost = cos(mesh_config::rotate[0]);
+   y[0] = cost * x[0] - sint * x[1];
+   y[1] = sint * x[0] + cost * x[1];
+
+   y[0] += mesh_config::trans[0];
+   y[1] += mesh_config::trans[1];
+}
+
+static void InverseTransform2D(const Vector &x, Vector &y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(2);
+   double tmp0 = x(0) - mesh_config::trans[0];
+   double tmp1 = x(1) - mesh_config::trans[1];
+
+   double sint = sin(- mesh_config::rotate[0]);
+   double cost = cos(- mesh_config::rotate[0]);
+   y(0) = cost * tmp0 - sint * tmp1;
+   y(1) = sint * tmp0 + cost * tmp1;
+}
+
+static void Transform3D(const Vector &x, Vector &y)
+{
+   mfem_error("not implemented!\n");
+}
+
+}
+
 class BlockMesh : public Mesh
 {
 public:
@@ -94,6 +132,7 @@ public:
 protected:
    void ReadGlobalConfigFromFile(const std::string filename);
    void ReadPortsFromFile(const std::string filename);
+   void BuildPortFromInput(const YAML::Node port_dict);
 
    void SetupComponents();
    void SetupReferencePorts();
@@ -102,30 +141,5 @@ protected:
    void SetupReferenceInterfaces();
    void SetupPorts();
 };
-
-namespace mesh_config
-{
-
-static double trans[3], rotate[3];
-
-static void Transform2D(const Vector &x, Vector &y)
-{
-   assert(x.Size() == 2);
-   y.SetSize(2);
-   double sint = sin(mesh_config::rotate[0]);
-   double cost = cos(mesh_config::rotate[0]);
-   y(0) = cost * x(0) - sint * x(1);
-   y(1) = sint * x(0) + cost * x(1);
-
-   y(0) += mesh_config::trans[0];
-   y(1) += mesh_config::trans[1];
-}
-
-static void Transform3D(const Vector &x, Vector &y)
-{
-   mfem_error("not implemented!\n");
-}
-
-}
 
 #endif

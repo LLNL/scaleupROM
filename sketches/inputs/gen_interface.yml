@@ -14,6 +14,14 @@ mesh:
       - name: "port1"
         file: "port1.h5"
       - name: "port2"
+#        file: "not_exist.h5"
+#        comp1:
+#          name: "square"
+#          attr: 2 
+#        comp2:
+#          name: "square"
+#          attr: 4
+#        comp2_configuration: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         file: "port2.h5"
 
 #domain-decomposition:
