@@ -21,6 +21,7 @@ namespace mesh_config
 {
 
 static double trans[3], rotate[3];
+typedef void TransformFunction(const Vector &, Vector &);
 
 static void Transform2D(const Vector &x, Vector &y)
 {
@@ -50,7 +51,20 @@ static void InverseTransform2D(const Vector &x, Vector &y)
 
 static void Transform3D(const Vector &x, Vector &y)
 {
-   mfem_error("not implemented!\n");
+   assert(x.Size() == 3);
+   y.SetSize(3);
+
+   for (int d = 0; d < 3; d++)
+      y(d) = x(d) + mesh_config::trans[d];
+}
+
+static void InverseTransform3D(const Vector &x, Vector &y)
+{
+   assert(x.Size() == 3);
+   y.SetSize(3);
+
+   for (int d = 0; d < 3; d++)
+      y(d) = x(d) - mesh_config::trans[d];
 }
 
 }
@@ -64,7 +78,6 @@ public:
    // these protected members are needed to be public for GenerateInterfaces.
    using Mesh::GetTriOrientation;
    using Mesh::GetQuadOrientation;
-   using Mesh::GetTetOrientation;
 };
 
 class ComponentTopologyHandler : public TopologyHandler
@@ -88,6 +101,8 @@ protected:
    };
    // configuration of each meshes
    Array<MeshConfig> mesh_configs;
+   mesh_config::TransformFunction *tf_ptr = NULL;
+   mesh_config::TransformFunction *inv_tf_ptr = NULL;
 
    // Meshes for global configuration.
    Array<Mesh*> meshes;
@@ -132,6 +147,9 @@ public:
    { mfem_error("ComponentTopologyHandler does not yet support global grid function/mesh!\n"); }
 
 protected:
+   // Get vertex orientation of face2 (from mesh2) with respect to face1 (mesh1).
+   int GetOrientation(BlockMesh *comp1, const Element::Type &be_type, const Array<int> &vtx1, const Array<int> &vtx2);
+
    void ReadGlobalConfigFromFile(const std::string filename);
    void ReadPortsFromFile(const std::string filename);
    void BuildPortFromInput(const YAML::Node port_dict);

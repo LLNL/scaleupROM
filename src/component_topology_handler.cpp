@@ -39,6 +39,25 @@ ComponentTopologyHandler::ComponentTopologyHandler()
 
    // Assume all components have the same spatial dimension.
    dim = components[0]->Dimension();
+   switch (dim)
+   {
+      case 1:
+      {
+         break;
+      }
+      case 2:
+      {
+         tf_ptr = &(mesh_config::Transform2D);
+         inv_tf_ptr = &(mesh_config::InverseTransform2D);
+         break;
+      }
+      case 3:
+      {
+         tf_ptr = &(mesh_config::Transform3D);
+         inv_tf_ptr = &(mesh_config::InverseTransform3D);
+         break;
+      }
+   }
 
    if (num_ref_ports > 0)
       SetupReferencePorts();
@@ -337,7 +356,7 @@ void ComponentTopologyHandler::SetupMeshes()
          mesh_config::trans[d] = mesh_configs[m].trans[d];
          mesh_config::rotate[d] = mesh_configs[m].rotate[d];
       }
-      meshes[m]->Transform(mesh_config::Transform2D);
+      meshes[m]->Transform(*tf_ptr);
    }
 
    for (int m = 0; m < numSub; m++) assert(meshes[m] != NULL);
@@ -370,10 +389,12 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
    {
       Array2D<int> *be_pairs = &(ref_ports[i]->be_pairs);
       std::unordered_map<int,int> *vtx2to1 = &(ref_ports[i]->vtx2to1);
-      int comp1 = ref_ports[i]->Component1;
-      int comp2 = ref_ports[i]->Component2;
+      int comp1_idx = ref_ports[i]->Component1;
+      int comp2_idx = ref_ports[i]->Component2;
       int attr1 = ref_ports[i]->Attr1;
       int attr2 = ref_ports[i]->Attr2;
+      BlockMesh *comp1 = components[comp1_idx];
+      BlockMesh *comp2 = components[comp2_idx];
 
       ref_interfaces[i] = new Array<InterfaceInfo>(0);
 
@@ -386,46 +407,40 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
          tmp.BE2 = pair[1];
 
          // use the face index from each component mesh.
-         int f1 = components[comp1]->GetBdrFace(tmp.BE1);
-         int f2 = components[comp2]->GetBdrFace(tmp.BE2);
+         int f1 = comp1->GetBdrFace(tmp.BE1);
+         int f2 = comp2->GetBdrFace(tmp.BE2);
          int Inf1, Inf2, dump;
-         components[comp1]->GetFaceInfos(f1, &Inf1, &dump);
-         components[comp2]->GetFaceInfos(f2, &Inf2, &dump);
+         comp1->GetFaceInfos(f1, &Inf1, &dump);
+         comp2->GetFaceInfos(f2, &Inf2, &dump);
          tmp.Inf1 = Inf1;
 
-         // determine orientation of the face with respect to mesh2/elem2.
+         // Get element type of two boundary elements and make sure they match.
+         Element::Type be1_type = comp1->GetBdrElementType(tmp.BE1);
+         Element::Type be2_type = comp2->GetBdrElementType(tmp.BE2);
+         assert(be1_type == be2_type);
+
+         // Get vertices from each mesh to determine orientation of mesh2.
+         // NOTE: orientation is determined by "face" vertex order, NOT "boundary element" vertex order!
+         /*
+            NOTE: Mesh::GenerateFaces() uses local face vertex order, while here we used global face vertex order.
+            However, this is still consistent. For 'boundary' face, only element 1 exists, and it uses global face vertex order.
+            Local face vertex order is used only for element 2. For an interface of two meshes, the faces of both mesh's elements
+            are boundary faces, which vertices are ordered by global face vertex order.
+         */
          Array<int> vtx1, vtx2;
-         components[comp1]->GetBdrElementVertices(tmp.BE1, vtx1);
-         components[comp2]->GetBdrElementVertices(tmp.BE2, vtx2);
-         for (int v = 0; v < vtx2.Size(); v++) vtx2[v] = (*vtx2to1)[vtx2[v]];
-         switch (dim)
+         comp1->GetFaceVertices(f1, vtx1);
+         comp2->GetFaceVertices(f2, vtx2);
+
+         for (int v = 0; v < vtx2.Size(); v++)
          {
-            case 1:
-            {
-               break;
-            }
-            case 2:
-            {
-               if ((vtx1[1] == vtx2[0]) && (vtx1[0] == vtx2[1]))
-               {
-                  tmp.Inf2 = 64 * (Inf2 / 64) + 1;
-               }
-               else if ((vtx1[0] == vtx2[0]) && (vtx1[1] == vtx2[1]))
-               {
-                  tmp.Inf2 = 64 * (Inf2 / 64);
-               }
-               else
-               {
-                  mfem_error("orientation error!\n");
-               }
-               break;
-            }
-            case 3:
-            {
-               mfem_error("not implemented yet!\n");
-               break;
-            }
-         }  // switch (dim)
+            // std::map creates a new item if it does not exist, which should not happen.
+            assert(vtx2to1->count(vtx2[v]));
+            vtx2[v] = (*vtx2to1)[vtx2[v]];
+         }
+
+         // determine orientation of the face with respect to mesh2/elem2.
+         int ori2 = GetOrientation(comp1, be1_type, vtx1, vtx2);
+         tmp.Inf2 = 64 * (Inf2 / 64) + ori2;
 
          ref_interfaces[i]->Append(tmp);
       }  // for (int be = 0; be < be_pair->Size(); be++)
@@ -440,7 +455,7 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
          for (int k = 0; k < ref_interfaces[i]->Size(); k++)
          {
             InterfaceInfo *tmp = &(*ref_interfaces[i])[k];
-            printf(format.c_str(), -1, comp1, comp2,
+            printf(format.c_str(), -1, comp1_idx, comp2_idx,
                                  tmp->BE1, tmp->BE2, tmp->Inf1 / 64,
                                  tmp->Inf1 % 64, tmp->Inf2 / 64, tmp->Inf2 % 64);
          }
@@ -577,7 +592,7 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
       double *x2 = comp2->GetVertex(vtx2[v2]);
       Vector tmp(x2, dim);
       x2_trns[v2] = new Vector;
-      mesh_config::Transform2D(tmp, *x2_trns[v2]);
+      (*tf_ptr)(tmp, *x2_trns[v2]);
    }
 
    double threshold = 1.e-10;
@@ -667,4 +682,54 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
          printf("%d\t%d\n", m.first, m.second);
       printf("\n");
    }  // if (verbose)
+}
+
+int ComponentTopologyHandler::GetOrientation(BlockMesh *comp1, const Element::Type &be_type, const Array<int> &vtx1, const Array<int> &vtx2)
+{
+   assert(comp1 != NULL);
+   assert(vtx1.Size() == vtx2.Size());
+
+   int ori;
+
+   switch (be_type)
+   {
+      case Element::Type::POINT:
+      {
+         mfem_error("GetOrientation: 1D not implemented yet!\n");
+         break;
+      }
+      case Element::Type::SEGMENT:
+      {
+         if ((vtx1[1] == vtx2[0]) && (vtx1[0] == vtx2[1]))
+         {
+            ori = 1;
+         }
+         else if ((vtx1[0] == vtx2[0]) && (vtx1[1] == vtx2[1]))
+         {
+            ori = 0;
+         }
+         else
+         {
+            mfem_error("orientation error!\n");
+         }
+         break;
+      }
+      case Element::Type::TRIANGLE:
+      {
+         ori = comp1->GetTriOrientation(vtx1.Read(), vtx2.Read());
+         break;
+      }
+      case Element::Type::QUADRILATERAL:
+      {
+         ori = comp1->GetQuadOrientation(vtx1.Read(), vtx2.Read());
+         break;
+      }
+      default:
+      {
+         mfem_error("GetOrientation: unsupported boundary element type!\n");
+         break;
+      }
+   }  // switch (dim)
+
+   return ori;
 }
