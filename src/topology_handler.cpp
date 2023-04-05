@@ -107,6 +107,50 @@ void TopologyHandler::UpdateBdrAttributes(Mesh& m)
    }
 }
 
+void TopologyHandler::PrintPortInfo(const int k)
+{
+   int start_idx = k, end_idx = k+1;
+   if (k < 0)
+   {
+      start_idx = 0;
+      end_idx = port_infos.Size();
+   }
+
+   printf("Port\tAttr\tMesh1\tMesh2\tAttr1\tAttr2\n");
+   for (int i = start_idx; i < end_idx; i++)
+   {
+      PortInfo *port = &(port_infos[i]);
+      printf("%d\t%d\t%d\t%d\t%d\t%d\n", i, port->PortAttr,
+            port->Mesh1, port->Mesh2, port->Attr1, port->Attr2);
+   }
+}
+
+void TopologyHandler::PrintInterfaceInfo(const int k)
+{
+   int start_idx = k, end_idx = k+1;
+   if (k < 0)
+   {
+      start_idx = 0;
+      end_idx = port_infos.Size();
+   }
+
+   for (int i = start_idx; i < end_idx; i++)
+   {
+      Array<InterfaceInfo> *info = interface_infos[i];
+
+      printf("Port %d interface info.\n", i);
+      printf("Idx\tBE1\tBE2\tLF1\tLF2\tOri1\tOri2\n");
+      for (int j = 0; j < info->Size(); j++)
+      {
+         InterfaceInfo *info_j = &((*info)[j]);
+         printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\n", j,
+               info_j->BE1, info_j->BE2,
+               info_j->Inf1 / 64, info_j->Inf2 / 64,
+               info_j->Inf1 % 64, info_j->Inf2 % 64);
+      }
+   }
+}
+
 /*
    SubMeshTopologyHandler
 */

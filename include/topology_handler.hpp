@@ -94,6 +94,9 @@ public:
 
    virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u) = 0;
 
+   virtual void PrintPortInfo(const int k = -1);
+   virtual void PrintInterfaceInfo(const int k = -1);
+
 protected:
    virtual void UpdateAttributes(Mesh& m);
    virtual void UpdateBdrAttributes(Mesh& m);
