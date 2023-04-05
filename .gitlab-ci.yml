@@ -53,3 +53,25 @@ workflow:
     - cd ci-build/test
     - ./test_workflow
 
+hdf5:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./test_hdf5
+
+comp-topol:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./test_topol
+
