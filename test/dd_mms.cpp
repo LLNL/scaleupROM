@@ -26,19 +26,19 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
     SUCCEED();
 }
 
-// TEST(DDSerialTest, Test_convergence)
-// {
-//    CheckConvergence("inputs/dd_mms.yml");
+TEST(DDSerialTest, Test_convergence)
+{
+   CheckConvergence("inputs/dd_mms.yml");
 
-//    return;
-// }
+   return;
+}
 
-// TEST(DDSerial_component_wise_test, Test_convergence)
-// {
-//    CheckConvergence("inputs/dd_mms.component.yml");
+TEST(DDSerial_component_wise_test, Test_convergence)
+{
+   CheckConvergence("inputs/dd_mms.component.yml");
 
-//    return;
-// }
+   return;
+}
 
 TEST(DDSerial_component_3D_test, Test_convergence)
 {
