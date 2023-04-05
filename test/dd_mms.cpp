@@ -17,6 +17,7 @@ static double constant;
 double ExactSolution(const Vector &);
 double ExactRHS(const Vector &);
 MultiBlockSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence(const std::string &input_file);
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -25,14 +26,63 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
     SUCCEED();
 }
 
-// int main(int argc, char *argv[])
 TEST(DDSerialTest, Test_convergence)
 {
-   // const char *input_file = "test.input";
-   // OptionsParser args(argc, argv);
-   // args.AddOption(&input_file, "-i", "--input", "Input file to use.");
-   // args.ParseCheck();
-   config = InputParser("inputs/dd_mms.yml");
+   CheckConvergence("inputs/dd_mms.yml");
+
+   return;
+}
+
+TEST(DDSerial_component_wise_test, Test_convergence)
+{
+   CheckConvergence("inputs/dd_mms.component.yml");
+
+   return;
+}
+
+int main(int argc, char* argv[])
+{
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+
+double ExactSolution(const Vector &x)
+{
+   return constant + amp1 * sin(2.0 * pi / L1 * (x(0) - offset1))
+                   + amp2 * cos(2.0 * pi / L2 * (x(1) - offset2));
+}
+
+double ExactRHS(const Vector &x)
+{
+   return amp1 * (2.0 * pi / L1) * (2.0 * pi / L1) * sin(2.0 * pi / L1 * (x(0) - offset1))
+            + amp2 * (2.0 * pi / L2) * (2.0 * pi / L2) * cos(2.0 * pi / L2 * (x(1) - offset2));
+}
+
+MultiBlockSolver *SolveWithRefinement(const int num_refinement)
+{
+   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+   MultiBlockSolver *test = new MultiBlockSolver();
+
+   test->InitVariables();
+   test->InitVisualization();
+
+   test->AddBCFunction(ExactSolution);
+   test->AddRHSFunction(ExactRHS);
+
+   test->BuildOperators();
+
+   test->SetupBCOperators();
+
+   test->Assemble();
+
+   test->Solve();
+
+   return test;
+}
+
+void CheckConvergence(const std::string &input_file)
+{
+   config = InputParser(input_file);
 
    amp1 = config.GetOption<double>("manufactured_solution/amp1", 0.22);
    amp2 = config.GetOption<double>("manufactured_solution/amp2", 0.13);
@@ -89,54 +139,10 @@ TEST(DDSerialTest, Test_convergence)
 
       // reported convergence rate
       if (r > 0)
-         if (conv_rate(r) < pow(2.0, order+1) - 0.5)
-         {
-            printf("Convergence rate below threshold: %.3f!\n", conv_rate(r));
-            exit(-1);
-         }
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
 
       error1 = error;
    }
 
    return;
-}
-
-int main(int argc, char* argv[])
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
-
-double ExactSolution(const Vector &x)
-{
-   return constant + amp1 * sin(2.0 * pi / L1 * (x(0) - offset1))
-                   + amp2 * cos(2.0 * pi / L2 * (x(1) - offset2));
-}
-
-double ExactRHS(const Vector &x)
-{
-   return amp1 * (2.0 * pi / L1) * (2.0 * pi / L1) * sin(2.0 * pi / L1 * (x(0) - offset1))
-            + amp2 * (2.0 * pi / L2) * (2.0 * pi / L2) * cos(2.0 * pi / L2 * (x(1) - offset2));
-}
-
-MultiBlockSolver *SolveWithRefinement(const int num_refinement)
-{
-   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   MultiBlockSolver *test = new MultiBlockSolver();
-
-   test->InitVariables();
-   test->InitVisualization();
-
-   test->AddBCFunction(ExactSolution);
-   test->AddRHSFunction(ExactRHS);
-
-   test->BuildOperators();
-
-   test->SetupBCOperators();
-
-   test->Assemble();
-
-   test->Solve();
-
-   return test;
 }

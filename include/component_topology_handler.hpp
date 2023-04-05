@@ -73,6 +73,9 @@ protected:
 //    // Global parent mesh that will be decomposed.
 //    Mesh *pmesh;
 
+   // Print out details.
+   bool verbose = false;
+
    int num_comp;  // number of components.
    // Map from component name to array index.
    std::unordered_map<std::string, int> comp_names;
@@ -113,8 +116,6 @@ protected:
    Array<int> bdr_attributes;
 
 public:
-//    SubMeshTopologyHandler(Mesh* pmesh_);
-//    // Read mesh file from input.
    ComponentTopologyHandler();
 
 //    virtual ~SubMeshTopologyHandler();
@@ -125,9 +126,10 @@ public:
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
 
    // Export mesh pointers and interface info.
-   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data) {}
+   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);
 
-   virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u) {}
+   virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u)
+   { mfem_error("ComponentTopologyHandler does not yet support global grid function/mesh!\n"); }
 
 protected:
    void ReadGlobalConfigFromFile(const std::string filename);

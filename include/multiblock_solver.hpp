@@ -28,6 +28,7 @@ using namespace mfem;
 enum TopologyHandlerMode
 {
    SUBMESH,
+   COMPONENT,
    NUM_TOPOL_MODE
 };
 

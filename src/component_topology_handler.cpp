@@ -29,6 +29,8 @@ inline bool FileExists(const std::string& name)
 ComponentTopologyHandler::ComponentTopologyHandler()
    : TopologyHandler()
 {
+   verbose = config.GetOption<bool>("mesh/component-wise/verbose", false);
+
    // read global file.
    std::string filename = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
    ReadGlobalConfigFromFile(filename);
@@ -50,6 +52,15 @@ ComponentTopologyHandler::ComponentTopologyHandler()
 
    // Do we really need to set boundary attributes of all meshes?
    SetupBoundaries();
+}
+
+void ComponentTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data)
+{
+   mesh_ptrs = meshes;
+
+   topol_data.dim = dim;
+   topol_data.numSub = numSub;
+   topol_data.global_bdr_attributes = &bdr_attributes;
 }
 
 void ComponentTopologyHandler::SetupComponents()
@@ -74,6 +85,16 @@ void ComponentTopologyHandler::SetupComponents()
    }
 
    for (int c = 0; c < components.Size(); c++) assert(components[c] != NULL);
+
+   // Uniform refinement if specified.
+   int num_refinement = config.GetOption<int>("mesh/uniform_refinement", 0);
+   if (num_refinement > 0)
+   {
+      mfem_warning("ComponentTopologyHandler: component meshes are refined. Existing ports may not work for refined meshes.\n");
+      for (int c = 0; c < components.Size(); c++)
+         for (int k = 0; k < num_refinement; k++)
+            components[c]->UniformRefinement();
+   }
 }
 
 void ComponentTopologyHandler::SetupReferencePorts()
@@ -409,19 +430,22 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
          ref_interfaces[i]->Append(tmp);
       }  // for (int be = 0; be < be_pair->Size(); be++)
 
-      std::string format = "";
-      for (int k = 0; k < 8; k++) format += "%d\t";
-      format += "%d\n";
-      printf("Reference Interface %d informations\n", i);
-      printf("Attr\tMesh1\tMesh2\tBE1\tBE2\tIdx1\tOri1\tIdx2\tOri2\n");
-      for (int k = 0; k < ref_interfaces[i]->Size(); k++)
+      if (verbose)
       {
-         InterfaceInfo *tmp = &(*ref_interfaces[i])[k];
-         printf(format.c_str(), -1, comp1, comp2,
-                              tmp->BE1, tmp->BE2, tmp->Inf1 / 64,
-                              tmp->Inf1 % 64, tmp->Inf2 / 64, tmp->Inf2 % 64);
-      }
-      printf("\n");
+         std::string format = "";
+         for (int k = 0; k < 8; k++) format += "%d\t";
+         format += "%d\n";
+         printf("Reference Interface %d informations\n", i);
+         printf("Attr\tMesh1\tMesh2\tBE1\tBE2\tIdx1\tOri1\tIdx2\tOri2\n");
+         for (int k = 0; k < ref_interfaces[i]->Size(); k++)
+         {
+            InterfaceInfo *tmp = &(*ref_interfaces[i])[k];
+            printf(format.c_str(), -1, comp1, comp2,
+                                 tmp->BE1, tmp->BE2, tmp->Inf1 / 64,
+                                 tmp->Inf1 % 64, tmp->Inf2 / 64, tmp->Inf2 % 64);
+         }
+         printf("\n");
+      }  // if (verbose)
    }  // for (int i = 0; i < num_ref_ports; i++)
 }
 
@@ -466,6 +490,8 @@ void ComponentTopologyHandler::SetupPorts()
    }
 
    for (int p = 0; p < interface_infos.Size(); p++) assert(interface_infos[p] != NULL);
+
+   for (int m = 0; m < numSub; m++) UpdateBdrAttributes(*meshes[m]);
 }
 
 void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
@@ -628,14 +654,17 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
       for (int j = 0; j < port->be_pairs.NumCols(); j++)
          assert(port->be_pairs(i,j) >= 0);
 
-   printf("port %s\n", port_name.c_str());
-   printf("comp: %d %d\n", port->Component1, port->Component2);
-   printf("attr: %d %d\n", port->Attr1, port->Attr2);
-   printf("be1\tbe2\n");
-   for (int i = 0; i < port->be_pairs.NumRows(); i++)
-      printf("%d\t%d\n", port->be_pairs(i,0), port->be_pairs(i,1));
-   printf("vtx2 -> vtx1\n");
-   for (auto m : port->vtx2to1)
-      printf("%d\t%d\n", m.first, m.second);
-   printf("\n");
+   if (verbose)
+   {
+      printf("port %s\n", port_name.c_str());
+      printf("comp: %d %d\n", port->Component1, port->Component2);
+      printf("attr: %d %d\n", port->Attr1, port->Attr2);
+      printf("be1\tbe2\n");
+      for (int i = 0; i < port->be_pairs.NumRows(); i++)
+         printf("%d\t%d\n", port->be_pairs(i,0), port->be_pairs(i,1));
+      printf("vtx2 -> vtx1\n");
+      for (auto m : port->vtx2to1)
+         printf("%d\t%d\n", m.first, m.second);
+      printf("\n");
+   }  // if (verbose)
 }

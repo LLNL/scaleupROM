@@ -1,0 +1,45 @@
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "meshes/dd_mms.h5"
+    components:
+      - name: "unit"
+        file: "meshes/dd_mms.unit.mesh"
+    ports:
+      - name: "port1"
+        file: "meshes/dd_mms.port1.h5"
+        comp1:
+          name: "unit"
+          attr: 3
+        comp2:
+          name: "unit"
+          attr: 1
+        comp2_configuration: [0., .5, 0., 0., 0., 0.]
+      - name: "port2"
+        file: "meshes/dd_mms.port2.h5"
+        comp1:
+          name: "unit"
+          attr: 2
+        comp2:
+          name: "unit"
+          attr: 4
+        comp2_configuration: [.5, 0., 0., 0., 0., 0.]
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+solver:
+  max_iter: 10000
+    #  print_level: 1
+  relative_tolerance: 1.e-10
+
+visualization:
+  enable: false
+  output_dir: dd_mms_output
+
+manufactured_solution:
+  number_of_refinement: 4
+  amp1: 1.23
+  amp2: 3.13
+  constant: 1.11

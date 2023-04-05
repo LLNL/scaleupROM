@@ -13,6 +13,7 @@
 
 #include "multiblock_solver.hpp"
 #include "linalg_utils.hpp"
+#include "component_topology_handler.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -29,6 +30,11 @@ MultiBlockSolver::MultiBlockSolver()
       case SUBMESH:
       {
          topol_handler = new SubMeshTopologyHandler();
+         break;
+      }
+      case COMPONENT:
+      {
+         topol_handler = new ComponentTopologyHandler();
          break;
       }
       default:
@@ -97,10 +103,14 @@ MultiBlockSolver::~MultiBlockSolver()
 
 void MultiBlockSolver::ParseInputs()
 {
-   std::string topol_str = config.GetOption<std::string>("mesh/topology_handler", "submesh");
+   std::string topol_str = config.GetOption<std::string>("mesh/type", "submesh");
    if (topol_str == "submesh")
    {
       topol_mode = SUBMESH;
+   }
+   else if (topol_str == "component-wise")
+   {
+      topol_mode = COMPONENT;
    }
    else
    {
