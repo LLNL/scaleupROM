@@ -129,6 +129,7 @@ set(scaleupROMObj_SOURCES
   src/random.cpp
 
   include/hdf5_utils.hpp
+  src/hdf5_utils.cpp
 
   include/navier_solver.hpp
   src/navier_solver.cpp
