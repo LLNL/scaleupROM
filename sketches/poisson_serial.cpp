@@ -345,7 +345,7 @@ int main(int argc, char *argv[])
      int skip_zeros = 1;
      for (int m = 0; m < numSub - 1; m++) {
        for (int bn = 0; bn < interface_pairs.Size(); bn++) {
-         DenseMatrix elemmat;
+         Array2D<DenseMatrix*> elemmats;
          FaceElementTransformations *tr1, *tr2;
          const FiniteElement *fe1, *fe2;
          Array<Array<int> *> vdofs(2);
@@ -361,19 +361,11 @@ int main(int argc, char *argv[])
             fe1 = fespaces[m]->GetFE(tr1->Elem1No);
             fe2 = fespaces[m+1]->GetFE(tr2->Elem1No);
 
-            interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmat);
+            interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
 
-            DenseMatrix subelemmat;
-            Array<int> block_offsets(3);
-            block_offsets[0] = 0;
-            block_offsets[1] = fe1->GetDof();
-            block_offsets[2] = fe2->GetDof();
-            block_offsets.PartialSum();
             for (int i = 0; i < 2; i++) {
               for (int j = 0; j < 2; j++) {
-                elemmat.GetSubMatrix(block_offsets[i], block_offsets[i+1],
-                                     block_offsets[j], block_offsets[j+1], subelemmat);
-                blockMats[(m+i) * numSub + (m+j)]->AddSubMatrix(*vdofs[i], *vdofs[j], subelemmat, skip_zeros);
+                blockMats[(m+i) * numSub + (m+j)]->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
               }
             }
          }  // if ((tr1 != NULL) && (tr2 != NULL))

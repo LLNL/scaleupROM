@@ -22,5 +22,22 @@ RUN sudo make
 
 ENV LIBROM_DIR=$LIB_DIR/libROM
 
+# install python
+RUN sudo apt-get update
+RUN sudo apt-get install -yq python3
+RUN sudo apt-get install -yq python3-pip
+
+RUN echo "numpy" >> requirements.txt
+RUN echo "scipy" >> requirements.txt
+RUN echo "argparse" >> requirements.txt
+RUN echo "tables" >> requirements.txt
+RUN echo "PyYAML" >> requirements.txt
+RUN echo "h5py" >> requirements.txt
+RUN sudo pip3 install --upgrade pip
+RUN sudo pip3 install -r ./requirements.txt
+
+# install h5dump
+RUN sudo apt-get install -yq hdf5-tools
+
 # create and switch to a user
 WORKDIR /home/$USERNAME

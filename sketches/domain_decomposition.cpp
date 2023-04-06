@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
       printf("Using InterfaceDGDiffusionIntegrator.\n");
       InterfaceDGDiffusionIntegrator interface_integ(one, sigma, kappa);
 
-      DenseMatrix elemmat;
+      Array2D<DenseMatrix*> elemmats;
       FaceElementTransformations *tr1, *tr2;
       const FiniteElement *fe1, *fe2;
       Array<int> vdofs, vdofs2;
@@ -186,14 +186,22 @@ int main(int argc, char* argv[])
          fe1 = fespaces[0]->GetFE(tr1->Elem1No);
          fe2 = fespaces[1]->GetFE(tr2->Elem1No);
 
-         interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmat);
+         interface_integ.AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
          printf("Interface elemmat.\n");
-         for (int h = 0; h < elemmat.Height(); h++) {
-           for (int w = 0; w < elemmat.Width(); w++) {
-             printf("%2.3f\t", elemmat(h, w));
-           }
-           printf("\n");
-         }
+         for (int I = 0; I < 2; I++)
+          {
+            for (int J = 0; J < 2; J++)
+            {
+              printf("elemmat(%d,%d)\n", I, J);
+              DenseMatrix *elemmat = elemmats(I,J);
+              for (int i = 0; i < elemmat->NumRows(); i++) {
+                for (int j = 0; j < elemmat->NumCols(); j++) {
+                  printf("%.3f\t", (*elemmat)(i,j));
+                }
+                printf("\n");
+              }
+            } // for (int J = 0; J < 2; J++)
+          } // for (int I = 0; I < 2; I++)
          // for (int k = 0; k < boundary_face_integs.Size(); k++)
          // {
          //    if (boundary_face_integs_marker[k] &&

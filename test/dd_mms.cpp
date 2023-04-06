@@ -9,14 +9,15 @@ using namespace std;
 using namespace mfem;
 
 static const double pi = 4.0 * atan(1.0);
-static double amp1, amp2;
-static double L1, L2;
-static double offset1, offset2;
+static double amp[3];
+static double L[3];
+static double offset[3];
 static double constant;
 
 double ExactSolution(const Vector &);
 double ExactRHS(const Vector &);
 MultiBlockSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence();
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -25,21 +26,94 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
     SUCCEED();
 }
 
-// int main(int argc, char *argv[])
 TEST(DDSerialTest, Test_convergence)
 {
-   // const char *input_file = "test.input";
-   // OptionsParser args(argc, argv);
-   // args.AddOption(&input_file, "-i", "--input", "Input file to use.");
-   // args.ParseCheck();
    config = InputParser("inputs/dd_mms.yml");
+   CheckConvergence();
 
-   amp1 = config.GetOption<double>("manufactured_solution/amp1", 0.22);
-   amp2 = config.GetOption<double>("manufactured_solution/amp2", 0.13);
-   L1 = config.GetOption<double>("manufactured_solution/L1", 0.31);
-   L2 = config.GetOption<double>("manufactured_solution/L2", 0.72);
-   offset1 = config.GetOption<double>("manufactured_solution/offset1", 0.35);
-   offset2 = config.GetOption<double>("manufactured_solution/offset2", 0.73);
+   return;
+}
+
+TEST(DDSerial_component_wise_test, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.component.yml");
+   CheckConvergence();
+
+   return;
+}
+
+TEST(DDSerial_component_3D_hex_test, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   CheckConvergence();
+
+   return;
+}
+
+TEST(DDSerial_component_3D_tet_test, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "meshes/dd_mms.3d.tet.mesh";
+   CheckConvergence();
+
+   return;
+}
+
+int main(int argc, char* argv[])
+{
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+
+double ExactSolution(const Vector &x)
+{
+   double result = constant;
+   for (int d = 0; d < x.Size(); d++)
+      result += amp[d] * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
+   return result;
+}
+
+double ExactRHS(const Vector &x)
+{
+   double result = 0.0;
+   for (int d = 0; d < x.Size(); d++)
+      result += amp[d] * (2.0 * pi / L[d]) * (2.0 * pi / L[d]) * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
+   return result;
+}
+
+MultiBlockSolver *SolveWithRefinement(const int num_refinement)
+{
+   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+   MultiBlockSolver *test = new MultiBlockSolver();
+
+   test->InitVariables();
+   test->InitVisualization();
+
+   test->AddBCFunction(ExactSolution);
+   test->AddRHSFunction(ExactRHS);
+
+   test->BuildOperators();
+
+   test->SetupBCOperators();
+
+   test->Assemble();
+
+   test->Solve();
+
+   return test;
+}
+
+void CheckConvergence()
+{
+   amp[0] = config.GetOption<double>("manufactured_solution/amp1", 0.22);
+   amp[1] = config.GetOption<double>("manufactured_solution/amp2", 0.13);
+   amp[2] = config.GetOption<double>("manufactured_solution/amp3", 0.37);
+   L[0] = config.GetOption<double>("manufactured_solution/L1", 0.31);
+   L[1] = config.GetOption<double>("manufactured_solution/L2", 0.72);
+   L[2] = config.GetOption<double>("manufactured_solution/L2", 0.47);
+   offset[0] = config.GetOption<double>("manufactured_solution/offset1", 0.35);
+   offset[1] = config.GetOption<double>("manufactured_solution/offset2", 0.73);
+   offset[2] = config.GetOption<double>("manufactured_solution/offset3", 0.59);
    constant = config.GetOption<double>("manufactured_solution/constant", -0.27);
 
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
@@ -89,54 +163,10 @@ TEST(DDSerialTest, Test_convergence)
 
       // reported convergence rate
       if (r > 0)
-         if (conv_rate(r) < pow(2.0, order+1) - 0.5)
-         {
-            printf("Convergence rate below threshold: %.3f!\n", conv_rate(r));
-            exit(-1);
-         }
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
 
       error1 = error;
    }
 
    return;
-}
-
-int main(int argc, char* argv[])
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
-
-double ExactSolution(const Vector &x)
-{
-   return constant + amp1 * sin(2.0 * pi / L1 * (x(0) - offset1))
-                   + amp2 * cos(2.0 * pi / L2 * (x(1) - offset2));
-}
-
-double ExactRHS(const Vector &x)
-{
-   return amp1 * (2.0 * pi / L1) * (2.0 * pi / L1) * sin(2.0 * pi / L1 * (x(0) - offset1))
-            + amp2 * (2.0 * pi / L2) * (2.0 * pi / L2) * cos(2.0 * pi / L2 * (x(1) - offset2));
-}
-
-MultiBlockSolver *SolveWithRefinement(const int num_refinement)
-{
-   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   MultiBlockSolver *test = new MultiBlockSolver();
-
-   test->InitVariables();
-   test->InitVisualization();
-
-   test->AddBCFunction(ExactSolution);
-   test->AddRHSFunction(ExactRHS);
-
-   test->BuildOperators();
-
-   test->SetupBCOperators();
-
-   test->Assemble();
-
-   test->Solve();
-
-   return test;
 }

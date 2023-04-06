@@ -26,9 +26,15 @@ enum DecompositionMode
    NUM_DDMODE
 };
 
+// Port information for global configuration.
+struct PortInfo {
+   int PortAttr;        // Global boundary attribute.
+   int Mesh1, Mesh2;    // Mesh indexes in global configuration
+   int Attr1, Attr2;    // boundary attribute of each mesh sharing the port.
+};
+
+// Interface information between two boundary elements within a port.
 struct InterfaceInfo {
-   int Attr;
-   int Mesh1, Mesh2;
    int BE1, BE2;
 
    // Inf = 64 * LocalFaceIndex + FaceOrientation
@@ -42,32 +48,38 @@ struct InterfaceInfo {
 struct TopologyData {
    int numSub = -1;
    int dim = -1;
-   Array<int> global_bdr_attributes;
+   Array<int> *global_bdr_attributes = NULL;
 };
 
 class TopologyHandler
 {
 protected:
-   int numSub;   // number of subdomains.
+   int numSub = -1;   // number of subdomains.
 
    // Spatial dimension.
-   int dim;
+   int dim = -1;
 
-   DecompositionMode dd_mode;
+   DecompositionMode dd_mode = NUM_DDMODE;
 
-   Array<InterfaceInfo> interface_infos;
+   int num_ports = -1;        // number of ports.
+   Array<PortInfo> port_infos;
+   Array<Array<InterfaceInfo>*> interface_infos;
 
 public:
    TopologyHandler();
-   TopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data)
-   { mfem_error("Abstract base constructor TopologyHandler is called!\n"); }
 
    virtual ~TopologyHandler() {};
 
    // access
    const int GetNumSubdomains() { return numSub; }
+   const int GetNumPorts() { return num_ports; }
+   const PortInfo* GetPortInfo(const int k) { return &(port_infos[k]); }
+   Array<InterfaceInfo>* const GetInterfaceInfos(const int k) { return interface_infos[k]; }
    virtual Mesh* GetMesh(const int k) = 0;
    virtual Mesh* GetGlobalMesh() = 0;
+
+   // Export mesh pointers and interface info.
+   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data) = 0;
 
    // Mesh sets face element transformation based on the face_info.
    // For boundary face, the adjacent element is always on element 1, and its orientation is "by convention" always zero.
@@ -81,6 +93,13 @@ public:
                                              FaceElementTransformations* &tr2);
 
    virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u) = 0;
+
+   virtual void PrintPortInfo(const int k = -1);
+   virtual void PrintInterfaceInfo(const int k = -1);
+
+protected:
+   virtual void UpdateAttributes(Mesh& m);
+   virtual void UpdateBdrAttributes(Mesh& m);
 };
 
 class SubMeshTopologyHandler : public TopologyHandler
@@ -97,10 +116,9 @@ protected:
    Array<Array<int> *> parent_elem_map;
 
 public:
+   SubMeshTopologyHandler(Mesh* pmesh_);
+   // Read mesh file from input.
    SubMeshTopologyHandler();
-
-   // Export mesh pointers and interface info.
-   SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data);
 
    virtual ~SubMeshTopologyHandler();
 
@@ -108,13 +126,15 @@ public:
    virtual Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    virtual Mesh* GetGlobalMesh() { return pmesh; }
 
+   // Export mesh pointers and interface info.
+   virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);
+
    virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u);
 
 protected:
    // SubMesh does not support face mapping for 2d meshes.
    Array<int> BuildFaceMap2D(const Mesh& pm, const SubMesh& sm);
    void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face_map=NULL);
-   void UpdateBdrAttributes(Mesh& m);
 
    void BuildInterfaceInfos();
    Array<int> FindParentInterfaceInfo(const int pface,

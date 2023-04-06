@@ -1,0 +1,38 @@
+mesh:
+  # for submesh global topology.
+  filename: "meshes/test.2x2x2.hex.mesh"
+  # for component topology.
+  component-wise:
+    global_config: "meshes/test_topol.3d.h5"
+    components:
+      - name: "cube"
+        file: "meshes/test.1x1x1.hex.mesh"
+    ports:
+      - name: "port1"
+        file: "port1.h5"
+        comp1:
+          name: "cube"
+          attr: 3 
+        comp2:
+          name: "cube"
+          attr: 5
+        comp2_configuration: [0.5, 0.0, 0.0, 0.0, 0.0, 0.0]
+      - name: "port2"
+        file: "port2.h5"
+        comp1:
+          name: "cube"
+          attr: 4
+        comp2:
+          name: "cube"
+          attr: 2
+        comp2_configuration: [0.0, 0.5, 0.0, 0.0, 0.0, 0.0]
+      - name: "port3"
+        file: "port3.h5"
+        comp1:
+          name: "cube"
+          attr: 6
+        comp2:
+          name: "cube"
+          attr: 1
+        comp2_configuration: [0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
+

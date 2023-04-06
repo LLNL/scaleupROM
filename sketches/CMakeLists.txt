@@ -11,3 +11,8 @@ add_executable(linalg_interface linalg_interface.cpp $<TARGET_OBJECTS:scaleupROM
 add_executable(friend_class friend_class.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(block_algebra block_algebra.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(mfem_sparse_hdf mfem_sparse_hdf.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_executable(generate_interface generate_interface.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
+file(COPY inputs/gen_interface.yml DESTINATION ${CMAKE_BINARY_DIR}/sketches/inputs)
+file(COPY meshes/2x2.mesh DESTINATION ${CMAKE_BINARY_DIR}/sketches/meshes)
+file(COPY meshes/1x1.mesh DESTINATION ${CMAKE_BINARY_DIR}/sketches/meshes)

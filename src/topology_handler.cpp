@@ -85,16 +85,81 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
    }
 }
 
+void TopologyHandler::UpdateAttributes(Mesh& m)
+{
+   m.attributes.DeleteAll();
+   for (int k = 0; k < m.GetNE(); k++)
+   {
+      int attr = m.GetAttribute(k);
+      int inBdrAttr = m.attributes.Find(attr);
+      if (inBdrAttr < 0) m.attributes.Append(attr);
+   }
+}
+
+void TopologyHandler::UpdateBdrAttributes(Mesh& m)
+{
+   m.bdr_attributes.DeleteAll();
+   for (int k = 0; k < m.GetNBE(); k++)
+   {
+      int attr = m.GetBdrAttribute(k);
+      int inBdrAttr = m.bdr_attributes.Find(attr);
+      if (inBdrAttr < 0) m.bdr_attributes.Append(attr);
+   }
+}
+
+void TopologyHandler::PrintPortInfo(const int k)
+{
+   int start_idx = k, end_idx = k+1;
+   if (k < 0)
+   {
+      start_idx = 0;
+      end_idx = port_infos.Size();
+   }
+
+   printf("Port\tAttr\tMesh1\tMesh2\tAttr1\tAttr2\n");
+   for (int i = start_idx; i < end_idx; i++)
+   {
+      PortInfo *port = &(port_infos[i]);
+      printf("%d\t%d\t%d\t%d\t%d\t%d\n", i, port->PortAttr,
+            port->Mesh1, port->Mesh2, port->Attr1, port->Attr2);
+   }
+}
+
+void TopologyHandler::PrintInterfaceInfo(const int k)
+{
+   int start_idx = k, end_idx = k+1;
+   if (k < 0)
+   {
+      start_idx = 0;
+      end_idx = port_infos.Size();
+   }
+
+   for (int i = start_idx; i < end_idx; i++)
+   {
+      Array<InterfaceInfo> *info = interface_infos[i];
+
+      printf("Port %d interface info.\n", i);
+      printf("Idx\tBE1\tBE2\tLF1\tLF2\tOri1\tOri2\n");
+      for (int j = 0; j < info->Size(); j++)
+      {
+         InterfaceInfo *info_j = &((*info)[j]);
+         printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\n", j,
+               info_j->BE1, info_j->BE2,
+               info_j->Inf1 / 64, info_j->Inf2 / 64,
+               info_j->Inf1 % 64, info_j->Inf2 % 64);
+      }
+   }
+}
+
 /*
    SubMeshTopologyHandler
 */
 
-SubMeshTopologyHandler::SubMeshTopologyHandler()
-   : TopologyHandler()
+SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
+   : TopologyHandler(), pmesh(pmesh_)
 {
-   // Initiate parent mesh.
-   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
-   pmesh = new Mesh(mesh_file.c_str());
+   // Input meshes may not have up-to-date attributes array.
+   UpdateAttributes(*pmesh);
    dim = pmesh->Dimension();
 
    // Uniform refinement if specified.
@@ -154,18 +219,23 @@ SubMeshTopologyHandler::SubMeshTopologyHandler()
    BuildInterfaceInfos();
 }
 
-SubMeshTopologyHandler::SubMeshTopologyHandler(Array<Mesh*> &mesh_ptrs, Array<InterfaceInfo>* &if_infos, TopologyData &topol_data)
-   : SubMeshTopologyHandler()
+SubMeshTopologyHandler::SubMeshTopologyHandler()
+   : SubMeshTopologyHandler(new Mesh(config.GetRequiredOption<std::string>("mesh/filename").c_str()))
+{
+   // Do not use *this = SubMeshTopologyHandler(...), unless you define operator=!
+}
+
+void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
+                                       // Array<InterfaceInfo>* &if_infos,
+                                       TopologyData &topol_data)
 {
    mesh_ptrs.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
       mesh_ptrs[m] = &(*meshes[m]);
 
-   if_infos = &interface_infos;
-
    topol_data.dim = dim;
    topol_data.numSub = numSub;
-   topol_data.global_bdr_attributes = pmesh->bdr_attributes;
+   topol_data.global_bdr_attributes = &pmesh->bdr_attributes;
 }
 
 SubMeshTopologyHandler::~SubMeshTopologyHandler()
@@ -243,23 +313,15 @@ void SubMeshTopologyHandler::BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm,
    UpdateBdrAttributes(sm);
 }
 
-void SubMeshTopologyHandler::UpdateBdrAttributes(Mesh& m)
-{
-   m.bdr_attributes.DeleteAll();
-   for (int k = 0; k < m.GetNBE(); k++)
-   {
-      int attr = m.GetBdrAttribute(k);
-      int inBdrAttr = m.bdr_attributes.Find(attr);
-      if (inBdrAttr < 0) m.bdr_attributes.Append(attr);
-   }
-}
-
 void SubMeshTopologyHandler::BuildInterfaceInfos()
 {
    Array2D<int> interface_attributes(numSub, numSub);
    interface_attributes = -1;
+   Array2D<int> interface_map(numSub, numSub);
+   interface_attributes = -1;
+
    interface_infos.SetSize(0);
-   // interface_parent.SetSize(0);
+   port_infos.SetSize(0);
 
    // interface attribute starts after the parent mesh boundary attributes.
    int if_attr = pmesh->bdr_attributes.Max() + 1;
@@ -279,12 +341,21 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
                int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrFace(jb)];
                if (parent_face_i != parent_face_j) continue;
 
-               MFEM_ASSERT(meshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE,
-                           "This interface element has been already set!");
+               assert(meshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE);
+
                if (interface_attributes[i][j] <= 0) {
                   interface_attributes[i][j] = if_attr;
+                  interface_map[i][j] = port_infos.Size();
+                  // NOTE: for SubMehs, component boundary attribute is simply SubMesh::GENERATED_ATTRIBUTE,
+                  // which is not informative at all.
+                  port_infos.Append(PortInfo({.PortAttr = if_attr,
+                                              .Mesh1 = i, .Mesh2 = j,
+                                              .Attr1 = if_attr, .Attr2 = if_attr}));
+                  interface_infos.Append(new Array<InterfaceInfo>(0));
+
                   if_attr += 1;
                }
+               assert(interface_map[i][j] >= 0);
 
                Array<int> Infs = FindParentInterfaceInfo(parent_face_i, i, ib, j, jb);
 
@@ -293,16 +364,15 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
 
                // submesh usually can inherit multiple attributes from parent.
                // we limit to single-attribute case where attribute = index + 1;
-               interface_infos.Append(InterfaceInfo({.Attr = interface_attributes[i][j],
-                                                   .Mesh1 = i, .Mesh2 = j,
-                                                   .BE1 = ib, .BE2 = jb,
-                                                   .Inf1 = Infs[0], .Inf2 = Infs[1]}));
+               interface_infos[interface_map[i][j]]->Append(
+                  InterfaceInfo({.BE1 = ib, .BE2 = jb, .Inf1 = Infs[0], .Inf2 = Infs[1]}));
                // interface_parent.Append(parent_face_i);
-            }
-         }
-      }
-   }
+            }  // for (int jb = 0; jb < meshes[j]->GetNBE(); jb++)
+         }  // for (int j = i+1; j < numSub; j++)
+      }  // for (int ib = 0; ib < meshes[i]->GetNBE(); ib++)
+   }  // for (int i = 0; i < numSub; i++)
 
+   num_ports = port_infos.Size();
    for (int i = 0; i < numSub; i++) UpdateBdrAttributes(*meshes[i]);
 }
 

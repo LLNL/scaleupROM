@@ -1,0 +1,29 @@
+mesh:
+  # for submesh global topology.
+  filename: "meshes/test.4x4.mesh"
+  # for component topology.
+  component-wise:
+    global_config: "meshes/test_topol.2d.h5"
+    components:
+      - name: "unit"
+        file: "meshes/test.2x2.mesh"
+    ports:
+      - name: "port1"
+        file: "port1.h5"
+        comp1:
+          name: "unit"
+          attr: 3 
+        comp2:
+          name: "unit"
+          attr: 1
+        comp2_configuration: [0.0, 2.0, 0.0, 0.0, 0.0, 0.0]
+      - name: "port2"
+        file: "port2.h5"
+        comp1:
+          name: "unit"
+          attr: 2 
+        comp2:
+          name: "unit"
+          attr: 4
+        comp2_configuration: [2.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
