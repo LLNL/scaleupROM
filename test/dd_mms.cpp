@@ -17,7 +17,7 @@ static double constant;
 double ExactSolution(const Vector &);
 double ExactRHS(const Vector &);
 MultiBlockSolver *SolveWithRefinement(const int num_refinement);
-void CheckConvergence(const std::string &input_file);
+void CheckConvergence();
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -28,21 +28,33 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 
 TEST(DDSerialTest, Test_convergence)
 {
-   CheckConvergence("inputs/dd_mms.yml");
+   config = InputParser("inputs/dd_mms.yml");
+   CheckConvergence();
 
    return;
 }
 
 TEST(DDSerial_component_wise_test, Test_convergence)
 {
-   CheckConvergence("inputs/dd_mms.component.yml");
+   config = InputParser("inputs/dd_mms.component.yml");
+   CheckConvergence();
 
    return;
 }
 
-TEST(DDSerial_component_3D_test, Test_convergence)
+TEST(DDSerial_component_3D_hex_test, Test_convergence)
 {
-   CheckConvergence("inputs/dd_mms.comp.3d.yml");
+   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   CheckConvergence();
+
+   return;
+}
+
+TEST(DDSerial_component_3D_tet_test, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "meshes/dd_mms.3d.tet.mesh";
+   CheckConvergence();
 
    return;
 }
@@ -91,10 +103,8 @@ MultiBlockSolver *SolveWithRefinement(const int num_refinement)
    return test;
 }
 
-void CheckConvergence(const std::string &input_file)
+void CheckConvergence()
 {
-   config = InputParser(input_file);
-
    amp[0] = config.GetOption<double>("manufactured_solution/amp1", 0.22);
    amp[1] = config.GetOption<double>("manufactured_solution/amp2", 0.13);
    amp[2] = config.GetOption<double>("manufactured_solution/amp3", 0.37);

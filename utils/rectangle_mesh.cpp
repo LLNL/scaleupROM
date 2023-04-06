@@ -170,10 +170,10 @@ printf("%s\n", meshFileString);
    int sny = Ny / dy_;
    double sa = a_ / dx_;
    double sb = b_ / dy_;
+   int numElem = mesh.GetNE();
+   printf("number of elements: %d\n", numElem);
    printf("number of elements in each subdomain: (%d, %d)\n", snx, sny);
-   for (int ky = 0; ky < Ny; ky++) {
-     for (int kx = 0; kx < Nx; kx++) {
-       int el = kx + ky * Nx;
+   for (int el = 0; el < numElem; el++) {
        Vector center(2);
        mesh.GetElementCenter(el, center);
 
@@ -183,11 +183,8 @@ printf("%s\n", meshFileString);
        int attr = 1 + skx + sky * dx_; // Attribute starts from 1.
        // printf("Element %d attribute: %d\n", el, attr);
        mesh.SetAttribute(el, attr);
-     }
    }
 
-   int numElem = mesh.GetNE();
-   printf("number of elements: %d\n", numElem);
    for (int el = 0; el < numElem; el++) {
      int attr = mesh.GetAttribute(el);
      Vector center(2);

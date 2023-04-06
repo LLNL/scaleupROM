@@ -186,26 +186,22 @@ int main(int argc, char *argv[])
    double sb = b_ / dy_;
    double sc = c_ / dz_;
    printf("number of elements in each subdomain: (%d, %d, %d)\n", snx, sny, snz);
-   for (int kz = 0; kz < Nz; kz++) {
-    for (int ky = 0; ky < Ny; ky++) {
-      for (int kx = 0; kx < Nx; kx++) {
-        int el = kx + ky * Nx + kz * Nx * Ny;
-        Vector center(3);
-        mesh.GetElementCenter(el, center);
-
-        int skx = floor(center(0) / sa);
-        int sky = floor(center(1) / sb);
-        int skz = floor(center(2) / sc);
-
-        int attr = 1 + skx + sky * dx_ + skz * dx_ * dy_; // Attribute starts from 1.
-        printf("Element %d attribute: %d\n", el, attr);
-        mesh.SetAttribute(el, attr);
-      }
-    }
-   }
-
    int numElem = mesh.GetNE();
    printf("number of elements: %d\n", numElem);
+   for (int el = 0; el < numElem; el++)
+   {
+      Vector center(3);
+      mesh.GetElementCenter(el, center);
+
+      int skx = floor(center(0) / sa);
+      int sky = floor(center(1) / sb);
+      int skz = floor(center(2) / sc);
+
+      int attr = 1 + skx + sky * dx_ + skz * dx_ * dy_; // Attribute starts from 1.
+      printf("Element %d attribute: %d\n", el, attr);
+      mesh.SetAttribute(el, attr);
+   }
+   
    for (int el = 0; el < numElem; el++) {
      int attr = mesh.GetAttribute(el);
      Vector center(3);
