@@ -82,12 +82,24 @@ public:
 
 class ComponentTopologyHandler : public TopologyHandler
 {
+public:
+   struct PortData {
+      int Component1, Component2;   // component mesh indexes.
+      int Attr1, Attr2;             // boundary attribute of each component mesh sharing the port.
+
+      std::unordered_map<int,int> vtx2to1;             // vertex mapping from component 2 to component 1.
+      Array2D<int> be_pairs;  // boundary element pairs between component 1 and 2.
+   };
+
 protected:
 //    // Global parent mesh that will be decomposed.
 //    Mesh *pmesh;
 
    // Print out details.
    bool verbose = false;
+
+   // Write built ports.
+   bool write_ports = false;
 
    int num_comp;  // number of components.
    // Map from component name to array index.
@@ -108,14 +120,6 @@ protected:
    Array<Mesh*> meshes;
    // Component index for each block.
    Array<int> mesh_types;
-
-   struct PortData {
-      int Component1, Component2;   // component mesh indexes.
-      int Attr1, Attr2;             // boundary attribute of each component mesh sharing the port.
-
-      std::unordered_map<int,int> vtx2to1;             // vertex mapping from component 2 to component 1.
-      Array2D<int> be_pairs;  // boundary element pairs between component 1 and 2.
-   };
 
    // Reference ports between components.
    int num_ref_ports = -1;
@@ -139,6 +143,8 @@ public:
    virtual Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    virtual Mesh* GetGlobalMesh()
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
+   virtual const int GetNumRefPorts() { return num_ref_ports; }
+   virtual PortData* GetPortData(const int r) { return ref_ports[r]; }
 
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);
@@ -153,6 +159,7 @@ protected:
    void ReadGlobalConfigFromFile(const std::string filename);
    void ReadPortsFromFile(const std::string filename);
    void BuildPortFromInput(const YAML::Node port_dict);
+   void WritePortToFile(const PortData &port, const std::string &port_name, const std::string &filename);
 
    void SetupComponents();
    void SetupReferencePorts();

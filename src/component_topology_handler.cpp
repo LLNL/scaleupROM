@@ -30,6 +30,7 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    : TopologyHandler()
 {
    verbose = config.GetOption<bool>("mesh/component-wise/verbose", false);
+   write_ports = config.GetOption<bool>("mesh/component-wise/write_ports", false);
 
    // read global file.
    std::string filename = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
@@ -335,6 +336,71 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
    errf = H5Fclose(file_id);
    assert(errf >= 0);
 
+   return;
+}
+
+void ComponentTopologyHandler::WritePortToFile(const PortData &port,
+                                               const std::string &port_name,
+                                               const std::string &filename)
+{
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   hdf5_utils::WriteAttribute(file_id, "number_of_ports", 1);
+
+   {  // Port data group
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, "0", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      hdf5_utils::WriteAttribute(grp_id, "name", port_name);
+
+      hdf5_utils::WriteAttribute(grp_id, "bdr_attr1", port.Attr1);
+      hdf5_utils::WriteAttribute(grp_id, "bdr_attr2", port.Attr2);
+
+      std::string comp1_name, comp2_name;
+      for (auto& it : comp_names)
+         if (it.second == port.Component1)
+         {
+            comp1_name = it.first;
+            break;
+         }
+      for (auto& it : comp_names)
+         if (it.second == port.Component2)
+         {
+            comp2_name = it.first;
+            break;
+         }
+      hdf5_utils::WriteAttribute(grp_id, "component1", comp1_name);
+      hdf5_utils::WriteAttribute(grp_id, "component2", comp2_name);
+
+      Array<int> vtx1(0), vtx2(0);
+      for (auto& it : port.vtx2to1)
+      {
+         vtx2.Append(it.first);
+         vtx1.Append(it.second);
+      }
+      hdf5_utils::WriteDataset(grp_id, "vtx1", vtx1);
+      hdf5_utils::WriteDataset(grp_id, "vtx2", vtx2);
+
+      Array<int> be1(0), be2(0);
+      for (int i = 0; i < port.be_pairs.NumRows(); i++)
+      {
+         const int *be_pair = port.be_pairs.GetRow(i);
+         be1.Append(be_pair[0]);
+         be2.Append(be_pair[1]);
+      }
+      hdf5_utils::WriteDataset(grp_id, "be1", be1);
+      hdf5_utils::WriteDataset(grp_id, "be2", be2);
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
    return;
 }
 
@@ -682,6 +748,12 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
          printf("%d\t%d\n", m.first, m.second);
       printf("\n");
    }  // if (verbose)
+
+   if (write_ports)
+   {
+      std::string filename = config.GetRequiredOptionFromDict<std::string>("file", port_dict);
+      WritePortToFile(*port, port_name, filename);
+   }
 }
 
 int ComponentTopologyHandler::GetOrientation(BlockMesh *comp1, const Element::Type &be_type, const Array<int> &vtx1, const Array<int> &vtx2)

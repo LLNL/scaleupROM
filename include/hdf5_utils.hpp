@@ -26,6 +26,7 @@ inline hid_t GetType(double) { return (H5T_NATIVE_DOUBLE); }
 hid_t GetNativeType(hid_t type);
 
 void ReadAttribute(hid_t source, std::string attribute, std::string &value);
+void WriteAttribute(hid_t source, std::string attribute, const std::string &value);
 
 template <typename T>
 void ReadAttribute(hid_t source, std::string attribute, T &value) {
@@ -40,7 +41,7 @@ void ReadAttribute(hid_t source, std::string attribute, T &value) {
 }
 
 template <typename T>
-void WriteAttribute(hid_t dest, std::string attribute, T &value) {
+void WriteAttribute(hid_t dest, std::string attribute, const T &value) {
    hid_t attr, status;
    hid_t attrType = hdf5_utils::GetType(value);
    hid_t dataspaceId = H5Screate(H5S_SCALAR);
@@ -103,6 +104,51 @@ void ReadDataset(hid_t source, std::string dataset, Array2D<T> &value)
 
 // This currently only reads the first item. Do not use it.
 void ReadDataset(hid_t source, std::string dataset, std::vector<std::string> &value);
+
+template <typename T>
+void WriteDataset(hid_t source, std::string dataset, const Array<T> &value)
+{
+   herr_t errf = 0;
+
+   hid_t dataType = hdf5_utils::GetType(value[0]);
+   hsize_t dims[1];
+   dims[0] = value.Size();
+
+   hid_t dspace_id = H5Screate_simple(1, dims, NULL);
+   assert(dspace_id >= 0);
+
+   hid_t dset_id = H5Dcreate2(source, dataset.c_str(), dataType, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(dset_id >= 0);
+
+   errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
+   assert(errf >= 0);
+
+   errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+}
+
+template <typename T>
+void WriteDataset(hid_t source, std::string dataset, const Array2D<T> &value)
+{
+   herr_t errf = 0;
+
+   hid_t dataType = hdf5_utils::GetType(value(0,0));
+   hsize_t dims[2];
+   dims[0] = value.NumRows();
+   dims[1] = value.NumCols();
+
+   hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+   assert(dspace_id >= 0);
+
+   hid_t dset_id = H5Dcreate2(source, dataset.c_str(), dataType, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(dset_id >= 0);
+   
+   errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.GetRow(0));
+   assert(errf >= 0);
+
+   errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+}
 
 }
 

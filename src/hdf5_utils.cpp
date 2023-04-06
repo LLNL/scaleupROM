@@ -56,6 +56,21 @@ void ReadAttribute(hid_t source, std::string attribute, std::string &value)
    value = tmp_str->c_str();
 }
 
+void WriteAttribute(hid_t dest, std::string attribute, const std::string &value)
+{
+   hid_t attr, status;
+   hid_t attrType = H5Tcreate(H5T_STRING, H5T_VARIABLE);
+   hid_t dataspaceId = H5Screate(H5S_SCALAR);
+
+   attr = H5Acreate(dest, attribute.c_str(), attrType, dataspaceId, H5P_DEFAULT, H5P_DEFAULT);
+   assert(attr >= 0);
+   status = H5Awrite(attr, attrType, &value);
+   assert(status >= 0);
+   H5Aclose(attr);
+   H5Sclose(dataspaceId);
+   H5Tclose(attrType);
+}
+
 // This currently only reads the first item. Do not use it.
 void ReadDataset(hid_t source, std::string dataset, std::vector<std::string> &value)
 {
