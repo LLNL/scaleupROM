@@ -31,7 +31,8 @@ double rhs(const Vector &x)
    double tmp = 0.0;
    for (int d = 0; d < x.Size(); d++)
       tmp += x(d);
-   return sin(poisson0::k * tmp + poisson0::offset);
+   tmp += poisson0::offset;
+   return sin(2.0 * pi * poisson0::k * tmp);
 }
 
 }  // namespace poisson0
@@ -48,7 +49,8 @@ double bdr(const Vector &x)
    double tmp = 0.0;
    for (int d = 0; d < x.Size(); d++)
       tmp += poisson_component::bdr_k(d) * x(d);
-   return sin(tmp + poisson_component::bdr_offset);
+   tmp += poisson_component::bdr_offset;
+   return sin(2.0 * pi * tmp);
 }
 
 double rhs(const Vector &x)
@@ -57,7 +59,8 @@ double rhs(const Vector &x)
    double tmp = 0.0;
    for (int d = 0; d < x.Size(); d++)
       tmp += poisson_component::k(d) * x(d);
-   return sin(tmp + poisson_component::offset);
+   tmp += poisson_component::offset;
+   return sin(2.0 * pi * tmp);
 }
 
 }  // namespace poisson_component
@@ -86,7 +89,7 @@ double rhs(const Vector &x)
       dist = min(dist, abs(tmp));
    }
 
-   return exp( - 0.5 * dist * dist / Lw / Lw ) * cos( k * dist );
+   return exp( - 0.5 * dist * dist / Lw / Lw ) * cos( 2.0 * pi *  k * dist );
 }
 
 }  // namespace poisson_spiral
