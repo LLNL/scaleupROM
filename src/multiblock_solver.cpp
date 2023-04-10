@@ -404,7 +404,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
 
 void MultiBlockSolver::Solve()
 {
-   int maxIter = config.GetOption<int>("solver/max_iter", 1000);
+   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
