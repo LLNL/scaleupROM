@@ -565,19 +565,43 @@ void MFEMROMHandler::Solve(BlockVector* U)
    BlockVector reduced_sol(rom_block_offsets);
 
    int maxIter = config.GetOption<int>("solver/max_iter", 1000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-6);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
+   bool use_amg = config.GetOption<bool>("solver/use_amg", true);
 
-   CGSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(*romMat);
-   solver.SetPrintLevel(print_level);
+   CGSolver *solver = NULL;
+   HypreParMatrix *parRomMat = NULL;
+   HypreBoomerAMG *M = NULL;
+   BlockDiagonalPreconditioner *globalPrec = NULL;
+
+   if (use_amg)
+   {
+      solver = new CGSolver(MPI_COMM_WORLD);
+
+      // TODO: need to change when the actual parallelization is implemented.
+      HYPRE_BigInt glob_size = rom_block_offsets.Last();
+      HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
+      
+      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat);
+
+      solver->SetOperator(*parRomMat);
+      M = new HypreBoomerAMG(*parRomMat);
+      solver->SetPreconditioner(*M);
+   }
+   else
+   {
+      solver = new CGSolver();
+      solver->SetOperator(*romMat);
+   }
+   
+   solver->SetAbsTol(atol);
+   solver->SetRelTol(rtol);
+   solver->SetMaxIter(maxIter);
+   solver->SetPrintLevel(print_level);
 
    reduced_sol = 0.0;
-   solver.Mult(*reduced_rhs, reduced_sol);
+   solver->Mult(*reduced_rhs, reduced_sol);
 
    for (int i = 0; i < numSub; i++)
    {
