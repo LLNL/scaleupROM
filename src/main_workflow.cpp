@@ -174,6 +174,9 @@ double SingleRun()
    // TODO: skip matrix assembly if use_rom.
    test->Assemble();
 
+   if (test->UseRom())
+      test->ProjectOperatorOnReducedBasis();
+
    StopWatch solveTimer;
    solveTimer.Start();
    if (test->UseRom())
@@ -196,7 +199,7 @@ double SingleRun()
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
    if (test->UseRom() && compare_sol)
       error = test->CompareSolution();
-
+   
    delete test;
    delete problem;
 

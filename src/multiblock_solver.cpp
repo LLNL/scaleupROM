@@ -431,6 +431,7 @@ void MultiBlockSolver::Solve()
 
       solver->SetOperator(*parGlobalMat);
       M = new HypreBoomerAMG(*parGlobalMat);
+      M->SetPrintLevel(print_level);
       solver->SetPreconditioner(*M);
    }
    else

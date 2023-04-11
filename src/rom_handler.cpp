@@ -65,7 +65,7 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
    if (save_operator)
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
    // TODO: assemble on the fly if not save_operator.
-   assert(save_operator);
+//   assert(save_operator);
 
    std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
    if (train_mode_str == "individual")
