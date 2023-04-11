@@ -31,8 +31,9 @@ double rhs(const Vector &x)
    double tmp = 0.0;
    for (int d = 0; d < x.Size(); d++)
       tmp += x(d);
+   tmp *= poisson0::k;
    tmp += poisson0::offset;
-   return sin(2.0 * pi * poisson0::k * tmp);
+   return sin(2.0 * pi * tmp);
 }
 
 }  // namespace poisson0
@@ -201,10 +202,10 @@ PoissonComponent::PoissonComponent()
 
    // Default values: a constant right-hand side with homogeneous Dirichlet BC.
    function_factory::poisson_component::k = 0.0;
-   function_factory::poisson_component::offset = 1.0;
+   function_factory::poisson_component::offset = 0.1;
    function_factory::poisson_component::bdr_k = 0.0;
    function_factory::poisson_component::bdr_offset = 0.0;
-   function_factory::poisson_component::bdr_idx = 0.0;
+   function_factory::poisson_component::bdr_idx = -1.0;
 
    for (int d = 0; d < 3; d++)
    {

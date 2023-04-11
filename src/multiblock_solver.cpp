@@ -456,6 +456,18 @@ void MultiBlockSolver::Solve()
    solver->Mult(*RHS, *U);
    // test.Stop();
    // printf("test: %f seconds.\n", test.RealTime());
+
+   // delete the created objects.
+   if (use_amg)
+   {
+      delete M;
+      delete parGlobalMat;
+   }
+   else
+   {
+      if (globalPrec != NULL) delete globalPrec;
+   }
+   delete solver;
 }
 
 void MultiBlockSolver::InitVisualization(const std::string& output_path)
