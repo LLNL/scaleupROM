@@ -44,6 +44,7 @@ protected:
    // file path
    std::string sample_dir = ".";
    std::string sample_prefix;
+   int file_offset = 0;
 
 public:
    SampleGenerator(MPI_Comm comm, ParameterizedProblem *target);
@@ -54,6 +55,7 @@ public:
    const Array<int> GetSampleSizes() { return sampling_sizes; }
    const int GetTotalSampleSize() { return total_samples; }
    const int GetProcRank() { return proc_rank; }
+   const int GetFileOffset() { return file_offset; }
 
    // Generate parameter space as listed in sample_generation/problem_name.
    virtual void SetParamSpaceSizes();

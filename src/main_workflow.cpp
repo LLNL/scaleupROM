@@ -90,7 +90,8 @@ void GenerateSamples(MPI_Comm comm)
       sample_generator->SetSampleParams(s);
       problem->SetParameterizedProblem(test);
 
-      const std::string visual_path = sample_generator->GetSamplePath(s, test->GetVisualizationPrefix());
+      int file_idx = s + sample_generator->GetFileOffset();
+      const std::string visual_path = sample_generator->GetSamplePath(file_idx, test->GetVisualizationPrefix());
       test->InitVisualization(visual_path);
       test->BuildOperators();
       test->SetupBCOperators();
@@ -98,7 +99,7 @@ void GenerateSamples(MPI_Comm comm)
       test->Solve();
       test->SaveVisualization();
 
-      test->SaveSnapshot(s);
+      test->SaveSnapshot(file_idx);
 
       delete test;
    }
