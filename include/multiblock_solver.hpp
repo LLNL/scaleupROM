@@ -86,7 +86,7 @@ protected:
    Array<Array<int> *> bdr_markers;
 
    // MFEM solver options
-   bool use_monolithic;
+   bool use_amg;
 
    // visualization variables
    bool save_visual = false;

@@ -31,8 +31,9 @@ double rhs(const Vector &x)
    double tmp = 0.0;
    for (int d = 0; d < x.Size(); d++)
       tmp += x(d);
+   tmp *= poisson0::k;
    tmp += poisson0::offset;
-   return sin(2.0 * pi * poisson0::k * tmp);
+   return sin(2.0 * pi * tmp);
 }
 
 }  // namespace poisson0
@@ -42,6 +43,7 @@ namespace poisson_component
 
 Vector k(3), bdr_k(3);
 double offset, bdr_offset;
+double bdr_idx;
 
 double bdr(const Vector &x)
 {
@@ -191,8 +193,8 @@ void Poisson0::SetParameterizedProblem(MultiBlockSolver *solver)
 PoissonComponent::PoissonComponent()
    : ParameterizedProblem()
 {
-   // k (max 3) + offset (1) + bdr_k (max 3) + bdr_offset(1)
-   param_num = 8;
+   // k (max 3) + offset (1) + bdr_k (max 3) + bdr_offset(1) + bdr_idx(1)
+   param_num = 9;
 
    // pointer to static function.
    scalar_rhs_ptr = &(function_factory::poisson_component::rhs);
@@ -200,9 +202,10 @@ PoissonComponent::PoissonComponent()
 
    // Default values: a constant right-hand side with homogeneous Dirichlet BC.
    function_factory::poisson_component::k = 0.0;
-   function_factory::poisson_component::offset = 1.0;
+   function_factory::poisson_component::offset = 0.1;
    function_factory::poisson_component::bdr_k = 0.0;
    function_factory::poisson_component::bdr_offset = 0.0;
+   function_factory::poisson_component::bdr_idx = -1.0;
 
    for (int d = 0; d < 3; d++)
    {
@@ -211,6 +214,7 @@ PoissonComponent::PoissonComponent()
    }
    param_map["offset"] = 3;
    param_map["bdr_offset"] = 7;
+   param_map["bdr_idx"] = 8;
 
    param_ptr.SetSize(param_num);
    for (int d = 0; d < 3; d++)
@@ -220,6 +224,7 @@ PoissonComponent::PoissonComponent()
    }
    param_ptr[3] = &(function_factory::poisson_component::offset);
    param_ptr[7] = &(function_factory::poisson_component::bdr_offset);
+   param_ptr[8] = &(function_factory::poisson_component::bdr_idx);
 }
 
 void PoissonComponent::SetParameterizedProblem(MultiBlockSolver *solver)
@@ -234,7 +239,14 @@ void PoissonComponent::SetParameterizedProblem(MultiBlockSolver *solver)
    solver->bdr_coeffs = NULL;
 
    // parameter values are set in the namespace function_factory::poisson_component.
-   solver->AddBCFunction(*scalar_bdr_ptr);
+   double bidx = function_factory::poisson_component::bdr_idx;
+   int battr = -1;
+   if (bidx >= 0.0)
+   {
+      battr = 1 + floor(bidx);
+      assert((battr >= 1) && (battr <= 4));
+   }
+   solver->AddBCFunction(*scalar_bdr_ptr, battr);
 
    // parameter values are set in the namespace function_factory::poisson_component.
    solver->AddRHSFunction(*scalar_rhs_ptr);

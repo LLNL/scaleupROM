@@ -37,6 +37,7 @@ namespace poisson_component
 {
    extern Vector k, bdr_k;
    extern double offset, bdr_offset;
+   extern double bdr_idx;
 
    double bdr(const Vector &x);
    double rhs(const Vector &x);

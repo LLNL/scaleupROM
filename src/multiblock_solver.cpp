@@ -124,7 +124,7 @@ void MultiBlockSolver::ParseInputs()
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 
    // solver option;
-   use_monolithic = config.GetOption<bool>("solver/use_monolithic_operator", false);
+   use_amg = config.GetOption<bool>("solver/use_amg", true);
 
    save_visual = config.GetOption<bool>("visualization/enabled", false);
    if (save_visual)
@@ -348,7 +348,7 @@ void MultiBlockSolver::Assemble()
       }
    }
 
-   if (use_monolithic)
+   if (use_amg)
       globalMat_mono = globalMat->CreateMonolithic();
 }
 
@@ -404,41 +404,70 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
 
 void MultiBlockSolver::Solve()
 {
-   int maxIter = config.GetOption<int>("solver/max_iter", 1000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-6);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
-   CGSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   // Until now, did not find a meaningful speed difference between block matrix and sparse matrix.
-   if (use_monolithic)
+   // TODO: need to change when the actual parallelization is implemented.
+   CGSolver *solver = NULL;
+   HypreParMatrix *parGlobalMat = NULL;
+   HypreBoomerAMG *M = NULL;
+   BlockDiagonalPreconditioner *globalPrec = NULL;
+   
+   // HypreBoomerAMG makes a meaningful difference in computation time.
+   if (use_amg)
    {
+      // Initializating HypreParMatrix needs the monolithic sparse matrix.
       assert(globalMat_mono != NULL);
-      solver.SetOperator(*globalMat_mono);
+
+      solver = new CGSolver(MPI_COMM_WORLD);
+      
+      // TODO: need to change when the actual parallelization is implemented.
+      HYPRE_BigInt glob_size = block_offsets.Last();
+      HYPRE_BigInt row_starts[2] = {0, block_offsets.Last()};
+      
+      parGlobalMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, globalMat_mono);
+
+      solver->SetOperator(*parGlobalMat);
+      M = new HypreBoomerAMG(*parGlobalMat);
+      M->SetPrintLevel(print_level);
+      solver->SetPreconditioner(*M);
    }
    else
    {
-      solver.SetOperator(*globalMat);
+      solver = new CGSolver();
+      solver->SetOperator(*globalMat);
+      if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
+      {
+         globalPrec = new BlockDiagonalPreconditioner(domain_offsets);
+         solver->SetPreconditioner(*globalPrec);
+      }
    }
-   solver.SetPrintLevel(print_level);
-
-   BlockDiagonalPreconditioner *globalPrec;
-   if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
-   {
-      globalPrec = new BlockDiagonalPreconditioner(domain_offsets);
-      solver.SetPreconditioner(*globalPrec);
-   }
+   solver->SetAbsTol(atol);
+   solver->SetRelTol(rtol);
+   solver->SetMaxIter(maxIter);
+   solver->SetPrintLevel(print_level);
 
    *U = 0.0;
    // The time for the setup above is much smaller than this Mult().
    // StopWatch test;
    // test.Start();
-   solver.Mult(*RHS, *U);
+   solver->Mult(*RHS, *U);
    // test.Stop();
    // printf("test: %f seconds.\n", test.RealTime());
+
+   // delete the created objects.
+   if (use_amg)
+   {
+      delete M;
+      delete parGlobalMat;
+   }
+   else
+   {
+      if (globalPrec != NULL) delete globalPrec;
+   }
+   delete solver;
 }
 
 void MultiBlockSolver::InitVisualization(const std::string& output_path)

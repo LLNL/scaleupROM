@@ -5,7 +5,7 @@
 using namespace std;
 using namespace mfem;
 
-static const double threshold = 1.0e-10;
+static const double threshold = 1.0e-14;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked

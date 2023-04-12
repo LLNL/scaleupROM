@@ -23,7 +23,7 @@ void CheckConvergence();
  * Simple smoke test to make sure Google Test is properly linked
  */
 TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
-    SUCCEED();
+   SUCCEED();
 }
 
 TEST(DDSerialTest, Test_convergence)
@@ -61,8 +61,11 @@ TEST(DDSerial_component_3D_tet_test, Test_convergence)
 
 int main(int argc, char* argv[])
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+   MPI_Init(&argc, &argv);
+   ::testing::InitGoogleTest(&argc, argv);
+   int result = RUN_ALL_TESTS();
+   MPI_Finalize();
+   return result;
 }
 
 double ExactSolution(const Vector &x)

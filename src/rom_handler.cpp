@@ -65,7 +65,7 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
    if (save_operator)
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
    // TODO: assemble on the fly if not save_operator.
-   assert(save_operator);
+//   assert(save_operator);
 
    std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
    if (train_mode_str == "individual")
@@ -118,7 +118,7 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
 void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
 {
    assert(us.Size() == numSub);
-   
+
    for (int m = 0; m < numSub; m++)
    {
       const std::string filename = GetSnapshotPrefix(sample_index, m);
@@ -126,6 +126,7 @@ void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
       bool addSample = basis_generator->takeSample(us[m]->GetData(), 0.0, 0.01);
+      assert(addSample);
       basis_generator->writeSnapshot();
 
       delete basis_generator;
@@ -564,20 +565,52 @@ void MFEMROMHandler::Solve(BlockVector* U)
    printf("Solve ROM.\n");
    BlockVector reduced_sol(rom_block_offsets);
 
-   int maxIter = config.GetOption<int>("solver/max_iter", 1000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-6);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
+   bool use_amg = config.GetOption<bool>("model_reduction/solver/use_amg",
+                     config.GetOption<bool>("solver/use_amg", true));
 
-   CGSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(*romMat);
-   solver.SetPrintLevel(print_level);
+   CGSolver *solver = NULL;
+   HypreParMatrix *parRomMat = NULL;
+   HypreBoomerAMG *M = NULL;
+   GSSmoother *gsM = NULL;
+
+   if (use_amg)
+   {
+      solver = new CGSolver(MPI_COMM_WORLD);
+
+      // TODO: need to change when the actual parallelization is implemented.
+      HYPRE_BigInt glob_size = rom_block_offsets.Last();
+      HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
+      
+      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat);
+
+      solver->SetOperator(*parRomMat);
+      M = new HypreBoomerAMG(*parRomMat);
+      M->SetPrintLevel(print_level);
+      solver->SetPreconditioner(*M);
+   }
+   else
+   {
+      solver = new CGSolver();
+      solver->SetOperator(*romMat);
+      gsM = new GSSmoother(*romMat);
+      solver->SetPreconditioner(*gsM);
+   }
+   
+   solver->SetAbsTol(atol);
+   solver->SetRelTol(rtol);
+   solver->SetMaxIter(maxIter);
+   solver->SetPrintLevel(print_level);
 
    reduced_sol = 0.0;
-   solver.Mult(*reduced_rhs, reduced_sol);
+   // StopWatch solveTimer;
+   // solveTimer.Start();
+   solver->Mult(*reduced_rhs, reduced_sol);
+   // solveTimer.Stop();
+   // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
 
    for (int i = 0; i < numSub; i++)
    {
@@ -589,6 +622,18 @@ void MFEMROMHandler::Solve(BlockVector* U)
       // 23. reconstruct FOM state
       basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
    }
+
+   // delete the created objects.
+   if (use_amg)
+   {
+      delete M;
+      delete parRomMat;
+   }
+   else
+   {
+      delete gsM;
+   }
+   delete solver;
 }
 
 void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)

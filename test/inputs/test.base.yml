@@ -14,11 +14,6 @@ discretization:
   order: 1
   full-discrete-galerkin: false
 
-solver:
-  max_iter: 10000
-    #  print_level: 1
-  relative_tolerance: 1.e-10
-
 visualization:
   enabled: false
   unified_paraview: true

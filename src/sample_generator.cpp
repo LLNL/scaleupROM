@@ -26,6 +26,8 @@ SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
    std::string problem_name = problem->GetProblemName();
    sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", problem_name);
 
+   file_offset = config.GetOption<int>("sample_generation/file_path/offset", 0);
+
    // TODO: currently combined with sample generation part.
    // TODO: Separate with sample generation.
    param_list_str = ("sample_generation/" + problem_name);

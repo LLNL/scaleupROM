@@ -29,11 +29,6 @@ discretization:
   order: 2
   full-discrete-galerkin: false
 
-solver:
-  max_iter: 10000
-    #  print_level: 1
-  relative_tolerance: 1.e-10
-
 visualization:
   enable: false
   output_dir: dd_mms_output

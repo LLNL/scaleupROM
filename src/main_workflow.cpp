@@ -90,7 +90,8 @@ void GenerateSamples(MPI_Comm comm)
       sample_generator->SetSampleParams(s);
       problem->SetParameterizedProblem(test);
 
-      const std::string visual_path = sample_generator->GetSamplePath(s, test->GetVisualizationPrefix());
+      int file_idx = s + sample_generator->GetFileOffset();
+      const std::string visual_path = sample_generator->GetSamplePath(file_idx, test->GetVisualizationPrefix());
       test->InitVisualization(visual_path);
       test->BuildOperators();
       test->SetupBCOperators();
@@ -98,7 +99,7 @@ void GenerateSamples(MPI_Comm comm)
       test->Solve();
       test->SaveVisualization();
 
-      test->SaveSnapshot(s);
+      test->SaveSnapshot(file_idx);
 
       delete test;
    }
@@ -174,6 +175,9 @@ double SingleRun()
    // TODO: skip matrix assembly if use_rom.
    test->Assemble();
 
+   if (test->UseRom())
+      test->ProjectOperatorOnReducedBasis();
+
    StopWatch solveTimer;
    solveTimer.Start();
    if (test->UseRom())
@@ -196,7 +200,7 @@ double SingleRun()
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
    if (test->UseRom() && compare_sol)
       error = test->CompareSolution();
-
+   
    delete test;
    delete problem;
 
