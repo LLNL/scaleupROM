@@ -111,11 +111,7 @@ void GenerateSamples(MPI_Comm comm)
 void BuildROM(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
-
-   sample_generator->SetParamSpaceSizes();
-   const int total_samples = sample_generator->GetTotalSampleSize();
 
    test = new MultiBlockSolver();
    if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
@@ -131,19 +127,22 @@ void BuildROM(MPI_Comm comm)
    test->SetupBCOperators();
    test->Assemble();
    
-   test->FormReducedBasis(total_samples);
-   // test->LoadReducedBasis();
+   ROMHandler *rom = test->GetROMHandler();
+   if (!rom->UseExistingBasis())
+   {
+      SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
+      sample_generator->SetParamSpaceSizes();
+      const int total_samples = sample_generator->GetTotalSampleSize();
+      test->FormReducedBasis(total_samples);
+      delete sample_generator;
+   }
+   
    // TODO: need to be able to save operator matrix.
    test->ProjectOperatorOnReducedBasis();
-
-   // // TODO: separate unto single run mode.
-   // test->ProjectRHSOnReducedBasis();
-   // test->SolveROM();
 
    test->SaveBasisVisualization();
 
    delete test;
-   delete sample_generator;
    delete problem;
 }
 

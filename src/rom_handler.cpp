@@ -59,7 +59,8 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
 
    num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
 
-   basis_prefix = config.GetOption<std::string>("model_reduction/basis_prefix", "basis");
+   basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
+   basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
 
    save_operator = config.GetOption<bool>("model_reduction/save_operator/enabled", false);
    if (save_operator)

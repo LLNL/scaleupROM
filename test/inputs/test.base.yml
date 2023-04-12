@@ -40,7 +40,8 @@ sample_generation:
 
 model_reduction:
   rom_handler_type: base
-  basis_prefix: "poisson0"
+  basis:
+    prefix: "poisson0"
   # individual/universal
   subdomain_training: individual
   number_of_basis: 3

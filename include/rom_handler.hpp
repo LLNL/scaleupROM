@@ -57,6 +57,7 @@ protected:
    bool save_basis_visual = false;
    bool component_sampling = false;
    bool save_lspg_basis = false;
+   bool basis_file_exists = false;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
    // ProjectionMode proj_mode = NUM_PROJMODE;
@@ -98,6 +99,7 @@ public:
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
+   const bool UseExistingBasis() { return basis_file_exists; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
