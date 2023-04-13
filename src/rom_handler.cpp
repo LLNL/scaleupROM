@@ -382,14 +382,9 @@ void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
 void ROMHandler::Solve(BlockVector* U)
 {
    assert(U->NumBlocks() == numSub);
+   assert(operator_loaded);
 
    printf("Solve ROM.\n");
-   if (!operator_loaded)
-   {  // TODO: assembling on the fly if not save_operator.
-      assert(save_operator);
-      romMat_inv->read(operator_prefix);
-      operator_loaded = true;
-   }
 
    CAROM::Vector reduced_sol(num_basis * numSub, false);
    romMat_inv->mult(*reduced_rhs, reduced_sol);
@@ -410,6 +405,20 @@ void ROMHandler::Solve(BlockVector* U)
       CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
       basis_i->mult(block_reduced_sol, U_block_carom);
    }
+}
+
+void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
+{
+   assert(save_operator);
+
+   std::string prefix;
+   if (input_prefix == "")
+      prefix = operator_prefix;
+   else
+      prefix = input_prefix;
+
+   romMat_inv->read(prefix);
+   operator_loaded = true;
 }
 
 void ROMHandler::SaveSV(const std::string& prefix)
@@ -554,14 +563,7 @@ void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
 void MFEMROMHandler::Solve(BlockVector* U)
 {
    assert(U->NumBlocks() == numSub);
-
-   if (!operator_loaded)
-   {  // TODO: option of assembling on the fly if not save_operator.
-      assert(save_operator);
-      std::string filename = operator_prefix + ".h5";
-      romMat = ReadSparseMatrixFromHDF(filename);
-      operator_loaded = true;
-   }
+   assert(operator_loaded);
 
    printf("Solve ROM.\n");
    BlockVector reduced_sol(rom_block_offsets);
@@ -635,6 +637,21 @@ void MFEMROMHandler::Solve(BlockVector* U)
       delete gsM;
    }
    delete solver;
+}
+
+void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
+{
+   assert(save_operator);
+   
+   std::string filename;
+   if (input_prefix == "")
+      filename = operator_prefix;
+   else
+      filename = input_prefix;
+   filename += ".h5";
+
+   romMat = ReadSparseMatrixFromHDF(filename);
+   operator_loaded = true;
 }
 
 void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)

@@ -154,6 +154,8 @@ double SingleRun()
    test->InitVariables();
    test->InitVisualization();
 
+   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
+
    std::string problem_name = problem->GetProblemName();
    std::string param_list_str("single_run/" + problem_name);
    YAML::Node param_list = config.FindNode(param_list_str);
@@ -172,11 +174,60 @@ double SingleRun()
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
-   // TODO: skip matrix assembly if use_rom.
-   test->Assemble();
+   test->AssembleRHS();
 
    if (test->UseRom())
-      test->ProjectOperatorOnReducedBasis();
+   {
+      ROMHandler *rom = test->GetROMHandler();
+      TopologyHandlerMode topol_mode = test->GetTopologyMode();
+      switch (topol_mode)
+      {
+         case SUBMESH:
+         {
+            printf("SubMesh Topology - ");
+            if (rom->SaveOperator())
+            {
+               printf("loading operator file.. ");
+               rom->LoadOperatorFromFile();
+            }
+            else
+            {
+               printf("building operator file all the way from FOM.. ");
+               test->AssembleOperator();
+               test->ProjectOperatorOnReducedBasis();
+            }
+            printf("Done!\n");
+            break;
+         }  // case SUBMESH:
+         case COMPONENT:
+         {
+            printf("Component-wise Topology - ");
+            // TODO: bottom-up assembly.
+            if (rom->SaveOperator())
+            {
+               printf("loading operator file.. ");
+               rom->LoadOperatorFromFile();
+            }
+            else
+            {
+               printf("building operator file all the way from FOM.. ");
+               test->AssembleOperator();
+               test->ProjectOperatorOnReducedBasis();
+            }
+            printf("Done!\n");
+            break;
+         }  // case COMPONENT:
+         default:
+         {
+            mfem_error("Unknown TopologyHandler Mode!\n");
+            break;
+         }
+      }  // switch (topol_mode)
+   }  // if (test->UseRom())
+   else
+   {
+      test->AssembleOperator();
+   }  // if not (test->UseRom())
 
    StopWatch solveTimer;
    solveTimer.Start();
@@ -191,7 +242,6 @@ double SingleRun()
       test->Solve();
    }
    solveTimer.Stop();
-   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
    printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
    test->SaveVisualization();

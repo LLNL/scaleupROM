@@ -160,6 +160,7 @@ public:
    ROMHandler* GetROMHandler() { return rom_handler; }
    const bool IsVisualizationSaved() { return save_visual; }
    const std::string GetVisualizationPrefix() { return visual_prefix; }
+   const TopologyHandlerMode GetTopologyMode() { return topol_mode; }
 
    void SetupBCVariables();
    void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);

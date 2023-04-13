@@ -100,6 +100,8 @@ public:
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
    const bool UseExistingBasis() { return basis_file_exists; }
+   const bool SaveOperator() { return save_operator; }
+   const bool OperatorLoaded() { return operator_loaded; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
@@ -117,6 +119,8 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   virtual void LoadOperatorFromFile(const std::string input_prefix="");
 
    const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
    { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
@@ -152,6 +156,8 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   virtual void LoadOperatorFromFile(const std::string input_prefix="");
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes);
 };
