@@ -178,6 +178,7 @@ double SingleRun()
 
    if (test->UseRom())
    {
+      printf("ROM with ");
       ROMHandler *rom = test->GetROMHandler();
       TopologyHandlerMode topol_mode = test->GetTopologyMode();
       switch (topol_mode)
@@ -196,7 +197,6 @@ double SingleRun()
                test->AssembleOperator();
                test->ProjectOperatorOnReducedBasis();
             }
-            printf("Done!\n");
             break;
          }  // case SUBMESH:
          case COMPONENT:
@@ -214,7 +214,6 @@ double SingleRun()
                test->AssembleOperator();
                test->ProjectOperatorOnReducedBasis();
             }
-            printf("Done!\n");
             break;
          }  // case COMPONENT:
          default:
@@ -223,6 +222,7 @@ double SingleRun()
             break;
          }
       }  // switch (topol_mode)
+      printf("Done!\n");
    }  // if (test->UseRom())
    else
    {
@@ -249,7 +249,10 @@ double SingleRun()
    double error = -1.0;
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
    if (test->UseRom() && compare_sol)
+   {
+      test->AssembleOperator();
       error = test->CompareSolution();
+   }
    
    delete test;
    delete problem;
