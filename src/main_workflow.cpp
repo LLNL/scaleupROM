@@ -133,6 +133,7 @@ void BuildROM(MPI_Comm comm)
       SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
       sample_generator->SetParamSpaceSizes();
       const int total_samples = sample_generator->GetTotalSampleSize();
+      
       test->FormReducedBasis(total_samples);
       delete sample_generator;
    }

@@ -299,16 +299,36 @@ void MultiBlockSolver::SetupBCOperators()
 
 void MultiBlockSolver::Assemble()
 {
+   AssembleRHS();
+   AssembleOperator();
+}
+
+void MultiBlockSolver::AssembleRHS()
+{
    SanityCheckOnCoeffs();
 
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
+
+   for (int m = 0; m < numSub; m++)
+   {
+      MFEM_ASSERT(bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
+      bs[m]->Assemble();
+   }
+
+   for (int m = 0; m < numSub; m++)
+      // Do we really need SyncAliasMemory?
+      bs[m]->SyncAliasMemory(*RHS);  // Synchronize with block vector RHS. What is different from SyncMemory?
+}
+
+void MultiBlockSolver::AssembleOperator()
+{
+   SanityCheckOnCoeffs();
+
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
    for (int m = 0; m < numSub; m++)
    {
-      MFEM_ASSERT(as[m] && bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
-
-      bs[m]->Assemble();
+      MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
       as[m]->Assemble();
    }
 
@@ -327,11 +347,7 @@ void MultiBlockSolver::Assemble()
    AssembleInterfaceMatrix();
 
    for (int m = 0; m < numSub; m++)
-   {
-      // Do we really need SyncAliasMemory?
-      bs[m]->SyncAliasMemory(*RHS);  // Synchronize with block vector RHS. What is different from SyncMemory?
       as[m]->Finalize();
-   }
 
    // globalMat = new BlockOperator(block_offsets);
    // NOTE: currently, domain-decomposed system will have a significantly different sparsity pattern.

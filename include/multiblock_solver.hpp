@@ -113,6 +113,9 @@ protected:
    BlockMatrix *globalMat;
    SparseMatrix *globalMat_mono;
 
+   // Used for bottom-up building, only with ComponentTopologyHandler.
+
+
    // operators
    Array<LinearForm *> bs;
    Array<BilinearForm *> as;
@@ -173,6 +176,8 @@ public:
    { rhs_coeffs.Append(new ConstantCoefficient(F)); }
 
    void Assemble();
+   void AssembleRHS();
+   void AssembleOperator();
    // For bilinear case.
    void AssembleInterfaceMatrix();
 
