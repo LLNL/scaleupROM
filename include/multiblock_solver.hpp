@@ -183,7 +183,12 @@ public:
    void AssembleRHS();
    void AssembleOperator();
    // For bilinear case.
-   void AssembleInterfaceMatrix();
+   void AssembleInterfaceMatrixes();
+   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+                                 FiniteElementSpace *fes1,
+                                 FiniteElementSpace *fes2,
+                                 Array<InterfaceInfo> *interface_infos,
+                                 Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
    void AssembleComponents();

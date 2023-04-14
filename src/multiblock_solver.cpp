@@ -343,7 +343,7 @@ void MultiBlockSolver::AssembleOperator()
          }
       }
    }
-   AssembleInterfaceMatrix();
+   AssembleInterfaceMatrixes();
 
    for (int m = 0; m < numSub; m++)
       as[m]->Finalize();
@@ -367,7 +367,7 @@ void MultiBlockSolver::AssembleOperator()
       globalMat_mono = globalMat->CreateMonolithic();
 }
 
-void MultiBlockSolver::AssembleInterfaceMatrix()
+void MultiBlockSolver::AssembleInterfaceMatrixes()
 {
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
@@ -376,6 +376,9 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
       Array<int> midx(2);
       midx[0] = pInfo->Mesh1;
       midx[1] = pInfo->Mesh2;
+      Array2D<SparseMatrix *> mats_p(2,2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++) mats_p(i, j) = mats(midx[i], midx[j]);
 
       Mesh *mesh1, *mesh2;
       mesh1 = meshes[midx[0]];
@@ -386,37 +389,46 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
       fes2 = fes[midx[1]];
 
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      for (int bn = 0; bn < interface_infos->Size(); bn++)
-      {
-         InterfaceInfo *if_info = &((*interface_infos)[bn]);
-         
-         Array2D<DenseMatrix*> elemmats;
-         FaceElementTransformations *tr1, *tr2;
-         const FiniteElement *fe1, *fe2;
-         Array<Array<int> *> vdofs(2);
-         vdofs[0] = new Array<int>;
-         vdofs[1] = new Array<int>;
-
-         topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-
-         if ((tr1 != NULL) && (tr2 != NULL))
-         {
-            fes1->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
-            fes2->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
-            // Both domains will have the adjacent element as Elem1.
-            fe1 = fes1->GetFE(tr1->Elem1No);
-            fe2 = fes2->GetFE(tr2->Elem1No);
-
-            interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
-
-            for (int i = 0; i < 2; i++) {
-               for (int j = 0; j < 2; j++) {
-                  mats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
-               }
-            }
-         }  // if ((tr1 != NULL) && (tr2 != NULL))
-      }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+      AssembleInterfaceMatrix(mesh1, mesh2, fes1, fes2, interface_infos, mats_p);
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+}
+
+void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+                                                FiniteElementSpace *fes1,
+                                                FiniteElementSpace *fes2,
+                                                Array<InterfaceInfo> *interface_infos,
+                                                Array2D<SparseMatrix*> &mats)
+{
+   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   {
+      InterfaceInfo *if_info = &((*interface_infos)[bn]);
+      
+      Array2D<DenseMatrix*> elemmats;
+      FaceElementTransformations *tr1, *tr2;
+      const FiniteElement *fe1, *fe2;
+      Array<Array<int> *> vdofs(2);
+      vdofs[0] = new Array<int>;
+      vdofs[1] = new Array<int>;
+
+      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+
+      if ((tr1 != NULL) && (tr2 != NULL))
+      {
+         fes1->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
+         fes2->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
+         // Both domains will have the adjacent element as Elem1.
+         fe1 = fes1->GetFE(tr1->Elem1No);
+         fe2 = fes2->GetFE(tr2->Elem1No);
+
+         interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
+
+         for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+               mats(i, j)->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
+            }
+         }
+      }  // if ((tr1 != NULL) && (tr2 != NULL))
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 }
 
 void MultiBlockSolver::AssembleComponents()
