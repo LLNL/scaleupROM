@@ -35,8 +35,6 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    // read global file.
    std::string global_config = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
    ReadComponentsFromFile(global_config);
-   ReadPortsFromFile(global_config);
-   ReadBoundariesFromFile(global_config);
 
    SetupComponents();
 
@@ -62,18 +60,21 @@ ComponentTopologyHandler::ComponentTopologyHandler()
       }
    }
 
-   if (num_ref_ports > 0)
-      SetupReferencePorts();
-
    // Do we really need to copy all meshes?
    SetupMeshes();
+
+   ReadBoundariesFromFile(global_config);
+   ReadPortsFromFile(global_config);
+
+   if (num_ref_ports > 0)
+      SetupReferencePorts();
 
    SetupReferenceInterfaces();
 
    SetupPorts();
 
    // Do we really need to set boundary attributes of all meshes?
-   SetupBoundaries();
+   SetupBdrAttributes();
 }
 
 void ComponentTopologyHandler::GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)
@@ -114,6 +115,9 @@ void ComponentTopologyHandler::SetupComponents()
       int idx = comp_names[comp_name];
       std::string filename = config.GetRequiredOptionFromDict<std::string>("file", comp_list[c]);
       components[idx] = new BlockMesh(filename.c_str());
+
+      // component bdr_attributes should not be duplicated. (usually does not happen)
+      ComponentBdrAttrCheck(components[idx]);
    }
 
    for (int c = 0; c < components.Size(); c++) assert(components[c] != NULL);
@@ -250,6 +254,35 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
+
+   // set up global bdr attributes.
+   // Port attribute will be setup with a value that does not overlap with any component boundary attribute.
+   int attr_offset = 0;
+   for (int c = 0; c < num_comp; c++)
+      attr_offset = max(attr_offset, components[c]->bdr_attributes.Max());
+   // Also does not overlap with global boundary attributes.
+   assert(bdr_attributes.Size() > 0);
+   attr_offset = max(attr_offset, bdr_attributes.Max());
+   attr_offset += 1;
+
+   for (int p = 0; p < num_ports; p++)
+   {
+      port_infos[p].PortAttr = attr_offset;
+
+      int c1, c2;
+      c1 = mesh_types[port_infos[p].Mesh1];
+      c2 = mesh_types[port_infos[p].Mesh2];
+
+      int idx1, idx2;
+      idx1 = components[c1]->bdr_attributes.Find(port_infos[p].Attr1);
+      idx2 = components[c2]->bdr_attributes.Find(port_infos[p].Attr2);
+      assert((idx1 >= 0) && (idx2 >= 0));
+      (*bdr_c2g[port_infos[p].Mesh1])[idx1] = attr_offset;
+      (*bdr_c2g[port_infos[p].Mesh2])[idx2] = attr_offset;
+      // interface attributes are not included in the global boundary attributes.
+
+      attr_offset += 1;
+   }
 }
 
 void ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename)
@@ -264,15 +297,15 @@ void ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename
       Array2D<int> tmp;
       hdf5_utils::ReadDataset(file_id, "boundary", tmp);
 
-      bdr_c2g.SetSize(numSub);
-      for (int m = 0; m < numSub; m++) bdr_c2g[m] = new std::unordered_map<int,int>;
-      bdr_attributes.SetSize(0);
-
       for (int b = 0; b < tmp.NumRows(); b++)
       {
-         const int *b_data = tmp.GetRow(b);
+         const int *b_data = tmp.GetRow(b);  // global bdr attr / mesh index / component bdr attr
          int m = b_data[1];
-         (*bdr_c2g[m])[b_data[2]] = b_data[0];
+         int c = mesh_types[m];
+         int c_idx = components[c]->bdr_attributes.Find(b_data[2]);
+         assert(c_idx >= 0);
+
+         (*bdr_c2g[m])[c_idx] = b_data[0];
 
          int idx = bdr_attributes.Find(b_data[0]);
          if (idx < 0) bdr_attributes.Append(b_data[0]);
@@ -462,21 +495,37 @@ void ComponentTopologyHandler::SetupMeshes()
    }
 
    for (int m = 0; m < numSub; m++) assert(meshes[m] != NULL);
+
+   // Set up boundary attribute map from component to global.
+   // Only the initialization.
+   bdr_c2g.SetSize(numSub);
+   bdr_attributes.SetSize(0);
+   for (int m = 0; m < numSub; m++)
+   {
+      bdr_c2g[m] = new Array<int>(meshes[m]->bdr_attributes.Size());
+      *bdr_c2g[m] = -1;
+   }
 }
 
-void ComponentTopologyHandler::SetupBoundaries()
+void ComponentTopologyHandler::SetupBdrAttributes()
 {
    assert(meshes.Size() == numSub);
 
    for (int m = 0; m < numSub; m++)
    {
-      std::unordered_map<int,int> *c2g_map = bdr_c2g[m];
-      for (int be = 0; be < meshes[m]->GetNBE(); be++)
-      {
-         int c_attr = meshes[m]->GetBdrAttribute(be);
-         if(!c2g_map->count(c_attr)) continue;
+      int c = mesh_types[m];
+      Mesh *comp = components[c];
 
-         meshes[m]->SetBdrAttribute(be, (*c2g_map)[c_attr]);
+      // std::unordered_map<int,int> *c2g_map = bdr_c2g[m];
+      Array<int> *c2g_map = bdr_c2g[m];
+      for (int be = 0; be < comp->GetNBE(); be++)
+      {
+         int b_attr = comp->GetBdrAttribute(be);
+         int c_idx = comp->bdr_attributes.Find(b_attr);
+         assert(c_idx >= 0);
+         assert((*c2g_map)[c_idx] >= 0);
+
+         meshes[m]->SetBdrAttribute(be, (*c2g_map)[c_idx]);
       }
 
       UpdateBdrAttributes(*meshes[m]);
@@ -572,14 +621,6 @@ void ComponentTopologyHandler::SetupPorts()
    assert(port_infos.Size() == num_ports);
    assert(port_types.Size() == num_ports);
 
-   // Port attribute will be setup with a value that does not overlap with any component boundary attribute.
-   int attr_offset = 0;
-   for (int c = 0; c < num_comp; c++)
-      attr_offset = max(attr_offset, components[c]->bdr_attributes.Max());
-   // Also does not overlap with global boundary attributes.
-   attr_offset = max(attr_offset, bdr_attributes.Max());
-   attr_offset += 1;
-
    interface_infos.SetSize(num_ports);
    for (int p = 0; p < num_ports; p++)
    {
@@ -590,25 +631,10 @@ void ComponentTopologyHandler::SetupPorts()
       assert(port_infos[p].Attr1 == ref_port->Attr1);
       assert(port_infos[p].Attr2 == ref_port->Attr2);
 
-      port_infos[p].PortAttr = attr_offset;
-
       interface_infos[p] = ref_interfaces[port_types[p]];
-
-      Mesh *mesh1 = meshes[port_infos[p].Mesh1];
-      Mesh *mesh2 = meshes[port_infos[p].Mesh2];
-      for (int b = 0; b < interface_infos[p]->Size(); b++)
-      {
-         InterfaceInfo *b_info = &((*interface_infos[p])[b]);
-         mesh1->SetBdrAttribute(b_info->BE1, attr_offset);
-         mesh2->SetBdrAttribute(b_info->BE2, attr_offset);
-      }
-
-      attr_offset += 1;
    }
 
    for (int p = 0; p < interface_infos.Size(); p++) assert(interface_infos[p] != NULL);
-
-   for (int m = 0; m < numSub; m++) UpdateBdrAttributes(*meshes[m]);
 }
 
 void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict)
@@ -840,4 +866,30 @@ int ComponentTopologyHandler::GetOrientation(BlockMesh *comp1, const Element::Ty
    }  // switch (dim)
 
    return ori;
+}
+
+bool ComponentTopologyHandler::ComponentBdrAttrCheck(Mesh *comp)
+{
+   bool success = true;
+
+   assert(comp != NULL);
+
+   Array<int> tmp(0);
+   for (int k = 0; k < comp->bdr_attributes.Size(); k++)
+   {
+      int idx = tmp.Find(comp->bdr_attributes[k]);
+      if (idx < 0)
+         tmp.Append(comp->bdr_attributes[k]);
+      else
+      {
+         success = false;
+         printf("Component has duplicated bdr_attributes %d!\n", comp->bdr_attributes[k]);
+         for (int i = 0; i < comp->bdr_attributes.Size(); i++)
+            printf("%d\t", comp->bdr_attributes[i]);
+         printf("\n");
+         break;
+      }
+   }
+
+   return success;
 }

@@ -131,7 +131,7 @@ protected:
    Array<int> port_types;
 
    // Boundary information for global configuration.
-   Array<std::unordered_map<int,int>*> bdr_c2g;
+   Array<Array<int>*> bdr_c2g;   // size of meshes.Size(). component battr to global battr.
    Array<int> bdr_attributes;
 
 public:
@@ -176,9 +176,11 @@ protected:
    void SetupComponents();
    void SetupReferencePorts();
    void SetupMeshes();
-   void SetupBoundaries();
+   void SetupBdrAttributes();
    void SetupReferenceInterfaces();
    void SetupPorts();
+
+   bool ComponentBdrAttrCheck(Mesh *comp);
 };
 
 #endif
