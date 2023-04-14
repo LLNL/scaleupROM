@@ -81,6 +81,10 @@ public:
    /*
       Methods only for ComponentTopologyHandler 
    */
+   virtual const int GetNumComponents()
+   { mfem_error("TopologyHandler::GetNumComponents is abstract method!\n"); return -1; }
+   virtual const int GetNumRefPorts()
+   { mfem_error("TopologyHandler::GetNumRefPorts is abstract method!\n"); return -1; }
    virtual Mesh* GetComponentMesh(const int &c)
    { mfem_error("TopologyHandler::GetComponentMesh is abstract method!\n"); return NULL; }
    // return component indexes for a reference port

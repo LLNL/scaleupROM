@@ -48,7 +48,7 @@ protected:
 // public:
    int numSub;          // number of subdomains.
    int udim;            // solution dimension.
-   int num_basis_sets;  // number of the basis sets.
+   int num_basis_sets;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
    Array<int> fom_num_vdofs;
 
    // rom options.
@@ -101,6 +101,7 @@ public:
    const TrainMode GetTrainMode() { return train_mode; }
    const bool UseExistingBasis() { return basis_file_exists; }
    const bool SaveOperator() { return save_operator; }
+   const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
    
    // cannot do const GridFunction* due to librom function definitions.
@@ -111,7 +112,7 @@ public:
    virtual void FormReducedBasisIndividual(const int &total_samples);
 
    virtual void LoadReducedBasis();
-   virtual void GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis);
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
@@ -119,6 +120,10 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+
+   // P_i^T * mat * P_j
+   virtual DenseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, SparseMatrix *mat)
+   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(const int &, const int &, SparseMatrix *) is not supported!\n"); return NULL; }
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
 
@@ -149,13 +154,17 @@ public:
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   virtual void GetReducedBasis(const int &subdomain_index, DenseMatrix* &basis);
+   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis);
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
    // virtual void AllocROMMat() override;  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+   
+   // P_i^T * mat * P_j
+   virtual DenseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, SparseMatrix *mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
 

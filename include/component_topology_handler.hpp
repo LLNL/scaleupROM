@@ -144,6 +144,7 @@ public:
    virtual Mesh* GetGlobalMesh()
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
    virtual const int GetNumRefPorts() { return num_ref_ports; }
+   virtual const int GetNumComponents() { return num_comp; }
    virtual PortData* GetPortData(const int r) { return ref_ports[r]; }
    virtual Mesh* GetComponentMesh(const int &c) { return components[c]; }
 

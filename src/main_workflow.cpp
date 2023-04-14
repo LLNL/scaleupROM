@@ -130,6 +130,7 @@ void BuildROM(MPI_Comm comm)
    ROMHandler *rom = test->GetROMHandler();
    if (!rom->UseExistingBasis())
    {
+      // TODO: basis for multiple components
       SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
       sample_generator->SetParamSpaceSizes();
       const int total_samples = sample_generator->GetTotalSampleSize();
@@ -138,8 +139,25 @@ void BuildROM(MPI_Comm comm)
       delete sample_generator;
    }
    
-   // TODO: need to be able to save operator matrix.
-   test->ProjectOperatorOnReducedBasis();
+   TopologyHandlerMode topol_mode = test->GetTopologyMode();
+   switch (topol_mode)
+   {
+      case SUBMESH:
+      {
+         test->ProjectOperatorOnReducedBasis();
+         break;
+      }
+      case COMPONENT:
+      {
+         test->ProjectOperatorOnReducedBasis();
+         break;
+      }
+      default:
+      {
+         mfem_error("Unknown TopologyHandler Mode!\n");
+         break;
+      }
+   }
 
    test->SaveBasisVisualization();
 

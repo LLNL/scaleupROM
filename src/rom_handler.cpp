@@ -258,9 +258,9 @@ void ROMHandler::LoadReducedBasis()
    basis_loaded = true;
 }
 
-void ROMHandler::GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis)
+void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis)
 {
-   MFEM_ASSERT(basis_loaded, "GetReducedBasis: reduced basis is not loaded!\n");
+   MFEM_ASSERT(basis_loaded, "GetBasisOnSubdomain: reduced basis is not loaded!\n");
 
    switch (train_mode)
    {
@@ -301,11 +301,11 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mat
    const CAROM::Matrix *basis_i, *basis_j;
    for (int i = 0; i < numSub; i++)
    {
-      GetReducedBasis(i, basis_i);
+      GetBasisOnSubdomain(i, basis_i);
 
       for (int j = 0; j < numSub; j++)
       {
-         GetReducedBasis(j, basis_j);
+         GetBasisOnSubdomain(j, basis_j);
 
          // 21. form inverse ROM operator
          assert(mats(i,j) != NULL);
@@ -370,7 +370,7 @@ void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
       assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       const CAROM::Matrix* basis_i;
-      GetReducedBasis(i, basis_i);
+      GetBasisOnSubdomain(i, basis_i);
 
       CAROM::Vector block_rhs_carom(RHS->GetBlock(i).GetData(), RHS->GetBlock(i).Size(), true, false);
       CAROM::Vector *block_reduced_rhs = basis_i->transposeMult(&block_rhs_carom);
@@ -393,7 +393,7 @@ void ROMHandler::Solve(BlockVector* U)
    for (int i = 0; i < numSub; i++)
    {
       const CAROM::Matrix* basis_i;
-      GetReducedBasis(i, basis_i);
+      GetBasisOnSubdomain(i, basis_i);
 
       // 23. reconstruct FOM state
       CAROM::Vector block_reduced_sol(num_basis, false);
@@ -472,9 +472,18 @@ void MFEMROMHandler::LoadReducedBasis()
    basis_loaded = true;
 }
 
-void MFEMROMHandler::GetReducedBasis(const int &subdomain_index, DenseMatrix* &basis)
+void MFEMROMHandler::GetBasis(const int &basis_index, DenseMatrix* &basis)
 {
-   MFEM_ASSERT(basis_loaded, "GetReducedBasis: reduced basis is not loaded!\n");
+   assert(num_basis_sets > 0);
+   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+
+   basis = spatialbasis[basis_index];
+   return;
+}
+
+void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
+{
+   MFEM_ASSERT(basis_loaded, "GetBasisOnSubdomain: reduced basis is not loaded!\n");
 
    switch (train_mode)
    {
@@ -512,14 +521,14 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> 
    DenseMatrix *basis_i, *basis_j;
    for (int i = 0; i < numSub; i++)
    {
-      GetReducedBasis(i, basis_i);
+      GetBasisOnSubdomain(i, basis_i);
 
       Array<int> vdof_i(num_basis);
       for (int k = 0; k < num_basis; k++) vdof_i[k] = k + i * num_basis;
 
       for (int j = 0; j < numSub; j++)
       {
-         GetReducedBasis(j, basis_j);
+         GetBasisOnSubdomain(j, basis_j);
 
          Array<int> vdof_j(num_basis);
          for (int k = 0; k < num_basis; k++) vdof_j[k] = k + j * num_basis;
@@ -555,7 +564,7 @@ void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
       assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       DenseMatrix* basis_i;
-      GetReducedBasis(i, basis_i);
+      GetBasisOnSubdomain(i, basis_i);
       basis_i->MultTranspose(RHS->GetBlock(i).GetData(), reduced_rhs->GetBlock(i).GetData());
    }
 }
@@ -620,7 +629,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       DenseMatrix* basis_i;
-      GetReducedBasis(i, basis_i);
+      GetBasisOnSubdomain(i, basis_i);
 
       // 23. reconstruct FOM state
       basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
@@ -637,6 +646,23 @@ void MFEMROMHandler::Solve(BlockVector* U)
       delete gsM;
    }
    delete solver;
+}
+
+DenseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, SparseMatrix *mat)
+{
+   assert((i >= 0) && (i < num_basis_sets));
+   assert((j >= 0) && (j < num_basis_sets));
+   assert(mat->Finalized());
+   assert(basis_loaded);
+   
+   DenseMatrix *basis_i, *basis_j;
+   GetBasis(i, basis_i);
+   GetBasis(j, basis_j);
+
+   // TODO: multi-component case.
+   DenseMatrix *elemmat = new DenseMatrix(num_basis, num_basis);
+   mfem::RtAP(*basis_i, *mat, *basis_j, *elemmat);
+   return elemmat;
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)

@@ -113,9 +113,6 @@ protected:
    BlockMatrix *globalMat;
    SparseMatrix *globalMat_mono;
 
-   // Used for bottom-up building, only with ComponentTopologyHandler.
-
-
    // operators
    Array<LinearForm *> bs;
    Array<BilinearForm *> as;
@@ -129,6 +126,12 @@ protected:
    // DG parameters specific to Poisson equation.
    double sigma = -1.0;
    double kappa = -1.0;
+
+   // Used for bottom-up building, only with ComponentTopologyHandler.
+   Array<DenseMatrix *> comp_mats;
+   // boundary condition is enforced via forcing term.
+   Array<Array<DenseMatrix *> *> bdr_mats;
+   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
 
 public:
    MultiBlockSolver();
@@ -181,6 +184,9 @@ public:
    void AssembleOperator();
    // For bilinear case.
    void AssembleInterfaceMatrix();
+
+   // Component-wise assembly
+   void AssembleComponents();
 
    void Solve();
 

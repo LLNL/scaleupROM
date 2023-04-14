@@ -64,7 +64,7 @@ MultiBlockSolver::MultiBlockSolver()
    udim = 1;
    fes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
-      fes[m] = new FiniteElementSpace(&(*meshes[m]), fec, udim);
+      fes[m] = new FiniteElementSpace(meshes[m], fec, udim);
    }
 
 }
@@ -165,6 +165,8 @@ void MultiBlockSolver::SetupBCVariables()
       max_bdr_attr = max(max_bdr_attr, meshes[m]->bdr_attributes.Max());
    }
 
+   // TODO: technically this should be Array<Array2D<int>*> for each meshes.
+   // Running with MFEM debug version will lead to error when assembling boundary integrators.
    bdr_markers.SetSize(max_bdr_attr);
    for (int k = 0; k < max_bdr_attr; k++) {
       bdr_markers[k] = new Array<int>(max_bdr_attr);
@@ -254,9 +256,6 @@ void MultiBlockSolver::BuildOperators()
 
    bs.SetSize(numSub);
    as.SetSize(numSub);
-
-   double sigma = -1.0;
-   double kappa = (order + 1.0) * (order + 1.0);
 
    // These are heavily system-dependent.
    // Based on scalar/vector system, different integrators/coefficients will be used.
@@ -378,23 +377,25 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
       midx[0] = pInfo->Mesh1;
       midx[1] = pInfo->Mesh2;
 
+      Mesh *mesh1, *mesh2;
+      mesh1 = meshes[midx[0]];
+      mesh2 = meshes[midx[1]];
+
+      FiniteElementSpace *fes1, *fes2;
+      fes1 = fes[midx[0]];
+      fes2 = fes[midx[1]];
+
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
       for (int bn = 0; bn < interface_infos->Size(); bn++)
       {
          InterfaceInfo *if_info = &((*interface_infos)[bn]);
-         Mesh *mesh1, *mesh2;
-         FiniteElementSpace *fes1, *fes2;
+         
          Array2D<DenseMatrix*> elemmats;
          FaceElementTransformations *tr1, *tr2;
          const FiniteElement *fe1, *fe2;
          Array<Array<int> *> vdofs(2);
          vdofs[0] = new Array<int>;
          vdofs[1] = new Array<int>;
-
-         mesh1 = meshes[midx[0]];
-         mesh2 = meshes[midx[1]];
-         fes1 = fes[midx[0]];
-         fes2 = fes[midx[1]];
 
          topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
 
@@ -416,6 +417,69 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
          }  // if ((tr1 != NULL) && (tr2 != NULL))
       }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+}
+
+void MultiBlockSolver::AssembleComponents()
+{
+   assert(topol_mode == COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   // Component domain system
+   const int num_comp = topol_handler->GetNumComponents();
+   Array<FiniteElementSpace *> fes_comp(num_comp);
+   fes_comp = NULL;
+   for (int c = 0; c < num_comp; c++) {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      fes_comp[c] = new FiniteElementSpace(comp, fec, udim);
+   }
+
+   {
+      comp_mats.SetSize(num_comp);
+      for (int c = 0; c < num_comp; c++)
+      {
+         Mesh *comp = topol_handler->GetComponentMesh(c);
+         BilinearForm a_comp(fes_comp[c]);
+
+         a_comp.AddDomainIntegrator(new DiffusionIntegrator);
+         if (full_dg)
+            a_comp.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
+
+         a_comp.Assemble();
+         a_comp.Finalize();
+
+         comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
+      }
+   }
+
+   // Boundary penalty matrixes
+   {
+      bdr_mats.SetSize(num_comp);
+      for (int c = 0; c < num_comp; c++)
+      {
+         Mesh *comp = topol_handler->GetComponentMesh(c);
+         bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
+         Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
+
+         for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+         {
+            Array<int> bdr_marker(comp->bdr_attributes.Max());
+            bdr_marker = 0;
+            bdr_marker[comp->bdr_attributes[b] - 1] = 1;
+            BilinearForm a_comp(fes_comp[c]);
+            a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
+
+            a_comp.Assemble();
+            a_comp.Finalize();
+
+            (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
+         }
+      }
+   }
+
+   // Port penalty matrixes
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
 }
 
 void MultiBlockSolver::Solve()
