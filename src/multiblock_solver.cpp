@@ -391,8 +391,8 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
          vdofs[0] = new Array<int>;
          vdofs[1] = new Array<int>;
 
-         mesh1 = &(*meshes[midx[0]]);
-         mesh2 = &(*meshes[midx[1]]);
+         mesh1 = meshes[midx[0]];
+         mesh2 = meshes[midx[1]];
          fes1 = fes[midx[0]];
          fes2 = fes[midx[1]];
 

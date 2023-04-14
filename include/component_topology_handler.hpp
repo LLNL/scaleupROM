@@ -125,7 +125,7 @@ protected:
    int num_ref_ports = -1;
    std::unordered_map<std::string, int> port_names;
    Array<PortData*> ref_ports;
-   Array<Array<InterfaceInfo>*> ref_interfaces;   // mesh indexes are replaced with component indexes.
+   Array<Array<InterfaceInfo>*> ref_interfaces;
 
    // Global port configuration
    Array<int> port_types;
@@ -145,6 +145,10 @@ public:
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
    virtual const int GetNumRefPorts() { return num_ref_ports; }
    virtual PortData* GetPortData(const int r) { return ref_ports[r]; }
+   virtual Mesh* GetComponentMesh(const int &c) { return components[c]; }
+
+   // return component indexes for a reference port (ComponentTopologyHandler only)
+   virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2);
 
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);
@@ -156,10 +160,18 @@ protected:
    // Get vertex orientation of face2 (from mesh2) with respect to face1 (mesh1).
    int GetOrientation(BlockMesh *comp1, const Element::Type &be_type, const Array<int> &vtx1, const Array<int> &vtx2);
 
-   void ReadGlobalConfigFromFile(const std::string filename);
+   // Global configuration data
+   // Read component list and names. not the actual meshes.
+   void ReadComponentsFromFile(const std::string filename);
+   // Read reference port list and names. not the actual port data.
    void ReadPortsFromFile(const std::string filename);
-   void BuildPortFromInput(const YAML::Node port_dict);
-   void WritePortToFile(const PortData &port, const std::string &port_name, const std::string &filename);
+   // Read boundary attribute map between components and global.
+   void ReadBoundariesFromFile(const std::string filename);
+
+   // Reference port data
+   void ReadPortDatasFromFile(const std::string filename);
+   void BuildPortDataFromInput(const YAML::Node port_dict);
+   void WritePortDataToFile(const PortData &port, const std::string &port_name, const std::string &filename);
 
    void SetupComponents();
    void SetupReferencePorts();

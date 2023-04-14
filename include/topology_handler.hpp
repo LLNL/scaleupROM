@@ -78,6 +78,17 @@ public:
    virtual Mesh* GetMesh(const int k) = 0;
    virtual Mesh* GetGlobalMesh() = 0;
 
+   /*
+      Methods only for ComponentTopologyHandler 
+   */
+   virtual Mesh* GetComponentMesh(const int &c)
+   { mfem_error("TopologyHandler::GetComponentMesh is abstract method!\n"); return NULL; }
+   // return component indexes for a reference port
+   virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)
+   { mfem_error("TopologyHandler::GetComponentPair is abstract method!\n"); return; }
+
+   /******/
+
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data) = 0;
 

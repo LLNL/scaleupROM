@@ -33,8 +33,10 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    write_ports = config.GetOption<bool>("mesh/component-wise/write_ports", false);
 
    // read global file.
-   std::string filename = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
-   ReadGlobalConfigFromFile(filename);
+   std::string global_config = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
+   ReadComponentsFromFile(global_config);
+   ReadPortsFromFile(global_config);
+   ReadBoundariesFromFile(global_config);
 
    SetupComponents();
 
@@ -72,6 +74,16 @@ ComponentTopologyHandler::ComponentTopologyHandler()
 
    // Do we really need to set boundary attributes of all meshes?
    SetupBoundaries();
+}
+
+void ComponentTopologyHandler::GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)
+{
+   assert(num_ref_ports > 0);
+   assert((ref_port_idx >= 0) && (ref_port_idx < num_ref_ports));
+
+   comp1 = ref_ports[ref_port_idx]->Component1;
+   comp2 = ref_ports[ref_port_idx]->Component2;
+   return;
 }
 
 void ComponentTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data)
@@ -135,16 +147,16 @@ void ComponentTopologyHandler::SetupReferencePorts()
          std::string filename = config.GetRequiredOptionFromDict<std::string>("file", port_list[p]);
 
          if (FileExists(filename))
-            ReadPortsFromFile(filename);
+            ReadPortDatasFromFile(filename);
          else
-            BuildPortFromInput(port_list[p]);
+            BuildPortDataFromInput(port_list[p]);
       }
    }
    
    for (int p = 0; p < ref_ports.Size(); p++) assert(ref_ports[p] != NULL);
 }
 
-void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filename)
+void ComponentTopologyHandler::ReadComponentsFromFile(const std::string filename)
 {
    hid_t file_id;
    hid_t grp_id;
@@ -190,6 +202,18 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
       assert(errf >= 0);
    }
 
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+}
+
+void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
+{
+   hid_t file_id;
+   hid_t grp_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
    {  // Port list.
       grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
       assert(grp_id >= 0);
@@ -224,6 +248,18 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
       assert(errf >= 0);
    }
 
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+}
+
+void ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename)
+{
+   hid_t file_id;
+   hid_t grp_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
    {  // Boundary data.
       Array2D<int> tmp;
       hdf5_utils::ReadDataset(file_id, "boundary", tmp);
@@ -247,7 +283,7 @@ void ComponentTopologyHandler::ReadGlobalConfigFromFile(const std::string filena
    assert(errf >= 0);
 }
 
-void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
+void ComponentTopologyHandler::ReadPortDatasFromFile(const std::string filename)
 {
    hid_t file_id;
    herr_t errf = 0;
@@ -339,7 +375,7 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
    return;
 }
 
-void ComponentTopologyHandler::WritePortToFile(const PortData &port,
+void ComponentTopologyHandler::WritePortDataToFile(const PortData &port,
                                                const std::string &port_name,
                                                const std::string &filename)
 {
@@ -575,7 +611,7 @@ void ComponentTopologyHandler::SetupPorts()
    for (int m = 0; m < numSub; m++) UpdateBdrAttributes(*meshes[m]);
 }
 
-void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
+void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict)
 {
    std::string port_name = config.GetRequiredOptionFromDict<std::string>("name", port_dict);
    if (!port_names.count(port_name))
@@ -604,9 +640,9 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
    int attr1 = config.GetRequiredOptionFromDict<int>("comp1/attr", port_dict);
    int attr2 = config.GetRequiredOptionFromDict<int>("comp2/attr", port_dict);
    int exists = comp1->bdr_attributes.Find(attr1);
-   if (exists < 0) mfem_error("BuildPortFromInput: specified boundary attribute for component 1 does not exist!\n");
+   if (exists < 0) mfem_error("BuildPortDataFromInput: specified boundary attribute for component 1 does not exist!\n");
    exists = comp2->bdr_attributes.Find(attr2);
-   if (exists < 0) mfem_error("BuildPortFromInput: specified boundary attribute for component 2 does not exist!\n");
+   if (exists < 0) mfem_error("BuildPortDataFromInput: specified boundary attribute for component 2 does not exist!\n");
 
    port->Component1 = idx1;
    port->Component2 = idx2;
@@ -689,7 +725,7 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
          }
       }  // for (int v2 = 0; v2 < vtx2.Size(); v2++)
 
-      if (!found_match) mfem_error("BuildPortFromInput: Cannot find the matching vertex!\n");
+      if (!found_match) mfem_error("BuildPortDataFromInput: Cannot find the matching vertex!\n");
    }  // for (int v1 = 0; v1 < vtx1.Size(); v1++)
 
    for (int b2 = 0; b2 < be2.Size(); b2++)
@@ -752,7 +788,7 @@ void ComponentTopologyHandler::BuildPortFromInput(const YAML::Node port_dict)
    if (write_ports)
    {
       std::string filename = config.GetRequiredOptionFromDict<std::string>("file", port_dict);
-      WritePortToFile(*port, port_name, filename);
+      WritePortDataToFile(*port, port_name, filename);
    }
 }
 
