@@ -678,8 +678,9 @@ void MFEMROMHandler::Solve(BlockVector* U)
    delete solver;
 }
 
-DenseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, SparseMatrix *mat)
+void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat)
 {
+   assert(proj_mat != NULL);
    assert((i >= 0) && (i < num_basis_sets));
    assert((j >= 0) && (j < num_basis_sets));
    assert(mat->Finalized());
@@ -690,9 +691,9 @@ DenseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const i
    GetBasis(j, basis_j);
 
    // TODO: multi-component case.
-   DenseMatrix *elemmat = new DenseMatrix(num_basis, num_basis);
-   mfem::RtAP(*basis_i, *mat, *basis_j, *elemmat);
-   return elemmat;
+   proj_mat->SetSize(num_basis, num_basis);
+   mfem::RtAP(*basis_i, *mat, *basis_j, *proj_mat);
+   return;
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)

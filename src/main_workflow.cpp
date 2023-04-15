@@ -229,6 +229,9 @@ double SingleRun()
             if (rom->SaveOperator())
             {
                printf("loading operator file.. ");
+               test->AllocateROMElements();
+               std::string filename = rom->GetROMElementPrefix() + ".h5";
+               test->LoadROMElements(filename);
                rom->LoadOperatorFromFile();
             }
             else

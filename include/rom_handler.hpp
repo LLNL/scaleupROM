@@ -129,8 +129,8 @@ public:
    // void CompareSolution();
 
    // P_i^T * mat * P_j
-   virtual DenseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, SparseMatrix *mat)
-   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(const int &, const int &, SparseMatrix *) is not supported!\n"); return NULL; }
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat)
+   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(const int &, const int &, SparseMatrix *) is not supported!\n"); }
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
 
@@ -172,7 +172,7 @@ public:
    // void CompareSolution();
    
    // P_i^T * mat * P_j
-   virtual DenseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, SparseMatrix *mat);
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
 
