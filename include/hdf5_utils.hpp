@@ -150,6 +150,9 @@ void WriteDataset(hid_t source, std::string dataset, const Array2D<T> &value)
    assert(errf >= 0);
 }
 
+void ReadDataset(hid_t source, std::string dataset, DenseMatrix &value);
+void WriteDataset(hid_t source, std::string dataset, const DenseMatrix &value);
+
 }
 
 #endif

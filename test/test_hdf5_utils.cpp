@@ -133,6 +133,43 @@ TEST(WriteDataset_test, Test_hdf5)
    return;
 }
 
+TEST(DenseMatrix_test, Test_hdf5)
+{
+   std::string filename("test.h5");
+   hid_t file_id;
+   hid_t grp_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   DenseMatrix double2_ans(5,4);
+   for (int i = 0; i < double2_ans.NumRows(); i++)
+      for (int j = 0; j < double2_ans.NumCols(); j++) double2_ans(i,j) = UniformRandom();
+   
+   hdf5_utils::WriteDataset(file_id, "double2_ans", double2_ans);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   DenseMatrix double2_result;
+   hdf5_utils::ReadDataset(file_id, "double2_ans", double2_result);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
+   EXPECT_EQ(double2_result.NumRows(), double2_ans.NumRows());
+   EXPECT_EQ(double2_result.NumCols(), double2_ans.NumCols());
+
+   for (int i = 0; i < double2_ans.NumRows(); i++)
+      for (int j = 0; j < double2_ans.NumCols(); j++)
+         EXPECT_EQ(double2_result(i,j), double2_ans(i,j));
+
+   return;
+}
+
 int main(int argc, char* argv[])
 {
     ::testing::InitGoogleTest(&argc, argv);
