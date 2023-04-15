@@ -454,6 +454,8 @@ void ROMHandler::SaveSV(const std::string& prefix)
 MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs)
    : ROMHandler(input_numSub, input_udim, input_num_vdofs)
 {
+   rom_elem_prefix = config.GetOption<std::string>("model_reduction/component_wise/rom_element_prefix", "rom_element");
+
    romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
 }
 

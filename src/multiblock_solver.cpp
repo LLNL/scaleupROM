@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "multiblock_solver.hpp"
+#include "hdf5_utils.hpp"
 #include "linalg_utils.hpp"
 #include "component_topology_handler.hpp"
 // #include <cmath>
@@ -431,6 +432,27 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 }
 
+void MultiBlockSolver::AllocateROMElements()
+{
+   assert(topol_mode == COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+
+   comp_mats.SetSize(num_comp);
+   bdr_mats.SetSize(num_comp);
+   for (int c = 0; c < num_comp; c++)
+   {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
+   }
+   port_mats.SetSize(num_ref_ports);
+   for (int p = 0; p < num_ref_ports; p++)
+      port_mats[p] = new Array2D<DenseMatrix *>(2,2);
+}
+
 void MultiBlockSolver::AssembleROMElements()
 {
    assert(topol_mode == COMPONENT);
@@ -448,7 +470,7 @@ void MultiBlockSolver::AssembleROMElements()
    }
 
    {
-      comp_mats.SetSize(num_comp);
+      assert(comp_mats.Size() == num_comp);
       for (int c = 0; c < num_comp; c++)
       {
          Mesh *comp = topol_handler->GetComponentMesh(c);
@@ -467,11 +489,11 @@ void MultiBlockSolver::AssembleROMElements()
 
    // Boundary penalty matrixes
    {
-      bdr_mats.SetSize(num_comp);
+      assert(bdr_mats.Size() == num_comp);
       for (int c = 0; c < num_comp; c++)
       {
          Mesh *comp = topol_handler->GetComponentMesh(c);
-         bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
+         assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
          Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
 
          for (int b = 0; b < comp->bdr_attributes.Size(); b++)
@@ -493,9 +515,12 @@ void MultiBlockSolver::AssembleROMElements()
    // Port penalty matrixes
    const int num_ref_ports = topol_handler->GetNumRefPorts();
    {
-      port_mats.SetSize(num_ref_ports);
+      assert(port_mats.Size() == num_ref_ports);
       for (int p = 0; p < num_ref_ports; p++)
       {
+         assert(port_mats[p]->NumRows() == 2);
+         assert(port_mats[p]->NumCols() == 2);
+
          int c1, c2;
          topol_handler->GetComponentPair(p, c1, c2);
          Mesh *comp1 = topol_handler->GetComponentMesh(c1);
@@ -513,7 +538,6 @@ void MultiBlockSolver::AssembleROMElements()
 
          AssembleInterfaceMatrix(comp1, comp2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
 
-         port_mats[p] = new Array2D<DenseMatrix *>(2,2);
          for (int i = 0; i < 2; i++)
             for (int j = 0; j < 2; j++)
                (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j));
@@ -522,6 +546,80 @@ void MultiBlockSolver::AssembleROMElements()
             for (int j = 0; j < 2; j++) delete spmats(i, j);
       }  // for (int p = 0; p < num_ref_ports; p++)
    }
+
+   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
+}
+
+void MultiBlockSolver::SaveROMElements(const std::string &filename)
+{
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   {  // components + boundary
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      const int num_comp = topol_handler->GetNumComponents();
+      hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
+      for (int c = 0; c < num_comp; c++)
+      {
+         hdf5_utils::WriteDataset(grp_id, std::to_string(c), *(comp_mats[c]));
+
+         {  // boundary
+            hid_t bdr_grp_id;
+            bdr_grp_id = H5Gcreate(bdr_grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            assert(bdr_grp_id >= 0);
+
+            const int num_bdr = bdr_mats[c]->Size();
+            Array<DenseMatrix *> *bdr_mat_c = bdr_mats[c];
+            hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
+            for (int b = 0; b < num_bdr; b++)
+               hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
+
+            errf = H5Gclose(bdr_grp_id);
+            assert(errf >= 0);
+         }
+      }  // for (int c = 0; c < num_comp; c++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   {  // (reference) ports
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, "ports", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      const int num_ref_ports = topol_handler->GetNumRefPorts();
+      hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
+      for (int p = 0; p < num_ref_ports; p++)
+      {
+         hid_t port_grp_id;
+         port_grp_id = H5Gcreate(port_grp_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+         assert(port_grp_id >= 0);
+
+         Array2D<DenseMatrix *> *port_mat = port_mats[p];
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+            {
+               std::string dset_name = std::to_string(i) + std::to_string(j);
+               hdf5_utils::WriteDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
+            }
+         
+         errf = H5Gclose(port_grp_id);
+         assert(errf >= 0);
+      }  // for (int p = 0; p < num_ref_ports; p++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
 }
 
 void MultiBlockSolver::Solve()

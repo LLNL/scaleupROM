@@ -191,7 +191,9 @@ public:
                                  Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
+   void AllocateROMElements();
    void AssembleROMElements();
+   void SaveROMElements(const std::string &filename);
 
    void Solve();
 

@@ -67,6 +67,7 @@ protected:
    std::string sample_prefix;
    std::string basis_prefix;
    std::string operator_prefix;
+   std::string rom_elem_prefix;
 
    // rom variables.
    // TODO: need Array<int> for multi-component basis.
@@ -103,6 +104,8 @@ public:
    const bool SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
+   virtual const std::string GetROMElementPrefix()
+   { mfem_error("ROMHandler::GetROMElementPrefix is not supported!\n"); return rom_elem_prefix; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
@@ -150,6 +153,8 @@ public:
    MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler() {};
+
+   virtual const std::string GetROMElementPrefix() { return rom_elem_prefix; }
    
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);

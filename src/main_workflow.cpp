@@ -149,7 +149,10 @@ void BuildROM(MPI_Comm comm)
       }
       case COMPONENT:
       {
+         test->AllocateROMElements();
          test->AssembleROMElements();
+         std::string filename = rom->GetROMElementPrefix() + ".h5";
+         test->SaveROMElements(filename);
          test->ProjectOperatorOnReducedBasis();
          break;
       }
