@@ -149,6 +149,7 @@ void BuildROM(MPI_Comm comm)
       }
       case COMPONENT:
       {
+         test->AssembleROMElements();
          test->ProjectOperatorOnReducedBasis();
          break;
       }

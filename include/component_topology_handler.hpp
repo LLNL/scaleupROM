@@ -147,6 +147,7 @@ public:
    virtual const int GetNumComponents() { return num_comp; }
    virtual PortData* GetPortData(const int r) { return ref_ports[r]; }
    virtual Mesh* GetComponentMesh(const int &c) { return components[c]; }
+   virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k) { return ref_interfaces[k]; }
 
    // return component indexes for a reference port (ComponentTopologyHandler only)
    virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2);

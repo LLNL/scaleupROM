@@ -431,7 +431,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 }
 
-void MultiBlockSolver::AssembleComponents()
+void MultiBlockSolver::AssembleROMElements()
 {
    assert(topol_mode == COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
@@ -492,6 +492,36 @@ void MultiBlockSolver::AssembleComponents()
 
    // Port penalty matrixes
    const int num_ref_ports = topol_handler->GetNumRefPorts();
+   {
+      port_mats.SetSize(num_ref_ports);
+      for (int p = 0; p < num_ref_ports; p++)
+      {
+         int c1, c2;
+         topol_handler->GetComponentPair(p, c1, c2);
+         Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+         Mesh *comp2 = topol_handler->GetComponentMesh(c2);
+
+         Array<int> c_idx(2);
+         c_idx[0] = c1;
+         c_idx[1] = c2;
+         Array2D<SparseMatrix *> spmats(2,2);
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+               spmats(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
+
+         Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
+
+         AssembleInterfaceMatrix(comp1, comp2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
+
+         port_mats[p] = new Array2D<DenseMatrix *>(2,2);
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+               (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j));
+
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++) delete spmats(i, j);
+      }  // for (int p = 0; p < num_ref_ports; p++)
+   }
 }
 
 void MultiBlockSolver::Solve()

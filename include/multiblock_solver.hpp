@@ -191,7 +191,7 @@ public:
                                  Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
-   void AssembleComponents();
+   void AssembleROMElements();
 
    void Solve();
 
