@@ -25,13 +25,6 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
-enum TopologyHandlerMode
-{
-   SUBMESH,
-   COMPONENT,
-   NUM_TOPOL_MODE
-};
-
 class MultiBlockSolver
 {
 
@@ -192,8 +185,9 @@ public:
 
    // Component-wise assembly
    void AllocateROMElements();
-   void AssembleROMElements();
+   void BuildROMElements();
    void SaveROMElements(const std::string &filename);
+   void LoadROMElements(const std::string &filename);
 
    void Solve();
 

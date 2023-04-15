@@ -1,0 +1,81 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: true
+
+mesh:
+  filename: meshes/test.2x2.mesh
+  type: component-wise
+  component-wise:
+    global_config: "meshes/test.global.h5"
+    components:
+      - name: "square"
+        file: "meshes/test.1x1.mesh"
+    ports:
+      - name: "port1"
+        file: "meshes/test.port1.h5"
+        comp1:
+          name: "square"
+          attr: 3
+        comp2:
+          name: "square"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "meshes/test.port2.h5"
+        comp1:
+          name: "square"
+          attr: 2
+        comp2:
+          name: "square"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: false
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: sample_gen_output
+
+parameterized_problem:
+  name: poisson0
+
+single_run:
+  poisson0:
+    - parameter_name: k
+      value: 2.5
+
+sample_generation:
+  component_sampling: false
+  file_path:
+    prefix: "poisson0"
+  poisson0:
+    - parameter_name: k
+      sample_size: 1
+      minimum: 2.5
+      maximum: 2.5
+
+model_reduction:
+  rom_handler_type: mfem
+  basis:
+    prefix: "poisson0"
+  # individual/universal
+  subdomain_training: universal
+  number_of_basis: 4
+  save_operator:
+    enabled: true
+    prefix: "proj_inv"
+  compare_solution: true
+  svd:
+    save_spectrum: true
+    maximum_number_of_snapshots: 400
+    update_right_sv: false
+  visualization:
+    enabled: false

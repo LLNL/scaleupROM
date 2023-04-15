@@ -27,7 +27,7 @@ inline bool FileExists(const std::string& name)
 }
 
 ComponentTopologyHandler::ComponentTopologyHandler()
-   : TopologyHandler()
+   : TopologyHandler(COMPONENT)
 {
    verbose = config.GetOption<bool>("mesh/component-wise/verbose", false);
    write_ports = config.GetOption<bool>("mesh/component-wise/write_ports", false);
@@ -190,6 +190,16 @@ void ComponentTopologyHandler::ReadComponentsFromFile(const std::string filename
       hdf5_utils::ReadDataset(grp_id, "configuration", tmp);
       assert(mesh_types.Size() == tmp.NumRows());
       numSub = mesh_types.Size();
+
+      // count number of subdomains per each component.
+      sub_composition.SetSize(num_comp);
+      sub_composition = 0;
+      mesh_comp_idx.SetSize(numSub);
+      for (int m = 0; m < numSub; m++)
+      {
+         mesh_comp_idx[m] = sub_composition[mesh_types[m]];
+         sub_composition[mesh_types[m]] += 1;
+      }
 
       mesh_configs.SetSize(numSub);
       for (int m = 0; m < numSub; m++)

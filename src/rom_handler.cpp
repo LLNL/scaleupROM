@@ -22,8 +22,9 @@ using namespace std;
 namespace mfem
 {
 
-ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs)
-   : numSub(input_numSub),
+ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
+   : topol_handler(input_topol),
+     numSub(input_topol->GetNumSubdomains()),
      udim(input_udim),
      fom_num_vdofs(input_num_vdofs),
      basis_loaded(false),
@@ -77,8 +78,7 @@ ROMHandler::ROMHandler(const int &input_numSub, const int &input_udim, const Arr
    else if (train_mode_str == "universal")
    {
       train_mode = TrainMode::UNIVERSAL;
-      // TODO: multi-component basis.
-      num_basis_sets = 1;
+      num_basis_sets = topol_handler->GetNumComponents();
    }
    else
    {
@@ -165,8 +165,8 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
    rom_options = new CAROM::Options(fom_num_vdofs[0], max_num_snapshots, 1, update_right_SV);
    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
 
-   int num_snapshot_sets = (component_sampling) ? num_basis_sets : numSub;
-   for (int m = 0; m < num_snapshot_sets; m++)
+   // int num_snapshot_sets = (component_sampling) ? num_basis_sets : numSub;
+   for (int m = 0; m < numSub; m++)
    {
       for (int s = 0; s < total_samples; s++)
       {
@@ -421,6 +421,34 @@ void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    operator_loaded = true;
 }
 
+const std::string ROMHandler::GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
+{
+   std::string prefix = sample_dir + "/" + sample_prefix + "_sample";
+   switch (train_mode)
+   {
+      case (INDIVIDUAL):
+      {
+         prefix += std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx);
+         break;
+      }
+      case (UNIVERSAL):
+      {
+         int c_type = topol_handler->GetMeshType(subdomain_idx);
+         int c_idx = topol_handler->GetComponentIndexOfMesh(subdomain_idx);
+         int comp_sample = sample_idx * topol_handler->GetNumSubdomains(c_type) + c_idx;
+
+         prefix += std::to_string(comp_sample) + "_comp" + std::to_string(c_type);
+         break;
+      }
+      default:
+      {
+         mfem_error("ROMHandler::GetSnapshotPrefix - Unknown training mode!\n");
+         break;
+      }
+   }
+   return prefix;
+}
+
 void ROMHandler::SaveSV(const std::string& prefix)
 {
    if (!save_sv) return;
@@ -451,8 +479,8 @@ void ROMHandler::SaveSV(const std::string& prefix)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs)
-   : ROMHandler(input_numSub, input_udim, input_num_vdofs)
+MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
+   : ROMHandler(input_topol, input_udim, input_num_vdofs)
 {
    rom_elem_prefix = config.GetOption<std::string>("model_reduction/component_wise/rom_element_prefix", "rom_element");
 

@@ -138,6 +138,7 @@ void BuildROM(MPI_Comm comm)
       test->FormReducedBasis(total_samples);
       delete sample_generator;
    }
+   rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
    switch (topol_mode)
@@ -150,7 +151,7 @@ void BuildROM(MPI_Comm comm)
       case COMPONENT:
       {
          test->AllocateROMElements();
-         test->AssembleROMElements();
+         test->BuildROMElements();
          std::string filename = rom->GetROMElementPrefix() + ".h5";
          test->SaveROMElements(filename);
          test->ProjectOperatorOnReducedBasis();

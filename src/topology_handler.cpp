@@ -20,7 +20,8 @@ using namespace mfem;
    TopologyHandler Base class
 */
 
-TopologyHandler::TopologyHandler()
+TopologyHandler::TopologyHandler(const TopologyHandlerMode &input_type)
+   : type(input_type)
 {
    std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
    if (dd_mode_str == "interior_penalty")
@@ -156,7 +157,8 @@ void TopologyHandler::PrintInterfaceInfo(const int k)
 */
 
 SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
-   : TopologyHandler(), pmesh(pmesh_)
+   : TopologyHandler(SUBMESH),
+     pmesh(pmesh_)
 {
    // Input meshes may not have up-to-date attributes array.
    UpdateAttributes(*pmesh);
@@ -195,6 +197,15 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
          break;
       }
    }
+
+   // for SubMeshTopologyHandler, only single-component is allowed.
+   num_comp = 1;
+   mesh_types.SetSize(numSub);
+   mesh_types = 0;
+   sub_composition.SetSize(num_comp);
+   sub_composition = numSub;
+   mesh_comp_idx.SetSize(numSub);
+   for (int m = 0; m < numSub; m++) mesh_comp_idx[m] = m;
 
    // Set up element mapping between submeshes and parent mesh.
    parent_elem_map.SetSize(numSub);

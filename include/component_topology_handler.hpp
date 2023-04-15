@@ -101,7 +101,6 @@ protected:
    // Write built ports.
    bool write_ports = false;
 
-   int num_comp;  // number of components.
    // Map from component name to array index.
    std::unordered_map<std::string, int> comp_names;
    // Reference meshes for components.
@@ -118,8 +117,6 @@ protected:
 
    // Meshes for global configuration.
    Array<Mesh*> meshes;
-   // Component index for each block.
-   Array<int> mesh_types;
 
    // Reference ports between components.
    int num_ref_ports = -1;
@@ -144,7 +141,6 @@ public:
    virtual Mesh* GetGlobalMesh()
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
    virtual const int GetNumRefPorts() { return num_ref_ports; }
-   virtual const int GetNumComponents() { return num_comp; }
    virtual PortData* GetPortData(const int r) { return ref_ports[r]; }
    virtual Mesh* GetComponentMesh(const int &c) { return components[c]; }
    virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k) { return ref_interfaces[k]; }

@@ -26,6 +26,13 @@ enum DecompositionMode
    NUM_DDMODE
 };
 
+enum TopologyHandlerMode
+{
+   SUBMESH,
+   COMPONENT,
+   NUM_TOPOL_MODE
+};
+
 // Port information for global configuration.
 struct PortInfo {
    int PortAttr;        // Global boundary attribute.
@@ -55,34 +62,46 @@ class TopologyHandler
 {
 protected:
    int numSub = -1;   // number of subdomains.
+   int num_comp = -1;  // number of components. Submesh - only one component / Component - multiple compoenents allowed, not yet implemented.
+   Array<int> sub_composition;  // number of subdomains per each component index.
 
    // Spatial dimension.
    int dim = -1;
 
    DecompositionMode dd_mode = NUM_DDMODE;
+   TopologyHandlerMode type = NUM_TOPOL_MODE;
+
+   // Component index for each block.
+   // Submesh: allows only one component (0).
+   // Component: multiple components allowed, but not yet implemented.
+   Array<int> mesh_types;
+   Array<int> mesh_comp_idx;  // mesh[m] is (mesh_comp_idx[m])-th mesh of component mesh_types[m].
 
    int num_ports = -1;        // number of ports.
    Array<PortInfo> port_infos;
    Array<Array<InterfaceInfo>*> interface_infos;
 
 public:
-   TopologyHandler();
+   TopologyHandler(const TopologyHandlerMode &input_type);
 
    virtual ~TopologyHandler() {};
 
    // access
+   const TopologyHandlerMode GetType() { return type; }
    const int GetNumSubdomains() { return numSub; }
+   const int GetNumSubdomains(const int &c) { return sub_composition[c]; }
+   const int GetNumComponents() { return num_comp; }
    const int GetNumPorts() { return num_ports; }
-   const PortInfo* GetPortInfo(const int k) { return &(port_infos[k]); }
-   Array<InterfaceInfo>* const GetInterfaceInfos(const int k) { return interface_infos[k]; }
+   const int GetMeshType(const int &m) { return mesh_types[m]; }
+   const int GetComponentIndexOfMesh(const int &m) { return mesh_comp_idx[m]; }
+   const PortInfo* GetPortInfo(const int &k) { return &(port_infos[k]); }
+   Array<InterfaceInfo>* const GetInterfaceInfos(const int &k) { return interface_infos[k]; }
    virtual Mesh* GetMesh(const int k) = 0;
    virtual Mesh* GetGlobalMesh() = 0;
 
    /*
       Methods only for ComponentTopologyHandler 
    */
-   virtual const int GetNumComponents()
-   { mfem_error("TopologyHandler::GetNumComponents is abstract method!\n"); return -1; }
    virtual const int GetNumRefPorts()
    { mfem_error("TopologyHandler::GetNumRefPorts is abstract method!\n"); return -1; }
    virtual Mesh* GetComponentMesh(const int &c)

@@ -16,6 +16,7 @@
 #include "linalg/BasisGenerator.h"
 #include "linalg/BasisReader.h"
 #include "mfem/Utilities.hpp"
+#include "topology_handler.hpp"
 
 namespace mfem
 {
@@ -69,6 +70,9 @@ protected:
    std::string operator_prefix;
    std::string rom_elem_prefix;
 
+   // topology handler
+   TopologyHandler *topol_handler = NULL;
+
    // rom variables.
    // TODO: need Array<int> for multi-component basis.
    int num_basis;    // number of columns in a basis set
@@ -93,7 +97,7 @@ protected:
    bool incremental = false;
 
 public:
-   ROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
+   ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
 
    virtual ~ROMHandler() {};
 
@@ -130,8 +134,7 @@ public:
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
 
-   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
-   { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
+   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
@@ -150,7 +153,7 @@ protected:
    mfem::BlockVector *reduced_rhs;
 
 public:
-   MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
+   MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler() {};
 
