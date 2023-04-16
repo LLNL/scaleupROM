@@ -111,6 +111,7 @@ public:
 
    // access
    const int GetNumSubdomains() { return numSub; }
+   const ROMHandlerMode GetMode() { return mode; }
    const TrainMode GetTrainMode() { return train_mode; }
    // TODO: multi-component case
    const int GetNumBasis(const int &basis_idx) { return num_basis; }

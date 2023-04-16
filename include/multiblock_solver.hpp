@@ -164,8 +164,12 @@ public:
    void InitVariables();
 
    void BuildOperators();
+   void BuildRHSOperators();
+   void BuildDomainOperators();
    // TODO: support non-homogeneous Neumann condition.
    void SetupBCOperators();
+   void SetupRHSBCOperators();
+   void SetupDomainBCOperators();
 
    void AddRHSFunction(std::function<double(const Vector &)> F)
    { rhs_coeffs.Append(new FunctionCoefficient(F)); }

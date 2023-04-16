@@ -273,10 +273,16 @@ void MultiBlockSolver::InitVariables()
 
 void MultiBlockSolver::BuildOperators()
 {
+   BuildRHSOperators();
+
+   BuildDomainOperators();
+}
+
+void MultiBlockSolver::BuildRHSOperators()
+{
    SanityCheckOnCoeffs();
 
    bs.SetSize(numSub);
-   as.SetSize(numSub);
 
    // These are heavily system-dependent.
    // Based on scalar/vector system, different integrators/coefficients will be used.
@@ -285,7 +291,17 @@ void MultiBlockSolver::BuildOperators()
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
       for (int r = 0; r < rhs_coeffs.Size(); r++)
          bs[m]->AddDomainIntegrator(new DomainLFIntegrator(*rhs_coeffs[r]));
+   }
+}
 
+void MultiBlockSolver::BuildDomainOperators()
+{
+   SanityCheckOnCoeffs();
+
+   as.SetSize(numSub);
+
+   for (int m = 0; m < numSub; m++)
+   {
       as[m] = new BilinearForm(fes[m]);
       as[m]->AddDomainIntegrator(new DiffusionIntegrator);
       if (full_dg)
@@ -297,14 +313,20 @@ void MultiBlockSolver::BuildOperators()
 
 void MultiBlockSolver::SetupBCOperators()
 {
+   SetupRHSBCOperators();
+
+   SetupDomainBCOperators();
+}
+
+void MultiBlockSolver::SetupRHSBCOperators()
+{
    SanityCheckOnCoeffs();
 
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
-   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
    for (int m = 0; m < numSub; m++)
    {
-      MFEM_ASSERT(as[m] && bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
+      MFEM_ASSERT(bs[m], "LinearForm pointer of a subdomain is not associated!\n");
       for (int b = 0; b < global_bdr_attributes.Size(); b++) 
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
@@ -312,6 +334,25 @@ void MultiBlockSolver::SetupBCOperators()
          if (bdr_coeffs[b] == NULL) continue;
 
          bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
+      }
+   }
+}
+
+void MultiBlockSolver::SetupDomainBCOperators()
+{
+   SanityCheckOnCoeffs();
+
+   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
+
+   for (int m = 0; m < numSub; m++)
+   {
+      MFEM_ASSERT(as[m], "BilinearForm pointer of a subdomain is not associated!\n");
+      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0) continue;
+         if (bdr_coeffs[b] == NULL) continue;
+
          as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), *bdr_markers[b]);
       }
    }

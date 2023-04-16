@@ -192,6 +192,7 @@ double SingleRun()
    test->InitVariables();
    test->InitVisualization();
 
+   StopWatch solveTimer;
    std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
 
    std::string problem_name = problem->GetProblemName();
@@ -210,10 +211,11 @@ double SingleRun()
    problem->SetParameterizedProblem(test);
 
    // TODO: there are skippable operations depending on rom/fom mode.
-   test->BuildOperators();
-   test->SetupBCOperators();
+   test->BuildRHSOperators();
+   test->SetupRHSBCOperators();
    test->AssembleRHS();
 
+   solveTimer.Start();
    if (test->UseRom())
    {
       printf("ROM with ");
@@ -236,6 +238,8 @@ double SingleRun()
                case ROMBuildingLevel::NONE:
                {
                   printf("building operator file all the way from FOM.. ");
+                  test->BuildDomainOperators();
+                  test->SetupDomainBCOperators();
                   test->AssembleOperator();
                   test->ProjectOperatorOnReducedBasis();
                   break;
@@ -272,6 +276,8 @@ double SingleRun()
                case ROMBuildingLevel::NONE:
                {
                   printf("building operator file all the way from FOM.. ");
+                  test->BuildDomainOperators();
+                  test->SetupDomainBCOperators();
                   test->AssembleOperator();
                   test->ProjectOperatorOnReducedBasis();
                   break;
@@ -289,10 +295,14 @@ double SingleRun()
    }  // if (test->UseRom())
    else
    {
+      test->BuildDomainOperators();
+      test->SetupDomainBCOperators();
       test->AssembleOperator();
-   }  // if not (test->UseRom())
+   }  // not if (test->UseRom())
+   solveTimer.Stop();
+   printf("%s-assemble time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
-   StopWatch solveTimer;
+   solveTimer.Clear();
    solveTimer.Start();
    if (test->UseRom())
    {
@@ -313,7 +323,14 @@ double SingleRun()
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
    if (test->UseRom() && compare_sol)
    {
+      solveTimer.Clear();
+      solveTimer.Start();
+      test->BuildDomainOperators();
+      test->SetupDomainBCOperators();
       test->AssembleOperator();
+      solveTimer.Stop();
+      printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+
       error = test->CompareSolution();
    }
    
