@@ -354,7 +354,7 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mat
    romMat_inv->inverse();
 
    operator_loaded = true;
-   if (save_operator) romMat_inv->write(operator_prefix);
+   if (save_operator == ROMBuildingLevel::GLOBAL) romMat_inv->write(operator_prefix);
 }
 
 void ROMHandler::SetBlockSizes()
@@ -433,7 +433,7 @@ void ROMHandler::Solve(BlockVector* U)
 
 void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 {
-   assert(save_operator);
+   assert(save_operator == ROMBuildingLevel::GLOBAL);
 
    std::string prefix;
    if (input_prefix == "")
@@ -594,7 +594,7 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> 
    romMat->Finalize();
    operator_loaded = true;
 
-   if (save_operator)
+   if (save_operator == ROMBuildingLevel::GLOBAL)
    {
       std::string filename = operator_prefix + ".h5";
       WriteSparseMatrixToHDF(romMat, filename);
@@ -720,7 +720,7 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, c
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 {
-   assert(save_operator);
+   assert(save_operator == ROMBuildingLevel::GLOBAL);
    
    std::string filename;
    if (input_prefix == "")
@@ -731,20 +731,6 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 
    romMat = ReadSparseMatrixFromHDF(filename);
    operator_loaded = true;
-// {
-//    DenseMatrix tmp;
-//    romMat->ToDenseMatrix(tmp);
-//    printf("RomMat\n");
-//    for (int i = 0 ; i < tmp.NumRows(); i++)
-//    {
-//       for (int j = 0 ; j < tmp.NumCols(); j++)
-//       {
-//          printf("%.3E\t", tmp(i, j));
-//       }
-//       printf("\n");
-//    }
-//    printf("\n");
-// }
 }
 
 void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
@@ -752,20 +738,6 @@ void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
    delete romMat;
    romMat = input_mat;
    operator_loaded = true;
-// {
-//    DenseMatrix tmp;
-//    romMat->ToDenseMatrix(tmp);
-//    printf("RomMat\n");
-//    for (int i = 0 ; i < tmp.NumRows(); i++)
-//    {
-//       for (int j = 0 ; j < tmp.NumCols(); j++)
-//       {
-//          printf("%.3E\t", tmp(i, j));
-//       }
-//       printf("\n");
-//    }
-//    printf("\n");
-// }
 }
 
 void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)

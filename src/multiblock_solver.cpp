@@ -555,6 +555,9 @@ void MultiBlockSolver::BuildROMElements()
          Mesh *comp1 = topol_handler->GetComponentMesh(c1);
          Mesh *comp2 = topol_handler->GetComponentMesh(c2);
 
+         Mesh mesh1(*comp1);
+         Mesh mesh2(*comp2);
+
          Array<int> c_idx(2);
          c_idx[0] = c1;
          c_idx[1] = c2;
@@ -565,7 +568,9 @@ void MultiBlockSolver::BuildROMElements()
 
          Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
 
-         AssembleInterfaceMatrix(comp1, comp2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
+         // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+         // Need to use two copied instances.
+         AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
 
          for (int i = 0; i < 2; i++)
             for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();
