@@ -36,6 +36,14 @@ enum TrainMode
    NUM_TRAINMODE
 };
 
+enum ROMBuildingLevel
+{
+   NONE,
+   COMPONENT,
+   GLOBAL,
+   NUM_BLD_LVL
+};
+
 // enum ProjectionMode
 // {
 //    GALERKIN,
@@ -47,18 +55,18 @@ class ROMHandler
 {
 protected:
 // public:
-   int numSub;          // number of subdomains.
-   int udim;            // solution dimension.
-   int num_basis_sets;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
+   int numSub = -1;          // number of subdomains.
+   int udim = -1;            // solution dimension.
+   int num_basis_sets = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
    Array<int> fom_num_vdofs;
 
    // rom options.
-   bool save_operator = false;
    bool save_sv = false;
    bool save_basis_visual = false;
    bool component_sampling = false;
    bool save_lspg_basis = false;
    bool basis_file_exists = false;
+   ROMBuildingLevel save_operator = NUM_BLD_LVL;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
    // ProjectionMode proj_mode = NUM_PROJMODE;
@@ -68,7 +76,6 @@ protected:
    std::string sample_prefix;
    std::string basis_prefix;
    std::string operator_prefix;
-   std::string rom_elem_prefix;
 
    // topology handler
    TopologyHandler *topol_handler = NULL;
@@ -96,6 +103,7 @@ protected:
    bool update_right_SV = false;
    bool incremental = false;
 
+   void ParseInputs();
 public:
    ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
 
@@ -104,12 +112,13 @@ public:
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
+   // TODO: multi-component case
+   const int GetNumBasis(const int &basis_idx) { return num_basis; }
    const bool UseExistingBasis() { return basis_file_exists; }
-   const bool SaveOperator() { return save_operator; }
+   const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
-   virtual const std::string GetROMElementPrefix()
-   { mfem_error("ROMHandler::GetROMElementPrefix is not supported!\n"); return rom_elem_prefix; }
+   const std::string GetOperatorPrefix() { return operator_prefix; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
@@ -133,6 +142,8 @@ public:
    { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(const int &, const int &, SparseMatrix *) is not supported!\n"); }
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
+   virtual void LoadOperator(SparseMatrix *input_mat)
+   { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
 
    const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
 
@@ -155,9 +166,7 @@ protected:
 public:
    MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
 
-   virtual ~MFEMROMHandler() {};
-
-   virtual const std::string GetROMElementPrefix() { return rom_elem_prefix; }
+   virtual ~MFEMROMHandler() {}; 
    
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);
@@ -175,6 +184,7 @@ public:
    virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
+   virtual void LoadOperator(SparseMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes);
 };

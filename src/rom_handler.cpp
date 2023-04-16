@@ -32,6 +32,16 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, cons
 {
    assert(fom_num_vdofs.Size() == (numSub));
 
+   ParseInputs();
+
+   AllocROMMat();
+}
+
+void ROMHandler::ParseInputs()
+{
+   assert(numSub > 0);
+   assert(topol_handler != NULL);
+
    std::string mode_str = config.GetOption<std::string>("main/mode", "");
    if (mode_str == "single_run")
    {
@@ -63,11 +73,27 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, cons
    basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
    basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
 
-   save_operator = config.GetOption<bool>("model_reduction/save_operator/enabled", false);
-   if (save_operator)
+   std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
+   if (save_op_str == "none")
+   {
+      save_operator = ROMBuildingLevel::NONE;
+   }
+   else
+   {
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
-   // TODO: assemble on the fly if not save_operator.
-//   assert(save_operator);
+      if (save_op_str == "global")
+      {
+         save_operator = ROMBuildingLevel::GLOBAL;
+      }
+      else if (save_op_str == "component")
+      {
+         save_operator = ROMBuildingLevel::COMPONENT;
+      }
+      else
+      {
+         mfem_error("Unknown ROM building level!\n");
+      }
+   }
 
    std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
    if (train_mode_str == "individual")
@@ -85,9 +111,9 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, cons
       mfem_error("Unknown subdomain training mode!\n");
    }
 
-   component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
-   if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
-      mfem_error("Component sampling is only supported with universal basis!\n");
+   // component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
+   // if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
+   //    mfem_error("Component sampling is only supported with universal basis!\n");
 
    // std::string proj_mode_str = config.GetOption<std::string>("model_reduction/projection_type", "lspg");
    // if (proj_mode_str == "galerkin")
@@ -112,8 +138,6 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, cons
    save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
 
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
-
-   AllocROMMat();
 }
 
 void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
@@ -482,8 +506,6 @@ void ROMHandler::SaveSV(const std::string& prefix)
 MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
    : ROMHandler(input_topol, input_udim, input_num_vdofs)
 {
-   rom_elem_prefix = config.GetOption<std::string>("model_reduction/component_wise/rom_element_prefix", "rom_element");
-
    romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
 }
 
@@ -709,6 +731,41 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 
    romMat = ReadSparseMatrixFromHDF(filename);
    operator_loaded = true;
+// {
+//    DenseMatrix tmp;
+//    romMat->ToDenseMatrix(tmp);
+//    printf("RomMat\n");
+//    for (int i = 0 ; i < tmp.NumRows(); i++)
+//    {
+//       for (int j = 0 ; j < tmp.NumCols(); j++)
+//       {
+//          printf("%.3E\t", tmp(i, j));
+//       }
+//       printf("\n");
+//    }
+//    printf("\n");
+// }
+}
+
+void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
+{
+   delete romMat;
+   romMat = input_mat;
+   operator_loaded = true;
+// {
+//    DenseMatrix tmp;
+//    romMat->ToDenseMatrix(tmp);
+//    printf("RomMat\n");
+//    for (int i = 0 ; i < tmp.NumRows(); i++)
+//    {
+//       for (int j = 0 ; j < tmp.NumCols(); j++)
+//       {
+//          printf("%.3E\t", tmp(i, j));
+//       }
+//       printf("\n");
+//    }
+//    printf("\n");
+// }
 }
 
 void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)

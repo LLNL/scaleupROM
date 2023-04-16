@@ -102,6 +102,8 @@ public:
    /*
       Methods only for ComponentTopologyHandler 
    */
+   virtual const int GetPortType(const int &port_idx)
+   { mfem_error("TopologyHandler::GetPortType is abstract method!\n"); return -1; }
    virtual const int GetNumRefPorts()
    { mfem_error("TopologyHandler::GetNumRefPorts is abstract method!\n"); return -1; }
    virtual Mesh* GetComponentMesh(const int &c)
@@ -111,6 +113,8 @@ public:
    { mfem_error("TopologyHandler::GetComponentPair is abstract method!\n"); return; }
    virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k)
    { mfem_error("TopologyHandler::GetRefInterfaceInfos is abstract method!\n"); return NULL; }
+   virtual Array<int>* GetBdrAttrComponentToGlobalMap(const int &m)
+   { mfem_error("TopologyHandler::GetBdrAttrComponentToGlobalMap is abstract method!\n"); return NULL; }
 
    /******/
 

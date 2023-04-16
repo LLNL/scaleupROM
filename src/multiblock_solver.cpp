@@ -28,12 +28,12 @@ MultiBlockSolver::MultiBlockSolver()
    TopologyData topol_data;
    switch (topol_mode)
    {
-      case SUBMESH:
+      case TopologyHandlerMode::SUBMESH:
       {
          topol_handler = new SubMeshTopologyHandler();
          break;
       }
-      case COMPONENT:
+      case TopologyHandlerMode::COMPONENT:
       {
          topol_handler = new ComponentTopologyHandler();
          break;
@@ -127,11 +127,11 @@ void MultiBlockSolver::ParseInputs()
    std::string topol_str = config.GetOption<std::string>("mesh/type", "submesh");
    if (topol_str == "submesh")
    {
-      topol_mode = SUBMESH;
+      topol_mode = TopologyHandlerMode::SUBMESH;
    }
    else if (topol_str == "component-wise")
    {
-      topol_mode = COMPONENT;
+      topol_mode = TopologyHandlerMode::COMPONENT;
    }
    else
    {
@@ -454,7 +454,7 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
 
 void MultiBlockSolver::AllocateROMElements()
 {
-   assert(topol_mode == COMPONENT);
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
@@ -484,7 +484,7 @@ void MultiBlockSolver::AllocateROMElements()
 
 void MultiBlockSolver::BuildROMElements()
 {
-   assert(topol_mode == COMPONENT);
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -584,7 +584,7 @@ void MultiBlockSolver::BuildROMElements()
 
 void MultiBlockSolver::SaveROMElements(const std::string &filename)
 {
-   assert(topol_mode == COMPONENT);
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
@@ -674,7 +674,7 @@ void MultiBlockSolver::SaveROMElements(const std::string &filename)
 
 void MultiBlockSolver::LoadROMElements(const std::string &filename)
 {
-   assert(topol_mode == COMPONENT);
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
@@ -762,6 +762,70 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
    assert(errf >= 0);
 
    return;
+}
+
+void MultiBlockSolver::AssembleROM()
+{
+   // TODO: multi-component case.
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   // TODO: multi_component case.
+   int num_basis = rom_handler->GetNumBasis(0);
+
+   SparseMatrix *romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
+
+   // component domain matrix.
+   for (int m = 0; m < numSub; m++)
+   {
+      int c_type = topol_handler->GetMeshType(m);
+
+      Array<int> vdofs(num_basis);
+      for (int k = 0; k < num_basis; k++) vdofs[k] = k + m * num_basis;
+
+      romMat->AddSubMatrix(vdofs, vdofs, *(comp_mats[c_type]));
+
+      // boundary matrixes of each component.
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+      Array<DenseMatrix *> *bdr_mat = bdr_mats[c_type];
+
+      for (int b = 0; b < bdr_c2g->Size(); b++)
+      {
+         int is_global = global_bdr_attributes.Find((*bdr_c2g)[b]);
+         if (is_global < 0) continue;
+
+         romMat->AddSubMatrix(vdofs, vdofs, *(*bdr_mat)[b]);
+      }
+   }
+
+   // interface matrixes.
+   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   {
+      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
+      const int p_type = topol_handler->GetPortType(p);
+      Array2D<DenseMatrix *> *port_mat = port_mats[p_type];
+
+      const int m1 = pInfo->Mesh1;
+      const int m2 = pInfo->Mesh2;
+
+      Array<int> vdofs1(num_basis), vdofs2(num_basis);
+      for (int k = 0; k < num_basis; k++)
+      {
+         vdofs1[k] = k + m1 * num_basis;
+         vdofs2[k] = k + m2 * num_basis;
+      }
+      Array<Array<int> *> vdofs(2);
+      vdofs[0] = &vdofs1;
+      vdofs[1] = &vdofs2;
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            romMat->AddSubMatrix(*vdofs[i], *vdofs[j], *((*port_mat)(i, j)));
+   }
+
+   romMat->Finalize();
+   rom_handler->LoadOperator(romMat);
 }
 
 void MultiBlockSolver::Solve()

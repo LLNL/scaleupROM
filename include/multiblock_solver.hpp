@@ -188,6 +188,7 @@ public:
    void BuildROMElements();
    void SaveROMElements(const std::string &filename);
    void LoadROMElements(const std::string &filename);
+   void AssembleROM();
 
    void Solve();
 

@@ -46,7 +46,7 @@ model_reduction:
   subdomain_training: individual
   number_of_basis: 3
   save_operator:
-    enabled: true
+    level: global
     prefix: "proj_inv"
   compare_solution: true
   svd:

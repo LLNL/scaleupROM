@@ -141,9 +141,11 @@ public:
    virtual Mesh* GetGlobalMesh()
    { mfem_error("ComponenetTopologyHandler does not support a global mesh!\n"); return NULL; }
    virtual const int GetNumRefPorts() { return num_ref_ports; }
+   virtual const int GetPortType(const int &port_idx) { return port_types[port_idx]; }
    virtual PortData* GetPortData(const int r) { return ref_ports[r]; }
    virtual Mesh* GetComponentMesh(const int &c) { return components[c]; }
    virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k) { return ref_interfaces[k]; }
+   virtual Array<int>* GetBdrAttrComponentToGlobalMap(const int &m) { return bdr_c2g[m]; }
 
    // return component indexes for a reference port (ComponentTopologyHandler only)
    virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2);

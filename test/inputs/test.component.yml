@@ -70,7 +70,7 @@ model_reduction:
   subdomain_training: universal
   number_of_basis: 4
   save_operator:
-    enabled: true
+    level: global
     prefix: "proj_inv"
   compare_solution: true
   svd:

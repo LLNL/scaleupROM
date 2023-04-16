@@ -141,28 +141,43 @@ void BuildROM(MPI_Comm comm)
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
+   ROMBuildingLevel save_operator = rom->SaveOperator();
    switch (topol_mode)
    {
-      case SUBMESH:
+      case TopologyHandlerMode::SUBMESH:
       {
-         test->ProjectOperatorOnReducedBasis();
+         if (save_operator == ROMBuildingLevel::GLOBAL)
+            test->ProjectOperatorOnReducedBasis();
+         else if (save_operator == ROMBuildingLevel::COMPONENT)
+            mfem_error("Unsupported rom building level!\n");
          break;
-      }
-      case COMPONENT:
+      }  // case TopologyHandlerMode::SUBMESH:
+      case TopologyHandlerMode::COMPONENT:
       {
-         test->AllocateROMElements();
-         test->BuildROMElements();
-         std::string filename = rom->GetROMElementPrefix() + ".h5";
-         test->SaveROMElements(filename);
-         test->ProjectOperatorOnReducedBasis();
+         switch (save_operator)
+         {
+            case ROMBuildingLevel::COMPONENT:
+            {
+               test->AllocateROMElements();
+               test->BuildROMElements();
+               std::string filename = rom->GetOperatorPrefix() + ".h5";
+               test->SaveROMElements(filename);
+               break;
+            }
+            case ROMBuildingLevel::GLOBAL:
+            {
+               test->ProjectOperatorOnReducedBasis();
+               break;
+            }
+         }  // switch (save_operator)
          break;
-      }
+      }  // case TopologyHandlerMode::COMPONENT:
       default:
       {
          mfem_error("Unknown TopologyHandler Mode!\n");
          break;
       }
-   }
+   }  // switch (topol_mode)
 
    test->SaveBasisVisualization();
 
@@ -203,45 +218,67 @@ double SingleRun()
    {
       printf("ROM with ");
       ROMHandler *rom = test->GetROMHandler();
+      ROMBuildingLevel save_operator = rom->SaveOperator();
       TopologyHandlerMode topol_mode = test->GetTopologyMode();
       switch (topol_mode)
       {
-         case SUBMESH:
+         case TopologyHandlerMode::SUBMESH:
          {
             printf("SubMesh Topology - ");
-            if (rom->SaveOperator())
+            switch (save_operator)
             {
-               printf("loading operator file.. ");
-               rom->LoadOperatorFromFile();
-            }
-            else
-            {
-               printf("building operator file all the way from FOM.. ");
-               test->AssembleOperator();
-               test->ProjectOperatorOnReducedBasis();
+               case ROMBuildingLevel::GLOBAL:
+               {
+                  printf("loading operator file.. ");
+                  rom->LoadOperatorFromFile();
+                  break;
+               }
+               case ROMBuildingLevel::NONE:
+               {
+                  printf("building operator file all the way from FOM.. ");
+                  test->AssembleOperator();
+                  test->ProjectOperatorOnReducedBasis();
+                  break;
+               }
+               default:
+               {
+                  mfem_error("Unsupported rom building level!\n");
+                  break;
+               }
             }
             break;
-         }  // case SUBMESH:
-         case COMPONENT:
+         }  // case TopologyHandlerMode::SUBMESH:
+         case TopologyHandlerMode::COMPONENT:
          {
             printf("Component-wise Topology - ");
             // TODO: bottom-up assembly.
-            if (rom->SaveOperator())
+            switch (save_operator)
             {
-               printf("loading operator file.. ");
-               test->AllocateROMElements();
-               std::string filename = rom->GetROMElementPrefix() + ".h5";
-               test->LoadROMElements(filename);
-               rom->LoadOperatorFromFile();
-            }
-            else
-            {
-               printf("building operator file all the way from FOM.. ");
-               test->AssembleOperator();
-               test->ProjectOperatorOnReducedBasis();
+               case ROMBuildingLevel::COMPONENT:
+               {
+                  printf("loading component operator file.. ");
+                  test->AllocateROMElements();
+                  std::string filename = rom->GetOperatorPrefix() + ".h5";
+                  test->LoadROMElements(filename);
+                  test->AssembleROM();
+                  break;
+               }
+               case ROMBuildingLevel::GLOBAL:
+               {
+                  printf("loading global operator file.. ");
+                  rom->LoadOperatorFromFile();
+                  break;
+               }
+               case ROMBuildingLevel::NONE:
+               {
+                  printf("building operator file all the way from FOM.. ");
+                  test->AssembleOperator();
+                  test->ProjectOperatorOnReducedBasis();
+                  break;
+               }
             }
             break;
-         }  // case COMPONENT:
+         }  // case TopologyHandlerMode::COMPONENT:
          default:
          {
             mfem_error("Unknown TopologyHandler Mode!\n");
