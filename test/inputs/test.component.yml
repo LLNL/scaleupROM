@@ -70,8 +70,8 @@ model_reduction:
   subdomain_training: universal
   number_of_basis: 4
   save_operator:
-    level: global
-    prefix: "proj_inv"
+    level: component
+    prefix: "test.rom_elem"
   compare_solution: true
   svd:
     save_spectrum: true
