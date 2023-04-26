@@ -575,7 +575,8 @@ void MFEMROMHandler::Solve(BlockVector* U)
    CGSolver *solver = NULL;
    HypreParMatrix *parRomMat = NULL;
    HypreBoomerAMG *M = NULL;
-   GSSmoother *gsM = NULL;
+   BlockDiagonalPreconditioner *bdM = NULL;
+   Array<DenseMatrix*> diag_inv;
 
    if (use_amg)
    {
@@ -595,8 +596,21 @@ void MFEMROMHandler::Solve(BlockVector* U)
    else
    {
       solver = new CGSolver();
-      gsM = new GSSmoother(*romMat);
-      solver->SetPreconditioner(*gsM);
+      bdM = new BlockDiagonalPreconditioner(rom_block_offsets);
+      diag_inv.SetSize(numSub);
+      for (int m = 0; m < numSub; m++)
+      {
+         Array<int> idx(rom_block_offsets[m+1] - rom_block_offsets[m]);
+         int offset = rom_block_offsets[m];
+         for (int k = rom_block_offsets[m]; k < rom_block_offsets[m+1]; k++)
+            idx[k - offset] = k;
+
+         diag_inv[m] = new DenseMatrix;
+         romMat->GetSubMatrix(idx, idx, *diag_inv[m]);
+         diag_inv[m]->Invert();
+         bdM->SetDiagonalBlock(m, diag_inv[m]);
+      }
+      solver->SetPreconditioner(*bdM);
 
       solver->SetOperator(*romMat);
    }
@@ -632,7 +646,9 @@ void MFEMROMHandler::Solve(BlockVector* U)
    }
    else
    {
-      delete gsM;
+      delete bdM;
+      for (int m = 0; m < numSub; m++)
+         delete diag_inv[m];
    }
    delete solver;
 }
