@@ -586,18 +586,19 @@ void MFEMROMHandler::Solve(BlockVector* U)
       HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
       
       parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat);
-
-      solver->SetOperator(*parRomMat);
       M = new HypreBoomerAMG(*parRomMat);
       M->SetPrintLevel(print_level);
       solver->SetPreconditioner(*M);
+
+      solver->SetOperator(*parRomMat);
    }
    else
    {
       solver = new CGSolver();
-      solver->SetOperator(*romMat);
       gsM = new GSSmoother(*romMat);
       solver->SetPreconditioner(*gsM);
+
+      solver->SetOperator(*romMat);
    }
    
    solver->SetAbsTol(atol);

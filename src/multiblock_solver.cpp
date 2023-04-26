@@ -428,21 +428,22 @@ void MultiBlockSolver::Solve()
       HYPRE_BigInt row_starts[2] = {0, block_offsets.Last()};
       
       parGlobalMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, globalMat_mono);
-
-      solver->SetOperator(*parGlobalMat);
       M = new HypreBoomerAMG(*parGlobalMat);
       M->SetPrintLevel(print_level);
       solver->SetPreconditioner(*M);
+
+      solver->SetOperator(*parGlobalMat);
    }
    else
    {
       solver = new CGSolver();
-      solver->SetOperator(*globalMat);
+      
       if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
       {
          globalPrec = new BlockDiagonalPreconditioner(domain_offsets);
          solver->SetPreconditioner(*globalPrec);
       }
+      solver->SetOperator(*globalMat);
    }
    solver->SetAbsTol(atol);
    solver->SetRelTol(rtol);
