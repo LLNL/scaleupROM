@@ -600,12 +600,13 @@ void MFEMROMHandler::Solve(BlockVector* U)
       diag_inv.SetSize(numSub);
       for (int m = 0; m < numSub; m++)
       {
-         Array<int> idx(rom_block_offsets[m+1] - rom_block_offsets[m]);
+         int size = rom_block_offsets[m+1] - rom_block_offsets[m];
          int offset = rom_block_offsets[m];
+         Array<int> idx(size);
          for (int k = rom_block_offsets[m]; k < rom_block_offsets[m+1]; k++)
             idx[k - offset] = k;
 
-         diag_inv[m] = new DenseMatrix;
+         diag_inv[m] = new DenseMatrix(size);
          romMat->GetSubMatrix(idx, idx, *diag_inv[m]);
          diag_inv[m]->Invert();
          bdM->SetDiagonalBlock(m, diag_inv[m]);
