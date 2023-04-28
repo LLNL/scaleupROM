@@ -627,7 +627,6 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
 
 void ComponentTopologyHandler::SetupPorts()
 {
-   assert(num_ports > 0);
    assert(port_infos.Size() == num_ports);
    assert(port_types.Size() == num_ports);
 
