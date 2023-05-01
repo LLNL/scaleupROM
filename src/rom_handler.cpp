@@ -633,37 +633,49 @@ void MFEMROMHandler::Solve(BlockVector* U)
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
-   bool use_amg = config.GetOption<bool>("model_reduction/solver/use_amg",
-                     config.GetOption<bool>("solver/use_amg", true));
+   std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
 
    CGSolver *solver = NULL;
    HypreParMatrix *parRomMat = NULL;
-   HypreBoomerAMG *M = NULL;
-   GSSmoother *gsM = NULL;
+   Solver *M = NULL;    // preconditioner.
+   Operator *K = NULL;  // operator.
+   HypreBoomerAMG *amgM = NULL;
+   // GSSmoother *gsM = NULL;
 
-   if (use_amg)
+   if (prec_str == "amg")
    {
       solver = new CGSolver(MPI_COMM_WORLD);
 
       // TODO: need to change when the actual parallelization is implemented.
       HYPRE_BigInt glob_size = rom_block_offsets.Last();
       HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-      
       parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat);
-      M = new HypreBoomerAMG(*parRomMat);
-      M->SetPrintLevel(print_level);
-      solver->SetPreconditioner(*M);
-
-      solver->SetOperator(*parRomMat);
+      K = parRomMat;
    }
    else
    {
       solver = new CGSolver();
-      gsM = new GSSmoother(*romMat);
-      solver->SetPreconditioner(*gsM);
-
-      solver->SetOperator(*romMat);
+      K = romMat;
    }
+
+   if (prec_str == "amg")
+   {
+      amgM = new HypreBoomerAMG(*parRomMat);
+      amgM->SetPrintLevel(print_level);
+      M = amgM;
+   }
+   else if (prec_str == "gs")
+   {
+      M = new GSSmoother(*romMat);
+   }
+   else if (prec_str != "none")
+   {
+      mfem_error("Unknown preconditioner for ROM!\n");
+   }
+
+   if (prec_str != "none")
+      solver->SetPreconditioner(*M);
+   solver->SetOperator(*K);
    
    solver->SetAbsTol(atol);
    solver->SetRelTol(rtol);
@@ -689,15 +701,9 @@ void MFEMROMHandler::Solve(BlockVector* U)
    }
 
    // delete the created objects.
-   if (use_amg)
-   {
-      delete M;
+   if (prec_str == "amg")
       delete parRomMat;
-   }
-   else
-   {
-      delete gsM;
-   }
+   delete M;
    delete solver;
 }
 

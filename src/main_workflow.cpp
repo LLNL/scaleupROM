@@ -292,6 +292,10 @@ double SingleRun()
          }
       }  // switch (topol_mode)
       printf("Done!\n");
+
+      printf("Projecting RHS to ROM.. ");
+      test->ProjectRHSOnReducedBasis();
+      printf("Done!\n");
    }  // if (test->UseRom())
    else
    {
@@ -306,7 +310,6 @@ double SingleRun()
    solveTimer.Start();
    if (test->UseRom())
    {
-      test->ProjectRHSOnReducedBasis();
       test->SolveROM();
    }
    else
