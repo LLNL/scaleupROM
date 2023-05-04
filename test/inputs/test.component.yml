@@ -5,7 +5,31 @@ main:
 
 mesh:
   filename: meshes/test.2x2.mesh
-  uniform_refinement: 1
+  type: component-wise
+  component-wise:
+    global_config: "meshes/test.global.h5"
+    components:
+      - name: "square"
+        file: "meshes/test.1x1.mesh"
+    ports:
+      - name: "port1"
+        file: "meshes/test.port1.h5"
+        comp1:
+          name: "square"
+          attr: 3
+        comp2:
+          name: "square"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "meshes/test.port2.h5"
+        comp1:
+          name: "square"
+          attr: 2
+        comp2:
+          name: "square"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
 
 domain-decomposition:
   type: interior_penalty
@@ -34,20 +58,20 @@ sample_generation:
     prefix: "poisson0"
   poisson0:
     - parameter_name: k
-      sample_size: 3
-      minimum: 2.0
-      maximum: 3.0
+      sample_size: 1
+      minimum: 2.5
+      maximum: 2.5
 
 model_reduction:
-  rom_handler_type: base
+  rom_handler_type: mfem
   basis:
     prefix: "poisson0"
   # individual/universal
-  subdomain_training: individual
-  number_of_basis: 3
+  subdomain_training: universal
+  number_of_basis: 4
   save_operator:
-    level: global
-    prefix: "proj_inv"
+    level: component
+    prefix: "test.rom_elem"
   compare_solution: true
   svd:
     save_spectrum: true
