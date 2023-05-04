@@ -25,13 +25,6 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
-enum TopologyHandlerMode
-{
-   SUBMESH,
-   COMPONENT,
-   NUM_TOPOL_MODE
-};
-
 class MultiBlockSolver
 {
 
@@ -127,6 +120,12 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
+   // Used for bottom-up building, only with ComponentTopologyHandler.
+   Array<DenseMatrix *> comp_mats;
+   // boundary condition is enforced via forcing term.
+   Array<Array<DenseMatrix *> *> bdr_mats;
+   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
+
 public:
    MultiBlockSolver();
 
@@ -157,6 +156,7 @@ public:
    ROMHandler* GetROMHandler() { return rom_handler; }
    const bool IsVisualizationSaved() { return save_visual; }
    const std::string GetVisualizationPrefix() { return visual_prefix; }
+   const TopologyHandlerMode GetTopologyMode() { return topol_mode; }
 
    void SetupBCVariables();
    void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
@@ -164,8 +164,12 @@ public:
    void InitVariables();
 
    void BuildOperators();
+   void BuildRHSOperators();
+   void BuildDomainOperators();
    // TODO: support non-homogeneous Neumann condition.
    void SetupBCOperators();
+   void SetupRHSBCOperators();
+   void SetupDomainBCOperators();
 
    void AddRHSFunction(std::function<double(const Vector &)> F)
    { rhs_coeffs.Append(new FunctionCoefficient(F)); }
@@ -173,8 +177,22 @@ public:
    { rhs_coeffs.Append(new ConstantCoefficient(F)); }
 
    void Assemble();
+   void AssembleRHS();
+   void AssembleOperator();
    // For bilinear case.
-   void AssembleInterfaceMatrix();
+   void AssembleInterfaceMatrixes();
+   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+                                 FiniteElementSpace *fes1,
+                                 FiniteElementSpace *fes2,
+                                 Array<InterfaceInfo> *interface_infos,
+                                 Array2D<SparseMatrix*> &mats);
+
+   // Component-wise assembly
+   void AllocateROMElements();
+   void BuildROMElements();
+   void SaveROMElements(const std::string &filename);
+   void LoadROMElements(const std::string &filename);
+   void AssembleROM();
 
    void Solve();
 

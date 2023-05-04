@@ -111,11 +111,7 @@ void GenerateSamples(MPI_Comm comm)
 void BuildROM(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
    MultiBlockSolver *test = NULL;
-
-   sample_generator->SetParamSpaceSizes();
-   const int total_samples = sample_generator->GetTotalSampleSize();
 
    test = new MultiBlockSolver();
    if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
@@ -131,19 +127,61 @@ void BuildROM(MPI_Comm comm)
    test->SetupBCOperators();
    test->Assemble();
    
-   test->FormReducedBasis(total_samples);
-   // test->LoadReducedBasis();
-   // TODO: need to be able to save operator matrix.
-   test->ProjectOperatorOnReducedBasis();
-
-   // // TODO: separate unto single run mode.
-   // test->ProjectRHSOnReducedBasis();
-   // test->SolveROM();
+   ROMHandler *rom = test->GetROMHandler();
+   if (!rom->UseExistingBasis())
+   {
+      // TODO: basis for multiple components
+      SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
+      sample_generator->SetParamSpaceSizes();
+      const int total_samples = sample_generator->GetTotalSampleSize();
+      
+      test->FormReducedBasis(total_samples);
+      delete sample_generator;
+   }
+   rom->LoadReducedBasis();
+   
+   TopologyHandlerMode topol_mode = test->GetTopologyMode();
+   ROMBuildingLevel save_operator = rom->SaveOperator();
+   switch (topol_mode)
+   {
+      case TopologyHandlerMode::SUBMESH:
+      {
+         if (save_operator == ROMBuildingLevel::GLOBAL)
+            test->ProjectOperatorOnReducedBasis();
+         else if (save_operator == ROMBuildingLevel::COMPONENT)
+            mfem_error("Unsupported rom building level!\n");
+         break;
+      }  // case TopologyHandlerMode::SUBMESH:
+      case TopologyHandlerMode::COMPONENT:
+      {
+         switch (save_operator)
+         {
+            case ROMBuildingLevel::COMPONENT:
+            {
+               test->AllocateROMElements();
+               test->BuildROMElements();
+               std::string filename = rom->GetOperatorPrefix() + ".h5";
+               test->SaveROMElements(filename);
+               break;
+            }
+            case ROMBuildingLevel::GLOBAL:
+            {
+               test->ProjectOperatorOnReducedBasis();
+               break;
+            }
+         }  // switch (save_operator)
+         break;
+      }  // case TopologyHandlerMode::COMPONENT:
+      default:
+      {
+         mfem_error("Unknown TopologyHandler Mode!\n");
+         break;
+      }
+   }  // switch (topol_mode)
 
    test->SaveBasisVisualization();
 
    delete test;
-   delete sample_generator;
    delete problem;
 }
 
@@ -153,6 +191,9 @@ double SingleRun()
    MultiBlockSolver *test = new MultiBlockSolver();
    test->InitVariables();
    test->InitVisualization();
+
+   StopWatch solveTimer;
+   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
 
    std::string problem_name = problem->GetProblemName();
    std::string param_list_str("single_run/" + problem_name);
@@ -170,19 +211,105 @@ double SingleRun()
    problem->SetParameterizedProblem(test);
 
    // TODO: there are skippable operations depending on rom/fom mode.
-   test->BuildOperators();
-   test->SetupBCOperators();
-   // TODO: skip matrix assembly if use_rom.
-   test->Assemble();
+   test->BuildRHSOperators();
+   test->SetupRHSBCOperators();
+   test->AssembleRHS();
 
-   if (test->UseRom())
-      test->ProjectOperatorOnReducedBasis();
-
-   StopWatch solveTimer;
    solveTimer.Start();
    if (test->UseRom())
    {
+      printf("ROM with ");
+      ROMHandler *rom = test->GetROMHandler();
+      ROMBuildingLevel save_operator = rom->SaveOperator();
+      TopologyHandlerMode topol_mode = test->GetTopologyMode();
+      switch (topol_mode)
+      {
+         case TopologyHandlerMode::SUBMESH:
+         {
+            printf("SubMesh Topology - ");
+            switch (save_operator)
+            {
+               case ROMBuildingLevel::GLOBAL:
+               {
+                  printf("loading operator file.. ");
+                  rom->LoadOperatorFromFile();
+                  break;
+               }
+               case ROMBuildingLevel::NONE:
+               {
+                  printf("building operator file all the way from FOM.. ");
+                  test->BuildDomainOperators();
+                  test->SetupDomainBCOperators();
+                  test->AssembleOperator();
+                  test->ProjectOperatorOnReducedBasis();
+                  break;
+               }
+               default:
+               {
+                  mfem_error("Unsupported rom building level!\n");
+                  break;
+               }
+            }
+            break;
+         }  // case TopologyHandlerMode::SUBMESH:
+         case TopologyHandlerMode::COMPONENT:
+         {
+            printf("Component-wise Topology - ");
+            // TODO: bottom-up assembly.
+            switch (save_operator)
+            {
+               case ROMBuildingLevel::COMPONENT:
+               {
+                  printf("loading component operator file.. ");
+                  test->AllocateROMElements();
+                  std::string filename = rom->GetOperatorPrefix() + ".h5";
+                  test->LoadROMElements(filename);
+                  test->AssembleROM();
+                  break;
+               }
+               case ROMBuildingLevel::GLOBAL:
+               {
+                  printf("loading global operator file.. ");
+                  rom->LoadOperatorFromFile();
+                  break;
+               }
+               case ROMBuildingLevel::NONE:
+               {
+                  printf("building operator file all the way from FOM.. ");
+                  test->BuildDomainOperators();
+                  test->SetupDomainBCOperators();
+                  test->AssembleOperator();
+                  test->ProjectOperatorOnReducedBasis();
+                  break;
+               }
+            }
+            break;
+         }  // case TopologyHandlerMode::COMPONENT:
+         default:
+         {
+            mfem_error("Unknown TopologyHandler Mode!\n");
+            break;
+         }
+      }  // switch (topol_mode)
+      printf("Done!\n");
+
+      printf("Projecting RHS to ROM.. ");
       test->ProjectRHSOnReducedBasis();
+      printf("Done!\n");
+   }  // if (test->UseRom())
+   else
+   {
+      test->BuildDomainOperators();
+      test->SetupDomainBCOperators();
+      test->AssembleOperator();
+   }  // not if (test->UseRom())
+   solveTimer.Stop();
+   printf("%s-assemble time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
+
+   solveTimer.Clear();
+   solveTimer.Start();
+   if (test->UseRom())
+   {
       test->SolveROM();
    }
    else
@@ -191,7 +318,6 @@ double SingleRun()
       test->Solve();
    }
    solveTimer.Stop();
-   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
    printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
    test->SaveVisualization();
@@ -199,7 +325,17 @@ double SingleRun()
    double error = -1.0;
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
    if (test->UseRom() && compare_sol)
+   {
+      solveTimer.Clear();
+      solveTimer.Start();
+      test->BuildDomainOperators();
+      test->SetupDomainBCOperators();
+      test->AssembleOperator();
+      solveTimer.Stop();
+      printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+
       error = test->CompareSolution();
+   }
    
    delete test;
    delete problem;

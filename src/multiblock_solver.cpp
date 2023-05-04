@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "multiblock_solver.hpp"
+#include "hdf5_utils.hpp"
 #include "linalg_utils.hpp"
 #include "component_topology_handler.hpp"
 // #include <cmath>
@@ -27,12 +28,12 @@ MultiBlockSolver::MultiBlockSolver()
    TopologyData topol_data;
    switch (topol_mode)
    {
-      case SUBMESH:
+      case TopologyHandlerMode::SUBMESH:
       {
          topol_handler = new SubMeshTopologyHandler();
          break;
       }
-      case COMPONENT:
+      case TopologyHandlerMode::COMPONENT:
       {
          topol_handler = new ComponentTopologyHandler();
          break;
@@ -64,7 +65,7 @@ MultiBlockSolver::MultiBlockSolver()
    udim = 1;
    fes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
-      fes[m] = new FiniteElementSpace(&(*meshes[m]), fec, udim);
+      fes[m] = new FiniteElementSpace(meshes[m], fec, udim);
    }
 
 }
@@ -97,6 +98,26 @@ MultiBlockSolver::~MultiBlockSolver()
    for (int k = 0; k < rhs_coeffs.Size(); k++)
       delete rhs_coeffs[k];
 
+   for (int c = 0; c < comp_mats.Size(); c++)
+      delete comp_mats[c];
+
+   for (int c = 0; c < bdr_mats.Size(); c++)
+   {
+      for (int b = 0; b < bdr_mats[c]->Size(); b++)
+         delete (*bdr_mats[c])[b];
+
+      delete bdr_mats[c];
+   }
+
+   for (int p = 0; p < port_mats.Size(); p++)
+   {
+      for (int i = 0; i < port_mats[p]->NumRows(); i++)
+         for (int j = 0; j < port_mats[p]->NumCols(); j++)
+            delete (*port_mats[p])(i,j);
+
+      delete port_mats[p];
+   }
+
    delete rom_handler;
    delete topol_handler;
 }
@@ -106,11 +127,11 @@ void MultiBlockSolver::ParseInputs()
    std::string topol_str = config.GetOption<std::string>("mesh/type", "submesh");
    if (topol_str == "submesh")
    {
-      topol_mode = SUBMESH;
+      topol_mode = TopologyHandlerMode::SUBMESH;
    }
    else if (topol_str == "component-wise")
    {
-      topol_mode = COMPONENT;
+      topol_mode = TopologyHandlerMode::COMPONENT;
    }
    else
    {
@@ -165,6 +186,8 @@ void MultiBlockSolver::SetupBCVariables()
       max_bdr_attr = max(max_bdr_attr, meshes[m]->bdr_attributes.Max());
    }
 
+   // TODO: technically this should be Array<Array2D<int>*> for each meshes.
+   // Running with MFEM debug version will lead to error when assembling boundary integrators.
    bdr_markers.SetSize(max_bdr_attr);
    for (int k = 0; k < max_bdr_attr; k++) {
       bdr_markers[k] = new Array<int>(max_bdr_attr);
@@ -250,13 +273,16 @@ void MultiBlockSolver::InitVariables()
 
 void MultiBlockSolver::BuildOperators()
 {
+   BuildRHSOperators();
+
+   BuildDomainOperators();
+}
+
+void MultiBlockSolver::BuildRHSOperators()
+{
    SanityCheckOnCoeffs();
 
    bs.SetSize(numSub);
-   as.SetSize(numSub);
-
-   double sigma = -1.0;
-   double kappa = (order + 1.0) * (order + 1.0);
 
    // These are heavily system-dependent.
    // Based on scalar/vector system, different integrators/coefficients will be used.
@@ -265,7 +291,17 @@ void MultiBlockSolver::BuildOperators()
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
       for (int r = 0; r < rhs_coeffs.Size(); r++)
          bs[m]->AddDomainIntegrator(new DomainLFIntegrator(*rhs_coeffs[r]));
+   }
+}
 
+void MultiBlockSolver::BuildDomainOperators()
+{
+   SanityCheckOnCoeffs();
+
+   as.SetSize(numSub);
+
+   for (int m = 0; m < numSub; m++)
+   {
       as[m] = new BilinearForm(fes[m]);
       as[m]->AddDomainIntegrator(new DiffusionIntegrator);
       if (full_dg)
@@ -277,14 +313,20 @@ void MultiBlockSolver::BuildOperators()
 
 void MultiBlockSolver::SetupBCOperators()
 {
+   SetupRHSBCOperators();
+
+   SetupDomainBCOperators();
+}
+
+void MultiBlockSolver::SetupRHSBCOperators()
+{
    SanityCheckOnCoeffs();
 
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
-   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
    for (int m = 0; m < numSub; m++)
    {
-      MFEM_ASSERT(as[m] && bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
+      MFEM_ASSERT(bs[m], "LinearForm pointer of a subdomain is not associated!\n");
       for (int b = 0; b < global_bdr_attributes.Size(); b++) 
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
@@ -292,6 +334,25 @@ void MultiBlockSolver::SetupBCOperators()
          if (bdr_coeffs[b] == NULL) continue;
 
          bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
+      }
+   }
+}
+
+void MultiBlockSolver::SetupDomainBCOperators()
+{
+   SanityCheckOnCoeffs();
+
+   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
+
+   for (int m = 0; m < numSub; m++)
+   {
+      MFEM_ASSERT(as[m], "BilinearForm pointer of a subdomain is not associated!\n");
+      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0) continue;
+         if (bdr_coeffs[b] == NULL) continue;
+
          as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), *bdr_markers[b]);
       }
    }
@@ -299,16 +360,36 @@ void MultiBlockSolver::SetupBCOperators()
 
 void MultiBlockSolver::Assemble()
 {
+   AssembleRHS();
+   AssembleOperator();
+}
+
+void MultiBlockSolver::AssembleRHS()
+{
    SanityCheckOnCoeffs();
 
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
+
+   for (int m = 0; m < numSub; m++)
+   {
+      MFEM_ASSERT(bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
+      bs[m]->Assemble();
+   }
+
+   for (int m = 0; m < numSub; m++)
+      // Do we really need SyncAliasMemory?
+      bs[m]->SyncAliasMemory(*RHS);  // Synchronize with block vector RHS. What is different from SyncMemory?
+}
+
+void MultiBlockSolver::AssembleOperator()
+{
+   SanityCheckOnCoeffs();
+
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
    for (int m = 0; m < numSub; m++)
    {
-      MFEM_ASSERT(as[m] && bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
-
-      bs[m]->Assemble();
+      MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
       as[m]->Assemble();
    }
 
@@ -324,14 +405,10 @@ void MultiBlockSolver::Assemble()
          }
       }
    }
-   AssembleInterfaceMatrix();
+   AssembleInterfaceMatrixes();
 
    for (int m = 0; m < numSub; m++)
-   {
-      // Do we really need SyncAliasMemory?
-      bs[m]->SyncAliasMemory(*RHS);  // Synchronize with block vector RHS. What is different from SyncMemory?
       as[m]->Finalize();
-   }
 
    // globalMat = new BlockOperator(block_offsets);
    // NOTE: currently, domain-decomposed system will have a significantly different sparsity pattern.
@@ -352,7 +429,7 @@ void MultiBlockSolver::Assemble()
       globalMat_mono = globalMat->CreateMonolithic();
 }
 
-void MultiBlockSolver::AssembleInterfaceMatrix()
+void MultiBlockSolver::AssembleInterfaceMatrixes()
 {
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
@@ -361,45 +438,440 @@ void MultiBlockSolver::AssembleInterfaceMatrix()
       Array<int> midx(2);
       midx[0] = pInfo->Mesh1;
       midx[1] = pInfo->Mesh2;
+      Array2D<SparseMatrix *> mats_p(2,2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++) mats_p(i, j) = mats(midx[i], midx[j]);
+
+      Mesh *mesh1, *mesh2;
+      mesh1 = meshes[midx[0]];
+      mesh2 = meshes[midx[1]];
+
+      FiniteElementSpace *fes1, *fes2;
+      fes1 = fes[midx[0]];
+      fes2 = fes[midx[1]];
 
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      for (int bn = 0; bn < interface_infos->Size(); bn++)
-      {
-         InterfaceInfo *if_info = &((*interface_infos)[bn]);
-         Mesh *mesh1, *mesh2;
-         FiniteElementSpace *fes1, *fes2;
-         Array2D<DenseMatrix*> elemmats;
-         FaceElementTransformations *tr1, *tr2;
-         const FiniteElement *fe1, *fe2;
-         Array<Array<int> *> vdofs(2);
-         vdofs[0] = new Array<int>;
-         vdofs[1] = new Array<int>;
-
-         mesh1 = &(*meshes[midx[0]]);
-         mesh2 = &(*meshes[midx[1]]);
-         fes1 = fes[midx[0]];
-         fes2 = fes[midx[1]];
-
-         topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-
-         if ((tr1 != NULL) && (tr2 != NULL))
-         {
-            fes1->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
-            fes2->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
-            // Both domains will have the adjacent element as Elem1.
-            fe1 = fes1->GetFE(tr1->Elem1No);
-            fe2 = fes2->GetFE(tr2->Elem1No);
-
-            interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
-
-            for (int i = 0; i < 2; i++) {
-               for (int j = 0; j < 2; j++) {
-                  mats(midx[i], midx[j])->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
-               }
-            }
-         }  // if ((tr1 != NULL) && (tr2 != NULL))
-      }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+      AssembleInterfaceMatrix(mesh1, mesh2, fes1, fes2, interface_infos, mats_p);
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+}
+
+void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+                                                FiniteElementSpace *fes1,
+                                                FiniteElementSpace *fes2,
+                                                Array<InterfaceInfo> *interface_infos,
+                                                Array2D<SparseMatrix*> &mats)
+{
+   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   {
+      InterfaceInfo *if_info = &((*interface_infos)[bn]);
+      
+      Array2D<DenseMatrix*> elemmats;
+      FaceElementTransformations *tr1, *tr2;
+      const FiniteElement *fe1, *fe2;
+      Array<Array<int> *> vdofs(2);
+      vdofs[0] = new Array<int>;
+      vdofs[1] = new Array<int>;
+
+      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+
+      if ((tr1 != NULL) && (tr2 != NULL))
+      {
+         fes1->GetElementVDofs(tr1->Elem1No, *vdofs[0]);
+         fes2->GetElementVDofs(tr2->Elem1No, *vdofs[1]);
+         // Both domains will have the adjacent element as Elem1.
+         fe1 = fes1->GetFE(tr1->Elem1No);
+         fe2 = fes2->GetFE(tr2->Elem1No);
+
+         interface_integ->AssembleInterfaceMatrix(*fe1, *fe2, *tr1, *tr2, elemmats);
+
+         for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+               mats(i, j)->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
+            }
+         }
+      }  // if ((tr1 != NULL) && (tr2 != NULL))
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+}
+
+void MultiBlockSolver::AllocateROMElements()
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+
+   comp_mats.SetSize(num_comp);
+   bdr_mats.SetSize(num_comp);
+   for (int c = 0; c < num_comp; c++)
+   {
+      comp_mats[c] = new DenseMatrix();
+
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
+      for (int b = 0; b < bdr_mats[c]->Size(); b++)
+         (*bdr_mats[c])[b] = new DenseMatrix();
+   }
+   port_mats.SetSize(num_ref_ports);
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      port_mats[p] = new Array2D<DenseMatrix *>(2,2);
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++) (*port_mats[p])(i,j) = new DenseMatrix();
+   }
+}
+
+void MultiBlockSolver::BuildROMElements()
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   // Component domain system
+   const int num_comp = topol_handler->GetNumComponents();
+   Array<FiniteElementSpace *> fes_comp(num_comp);
+   fes_comp = NULL;
+   for (int c = 0; c < num_comp; c++) {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      fes_comp[c] = new FiniteElementSpace(comp, fec, udim);
+   }
+
+   {
+      assert(comp_mats.Size() == num_comp);
+      for (int c = 0; c < num_comp; c++)
+      {
+         Mesh *comp = topol_handler->GetComponentMesh(c);
+         BilinearForm a_comp(fes_comp[c]);
+
+         a_comp.AddDomainIntegrator(new DiffusionIntegrator);
+         if (full_dg)
+            a_comp.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
+
+         a_comp.Assemble();
+         a_comp.Finalize();
+
+         rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), comp_mats[c]);
+      }
+   }
+
+   // Boundary penalty matrixes
+   {
+      assert(bdr_mats.Size() == num_comp);
+      for (int c = 0; c < num_comp; c++)
+      {
+         Mesh *comp = topol_handler->GetComponentMesh(c);
+         assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
+         Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
+
+         for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+         {
+            Array<int> bdr_marker(comp->bdr_attributes.Max());
+            bdr_marker = 0;
+            bdr_marker[comp->bdr_attributes[b] - 1] = 1;
+            BilinearForm a_comp(fes_comp[c]);
+            a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
+
+            a_comp.Assemble();
+            a_comp.Finalize();
+
+            rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), (*bdr_mats_c)[b]);
+         }
+      }
+   }
+
+   // Port penalty matrixes
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+   {
+      assert(port_mats.Size() == num_ref_ports);
+      for (int p = 0; p < num_ref_ports; p++)
+      {
+         assert(port_mats[p]->NumRows() == 2);
+         assert(port_mats[p]->NumCols() == 2);
+
+         int c1, c2;
+         topol_handler->GetComponentPair(p, c1, c2);
+         Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+         Mesh *comp2 = topol_handler->GetComponentMesh(c2);
+
+         Mesh mesh1(*comp1);
+         Mesh mesh2(*comp2);
+
+         Array<int> c_idx(2);
+         c_idx[0] = c1;
+         c_idx[1] = c2;
+         Array2D<SparseMatrix *> spmats(2,2);
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+               spmats(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
+
+         Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
+
+         // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+         // Need to use two copied instances.
+         AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
+
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();
+
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+               rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j), (*port_mats[p])(i, j));
+
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++) delete spmats(i, j);
+      }  // for (int p = 0; p < num_ref_ports; p++)
+   }
+
+   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
+}
+
+void MultiBlockSolver::SaveROMElements(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   {  // components + boundary
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      const int num_comp = topol_handler->GetNumComponents();
+      assert(comp_mats.Size() == num_comp);
+      assert(bdr_mats.Size() == num_comp);
+
+      hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
+
+      for (int c = 0; c < num_comp; c++)
+      {
+         hdf5_utils::WriteDataset(grp_id, std::to_string(c), *(comp_mats[c]));
+
+         {  // boundary
+            hid_t bdr_grp_id;
+            bdr_grp_id = H5Gcreate(grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            assert(bdr_grp_id >= 0);
+
+            const int num_bdr = bdr_mats[c]->Size();
+            Mesh *comp = topol_handler->GetComponentMesh(c);
+            assert(num_bdr == comp->bdr_attributes.Size());
+
+            hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
+            
+            Array<DenseMatrix *> *bdr_mat_c = bdr_mats[c];
+            for (int b = 0; b < num_bdr; b++)
+               hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
+
+            errf = H5Gclose(bdr_grp_id);
+            assert(errf >= 0);
+         }
+      }  // for (int c = 0; c < num_comp; c++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   {  // (reference) ports
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, "ports", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      const int num_ref_ports = topol_handler->GetNumRefPorts();
+      assert(port_mats.Size() == num_ref_ports);
+
+      hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
+      
+      for (int p = 0; p < num_ref_ports; p++)
+      {
+         assert(port_mats[p]->NumRows() == 2);
+         assert(port_mats[p]->NumCols() == 2);
+
+         hid_t port_grp_id;
+         port_grp_id = H5Gcreate(grp_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+         assert(port_grp_id >= 0);
+
+         Array2D<DenseMatrix *> *port_mat = port_mats[p];
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+            {
+               std::string dset_name = std::to_string(i) + std::to_string(j);
+               hdf5_utils::WriteDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
+            }
+         
+         errf = H5Gclose(port_grp_id);
+         assert(errf >= 0);
+      }  // for (int p = 0; p < num_ref_ports; p++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
+}
+
+void MultiBlockSolver::LoadROMElements(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   {  // components
+      hid_t grp_id;
+      grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      int num_comp;
+      hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
+      assert(num_comp == topol_handler->GetNumComponents());
+      assert(comp_mats.Size() == num_comp);
+      assert(bdr_mats.Size() == num_comp);
+
+      for (int c = 0; c < num_comp; c++)
+      {
+         hdf5_utils::ReadDataset(grp_id, std::to_string(c), *(comp_mats[c]));
+
+         {  // boundary
+            hid_t bdr_grp_id;
+            bdr_grp_id = H5Gopen2(grp_id, "boundary", H5P_DEFAULT);
+            assert(bdr_grp_id >= 0);
+
+            int num_bdr;
+            hdf5_utils::ReadAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
+
+            Mesh *comp = topol_handler->GetComponentMesh(c);
+            assert(num_bdr == comp->bdr_attributes.Size());
+            assert(num_bdr = bdr_mats[c]->Size());
+
+            Array<DenseMatrix *> *bdr_mat_c = bdr_mats[c];
+            for (int b = 0; b < num_bdr; b++)
+               hdf5_utils::ReadDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
+
+            errf = H5Gclose(bdr_grp_id);
+            assert(errf >= 0);
+         }
+      }  // for (int c = 0; c < num_comp; c++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   {  // (reference) ports
+      hid_t grp_id;
+      grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      int num_ref_ports;
+      hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
+      assert(num_ref_ports == topol_handler->GetNumRefPorts());
+      assert(port_mats.Size() == num_ref_ports);
+
+      for (int p = 0; p < num_ref_ports; p++)
+      {
+         assert(port_mats[p]->NumRows() == 2);
+         assert(port_mats[p]->NumCols() == 2);
+
+         hid_t port_grp_id;
+         port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
+         assert(port_grp_id >= 0);
+
+         Array2D<DenseMatrix *> *port_mat = port_mats[p];
+         for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+            {
+               std::string dset_name = std::to_string(i) + std::to_string(j);
+               hdf5_utils::ReadDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
+            }
+         
+         errf = H5Gclose(port_grp_id);
+         assert(errf >= 0);
+      }  // for (int p = 0; p < num_ref_ports; p++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
+   return;
+}
+
+void MultiBlockSolver::AssembleROM()
+{
+   // TODO: multi-component case.
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   // TODO: multi_component case.
+   int num_basis = rom_handler->GetNumBasis(0);
+
+   SparseMatrix *romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
+
+   // component domain matrix.
+   for (int m = 0; m < numSub; m++)
+   {
+      int c_type = topol_handler->GetMeshType(m);
+
+      Array<int> vdofs(num_basis);
+      for (int k = 0; k < num_basis; k++) vdofs[k] = k + m * num_basis;
+
+      romMat->AddSubMatrix(vdofs, vdofs, *(comp_mats[c_type]));
+
+      // boundary matrixes of each component.
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+      Array<DenseMatrix *> *bdr_mat = bdr_mats[c_type];
+
+      for (int b = 0; b < bdr_c2g->Size(); b++)
+      {
+         int is_global = global_bdr_attributes.Find((*bdr_c2g)[b]);
+         if (is_global < 0) continue;
+
+         romMat->AddSubMatrix(vdofs, vdofs, *(*bdr_mat)[b]);
+      }
+   }
+
+   // interface matrixes.
+   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   {
+      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
+      const int p_type = topol_handler->GetPortType(p);
+      Array2D<DenseMatrix *> *port_mat = port_mats[p_type];
+
+      const int m1 = pInfo->Mesh1;
+      const int m2 = pInfo->Mesh2;
+
+      Array<int> vdofs1(num_basis), vdofs2(num_basis);
+      for (int k = 0; k < num_basis; k++)
+      {
+         vdofs1[k] = k + m1 * num_basis;
+         vdofs2[k] = k + m2 * num_basis;
+      }
+      Array<Array<int> *> vdofs(2);
+      vdofs[0] = &vdofs1;
+      vdofs[1] = &vdofs2;
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            romMat->AddSubMatrix(*vdofs[i], *vdofs[j], *((*port_mat)(i, j)));
+   }
+
+   romMat->Finalize();
+   rom_handler->LoadOperator(romMat);
 }
 
 void MultiBlockSolver::Solve()
@@ -428,21 +900,22 @@ void MultiBlockSolver::Solve()
       HYPRE_BigInt row_starts[2] = {0, block_offsets.Last()};
       
       parGlobalMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, globalMat_mono);
-
-      solver->SetOperator(*parGlobalMat);
       M = new HypreBoomerAMG(*parGlobalMat);
       M->SetPrintLevel(print_level);
       solver->SetPreconditioner(*M);
+
+      solver->SetOperator(*parGlobalMat);
    }
    else
    {
       solver = new CGSolver();
-      solver->SetOperator(*globalMat);
+      
       if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
       {
          globalPrec = new BlockDiagonalPreconditioner(domain_offsets);
          solver->SetPreconditioner(*globalPrec);
       }
+      solver->SetOperator(*globalMat);
    }
    solver->SetAbsTol(atol);
    solver->SetRelTol(rtol);
@@ -552,11 +1025,11 @@ void MultiBlockSolver::InitROMHandler()
 
    if (rom_handler_str == "base")
    {
-      rom_handler = new ROMHandler(numSub, udim, num_vdofs);
+      rom_handler = new ROMHandler(topol_handler, udim, num_vdofs);
    }
    else if (rom_handler_str == "mfem")
    {
-      rom_handler = new MFEMROMHandler(numSub, udim, num_vdofs);
+      rom_handler = new MFEMROMHandler(topol_handler, udim, num_vdofs);
    }
    else
    {

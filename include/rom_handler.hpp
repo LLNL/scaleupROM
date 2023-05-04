@@ -16,6 +16,7 @@
 #include "linalg/BasisGenerator.h"
 #include "linalg/BasisReader.h"
 #include "mfem/Utilities.hpp"
+#include "topology_handler.hpp"
 
 namespace mfem
 {
@@ -35,6 +36,14 @@ enum TrainMode
    NUM_TRAINMODE
 };
 
+enum ROMBuildingLevel
+{
+   NONE,
+   COMPONENT,
+   GLOBAL,
+   NUM_BLD_LVL
+};
+
 // enum ProjectionMode
 // {
 //    GALERKIN,
@@ -46,17 +55,18 @@ class ROMHandler
 {
 protected:
 // public:
-   int numSub;          // number of subdomains.
-   int udim;            // solution dimension.
-   int num_basis_sets;  // number of the basis sets.
+   int numSub = -1;          // number of subdomains.
+   int udim = -1;            // solution dimension.
+   int num_basis_sets = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
    Array<int> fom_num_vdofs;
 
    // rom options.
-   bool save_operator = false;
    bool save_sv = false;
    bool save_basis_visual = false;
    bool component_sampling = false;
    bool save_lspg_basis = false;
+   bool basis_file_exists = false;
+   ROMBuildingLevel save_operator = NUM_BLD_LVL;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
    // ProjectionMode proj_mode = NUM_PROJMODE;
@@ -66,6 +76,9 @@ protected:
    std::string sample_prefix;
    std::string basis_prefix;
    std::string operator_prefix;
+
+   // topology handler
+   TopologyHandler *topol_handler = NULL;
 
    // rom variables.
    // TODO: need Array<int> for multi-component basis.
@@ -90,14 +103,23 @@ protected:
    bool update_right_SV = false;
    bool incremental = false;
 
+   void ParseInputs();
 public:
-   ROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
+   ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
 
    virtual ~ROMHandler() {};
 
    // access
    const int GetNumSubdomains() { return numSub; }
+   const ROMHandlerMode GetMode() { return mode; }
    const TrainMode GetTrainMode() { return train_mode; }
+   // TODO: multi-component case
+   const int GetNumBasis(const int &basis_idx) { return num_basis; }
+   const bool UseExistingBasis() { return basis_file_exists; }
+   const ROMBuildingLevel SaveOperator() { return save_operator; }
+   const bool BasisLoaded() { return basis_loaded; }
+   const bool OperatorLoaded() { return operator_loaded; }
+   const std::string GetOperatorPrefix() { return operator_prefix; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
@@ -107,7 +129,7 @@ public:
    virtual void FormReducedBasisIndividual(const int &total_samples);
 
    virtual void LoadReducedBasis();
-   virtual void GetReducedBasis(const int &subdomain_index, const CAROM::Matrix* &basis);
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
@@ -116,8 +138,15 @@ public:
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
 
-   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
-   { return sample_dir + "/" + sample_prefix + "_sample" + std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx); }
+   // P_i^T * mat * P_j
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat)
+   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(const int &, const int &, SparseMatrix *) is not supported!\n"); }
+
+   virtual void LoadOperatorFromFile(const std::string input_prefix="");
+   virtual void LoadOperator(SparseMatrix *input_mat)
+   { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
+
+   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
@@ -136,20 +165,27 @@ protected:
    mfem::BlockVector *reduced_rhs;
 
 public:
-   MFEMROMHandler(const int &input_numSub, const int &input_udim, const Array<int> &input_num_vdofs);
+   MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
 
-   virtual ~MFEMROMHandler() {};
+   virtual ~MFEMROMHandler() {}; 
    
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   virtual void GetReducedBasis(const int &subdomain_index, DenseMatrix* &basis);
+   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis);
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
    // virtual void AllocROMMat() override;  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
+   
+   // P_i^T * mat * P_j
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat);
+
+   virtual void LoadOperatorFromFile(const std::string input_prefix="");
+   virtual void LoadOperator(SparseMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes);
 };
