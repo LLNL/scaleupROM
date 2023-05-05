@@ -28,7 +28,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 
 TEST(DDSerialTest, Test_convergence)
 {
-   config = InputParser("inputs/dd_mms.yml");
+   config = ScaleUpInputParser("inputs/dd_mms.yml");
    CheckConvergence();
 
    return;
@@ -36,7 +36,7 @@ TEST(DDSerialTest, Test_convergence)
 
 TEST(DDSerial_component_wise_test, Test_convergence)
 {
-   config = InputParser("inputs/dd_mms.component.yml");
+   config = ScaleUpInputParser("inputs/dd_mms.component.yml");
    CheckConvergence();
 
    return;
@@ -44,7 +44,7 @@ TEST(DDSerial_component_wise_test, Test_convergence)
 
 TEST(DDSerial_component_3D_hex_test, Test_convergence)
 {
-   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   config = ScaleUpInputParser("inputs/dd_mms.comp.3d.yml");
    CheckConvergence();
 
    return;
@@ -52,7 +52,7 @@ TEST(DDSerial_component_3D_hex_test, Test_convergence)
 
 TEST(DDSerial_component_3D_tet_test, Test_convergence)
 {
-   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   config = ScaleUpInputParser("inputs/dd_mms.comp.3d.yml");
    config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "meshes/dd_mms.3d.tet.mesh";
    CheckConvergence();
 

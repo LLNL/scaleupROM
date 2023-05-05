@@ -17,7 +17,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 
 TEST(Consistency2D_test, Test_topol)
 {
-   config = InputParser("inputs/test_topol.2d.yml");
+   config = ScaleUpInputParser("inputs/test_topol.2d.yml");
 
    CompareWithSubMesh();
    return;
@@ -25,7 +25,7 @@ TEST(Consistency2D_test, Test_topol)
 
 TEST(Consistency3D_hex_test, Test_topol)
 {
-   config = InputParser("inputs/test_topol.3d.yml");
+   config = ScaleUpInputParser("inputs/test_topol.3d.yml");
 
    CompareWithSubMesh();
    return;
@@ -33,7 +33,7 @@ TEST(Consistency3D_hex_test, Test_topol)
 
 TEST(Consistency3D_tet_test, Test_topol)
 {
-   config = InputParser("inputs/test_topol.3d.yml");
+   config = ScaleUpInputParser("inputs/test_topol.3d.yml");
    config.dict_["mesh"]["filename"] = "meshes/test.2x2x2.tet.mesh";
    config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "meshes/test.1x1x1.tet.mesh";
 
@@ -56,7 +56,7 @@ TEST(Consistency3D_tet_test, Test_topol)
 
 TEST(PortReadWrite_test, Test_topol)
 {
-   config = InputParser("inputs/test_topol.3d.yml");
+   config = ScaleUpInputParser("inputs/test_topol.3d.yml");
    config.dict_["mesh"]["component-wise"]["write_ports"] = true;
 
    printf("Generate\n");

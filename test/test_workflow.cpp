@@ -16,7 +16,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 
 TEST(BaseIndividualTest, Test_Workflow)
 {
-   config = InputParser("inputs/test.base.yml");
+   config = ScaleUpInputParser("inputs/test.base.yml");
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -36,7 +36,7 @@ TEST(BaseIndividualTest, Test_Workflow)
 
 TEST(BaseUniversalTest, Test_Workflow)
 {
-   config = InputParser("inputs/test.base.yml");
+   config = ScaleUpInputParser("inputs/test.base.yml");
 
    config.dict_["single_run"]["poisson0"][0]["value"] = 2.0;
    config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
@@ -61,7 +61,7 @@ TEST(BaseUniversalTest, Test_Workflow)
 
 TEST(MFEMIndividualTest, Test_Workflow)
 {
-   config = InputParser("inputs/test.base.yml");
+   config = ScaleUpInputParser("inputs/test.base.yml");
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
@@ -85,7 +85,7 @@ TEST(MFEMIndividualTest, Test_Workflow)
 
 TEST(MFEMUniversalTest, Test_Workflow)
 {
-   config = InputParser("inputs/test.base.yml");
+   config = ScaleUpInputParser("inputs/test.base.yml");
 
    config.dict_["visualization"]["enabled"] = true;
 
@@ -116,7 +116,7 @@ TEST(MFEMUniversalTest, Test_Workflow)
 
 TEST(ComponentWiseTest, Test_Workflow)
 {
-   config = InputParser("inputs/test.component.yml");
+   config = ScaleUpInputParser("inputs/test.component.yml");
 
    printf("\nSample Generation \n\n");
 

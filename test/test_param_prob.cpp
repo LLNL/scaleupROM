@@ -18,7 +18,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 
 TEST(SampleGeneratorTest, Test_Parsing)
 {
-   config = InputParser("inputs/test_param_prob.yml");
+   config = ScaleUpInputParser("inputs/test_param_prob.yml");
 
    ParameterizedProblem *test = InitParameterizedProblem();
    SampleGenerator sample_gen(MPI_COMM_WORLD, test);
@@ -54,7 +54,7 @@ TEST(SampleGeneratorTest, Test_Parsing)
 
 TEST(RandomSampleGeneratorTest, Test_Parsing)
 {
-   config = InputParser("inputs/test_param_prob.yml");
+   config = ScaleUpInputParser("inputs/test_param_prob.yml");
 
    ParameterizedProblem *test = InitParameterizedProblem();
    RandomSampleGenerator sample_gen(MPI_COMM_WORLD, test);

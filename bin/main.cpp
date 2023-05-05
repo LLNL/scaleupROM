@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
    OptionsParser args(argc, argv);
    args.AddOption(&input_file, "-i", "--input", "Input file to use.");
    args.ParseCheck();
-   config = InputParser(input_file);
+   config = ScaleUpInputParser(input_file);
    
    std::string mode = config.GetOption<std::string>("main/mode", "run_example");
    if (mode == "run_example")

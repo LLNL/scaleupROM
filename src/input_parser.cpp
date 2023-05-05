@@ -72,6 +72,24 @@ YAML::Node InputParser::FindNodeFromDict(const std::string &keys, YAML::Node inp
    return nodes.back();
 }
 
+/*
+      ScaleUpInputParser
+*/
+ScaleUpInputParser::ScaleUpInputParser(const std::string &input_file)
+   : InputParser(input_file)
+{
+   ParseWorkFlowOptions();
+   return;
+}
+
+void ScaleUpInputParser::ParseWorkFlowOptions()
+{
+   workflow.mode = config.GetOption<std::string>("main/mode", "run_example");
+   workflow.use_rom = config.GetOption<bool>("main/use_rom", false);
+
+   return;
+}
+
 // template int InputParser::GetRequiredOption<int>(const std::string&);
 
-InputParser config;
+ScaleUpInputParser config;

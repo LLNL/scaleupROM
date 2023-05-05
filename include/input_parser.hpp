@@ -117,6 +117,27 @@ public:
 
 };
 
-extern InputParser config;
+class ScaleUpInputParser : public InputParser
+{
+public:
+struct WorkFlowOptions
+{
+   std::string mode;
+   bool use_rom;
+} workflow;
+
+public:
+   ScaleUpInputParser() : InputParser() {};
+   ScaleUpInputParser(const std::string &input_file);
+
+   void ParseWorkFlowOptions();
+
+// protected:
+//    using InputParser::GetOption;
+//    using InputParser::GetRequiredOption;
+
+};
+
+extern ScaleUpInputParser config;
 
 #endif
