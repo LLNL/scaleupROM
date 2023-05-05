@@ -266,18 +266,18 @@ void ROMHandler::LoadReducedBasis()
       case TrainMode::UNIVERSAL:
       {
          carom_spatialbasis.SetSize(num_basis_sets);
-         basis_name = basis_prefix + "_universal";
-         basis_reader = new CAROM::BasisReader(basis_name);
-
          for (int k = 0; k < num_basis_sets; k++)
          {
+            basis_name = basis_prefix + "_universal_comp" + std::to_string(k);
+            basis_reader = new CAROM::BasisReader(basis_name);
+
             carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
             numRowRB = carom_spatialbasis[k]->numRows();
             numColumnRB = carom_spatialbasis[k]->numColumns();
             printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
-         }
 
-         delete basis_reader;
+            delete basis_reader;
+         }
          break;
       }
       case TrainMode::INDIVIDUAL:
@@ -393,7 +393,7 @@ void ROMHandler::SetBlockSizes()
 
    for (int k = 1; k <= numSub; k++)
    {
-      int c = topol_handler->GetMeshType(k);
+      int c = topol_handler->GetMeshType(k-1);
       rom_block_offsets[k] = num_basis[c];
    }
    rom_block_offsets.PartialSum();
@@ -798,9 +798,18 @@ void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &f
       file_prefix += "_" + std::to_string(c);
 
       int midx = -1;
-      for (int m = 0; m < numSub; m++)
-         if (topol_handler->GetMeshType(m) == c) { midx = m; break; }
+      switch (train_mode) {
+         case (TrainMode::INDIVIDUAL): midx = c; break;
+         case (TrainMode::UNIVERSAL):
+         {
+            for (int m = 0; m < numSub; m++)
+               if (topol_handler->GetMeshType(m) == c) { midx = m; break; }
+            break;
+         }
+         default: mfem_error("Unknown train mode!\n"); break;
+      }
       assert(midx >= 0);
+
       Mesh *mesh = fes[midx]->GetMesh();
       const int order = fes[midx]->FEColl()->GetOrder();
       ParaViewDataCollection coll = ParaViewDataCollection(file_prefix.c_str(), mesh);
