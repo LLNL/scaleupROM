@@ -68,7 +68,9 @@ void ROMHandler::ParseInputs()
          sample_prefix = config.GetRequiredOption<std::string>("parameterized_problem/name");
    }
 
-   num_basis = config.GetRequiredOption<int>("model_reduction/number_of_basis");
+   num_basis = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
+   assert(num_basis.Size() > 0);
+   for (int k = 0; k < num_basis.Size(); k++) assert(num_basis[k] > 0);
 
    basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
    basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
@@ -189,12 +191,10 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
    rom_options = new CAROM::Options(fom_num_vdofs[0], max_num_snapshots, 1, update_right_SV);
    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
 
-   // int num_snapshot_sets = (component_sampling) ? num_basis_sets : numSub;
    for (int m = 0; m < numSub; m++)
    {
       for (int s = 0; s < total_samples; s++)
       {
-         // TODO: we still need multi-component case adjustment for prefix.
          const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
          basis_generator->loadSamples(filename,"snapshot");
       }
