@@ -129,19 +129,6 @@ protected:
 public:
    MultiBlockSolver();
 
-   // // constructor using command line inputs.
-   // MultiBlockSolver(int argc, char *argv[]);
-   // RubberOperator(Array<FiniteElementSpace *> &fes, Array<Array<int> *>&ess_bdr,
-   //                Array<int> &block_trueOffsets, double rel_tol, double abs_tol,
-   //                int iter, Coefficient &mu);
-
-   // // Required to use the native newton solver
-   // virtual Operator &GetGradient(const Vector &xp) const;
-   // virtual void Mult(const Vector &k, Vector &y) const;
-
-   // // Driver for the newton solver
-   // void Solve(Vector &xp) const;
-
    virtual ~MultiBlockSolver();
 
    // Parse some base input options. 

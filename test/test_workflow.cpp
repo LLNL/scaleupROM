@@ -41,7 +41,9 @@ TEST(BaseUniversalTest, Test_Workflow)
    config.dict_["single_run"]["poisson0"][0]["value"] = 2.0;
    config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["model_reduction"]["number_of_basis"] = 4;
+   Array<int> num_basis(1);
+   num_basis = 4;
+   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -96,7 +98,9 @@ TEST(MFEMUniversalTest, Test_Workflow)
    config.dict_["single_run"]["poisson0"][0]["value"] = 2.0;
    config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["model_reduction"]["number_of_basis"] = 4;
+   Array<int> num_basis(1);
+   num_basis = 4;
+   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
