@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
    MPI_Init(&argc, &argv);
    YAML::Node test = YAML::LoadFile("test.yaml");
-   config = InputParser("test.yaml");
+   InputParser config = InputParser("test.yaml");
 
    YAML::Node zombie = test["non-existing"];
    if (test["students"])

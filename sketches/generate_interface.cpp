@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
       //    printf("\n");
       }  // Array<InterfaceInfo> comp_if_info(0);
 
-      config = InputParser("inputs/gen_interface.yml");
+      config = ScaleUpInputParser("inputs/gen_interface.yml");
       ComponentTopologyHandler comp_topol;
 
    }  // 2 dimension
