@@ -79,6 +79,7 @@ ScaleUpInputParser::ScaleUpInputParser(const std::string &input_file)
    : InputParser(input_file)
 {
    ParseWorkFlowOptions();
+   ParseDiscretizationOptions();
    return;
 }
 
@@ -87,7 +88,22 @@ void ScaleUpInputParser::ParseWorkFlowOptions()
    workflow.mode = config.GetOption<std::string>("main/mode", "run_example");
    workflow.use_rom = config.GetOption<bool>("main/use_rom", false);
 
+   if ((workflow.mode == "sample_generation") || (workflow.mode == "build_rom"))
+      if (!workflow.use_rom)
+      {
+         printf("%s should be run with ROM enabled. Setting main/use_rom = true.\n", workflow.mode);
+         workflow.use_rom = true;
+      }
+
    return;
+}
+
+void ScaleUpInputParser::ParseDiscretizationOptions()
+{
+   disc.order = config.GetOption<int>("discretization/order", 1);
+   disc.full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   disc.sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
+   disc.kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 }
 
 // template int InputParser::GetRequiredOption<int>(const std::string&);

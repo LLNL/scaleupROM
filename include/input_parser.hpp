@@ -120,17 +120,27 @@ public:
 class ScaleUpInputParser : public InputParser
 {
 public:
+
 struct WorkFlowOptions
 {
    std::string mode;
    bool use_rom;
 } workflow;
 
+struct DiscretizationOptions
+{
+   int order;
+   bool full_dg;
+   double sigma;
+   double kappa;
+} disc;
+
 public:
    ScaleUpInputParser() : InputParser() {};
    ScaleUpInputParser(const std::string &input_file);
 
    void ParseWorkFlowOptions();
+   void ParseDiscretizationOptions();
 
 // protected:
 //    using InputParser::GetOption;
