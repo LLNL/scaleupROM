@@ -150,7 +150,7 @@ public:
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
-   virtual void SaveSV(const std::string& prefix);
+   virtual void SaveSV(const std::string& prefix, const int& basis_idx);
 };
 
 class MFEMROMHandler : public ROMHandler
