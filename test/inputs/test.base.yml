@@ -44,7 +44,7 @@ model_reduction:
     prefix: "poisson0"
   # individual/universal
   subdomain_training: individual
-  number_of_basis: 3
+  number_of_basis: [3]
   save_operator:
     level: global
     prefix: "proj_inv"

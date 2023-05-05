@@ -68,7 +68,7 @@ model_reduction:
     prefix: "poisson0"
   # individual/universal
   subdomain_training: universal
-  number_of_basis: 4
+  number_of_basis: [4]
   save_operator:
     level: component
     prefix: "test.rom_elem"

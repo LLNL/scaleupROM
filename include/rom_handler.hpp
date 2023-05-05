@@ -81,8 +81,7 @@ protected:
    TopologyHandler *topol_handler = NULL;
 
    // rom variables.
-   // TODO: need Array<int> for multi-component basis.
-   int num_basis;    // number of columns in a basis set
+   Array<int> num_basis;    // number of columns in a basis set
    Array<const CAROM::Matrix*> carom_spatialbasis;
    bool basis_loaded;
    bool operator_loaded;
@@ -114,7 +113,7 @@ public:
    const ROMHandlerMode GetMode() { return mode; }
    const TrainMode GetTrainMode() { return train_mode; }
    // TODO: multi-component case
-   const int GetNumBasis(const int &basis_idx) { return num_basis; }
+   const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
    const bool UseExistingBasis() { return basis_file_exists; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
@@ -151,7 +150,7 @@ public:
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
-   virtual void SaveSV(const std::string& prefix);
+   virtual void SaveSV(const std::string& prefix, const int& basis_idx);
 };
 
 class MFEMROMHandler : public ROMHandler
