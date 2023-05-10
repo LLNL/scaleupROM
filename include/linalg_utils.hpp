@@ -63,6 +63,10 @@ void PrintMatrix(const SparseMatrix &mat,
 void PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename);
 
+// TODO: parallel version + hdf5 file format for larger basis dimension.
+void PrintVector(const Vector &vec,
+                 const std::string &filename);
+
 SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename);
 void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename);
 
