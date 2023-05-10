@@ -189,6 +189,18 @@ void PrintMatrix(const DenseMatrix &mat,
    return;
 }
 
+void PrintVector(const Vector &vec,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < vec.Size(); i++)
+      fprintf(fp, "%.15E\n", vec(i));
+
+   fclose(fp);
+   return;
+}
+
 // TODO: support parallel I/O.
 SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename)
 {
