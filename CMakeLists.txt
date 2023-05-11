@@ -76,6 +76,8 @@ find_package(Doxygen 1.8.5)
 
 find_package(GTest 1.6.0 REQUIRED)
 
+find_program(GMSH gmsh)
+
 # MFEM is required.
 find_library(MFEM mfem "$ENV{MFEM_DIR}/lib")
 find_library(HYPRE HYPRE "$ENV{HYPRE_DIR}/lib")

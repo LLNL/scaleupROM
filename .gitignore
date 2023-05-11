@@ -4,3 +4,5 @@ playground
 dependencies
 .vscode
 dump
+*.msh
+*.msh.mfem

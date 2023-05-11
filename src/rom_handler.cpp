@@ -516,11 +516,13 @@ void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
 
    double coverage = 0.0;
    double total = 0.0;
+
    for (int d = 0; d < rom_sv->dim(); d++)
    {
       if (d == num_basis[basis_idx]) coverage = total;
       total += rom_sv->item(d);
    }
+   if (rom_sv->dim() == num_basis[basis_idx]) coverage = total;
    coverage /= total;
    printf("Coverage: %.7f%%\n", coverage * 100.0);
 

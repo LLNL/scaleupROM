@@ -1,6 +1,54 @@
 import numpy as np
 import h5py
 
+def ConfigTestMultiComponent():
+    n_mesh = 3
+    mesh_type = [0, 1, 1]
+    mesh_configs = np.zeros([n_mesh, 6])
+    mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
+    mesh_configs[2,:] = [0., 1., 0., 0., 0., 0.]
+
+    if_data = np.zeros([2, 5])
+    if_data[0, :] = [0, 1, 2, 4, 0]
+    if_data[1, :] = [0, 2, 3, 1, 1]
+
+    bdr_data = []
+    bdr_data += [[1, 0, 1]]
+    bdr_data += [[1, 1, 1]]
+    bdr_data += [[3, 1, 3]]
+    bdr_data += [[3, 2, 3]]
+    bdr_data += [[2, 1, 2]]
+    bdr_data += [[2, 2, 2]]
+    bdr_data += [[4, 0, 4]]
+    bdr_data += [[4, 2, 4]]
+    bdr_data += [[5, 1, 5]]
+    bdr_data += [[5, 2, 5]]
+    bdr_data = np.array(bdr_data)
+    print(bdr_data.shape)
+
+    filename = "test.multi_comp.h5"
+    with h5py.File(filename, 'w') as f:
+        # c++ currently cannot read datasets of string.
+        # change to multiple attributes, only as a temporary implementation.
+        grp = f.create_group("components")
+        grp.attrs["number_of_components"] = 2
+        grp.attrs["0"] = "empty"
+        grp.attrs["1"] = "circle"
+        # component index of each mesh
+        grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
+        # 3-dimension vector for translation / rotation
+        grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
+
+        grp = f.create_group("ports")
+        grp.attrs["number_of_references"] = 2
+        grp.attrs["0"] = "port1"
+        grp.attrs["1"] = "port2"
+        grp.create_dataset("interface", if_data.shape, data=if_data)
+
+        # boundary attributes
+        f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
+    return
+
 def ConfigScaleUp(ncomp):
     n_mesh = ncomp * ncomp
     mesh_type = [0] * n_mesh
@@ -200,8 +248,11 @@ def Config3D():
         f.create_dataset("boundary", (24,3), data=bdr_data)
     return
 
+
+
 if __name__ == "__main__":
-    ConfigScaleUp(128)
+    #ConfigScaleUp(128)
+    ConfigTestMultiComponent()
     #for ncomp in [4,8,16,32,64]:
     #    ConfigScaleUp(ncomp)
     # Config2D()

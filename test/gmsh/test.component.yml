@@ -1,0 +1,91 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: true
+
+mesh:
+  type: component-wise
+  uniform_refinement: 1
+  component-wise:
+    global_config: "test.multi_comp.h5"
+    components:
+      - name: "empty"
+        file: "square.mesh"
+      - name: "circle"
+        file: "square-circle.msh.mfem"
+    ports:
+      - name: "port1"
+        file: "test.port1.h5"
+        comp1:
+          name: "empty"
+          attr: 2
+        comp2:
+          name: "circle"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "test.port2.h5"
+        comp1:
+          name: "empty"
+          attr: 3
+        comp2:
+          name: "circle"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+visualization:
+  enable: false
+  output_dir: dd_mms_output
+
+parameterized_problem:
+  name: poisson0
+
+single_run:
+  poisson0:
+    - parameter_name: k
+      value: 2.5
+
+sample_generation:
+  component_sampling: false
+  file_path:
+    prefix: "poisson0"
+  poisson0:
+    - parameter_name: k
+      sample_size: 2
+      minimum: 2.0
+      maximum: 2.5
+
+
+model_reduction:
+  rom_handler_type: mfem
+  basis:
+    prefix: "poisson0"
+  # individual/universal
+  subdomain_training: universal
+  number_of_basis: [2,4]
+  save_operator:
+    level: component
+    prefix: "test.rom_elem"
+  compare_solution: true
+  svd:
+    save_spectrum: true
+    maximum_number_of_snapshots: 400
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+manufactured_solution:
+  baseline_refinement: 1
+  number_of_refinement: 4
+  amp1: 1.23
+  amp2: 3.13
+  constant: 1.11
+
+
