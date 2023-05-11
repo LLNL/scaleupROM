@@ -2,22 +2,27 @@ import numpy as np
 import h5py
 
 def ConfigTestMultiComponent():
-    n_mesh = 2
-    mesh_type = [0, 1]
+    n_mesh = 3
+    mesh_type = [0, 1, 1]
     mesh_configs = np.zeros([n_mesh, 6])
     mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
+    mesh_configs[2,:] = [0., 1., 0., 0., 0., 0.]
 
-    if_data = np.zeros([1, 5])
+    if_data = np.zeros([2, 5])
     if_data[0, :] = [0, 1, 2, 4, 0]
+    if_data[1, :] = [0, 2, 3, 1, 1]
 
     bdr_data = []
     bdr_data += [[1, 0, 1]]
     bdr_data += [[1, 1, 1]]
-    bdr_data += [[3, 0, 3]]
     bdr_data += [[3, 1, 3]]
+    bdr_data += [[3, 2, 3]]
     bdr_data += [[2, 1, 2]]
+    bdr_data += [[2, 2, 2]]
     bdr_data += [[4, 0, 4]]
+    bdr_data += [[4, 2, 4]]
     bdr_data += [[5, 1, 5]]
+    bdr_data += [[5, 2, 5]]
     bdr_data = np.array(bdr_data)
     print(bdr_data.shape)
 
@@ -35,9 +40,9 @@ def ConfigTestMultiComponent():
         grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
 
         grp = f.create_group("ports")
-        grp.attrs["number_of_references"] = 1
+        grp.attrs["number_of_references"] = 2
         grp.attrs["0"] = "port1"
-        #grp.attrs["1"] = "port2"
+        grp.attrs["1"] = "port2"
         grp.create_dataset("interface", if_data.shape, data=if_data)
 
         # boundary attributes

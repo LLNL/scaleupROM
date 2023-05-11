@@ -828,23 +828,22 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
 
 void MultiBlockSolver::AssembleROM()
 {
-   // TODO: multi-component case.
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
-   // TODO: multi_component case.
-   int num_basis = rom_handler->GetNumBasis(0);
-
-   SparseMatrix *romMat = new SparseMatrix(numSub * num_basis, numSub * num_basis);
+   const Array<int> rom_block_offsets = rom_handler->GetBlockOffsets();
+   SparseMatrix *romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
 
    // component domain matrix.
    for (int m = 0; m < numSub; m++)
    {
       int c_type = topol_handler->GetMeshType(m);
+      int num_basis = rom_handler->GetNumBasis(c_type);
 
       Array<int> vdofs(num_basis);
-      for (int k = 0; k < num_basis; k++) vdofs[k] = k + m * num_basis;
+      for (int k = rom_block_offsets[m]; k < rom_block_offsets[m+1]; k++)
+         vdofs[k - rom_block_offsets[m]] = k;
 
       romMat->AddSubMatrix(vdofs, vdofs, *(comp_mats[c_type]));
 
@@ -870,13 +869,16 @@ void MultiBlockSolver::AssembleROM()
 
       const int m1 = pInfo->Mesh1;
       const int m2 = pInfo->Mesh2;
+      const int c1 = topol_handler->GetMeshType(m1);
+      const int c2 = topol_handler->GetMeshType(m2);
+      const int num_basis1 = rom_handler->GetNumBasis(c1);
+      const int num_basis2 = rom_handler->GetNumBasis(c2);
 
-      Array<int> vdofs1(num_basis), vdofs2(num_basis);
-      for (int k = 0; k < num_basis; k++)
-      {
-         vdofs1[k] = k + m1 * num_basis;
-         vdofs2[k] = k + m2 * num_basis;
-      }
+      Array<int> vdofs1(num_basis1), vdofs2(num_basis2);
+      for (int k = rom_block_offsets[m1]; k < rom_block_offsets[m1+1]; k++)
+         vdofs1[k - rom_block_offsets[m1]] = k;
+      for (int k = rom_block_offsets[m2]; k < rom_block_offsets[m2+1]; k++)
+         vdofs2[k - rom_block_offsets[m2]] = k;
       Array<Array<int> *> vdofs(2);
       vdofs[0] = &vdofs1;
       vdofs[1] = &vdofs2;

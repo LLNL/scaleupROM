@@ -119,6 +119,7 @@ public:
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
+   const Array<int> GetBlockOffsets() { return rom_block_offsets; }
    
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);

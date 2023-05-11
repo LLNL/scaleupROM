@@ -23,15 +23,15 @@ mesh:
           name: "circle"
           attr: 4
         comp2_configuration: [1., 0., 0., 0., 0., 0.]
-      # - name: "port2"
-      #   file: "test.port2.h5"
-      #   comp1:
-      #     name: "empty"
-      #     attr: 3
-      #   comp2:
-      #     name: "circle"
-      #     attr: 1
-      #   comp2_configuration: [0., 1., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "test.port2.h5"
+        comp1:
+          name: "empty"
+          attr: 3
+        comp2:
+          name: "circle"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
 
 domain-decomposition:
   type: interior_penalty
@@ -69,7 +69,7 @@ model_reduction:
     prefix: "poisson0"
   # individual/universal
   subdomain_training: universal
-  number_of_basis: [2]
+  number_of_basis: [2,4]
   save_operator:
     level: component
     prefix: "test.rom_elem"
