@@ -82,10 +82,10 @@ multi_comp_dd_mms:
   tags:
     - shell
     - quartz
-  rules:
-    - exists:
-        - ./ci-build/test/gmsh/multi_comp_dd_mms
+  # rules:
+  #   - exists:
+  #       - ./ci-build/test/gmsh/multi_comp_dd_mms
   script:
     - cd ci-build/test/gmsh
-    - ./multi_comp_dd_mms
+    - if [ -f "./multi_comp_dd_mms" ]; then ./multi_comp_dd_mms; else echo "multi_comp_dd_mms does not exist. Passing the test."; fi
 

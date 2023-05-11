@@ -32,6 +32,7 @@ visualization:
   output_dir: dd_mms_output
 
 manufactured_solution:
+  baseline_refinement: 1
   number_of_refinement: 4
   amp1: 1.23
   amp2: 3.13
