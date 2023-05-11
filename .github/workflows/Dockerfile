@@ -1,4 +1,4 @@
-FROM dreamer2368/librom_env:v0.1.0
+FROM dreamer2368/librom_env:v0.2.0
 
 # install yaml-cpp
 WORKDIR $LIB_DIR
@@ -19,10 +19,9 @@ RUN sudo git clone https://github.com/LLNL/libROM.git
 WORKDIR ./libROM
 # some minor revisions needed for scaleupROM, not merged yet into master branch.
 RUN sudo git pull
-RUN sudo git checkout error_msg
 WORKDIR ./build
 RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=${USE_MFEM} -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
-RUN sudo make
+RUN sudo make -j 16
 
 ENV LIBROM_DIR=$LIB_DIR/libROM
 
@@ -42,6 +41,9 @@ RUN sudo pip3 install -r ./requirements.txt
 
 # install h5dump
 RUN sudo apt-get install -yq hdf5-tools
+
+# install gmsh
+RUN sudo apt-get install -yq gmsh
 
 # create and switch to a user
 WORKDIR /home/$USERNAME
