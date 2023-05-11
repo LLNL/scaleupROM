@@ -738,6 +738,7 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
       double *x1 = comp1->GetVertex(vtx1[v1]);
       bool found_match = false;
 
+      double mingap = 1.e100;
       for (int v2 = 0; v2 < vtx2.Size(); v2++)
       {
          if (port->vtx2to1.count(vtx2[v2])) continue;
@@ -746,11 +747,15 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
          const double *x2 = x2_trns[v2]->Read();
 
          bool match = true;
+         double tmp1 = 0.0;
          for (int d = 0; d < dim; d++)
          {
-            match = (abs(x1[d] - x2[d]) < threshold);
+            double tmp = abs(x1[d] - x2[d]);
+            tmp1 = max(tmp1, tmp);
+            match = (tmp < threshold);
             if (!match) break;
          }
+         mingap = min(mingap, tmp1);
 
          if (match)
          {
@@ -760,7 +765,11 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
          }
       }  // for (int v2 = 0; v2 < vtx2.Size(); v2++)
 
-      if (!found_match) mfem_error("BuildPortDataFromInput: Cannot find the matching vertex!\n");
+      if (!found_match)
+      {
+         printf("minimal gap: %.5E\n", mingap);
+         mfem_error("BuildPortDataFromInput: Cannot find the matching vertex!\n");
+      }
    }  // for (int v1 = 0; v1 < vtx1.Size(); v1++)
 
    for (int b2 = 0; b2 < be2.Size(); b2++)
