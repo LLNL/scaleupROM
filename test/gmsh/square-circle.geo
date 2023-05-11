@@ -66,6 +66,7 @@ Physical Surface(1) = {1};
 Mesh.AnisoMax = 0;
 Mesh.ElementOrder = 3;
 Mesh.MshFileVersion = 2.2;
+// Mesh.LcIntegrationPrecision = 1.0e-15;
 Mesh 2;
 Save "square-circle.msh";
 Exit;
