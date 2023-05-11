@@ -654,11 +654,15 @@ void MultiBlockSolver::SaveROMElements(const std::string &filename)
 
       for (int c = 0; c < num_comp; c++)
       {
-         hdf5_utils::WriteDataset(grp_id, std::to_string(c), *(comp_mats[c]));
+         hid_t comp_grp_id;
+         comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+         assert(comp_grp_id >= 0);
+
+         hdf5_utils::WriteDataset(comp_grp_id, "domain", *(comp_mats[c]));
 
          {  // boundary
             hid_t bdr_grp_id;
-            bdr_grp_id = H5Gcreate(grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            bdr_grp_id = H5Gcreate(comp_grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
             assert(bdr_grp_id >= 0);
 
             const int num_bdr = bdr_mats[c]->Size();
@@ -674,6 +678,9 @@ void MultiBlockSolver::SaveROMElements(const std::string &filename)
             errf = H5Gclose(bdr_grp_id);
             assert(errf >= 0);
          }
+
+         errf = H5Gclose(comp_grp_id);
+         assert(errf >= 0);
       }  // for (int c = 0; c < num_comp; c++)
 
       errf = H5Gclose(grp_id);
@@ -744,11 +751,15 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
 
       for (int c = 0; c < num_comp; c++)
       {
-         hdf5_utils::ReadDataset(grp_id, std::to_string(c), *(comp_mats[c]));
+         hid_t comp_grp_id;
+         comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+         assert(comp_grp_id >= 0);
+
+         hdf5_utils::ReadDataset(comp_grp_id, "domain", *(comp_mats[c]));
 
          {  // boundary
             hid_t bdr_grp_id;
-            bdr_grp_id = H5Gopen2(grp_id, "boundary", H5P_DEFAULT);
+            bdr_grp_id = H5Gopen2(comp_grp_id, "boundary", H5P_DEFAULT);
             assert(bdr_grp_id >= 0);
 
             int num_bdr;
@@ -765,6 +776,9 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
             errf = H5Gclose(bdr_grp_id);
             assert(errf >= 0);
          }
+
+         errf = H5Gclose(comp_grp_id);
+         assert(errf >= 0);
       }  // for (int c = 0; c < num_comp; c++)
 
       errf = H5Gclose(grp_id);
