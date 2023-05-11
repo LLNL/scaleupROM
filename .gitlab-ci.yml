@@ -75,3 +75,17 @@ comp-topol:
     - cd ci-build/test
     - ./test_topol
 
+multi_comp_dd_mms:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  rules:
+    - exists:
+        - ./ci-build/test/gmsh/multi_comp_dd_mms
+  script:
+    - cd ci-build/test/gmsh
+    - ./multi_comp_dd_mms
+
