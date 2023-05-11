@@ -188,11 +188,13 @@ void MultiBlockSolver::SetupBCVariables()
 
    // TODO: technically this should be Array<Array2D<int>*> for each meshes.
    // Running with MFEM debug version will lead to error when assembling boundary integrators.
-   bdr_markers.SetSize(max_bdr_attr);
-   for (int k = 0; k < max_bdr_attr; k++) {
+   bdr_markers.SetSize(global_bdr_attributes.Size());
+   for (int k = 0; k < bdr_markers.Size(); k++) {
+      int bdr_attr = global_bdr_attributes[k];
+      assert((bdr_attr > 0) && (bdr_attr <= max_bdr_attr));
       bdr_markers[k] = new Array<int>(max_bdr_attr);
       (*bdr_markers[k]) = 0;
-      (*bdr_markers[k])[k] = 1;
+      (*bdr_markers[k])[bdr_attr-1] = 1;
    }
 }
 
