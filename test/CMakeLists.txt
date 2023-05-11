@@ -32,3 +32,7 @@ file(COPY meshes/test.2x2x2.hex.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes
 file(COPY meshes/test.1x1x1.tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/test.2x2x2.tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/test_topol.3d.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
+
+if(GMSH)
+    add_subdirectory(gmsh)
+endif(GMSH)
