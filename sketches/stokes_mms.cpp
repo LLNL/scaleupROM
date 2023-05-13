@@ -63,23 +63,18 @@ protected:
 
 public:
    SchurOperator(Operator* const A_, Operator* const B_)
-      : Operator(B_->Height()), A(A_), B(B_)//, Bt(Transpose(*B_))
+      : Operator(B_->Height()), A(A_), B(B_)
    {
-      // B->BuildTranspose();
-      // Bt = Transpose(*B);
-      // Bt = TransposeAbstractSparseMatrix(*B, 0);
-
       solver = new CGSolver();
       solver->SetRelTol(rtol);
       solver->SetMaxIter(maxIter);
       solver->SetOperator(*A);
-      solver->SetPrintLevel(1);
+      solver->SetPrintLevel(0);
    };
 
    virtual ~SchurOperator()
    {
       delete solver;
-      // delete Bt;
    }
    
    virtual void Mult(const Vector &x, Vector &y) const
@@ -113,13 +108,6 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
                   "Number of refinements.");
-   // args.AddOption(&pa, "-pa", "--partial-assembly", "-no-pa",
-   //                "--no-partial-assembly", "Enable Partial Assembly.");
-   // args.AddOption(&device_config, "-d", "--device",
-   //                "Device configuration string, see Device::Configure().");
-   // args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
-   //                "--no-visualization",
-   //                "Enable or disable GLVis visualization.");
    args.Parse();
    if (!args.Good())
    {
@@ -148,15 +136,11 @@ int main(int argc, char *argv[])
    // FiniteElementCollection *hdiv_coll(new RT_FECollection(order, dim));
    FiniteElementCollection *l2_coll(new L2_FECollection(order, dim));
    FiniteElementCollection *h1_coll(new H1_FECollection(order+1, dim));
-   FiniteElementCollection *ph1_coll(new L2_FECollection(order, dim));
+   FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
    FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
    FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
-   // FiniteElementSpace *qfes = new FiniteElementSpace(mesh, h1_coll, dim+1);
-
-   // FiniteElementSpace *R_space = new FiniteElementSpace(mesh, hdiv_coll, dim);
-   // FiniteElementSpace *W_space = new FiniteElementSpace(mesh, l2_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
    //    offsets for each variable. The last component of the Array is the sum
@@ -194,14 +178,14 @@ int main(int argc, char *argv[])
 
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
-//    // fform->AddDomainIntegrator(new VectorFEDomainLFIntegrator(fcoeff));
-   // fform->AddBoundaryIntegrator(new VectorFEBoundaryFluxLFIntegrator(fnatcoeff));
+   fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
+   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff));
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
 
    LinearForm *gform(new LinearForm);
    gform->Update(pfes, rhs.GetBlock(dim), 0);
-//    // gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
+   gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
 
@@ -268,26 +252,9 @@ int main(int argc, char *argv[])
    // If value is 0, then it is not Dirichlet.
    // If value is 1, then it is Dirichlet.
    ess_attr = 1;
-   Array<int> ess_tdof_list, tmp, empty;
-   ufes->GetEssentialTrueDofs(ess_attr, ess_tdof_list);
-   // ess_tdof_list.SetSize(0);
-   // for (int d = 0; d < dim; d++)
-   // {
-   //    ufes->GetEssentialTrueDofs(ess_attr, tmp, d);
-   //    ess_tdof_list.Append(tmp);
-   // }
-   // ess_tdof_list.Append(vblock_offsets[1]);
-   // printf("ess_tdof size: %d\n", ess_tdof_list.Size());
-   // {
-   //    std::string filename;
-   //    filename = "stokes.ess_tdof.txt";
-   //    FILE *fp = fopen(filename.c_str(), "w");
-
-   //    for (int i = 0; i < ess_tdof_list.Size(); i++)
-   //       fprintf(fp, "%d\n", ess_tdof_list[i]);
-
-   //    fclose(fp);
-   // }
+   Array<int> u_ess_tdof, p_ess_tdof, empty;
+   ufes->GetEssentialTrueDofs(ess_attr, u_ess_tdof);
+   pfes->GetEssentialTrueDofs(ess_attr, p_ess_tdof);
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
    GridFunction u, p;
@@ -295,36 +262,28 @@ int main(int argc, char *argv[])
    p.MakeRef(pfes, x.GetBlock(dim), 0);
 
    u = 0.0;
+   p = 0.0;
 
    // add dirichlet boundary condition.
-   Vector ud(dim);
-   ud[0] = 1.0; ud[1] = 0.0;
-   VectorConstantCoefficient one(ud);
+   // Vector ud(dim);
+   // ud[0] = 1.0; ud[1] = 0.0;
+   // VectorConstantCoefficient one(ud);
    Array<int> bdrAttr(mesh->bdr_attributes.Max());
-   bdrAttr = 0;
-   bdrAttr[2] = 1;
-   u.ProjectBdrCoefficient(one, bdrAttr);
-   // {
-   //    std::string filename;
-   //    filename = "stokes.u.txt";
-   //    PrintVector(u, filename);
-   // }
-// {  // x reflects the change from u.
-//    printf("u\n");
-//    for (int k = 0; k < u.Size(); k++) printf("%.5E\t", u[k]);
-//    printf("\n");
-//    printf("x\n");
-//    for (int k = 0; k < u.Size(); k++) printf("%.5E\t", x[k]);
-//    printf("\n");
-// }
+   bdrAttr = 1;
+   // bdrAttr[2] = 1;
+   // u.ProjectBdrCoefficient(one, bdrAttr);
+   u.ProjectBdrCoefficient(ucoeff, bdrAttr);
+   p.ProjectCoefficient(pcoeff);
+   const double p_const = p.Sum() / static_cast<double>(p.Size());
 
-   // A \ F1.
+   // A \ F2.
    SparseMatrix A;
    OperatorHandle Bh;
    Vector U1, F1;
    Vector P1, G1;
-   mVarf->FormLinearSystem(ess_tdof_list, u, *fform, A, U1, F1);
-   bVarf->FormRectangularLinearSystem(ess_tdof_list, empty, u, *gform, Bh, U1, G1);
+   mVarf->FormLinearSystem(u_ess_tdof, u, *fform, A, U1, F1);
+
+   bVarf->FormRectangularLinearSystem(u_ess_tdof, empty, u, *gform, Bh, U1, G1);
    Operator &B(*Bh);
 
    int maxIter(10000);
@@ -334,12 +293,12 @@ int main(int argc, char *argv[])
    chrono.Start();
    // MINRESSolver solver;
    CGSolver solver;
-   // solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
+   solver.SetAbsTol(atol);
+   // solver.SetRelTol(rtol);
    solver.SetMaxIter(maxIter);
    solver.SetOperator(A);
    // solver.SetPreconditioner(darcyPrec);
-   solver.SetPrintLevel(1);
+   solver.SetPrintLevel(0);
    // x = 0.0;
    solver.Mult(F1, U1);
    // if (device.IsEnabled()) { x.HostRead(); }
@@ -354,154 +313,43 @@ int main(int argc, char *argv[])
    SchurOperator schur(&A, &B);
    CGSolver solver2;
    solver2.SetOperator(schur);
+   // solver2.SetPrintLevel(1);
+   // solver2.SetAbsTol(rtol);
+   // solver2.SetMaxIter(maxIter);
    OrthoSolver ortho;
    ortho.SetSolver(solver2);
    ortho.SetOperator(schur);
    printf("Solving for pressure\n");
-   printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
+   // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
+   // solver2.Mult(R2, p);
    ortho.Mult(R2, p);
+   p += p_const;
    printf("Pressure is solved.\n");
 
    // AU = F - B^T * P;
-   Vector F2(F1.Size());
-   B.MultTranspose(p, F2);
-   F2 *= -1.0;
-   F2 += F1;
+   Vector F3(F1.Size());
+   B.MultTranspose(p, F3);
+   F3 *= -1.0;
+   F3 += F1;
 
    printf("Solving for velocity\n");
-   solver.Mult(F2, u);
+   solver.Mult(F3, u);
    printf("Velocity is solved.\n");
 
-   // SparseMatrix *Ad = new SparseMatrix;
-   // Operator *A(Ad);
-   // Vector R, X;
-   // darcyOp.FormLinearSystem(ess_tdof_list, x, rhs, A, X, R);
-   // printf("Ad: %dx%d\n", Ad->NumRows(), Ad->NumCols());
-   // printf("A: %dx%d\n", A->NumRows(), A->NumCols());
-   // std::string filename;
-   // filename = "stokes.A.txt";
-   // PrintMatrix(*Ad, filename);
-   // filename = "stokes.R.txt";
-   // PrintVector(R, filename);
+   int order_quad = max(2, 2*(order+1)+1);
+   const IntegrationRule *irs[Geometry::NumGeom];
+   for (int i=0; i < Geometry::NumGeom; ++i)
+   {
+      irs[i] = &(IntRules.Get(i, order_quad));
+   }
 
-//    // 10. Construct the operators for preconditioner
-//    //
-//    //                 P = [ diag(M)         0         ]
-//    //                     [  0       B diag(M)^-1 B^T ]
-//    //
-//    //     Here we use Symmetric Gauss-Seidel to approximate the inverse of the
-//    //     pressure Schur Complement
-//    SparseMatrix *MinvBt = NULL;
-//    Vector Md(mVarf->Height());
+   double err_u  = u.ComputeL2Error(ucoeff, irs);
+   double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+   double err_p  = p.ComputeL2Error(pcoeff, irs);
+   double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
 
-//    BlockDiagonalPreconditioner darcyPrec(vblock_offsets);
-//    Solver *invM, *invS;
-//    SparseMatrix *S = NULL;
-
-//    {
-//       SparseMatrix &M(mVarf->SpMat());
-//       M.GetDiag(Md);
-//       Md.HostReadWrite();
-
-//       SparseMatrix &B(bVarf->SpMat());
-//       MinvBt = Transpose(B);
-
-//       for (int i = 0; i < Md.Size(); i++)
-//       {
-//          MinvBt->ScaleRow(i, 1./Md(i));
-//       }
-
-//       S = Mult(B, *MinvBt);
-
-//       invM = new DSmoother(M);
-
-// #ifndef MFEM_USE_SUITESPARSE
-//       invS = new GSSmoother(*S);
-// #else
-//       invS = new UMFPackSolver(*S);
-// #endif
-//    }
-
-//    invM->iterative_mode = false;
-//    invS->iterative_mode = false;
-
-//    darcyPrec.SetDiagonalBlock(0, invM);
-//    darcyPrec.SetDiagonalBlock(1, invS);
-
-   // // 11. Solve the linear system with MINRES.
-   // //     Check the norm of the unpreconditioned residual.
-   // int maxIter(10000);
-   // double rtol(1.e-6);
-   // double atol(1.e-10);
-
-   // chrono.Clear();
-   // chrono.Start();
-   // // MINRESSolver solver;
-   // CGSolver solver;
-   // solver.SetAbsTol(atol);
-   // solver.SetRelTol(rtol);
-   // solver.SetMaxIter(maxIter);
-   // solver.SetOperator(*A);
-   // // solver.SetPreconditioner(darcyPrec);
-   // solver.SetPrintLevel(1);
-   // // x = 0.0;
-   // solver.Mult(R, X);
-   // // if (device.IsEnabled()) { x.HostRead(); }
-   // chrono.Stop();
-
-//    if (solver.GetConverged())
-//    {
-//       std::cout << "MINRES converged in " << solver.GetNumIterations()
-//                 << " iterations with a residual norm of "
-//                 << solver.GetFinalNorm() << ".\n";
-//    }
-//    else
-//    {
-//       std::cout << "MINRES did not converge in " << solver.GetNumIterations()
-//                 << " iterations. Residual norm is " << solver.GetFinalNorm()
-//                 << ".\n";
-//    }
-//    std::cout << "MINRES solver took " << chrono.RealTime() << "s.\n";
-
-
-
-//    int order_quad = max(2, 2*order+1);
-//    const IntegrationRule *irs[Geometry::NumGeom];
-//    for (int i=0; i < Geometry::NumGeom; ++i)
-//    {
-//       irs[i] = &(IntRules.Get(i, order_quad));
-//    }
-
-//    double err_u  = u.ComputeL2Error(ucoeff, irs);
-//    double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
-//    double err_p  = p.ComputeL2Error(pcoeff, irs);
-//    double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
-
-//    std::cout << "|| u_h - u_ex || / || u_ex || = " << err_u / norm_u << "\n";
-//    std::cout << "|| p_h - p_ex || / || p_ex || = " << err_p / norm_p << "\n";
-
-//    // 13. Save the mesh and the solution. This output can be viewed later using
-//    //     GLVis: "glvis -m ex5.mesh -g sol_u.gf" or "glvis -m ex5.mesh -g
-//    //     sol_p.gf".
-//    {
-//       ofstream mesh_ofs("ex5.mesh");
-//       mesh_ofs.precision(8);
-//       mesh->Print(mesh_ofs);
-
-//       ofstream u_ofs("sol_u.gf");
-//       u_ofs.precision(8);
-//       u.Save(u_ofs);
-
-//       ofstream p_ofs("sol_p.gf");
-//       p_ofs.precision(8);
-//       p.Save(p_ofs);
-//    }
-
-//    // 14. Save data in the VisIt format
-//    VisItDataCollection visit_dc("Example5", mesh);
-//    visit_dc.RegisterField("velocity", &u);
-//    visit_dc.RegisterField("pressure", &p);
-//    visit_dc.Save();
+   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+   printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
    // 15. Save data in the ParaView format
    ParaViewDataCollection paraview_dc("Example5", mesh);
@@ -514,19 +362,6 @@ int main(int argc, char *argv[])
    paraview_dc.RegisterField("velocity",&u);
    paraview_dc.RegisterField("pressure",&p);
    paraview_dc.Save();
-
-//    // 16. Send the solution by socket to a GLVis server.
-//    if (visualization)
-//    {
-//       char vishost[] = "localhost";
-//       int  visport   = 19916;
-//       socketstream u_sock(vishost, visport);
-//       u_sock.precision(8);
-//       u_sock << "solution\n" << *mesh << u << "window_title 'Velocity'" << endl;
-//       socketstream p_sock(vishost, visport);
-//       p_sock.precision(8);
-//       p_sock << "solution\n" << *mesh << p << "window_title 'Pressure'" << endl;
-//    }
 
    // 17. Free the used memory.
    delete fform;
@@ -558,19 +393,10 @@ void uFun_ex(const Vector & x, Vector & u)
 {
    double xi(x(0));
    double yi(x(1));
-   double zi(0.0);
-   if (x.Size() == 3)
-   {
-      zi = x(2);
-   }
+   assert(x.Size() == 2);
 
-   u(0) = - exp(xi)*sin(yi)*cos(zi);
-   u(1) = - exp(xi)*cos(yi)*cos(zi);
-
-   if (x.Size() == 3)
-   {
-      u(2) = exp(xi)*sin(yi)*sin(zi);
-   }
+   u(0) = - exp(xi)*sin(yi);
+   u(1) = - exp(xi)*cos(yi);
 }
 
 // Change if needed
@@ -578,31 +404,28 @@ double pFun_ex(const Vector & x)
 {
    double xi(x(0));
    double yi(x(1));
-   double zi(0.0);
 
-   if (x.Size() == 3)
-   {
-      zi = x(2);
-   }
+   assert(x.Size() == 2);
 
-   return exp(xi)*sin(yi)*cos(zi);
+   return exp(xi)*sin(yi);
 }
 
 void fFun(const Vector & x, Vector & f)
 {
-   f = 0.0;
+   assert(x.Size() == 2);
+   f.SetSize(x.Size());
+
+   double xi(x(0));
+   double yi(x(1));
+
+   f(0) = exp(xi)*sin(yi);
+   f(1) = exp(xi)*cos(yi);
 }
 
 double gFun(const Vector & x)
 {
-   if (x.Size() == 3)
-   {
-      return -pFun_ex(x);
-   }
-   else
-   {
-      return 0;
-   }
+   assert(x.Size() == 2);
+   return 0;
 }
 
 double f_natural(const Vector & x)

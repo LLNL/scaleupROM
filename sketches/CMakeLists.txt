@@ -14,6 +14,7 @@ add_executable(mfem_sparse_hdf mfem_sparse_hdf.cpp $<TARGET_OBJECTS:scaleupROMOb
 add_executable(generate_interface generate_interface.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(mixed_dg_trace mixed_dg_trace_sketch.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(stokes stokes.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_executable(stokes_mms stokes_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 # add_executable(stokes_dg stokes_dg.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
 file(COPY inputs/gen_interface.yml DESTINATION ${CMAKE_BINARY_DIR}/sketches/inputs)
