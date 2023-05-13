@@ -51,6 +51,49 @@ void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 double f_natural(const Vector & x);
 
+class SchurOperator : public Operator
+{
+protected:
+   Operator *A, *B;//, *Bt;
+   CGSolver *solver = NULL;
+
+   int maxIter = 10000;
+   double rtol = 1.0e-15;
+   double atol = 1.0e-15;
+
+public:
+   SchurOperator(Operator* const A_, Operator* const B_)
+      : Operator(B_->Height()), A(A_), B(B_)//, Bt(Transpose(*B_))
+   {
+      // B->BuildTranspose();
+      // Bt = Transpose(*B);
+      // Bt = TransposeAbstractSparseMatrix(*B, 0);
+
+      solver = new CGSolver();
+      solver->SetRelTol(rtol);
+      solver->SetMaxIter(maxIter);
+      solver->SetOperator(*A);
+      solver->SetPrintLevel(1);
+   };
+
+   virtual ~SchurOperator()
+   {
+      delete solver;
+      // delete Bt;
+   }
+   
+   virtual void Mult(const Vector &x, Vector &y) const
+   {
+      Vector x1(A->NumCols());
+      B->MultTranspose(x, x1);
+
+      Vector y1(x1.Size());
+      solver->Mult(x1, y1);
+
+      B->Mult(y1, y);
+   }
+};
+
 int main(int argc, char *argv[])
 {
    StopWatch chrono;
@@ -58,6 +101,7 @@ int main(int argc, char *argv[])
    // 1. Parse command-line options.
    const char *mesh_file = "../data/star.mesh";
    int order = 1;
+   int refine = 0;
    bool pa = false;
    const char *device_config = "cpu";
    bool visualization = 1;
@@ -67,6 +111,8 @@ int main(int argc, char *argv[])
                   "Mesh file to use.");
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree).");
+   args.AddOption(&refine, "-r", "--refine",
+                  "Number of refinements.");
    // args.AddOption(&pa, "-pa", "--partial-assembly", "-no-pa",
    //                "--no-partial-assembly", "Enable Partial Assembly.");
    // args.AddOption(&device_config, "-d", "--device",
@@ -88,29 +134,26 @@ int main(int argc, char *argv[])
    Mesh *mesh = new Mesh(mesh_file, 1, 1);
    int dim = mesh->Dimension();
 
-   // // 4. Refine the mesh to increase the resolution. In this example we do
-   // //    'ref_levels' of uniform refinement. We choose 'ref_levels' to be the
-   // //    largest number that gives a final mesh with no more than 10,000
-   // //    elements.
-   // {
-   //    int ref_levels =
-   //       (int)floor(log(10000./mesh->GetNE())/log(2.)/dim);
-   //    for (int l = 0; l < ref_levels; l++)
-   //    {
-   //       mesh->UniformRefinement();
-   //    }
-   // }
+   // 4. Refine the mesh to increase the resolution. In this example we do
+   //    'ref_levels' of uniform refinement. We choose 'ref_levels' to be the
+   //    largest number that gives a final mesh with no more than 10,000
+   //    elements.
+   for (int l = 0; l < refine; l++)
+   {
+      mesh->UniformRefinement();
+   }
 
    // 5. Define a finite element space on the mesh. Here we use the
    //    Raviart-Thomas finite elements of the specified order.
    // FiniteElementCollection *hdiv_coll(new RT_FECollection(order, dim));
    FiniteElementCollection *l2_coll(new L2_FECollection(order, dim));
-   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+   FiniteElementCollection *h1_coll(new H1_FECollection(order+1, dim));
+   FiniteElementCollection *ph1_coll(new L2_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
    FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
    FiniteElementSpace *pfes = new FiniteElementSpace(mesh, l2_coll);
-   FiniteElementSpace *qfes = new FiniteElementSpace(mesh, h1_coll, dim+1);
+   // FiniteElementSpace *qfes = new FiniteElementSpace(mesh, h1_coll, dim+1);
 
    // FiniteElementSpace *R_space = new FiniteElementSpace(mesh, hdiv_coll, dim);
    // FiniteElementSpace *W_space = new FiniteElementSpace(mesh, l2_coll);
@@ -132,7 +175,7 @@ int main(int argc, char *argv[])
    std::cout << "***********************************************************\n";
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(1.0);
+   ConstantCoefficient k(1.0), minus_one(-1.0);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
@@ -179,7 +222,7 @@ int main(int argc, char *argv[])
    mVarf->Assemble();
    mVarf->Finalize();
 
-   bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator);
+   bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
    bVarf->Assemble();
    bVarf->Finalize();
 
@@ -187,67 +230,69 @@ int main(int argc, char *argv[])
    // btVarf->Assemble();
    // btVarf->Finalize();
 
-   Array<int> vblock_offsets(3); // number of variables + 1
-   vblock_offsets[0] = 0;
-   vblock_offsets[1] = ufes->GetVSize();
-   vblock_offsets[2] = pfes->GetVSize();
-   vblock_offsets.PartialSum();
-   BlockMatrix darcyOp(vblock_offsets);
+//    Array<int> vblock_offsets(3); // number of variables + 1
+//    vblock_offsets[0] = 0;
+//    vblock_offsets[1] = ufes->GetVSize();
+//    vblock_offsets[2] = pfes->GetVSize();
+//    vblock_offsets.PartialSum();
+//    BlockMatrix darcyOp(vblock_offsets);
 
-   SparseMatrix *Bt = NULL;
+//    SparseMatrix *Bt = NULL;
 
-   SparseMatrix &M(mVarf->SpMat());
-   SparseMatrix &B(bVarf->SpMat());
-   {
-      printf("M size: %d x %d\n", M.NumRows(), M.NumCols());
-      printf("B size: %d x %d\n", B.NumRows(), B.NumCols());
-      std::string filename;
-      filename = "stokes.M.txt";
-      PrintMatrix(M, filename);
-      filename = "stokes.B.txt";
-      PrintMatrix(B, filename);
-   }
-   B *= -1.;
-   Bt = TransposeAbstractSparseMatrix(B, 0);
+//    SparseMatrix &M(mVarf->SpMat());
+   // SparseMatrix &B(bVarf->SpMat());
+//    {
+//       printf("M size: %d x %d\n", M.NumRows(), M.NumCols());
+//       printf("B size: %d x %d\n", B.NumRows(), B.NumCols());
+//       std::string filename;
+//       filename = "stokes.M.txt";
+//       PrintMatrix(M, filename);
+//       filename = "stokes.B.txt";
+//       PrintMatrix(B, filename);
+//    }
+   // B *= -1.;
+//    Bt = TransposeAbstractSparseMatrix(B, 0);
 
-   darcyOp.SetBlock(0,0, &M);
-   darcyOp.SetBlock(0,1, Bt);
-   darcyOp.SetBlock(1,0, &B);
-{
-   SparseMatrix *D = darcyOp.CreateMonolithic();
-   std::string filename;
-   filename = "stokes.D.txt";
-   PrintMatrix(*D, filename);
-}
+//    darcyOp.SetBlock(0,0, &M);
+//    darcyOp.SetBlock(0,1, Bt);
+//    darcyOp.SetBlock(1,0, &B);
+// {
+//    SparseMatrix *D = darcyOp.CreateMonolithic();
+//    std::string filename;
+//    filename = "stokes.D.txt";
+//    PrintMatrix(*D, filename);
+// }
 
    Array<int> ess_attr(mesh->bdr_attributes.Max());
    // this array of integer essentially acts as the array of boolean:
    // If value is 0, then it is not Dirichlet.
    // If value is 1, then it is Dirichlet.
    ess_attr = 1;
-   Array<int> ess_tdof_list, tmp;
-   ess_tdof_list.SetSize(0);
-   for (int d = 0; d < dim; d++)
-   {
-      qfes->GetEssentialTrueDofs(ess_attr, tmp, d);
-      ess_tdof_list.Append(tmp);
-   }
-   printf("ess_tdof size: %d\n", ess_tdof_list.Size());
-   {
-      std::string filename;
-      filename = "stokes.ess_tdof.txt";
-      FILE *fp = fopen(filename.c_str(), "w");
+   Array<int> ess_tdof_list, tmp, empty;
+   ufes->GetEssentialTrueDofs(ess_attr, ess_tdof_list);
+   // ess_tdof_list.SetSize(0);
+   // for (int d = 0; d < dim; d++)
+   // {
+   //    ufes->GetEssentialTrueDofs(ess_attr, tmp, d);
+   //    ess_tdof_list.Append(tmp);
+   // }
+   // ess_tdof_list.Append(vblock_offsets[1]);
+   // printf("ess_tdof size: %d\n", ess_tdof_list.Size());
+   // {
+   //    std::string filename;
+   //    filename = "stokes.ess_tdof.txt";
+   //    FILE *fp = fopen(filename.c_str(), "w");
 
-      for (int i = 0; i < ess_tdof_list.Size(); i++)
-         fprintf(fp, "%d\n", ess_tdof_list[i]);
+   //    for (int i = 0; i < ess_tdof_list.Size(); i++)
+   //       fprintf(fp, "%d\n", ess_tdof_list[i]);
 
-      fclose(fp);
-   }
+   //    fclose(fp);
+   // }
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
    GridFunction u, p;
    u.MakeRef(ufes, x.GetBlock(0), 0);
-   p.MakeRef(fes, x.GetBlock(dim), 0);
+   p.MakeRef(pfes, x.GetBlock(dim), 0);
 
    u = 0.0;
 
@@ -257,13 +302,13 @@ int main(int argc, char *argv[])
    VectorConstantCoefficient one(ud);
    Array<int> bdrAttr(mesh->bdr_attributes.Max());
    bdrAttr = 0;
-   bdrAttr[3] = 1;
+   bdrAttr[2] = 1;
    u.ProjectBdrCoefficient(one, bdrAttr);
-   {
-      std::string filename;
-      filename = "stokes.u.txt";
-      PrintVector(u, filename);
-   }
+   // {
+   //    std::string filename;
+   //    filename = "stokes.u.txt";
+   //    PrintVector(u, filename);
+   // }
 // {  // x reflects the change from u.
 //    printf("u\n");
 //    for (int k = 0; k < u.Size(); k++) printf("%.5E\t", u[k]);
@@ -273,10 +318,64 @@ int main(int argc, char *argv[])
 //    printf("\n");
 // }
 
-   SparseMatrix *Ad = new SparseMatrix;
-   Operator *A(Ad);
-   Vector R, X;
-   darcyOp.FormLinearSystem(ess_tdof_list, x, rhs, A, X, R);
+   // A \ F1.
+   SparseMatrix A;
+   OperatorHandle Bh;
+   Vector U1, F1;
+   Vector P1, G1;
+   mVarf->FormLinearSystem(ess_tdof_list, u, *fform, A, U1, F1);
+   bVarf->FormRectangularLinearSystem(ess_tdof_list, empty, u, *gform, Bh, U1, G1);
+   Operator &B(*Bh);
+
+   int maxIter(10000);
+   double rtol(1.e-15);
+   double atol(1.e-15);
+   chrono.Clear();
+   chrono.Start();
+   // MINRESSolver solver;
+   CGSolver solver;
+   // solver.SetAbsTol(atol);
+   solver.SetRelTol(rtol);
+   solver.SetMaxIter(maxIter);
+   solver.SetOperator(A);
+   // solver.SetPreconditioner(darcyPrec);
+   solver.SetPrintLevel(1);
+   // x = 0.0;
+   solver.Mult(F1, U1);
+   // if (device.IsEnabled()) { x.HostRead(); }
+   chrono.Stop();
+
+   // B * A^{-1} * F1 - G1
+   Vector R2(pfes->GetVSize());
+   bVarf->Mult(U1, R2);
+   R2 -= G1;
+
+   // B.BuildTranspose();
+   SchurOperator schur(&A, &B);
+   CGSolver solver2;
+   solver2.SetOperator(schur);
+   OrthoSolver ortho;
+   ortho.SetSolver(solver2);
+   ortho.SetOperator(schur);
+   printf("Solving for pressure\n");
+   printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
+   ortho.Mult(R2, p);
+   printf("Pressure is solved.\n");
+
+   // AU = F - B^T * P;
+   Vector F2(F1.Size());
+   B.MultTranspose(p, F2);
+   F2 *= -1.0;
+   F2 += F1;
+
+   printf("Solving for velocity\n");
+   solver.Mult(F2, u);
+   printf("Velocity is solved.\n");
+
+   // SparseMatrix *Ad = new SparseMatrix;
+   // Operator *A(Ad);
+   // Vector R, X;
+   // darcyOp.FormLinearSystem(ess_tdof_list, x, rhs, A, X, R);
    // printf("Ad: %dx%d\n", Ad->NumRows(), Ad->NumCols());
    // printf("A: %dx%d\n", A->NumRows(), A->NumCols());
    // std::string filename;
@@ -329,26 +428,26 @@ int main(int argc, char *argv[])
 //    darcyPrec.SetDiagonalBlock(0, invM);
 //    darcyPrec.SetDiagonalBlock(1, invS);
 
-   // 11. Solve the linear system with MINRES.
-   //     Check the norm of the unpreconditioned residual.
-   int maxIter(10000);
-   double rtol(1.e-6);
-   double atol(1.e-10);
+   // // 11. Solve the linear system with MINRES.
+   // //     Check the norm of the unpreconditioned residual.
+   // int maxIter(10000);
+   // double rtol(1.e-6);
+   // double atol(1.e-10);
 
-   chrono.Clear();
-   chrono.Start();
-   // MINRESSolver solver;
-   CGSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(*A);
-   // solver.SetPreconditioner(darcyPrec);
-   solver.SetPrintLevel(1);
-   // x = 0.0;
-   solver.Mult(R, X);
-   // if (device.IsEnabled()) { x.HostRead(); }
-   chrono.Stop();
+   // chrono.Clear();
+   // chrono.Start();
+   // // MINRESSolver solver;
+   // CGSolver solver;
+   // solver.SetAbsTol(atol);
+   // solver.SetRelTol(rtol);
+   // solver.SetMaxIter(maxIter);
+   // solver.SetOperator(*A);
+   // // solver.SetPreconditioner(darcyPrec);
+   // solver.SetPrintLevel(1);
+   // // x = 0.0;
+   // solver.Mult(R, X);
+   // // if (device.IsEnabled()) { x.HostRead(); }
+   // chrono.Stop();
 
 //    if (solver.GetConverged())
 //    {
@@ -404,17 +503,17 @@ int main(int argc, char *argv[])
 //    visit_dc.RegisterField("pressure", &p);
 //    visit_dc.Save();
 
-//    // 15. Save data in the ParaView format
-//    ParaViewDataCollection paraview_dc("Example5", mesh);
-//    paraview_dc.SetPrefixPath("ParaView");
-//    paraview_dc.SetLevelsOfDetail(order);
-//    paraview_dc.SetCycle(0);
+   // 15. Save data in the ParaView format
+   ParaViewDataCollection paraview_dc("Example5", mesh);
+   paraview_dc.SetPrefixPath("ParaView");
+   paraview_dc.SetLevelsOfDetail(order);
+   // paraview_dc.SetCycle(0);
 //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
 //    paraview_dc.SetHighOrderOutput(true);
 //    paraview_dc.SetTime(0.0); // set the time
-//    paraview_dc.RegisterField("velocity",&u);
-//    paraview_dc.RegisterField("pressure",&p);
-//    paraview_dc.Save();
+   paraview_dc.RegisterField("velocity",&u);
+   paraview_dc.RegisterField("pressure",&p);
+   paraview_dc.Save();
 
 //    // 16. Send the solution by socket to a GLVis server.
 //    if (visualization)
@@ -435,15 +534,16 @@ int main(int argc, char *argv[])
    // delete invM;
    // delete invS;
    // delete S;
-   delete Bt;
+   // delete Bt;
    // delete MinvBt;
    delete mVarf;
    delete bVarf;
    delete fes;
    delete ufes;
    delete pfes;
-   delete qfes;
+   // delete qfes;
    delete h1_coll;
+   delete ph1_coll;
    // delete W_space;
    // delete R_space;
    delete l2_coll;
