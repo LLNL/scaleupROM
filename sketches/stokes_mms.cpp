@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
-   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff));
+   // fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff));
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
 
@@ -213,39 +213,6 @@ int main(int argc, char *argv[])
    // btVarf->AddDomainIntegrator(new MixedScalarWeakGradientIntegrator);
    // btVarf->Assemble();
    // btVarf->Finalize();
-
-//    Array<int> vblock_offsets(3); // number of variables + 1
-//    vblock_offsets[0] = 0;
-//    vblock_offsets[1] = ufes->GetVSize();
-//    vblock_offsets[2] = pfes->GetVSize();
-//    vblock_offsets.PartialSum();
-//    BlockMatrix darcyOp(vblock_offsets);
-
-//    SparseMatrix *Bt = NULL;
-
-//    SparseMatrix &M(mVarf->SpMat());
-   // SparseMatrix &B(bVarf->SpMat());
-//    {
-//       printf("M size: %d x %d\n", M.NumRows(), M.NumCols());
-//       printf("B size: %d x %d\n", B.NumRows(), B.NumCols());
-//       std::string filename;
-//       filename = "stokes.M.txt";
-//       PrintMatrix(M, filename);
-//       filename = "stokes.B.txt";
-//       PrintMatrix(B, filename);
-//    }
-   // B *= -1.;
-//    Bt = TransposeAbstractSparseMatrix(B, 0);
-
-//    darcyOp.SetBlock(0,0, &M);
-//    darcyOp.SetBlock(0,1, Bt);
-//    darcyOp.SetBlock(1,0, &B);
-// {
-//    SparseMatrix *D = darcyOp.CreateMonolithic();
-//    std::string filename;
-//    filename = "stokes.D.txt";
-//    PrintMatrix(*D, filename);
-// }
 
    Array<int> ess_attr(mesh->bdr_attributes.Max());
    // this array of integer essentially acts as the array of boolean:
@@ -313,9 +280,9 @@ int main(int argc, char *argv[])
    SchurOperator schur(&A, &B);
    CGSolver solver2;
    solver2.SetOperator(schur);
-   // solver2.SetPrintLevel(1);
-   // solver2.SetAbsTol(rtol);
-   // solver2.SetMaxIter(maxIter);
+   solver2.SetPrintLevel(0);
+   solver2.SetAbsTol(rtol);
+   solver2.SetMaxIter(maxIter);
    OrthoSolver ortho;
    ortho.SetSolver(solver2);
    ortho.SetOperator(schur);
@@ -323,7 +290,6 @@ int main(int argc, char *argv[])
    // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
    // solver2.Mult(R2, p);
    ortho.Mult(R2, p);
-   p += p_const;
    printf("Pressure is solved.\n");
 
    // AU = F - B^T * P;
@@ -335,6 +301,8 @@ int main(int argc, char *argv[])
    printf("Solving for velocity\n");
    solver.Mult(F3, u);
    printf("Velocity is solved.\n");
+
+   p += p_const;
 
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
@@ -352,8 +320,8 @@ int main(int argc, char *argv[])
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
    // 15. Save data in the ParaView format
-   ParaViewDataCollection paraview_dc("Example5", mesh);
-   paraview_dc.SetPrefixPath("ParaView");
+   ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
+   // paraview_dc.SetPrefixPath("ParaView");
    paraview_dc.SetLevelsOfDetail(order);
    // paraview_dc.SetCycle(0);
 //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
