@@ -158,6 +158,19 @@ int main(int argc, char *argv[])
    printf("dim(q) = %d\n", block_offsets.Last());
    std::cout << "***********************************************************\n";
 
+   Array<int> u_ess_attr(mesh->bdr_attributes.Max());
+   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   u_ess_attr = 1;
+   p_ess_attr = 0;
+   // u_ess_attr[1] = 0;
+   // p_ess_attr[1] = 1;
+   Array<int> u_ess_tdof, p_ess_tdof, empty;
+   ufes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
+   pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
+
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
    ConstantCoefficient k(1.0), minus_one(-1.0);
 
@@ -175,6 +188,19 @@ int main(int argc, char *argv[])
    //    (u,p) and the linear forms (fform, gform).
 //    MemoryType mt = device.GetMemoryType();
    BlockVector x(block_offsets), rhs(block_offsets);
+
+   // 12. Create the grid functions u and p. Compute the L2 error norms.
+   GridFunction u, p;
+   u.MakeRef(ufes, x.GetBlock(0), 0);
+   p.MakeRef(pfes, x.GetBlock(dim), 0);
+
+   u = 0.0;
+   u.ProjectBdrCoefficient(ucoeff, u_ess_attr);
+
+   p.ProjectCoefficient(pcoeff);
+   const double p_const = p.Sum() / static_cast<double>(p.Size());
+   p = 0.0;
+   p.ProjectBdrCoefficient(pcoeff, p_ess_attr);
 
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
@@ -214,35 +240,6 @@ int main(int argc, char *argv[])
    // btVarf->Assemble();
    // btVarf->Finalize();
 
-   Array<int> ess_attr(mesh->bdr_attributes.Max());
-   // this array of integer essentially acts as the array of boolean:
-   // If value is 0, then it is not Dirichlet.
-   // If value is 1, then it is Dirichlet.
-   ess_attr = 1;
-   Array<int> u_ess_tdof, p_ess_tdof, empty;
-   ufes->GetEssentialTrueDofs(ess_attr, u_ess_tdof);
-   pfes->GetEssentialTrueDofs(ess_attr, p_ess_tdof);
-
-   // 12. Create the grid functions u and p. Compute the L2 error norms.
-   GridFunction u, p;
-   u.MakeRef(ufes, x.GetBlock(0), 0);
-   p.MakeRef(pfes, x.GetBlock(dim), 0);
-
-   u = 0.0;
-   p = 0.0;
-
-   // add dirichlet boundary condition.
-   // Vector ud(dim);
-   // ud[0] = 1.0; ud[1] = 0.0;
-   // VectorConstantCoefficient one(ud);
-   Array<int> bdrAttr(mesh->bdr_attributes.Max());
-   bdrAttr = 1;
-   // bdrAttr[2] = 1;
-   // u.ProjectBdrCoefficient(one, bdrAttr);
-   u.ProjectBdrCoefficient(ucoeff, bdrAttr);
-   p.ProjectCoefficient(pcoeff);
-   const double p_const = p.Sum() / static_cast<double>(p.Size());
-
    // A \ F2.
    SparseMatrix A;
    OperatorHandle Bh;
@@ -250,7 +247,7 @@ int main(int argc, char *argv[])
    Vector P1, G1;
    mVarf->FormLinearSystem(u_ess_tdof, u, *fform, A, U1, F1);
 
-   bVarf->FormRectangularLinearSystem(u_ess_tdof, empty, u, *gform, Bh, U1, G1);
+   bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
    Operator &B(*Bh);
 
    int maxIter(10000);
