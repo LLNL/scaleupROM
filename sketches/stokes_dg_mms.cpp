@@ -47,6 +47,7 @@ using namespace mfem;
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
 double pFun_ex(const Vector & x);
+void grad_pFun_ex(const Vector & x, Vector & y);
 double lap_pFun_ex(const Vector & x);
 void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
@@ -126,9 +127,9 @@ int main(int argc, char *argv[])
    FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
    FiniteElementCollection *pdg_coll(new DG_FECollection(order+1, dim));
 
-   FiniteElementSpace *fes = new FiniteElementSpace(mesh, dg_coll);
-   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, dg_coll, dim);
-   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, dg_coll);
+   FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
+   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
+   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, h1_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
    //    offsets for each variable. The last component of the Array is the sum
@@ -166,6 +167,8 @@ int main(int argc, char *argv[])
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    VectorFunctionCoefficient minus_fcoeff(dim, fFun, &minus_one);
+   VectorFunctionCoefficient grad_pcoeff(dim, grad_pFun_ex);
+   FunctionCoefficient lap_pcoeff(lap_pFun_ex);
    FunctionCoefficient fnatcoeff(f_natural);
    FunctionCoefficient gcoeff(gFun);
 
@@ -173,6 +176,8 @@ int main(int argc, char *argv[])
    FunctionCoefficient pcoeff(pFun_ex);
 
    GridFunction f_gf(ufes);
+   f_gf.ProjectCoefficient(fcoeff);
+   f_gf *= -1.0;
    DivergenceGridFunctionCoefficient div_fcoeff(&f_gf);
 
    GridFunction g_gf(pfes);
@@ -212,19 +217,30 @@ int main(int argc, char *argv[])
 
    BilinearForm *pVarf(new BilinearForm(pfes));
    pVarf->AddDomainIntegrator(new DiffusionIntegrator);
-   pVarf->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa));
-   pVarf->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa));
+   // pVarf->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa));
+   // pVarf->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa));
+   pVarf->AddBdrFaceIntegrator(new DGDiffusionIntegrator(one, sigma, kappa), p_ess_attr);
    pVarf->Assemble();
    pVarf->Finalize();
 
    LinearForm *pform(new LinearForm);
    pform->Update(pfes, rhs.GetBlock(dim), 0);
-   // pform->AddDomainIntegrator(new DomainLFGradIntegrator(fcoeff));
+   // pform->AddDomainIntegrator(new DomainLFIntegrator(lap_pcoeff));
+
+
+   // With L2 space, this is not possible, as it does not provide BE for BoundaryIntegrator.
    pform->AddDomainIntegrator(new DomainLFIntegrator(div_fcoeff));
+   // pform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(grad_pcoeff), u_ess_attr);
+   pform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(fcoeff), u_ess_attr);
+
+   // This does not have the proper convergence rate.
+   // pform->AddDomainIntegrator(new DomainLFGradIntegrator(fcoeff));
+
+
    // pform->AddDomainIntegrator(new DomainLFGradIntegrator(grad_gcoeff));
-   // pform->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(pcoeff, one, sigma, kappa), p_ess_attr);
    // pform->AddDomainIntegrator(new DomainLFIntegrator(zero));
-   pform->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(pcoeff, one, sigma, kappa));
+   // pform->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(pcoeff, one, sigma, kappa));
+   pform->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(pcoeff, one, sigma, kappa), p_ess_attr);
 
 // {
 //    printf("BE GetDim\n");
@@ -378,8 +394,29 @@ double pFun_ex(const Vector & x)
    return exp(xi)*sin(yi);
 }
 
+void grad_pFun_ex(const Vector & x, Vector & y)
+{
+   double xi(x(0));
+   double yi(x(1));
+   assert(x.Size() == 2);
+
+   y.SetSize(2);
+
+   y(0) = exp(xi)*sin(yi);
+   y(1) = exp(xi)*cos(yi);
+   return;
+}
+
 double lap_pFun_ex(const Vector & x)
-{ return 0.0; }
+{
+   double xi(x(0));
+   double yi(x(1));
+
+   assert(x.Size() == 2);
+
+   // return 2.0 * sin(xi)*cos(yi);
+   return 0.0;
+}
 
 void fFun(const Vector & x, Vector & f)
 {
