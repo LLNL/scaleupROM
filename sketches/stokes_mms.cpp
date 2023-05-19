@@ -50,6 +50,7 @@ double pFun_ex(const Vector & x);
 void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 double f_natural(const Vector & x);
+void dudx_ex(const Vector & x, Vector & y);
 
 class SchurOperator : public Operator
 {
@@ -98,6 +99,7 @@ int main(int argc, char *argv[])
    int order = 1;
    int refine = 0;
    bool pa = false;
+   bool pres_dbc = false;
    const char *device_config = "cpu";
    bool visualization = 1;
 
@@ -108,6 +110,9 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
                   "Number of refinements.");
+   args.AddOption(&pres_dbc, "-pd", "--pressure-dirichlet",
+                  "-no-pd", "--no-pressure-dirichlet",
+                  "Use pressure Dirichlet condition.");
    args.Parse();
    if (!args.Good())
    {
@@ -165,8 +170,12 @@ int main(int argc, char *argv[])
    // If value is 1, then it is Dirichlet.
    u_ess_attr = 1;
    p_ess_attr = 0;
-   // u_ess_attr[1] = 0;
-   // p_ess_attr[1] = 1;
+   if (pres_dbc)
+   {
+      u_ess_attr[1] = 0;
+      p_ess_attr[1] = 1;
+   }
+
    Array<int> u_ess_tdof, p_ess_tdof, empty;
    ufes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
    pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
@@ -176,6 +185,7 @@ int main(int argc, char *argv[])
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
+   VectorFunctionCoefficient dudxcoeff(dim, dudx_ex);
    FunctionCoefficient gcoeff(gFun);
 
    VectorFunctionCoefficient ucoeff(dim, uFun_ex);
@@ -205,7 +215,11 @@ int main(int argc, char *argv[])
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
-   // fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff));
+
+   // Currently, mfem does not have a way to impose general tensor bc.
+   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
+   fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
+
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
 
@@ -247,7 +261,9 @@ int main(int argc, char *argv[])
    Vector P1, G1;
    mVarf->FormLinearSystem(u_ess_tdof, u, *fform, A, U1, F1);
 
-   bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
+   // It turns out that we do not remove pressure dirichlet bc dofs from this matrix.
+   // bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
+   bVarf->FormRectangularLinearSystem(u_ess_tdof, empty, u, *gform, Bh, U1, G1);
    Operator &B(*Bh);
 
    int maxIter(10000);
@@ -281,12 +297,19 @@ int main(int argc, char *argv[])
    solver2.SetAbsTol(rtol);
    solver2.SetMaxIter(maxIter);
    OrthoSolver ortho;
-   ortho.SetSolver(solver2);
-   ortho.SetOperator(schur);
+   if (!pres_dbc)
+   {
+      printf("Setting up OrthoSolver\n");
+      ortho.SetSolver(solver2);
+      ortho.SetOperator(schur);
+   }
+   
    printf("Solving for pressure\n");
    // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
-   // solver2.Mult(R2, p);
-   ortho.Mult(R2, p);
+   if (pres_dbc)
+      solver2.Mult(R2, p);
+   else
+      ortho.Mult(R2, p);
    printf("Pressure is solved.\n");
 
    // AU = F - B^T * P;
@@ -299,7 +322,8 @@ int main(int argc, char *argv[])
    solver.Mult(F3, u);
    printf("Velocity is solved.\n");
 
-   p += p_const;
+   if (!pres_dbc)
+      p += p_const;
 
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
@@ -396,4 +420,16 @@ double gFun(const Vector & x)
 double f_natural(const Vector & x)
 {
    return (-pFun_ex(x));
+}
+
+void dudx_ex(const Vector & x, Vector & y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(x.Size());
+
+   double xi(x(0));
+   double yi(x(1));
+
+   y(0) = - exp(xi)*sin(yi);
+   y(1) = - exp(xi)*cos(yi);
 }
