@@ -384,8 +384,10 @@ void uFun_ex(const Vector & x, Vector & u)
    double yi(x(1));
    assert(x.Size() == 2);
 
-   u(0) = - exp(xi)*sin(yi);
-   u(1) = - exp(xi)*cos(yi);
+   // u(0) = - exp(xi)*sin(yi);
+   // u(1) = - exp(xi)*cos(yi);
+   u(0) = cos(xi)*sin(yi);
+   u(1) = - sin(xi)*cos(yi);
 }
 
 // Change if needed
@@ -396,7 +398,7 @@ double pFun_ex(const Vector & x)
 
    assert(x.Size() == 2);
 
-   return exp(xi)*sin(yi);
+   return 2.0 * sin(xi)*sin(yi);
 }
 
 void fFun(const Vector & x, Vector & f)
@@ -407,8 +409,10 @@ void fFun(const Vector & x, Vector & f)
    double xi(x(0));
    double yi(x(1));
 
-   f(0) = exp(xi)*sin(yi);
-   f(1) = exp(xi)*cos(yi);
+   // f(0) = exp(xi)*sin(yi);
+   // f(1) = exp(xi)*cos(yi);
+   f(0) = 4.0 * cos(xi) * sin(yi);
+   f(1) = 0.0;
 }
 
 double gFun(const Vector & x)
@@ -430,6 +434,6 @@ void dudx_ex(const Vector & x, Vector & y)
    double xi(x(0));
    double yi(x(1));
 
-   y(0) = - exp(xi)*sin(yi);
-   y(1) = - exp(xi)*cos(yi);
+   y(0) = - sin(xi)*sin(yi);
+   y(1) = - cos(xi)*cos(yi);
 }
