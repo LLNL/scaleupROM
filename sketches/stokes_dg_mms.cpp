@@ -101,6 +101,8 @@ protected:
       : BilinearFormIntegrator(ir) { }
 
 public:
+   virtual ~MixedBilinearFormFaceIntegrator() {};
+
    /** Abstract method used for assembling InteriorFaceIntegrators in a
        MixedBilinearFormDGExtension. */
    virtual void AssembleFaceMatrix(const FiniteElement &trial_fe1,
@@ -224,7 +226,16 @@ class DGNormalFluxIntegrator : public MixedBilinearFormFaceIntegrator//, DGTrace
 {
 private:
    int dim;
+   int order;
+   int p;
 
+   int trial_dof1, trial_dof2, test_dof1, test_dof2;
+   int trial_vdof1, trial_vdof2;
+
+   double w, wn;
+   int i, j, idof, jdof, jm;
+
+   Vector nor, wnor;
    Vector shape1, shape2;
    // Vector divshape;
    Vector trshape1, trshape2;
@@ -233,6 +244,7 @@ private:
 
 public:
    DGNormalFluxIntegrator() {};
+   virtual ~DGNormalFluxIntegrator() {};
    // /// Construct integrator with rho = 1, b = 0.5*a.
    // DGNormalFluxIntegrator(VectorCoefficient &u_, double a)
    //    : DGTraceIntegrator(u_, a) {};
@@ -350,7 +362,7 @@ int main(int argc, char *argv[])
    FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
-   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, ph1_coll, dim);
+   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
    FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
@@ -424,8 +436,8 @@ int main(int argc, char *argv[])
 
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
-   // fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
-   fform->AddDomainIntegrator(new VectorDomainLFIntegrator(mlap_ucoeff));
+   fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
+   // fform->AddDomainIntegrator(new VectorDomainLFIntegrator(mlap_ucoeff));
 
    // // Currently, mfem does not have a way to impose general tensor bc.
    // // dg fe space does not support boundary integrators. needs reimplmentation.
@@ -440,8 +452,8 @@ int main(int argc, char *argv[])
    LinearForm *gform(new LinearForm);
    gform->Update(pfes, rhs.GetBlock(dim), 0);
    gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
-   // dg fe space does not support boundary integrators. needs reimplmentation.
-   gform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
+   // // dg fe space does not support boundary integrators. needs reimplmentation.
+   // gform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
 
@@ -454,19 +466,19 @@ int main(int argc, char *argv[])
    //     M = \int_\Omega k \grad u_h \cdot \grad v_h d\Omega   u_h, v_h \in R_h
    //     B   = -\int_\Omega \div u_h q_h d\Omega   u_h \in R_h, q_h \in W_h
    BilinearForm *mVarf(new BilinearForm(ufes));
-   // MixedBilinearFormDGExtension *bVarf(new MixedBilinearFormDGExtension(ufes, pfes));
+   MixedBilinearFormDGExtension *bVarf(new MixedBilinearFormDGExtension(ufes, pfes));
 
    mVarf->AddDomainIntegrator(new VectorDiffusionIntegrator(k));
    mVarf->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(k, sigma, kappa), u_ess_attr);
    mVarf->Assemble();
    mVarf->Finalize();
 
-   // bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
-   // bVarf->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, u_ess_attr);
-   // bVarf->Assemble();
-   // bVarf->Finalize();
+   bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+   bVarf->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, u_ess_attr);
+   bVarf->Assemble();
+   bVarf->Finalize();
 
-   Vector R1(fform->Size());
+   Vector R1(ufes->GetVSize());
    SparseMatrix M;
    Vector F1(ufes->GetVSize());
    // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, M, R1, F1);
@@ -492,32 +504,31 @@ int main(int argc, char *argv[])
    // solver.SetPreconditioner(darcyPrec);
    solver.SetPrintLevel(0);
    // x = 0.0;
-   solver.Mult(*fform, u);
+   solver.Mult(*fform, R1);
    // mVarf->RecoverFEMSolution(R1, *fform, u);
    // if (device.IsEnabled()) { x.HostRead(); }
    // chrono.Stop();
    printf("Set up pressure RHS\n");
 
-{
-   int order_quad = max(2, 2*(order+1)+1);
-   const IntegrationRule *irs[Geometry::NumGeom];
-   for (int i=0; i < Geometry::NumGeom; ++i)
-   {
-      irs[i] = &(IntRules.Get(i, order_quad));
-   }
+// {
+//    int order_quad = max(2, 2*(order+1)+1);
+//    const IntegrationRule *irs[Geometry::NumGeom];
+//    for (int i=0; i < Geometry::NumGeom; ++i)
+//    {
+//       irs[i] = &(IntRules.Get(i, order_quad));
+//    }
 
-   double err_u  = u.ComputeL2Error(ucoeff, irs);
-   double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+//    double err_u  = u.ComputeL2Error(ucoeff, irs);
+//    double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
 
-   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-}
+//    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+// }
 
    // // B * A^{-1} * F1 - G1
    // Vector R2(pfes->GetVSize());
    // bVarf->Mult(R1, R2);
    // R2 -= (*gform);
 
-   // // B.BuildTranspose();
    // SchurOperator schur(mVarf, bVarf);
    // CGSolver solver2;
    // solver2.SetOperator(schur);
@@ -541,8 +552,6 @@ int main(int argc, char *argv[])
    // else
    //    ortho.Mult(R2, p);
    // printf("Pressure is solved.\n");
-
-   // exit(-1);
 
    // BilinearForm *uVarf(new BilinearForm(ufes));
    // uVarf->AddDomainIntegrator(new VectorDiffusionIntegrator(k));
@@ -617,7 +626,7 @@ int main(int argc, char *argv[])
    delete fform;
    delete gform;
    delete mVarf;
-   // delete bVarf;
+   delete bVarf;
    delete fes;
    delete ufes;
    delete pfes;
@@ -878,16 +887,13 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
                                                 FaceElementTransformations &Trans,
                                                 DenseMatrix &elmat)
 {
-   int trial_dof1, trial_dof2, test_dof1, test_dof2;
-   int trial_vdof1, trial_vdof2;
-
-   double w;
-
    dim = trial_fe1.GetDim();
    trial_dof1 = trial_fe1.GetDof();
    trial_vdof1 = dim * trial_dof1;
    test_dof1 = test_fe1.GetDof();
-   Vector nor(dim), wnor(dim);
+
+   nor.SetSize(dim);
+   wnor.SetSize(dim);
 
    // vshape1.SetSize(trial_dof1, dim);
    // vshape1_n.SetSize(trial_dof1);
@@ -918,14 +924,14 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
-      int order;
       // Assuming order(u)==order(mesh)
       if (Trans.Elem2No >= 0)
          order = (min(Trans.Elem1->OrderW(), Trans.Elem2->OrderW()) +
-                  2*max(trial_fe1.GetOrder(), trial_fe2.GetOrder()));
+                  max(trial_fe1.GetOrder(), trial_fe2.GetOrder()) +
+                  max(test_fe1.GetOrder(), test_fe2.GetOrder()));
       else
       {
-         order = Trans.Elem1->OrderW() + 2*trial_fe1.GetOrder();
+         order = Trans.Elem1->OrderW() + trial_fe1.GetOrder() + test_fe1.GetOrder();
       }
       if (trial_fe1.Space() == FunctionSpace::Pk)
       {
@@ -934,7 +940,7 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
       ir = &IntRules.Get(Trans.GetGeometryType(), order);
    }  // if (ir == NULL)
 
-   for (int p = 0; p < ir->GetNPoints(); p++)
+   for (p = 0; p < ir->GetNPoints(); p++)
    {
       const IntegrationPoint &ip = ir->IntPoint(p);
 
@@ -966,11 +972,11 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
 
       wnor.Set(w, nor);
       
-      for (int jm = 0, j = 0; jm < dim; jm++)
+      for (jm = 0, j = 0; jm < dim; jm++)
       {
-         double wn = wnor(jm);
-         for (int jdof = 0; jdof < trial_dof1; jdof++, j++)
-            for (int idof = 0, i = 0; idof < test_dof1; idof++, i++)
+         wn = wnor(jm);
+         for (jdof = 0; jdof < trial_dof1; jdof++, j++)
+            for (idof = 0, i = 0; idof < test_dof1; idof++, i++)
                elmat(i, j) += wn * shape1(idof) * trshape1(jdof);
       }
 
@@ -981,11 +987,11 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
          test_fe2.CalcShape(eip2, shape2);
          // vshape2.Mult(nor, vshape2_n);
 
-         for (int jm = 0, j = 0; jm < dim; jm++)
+         for (jm = 0, j = 0; jm < dim; jm++)
          {
-            double wn = wnor(jm);
-            for (int jdof = 0; jdof < trial_dof1; jdof++, j++)
-               for (int idof = 0, i = test_dof1; idof < test_dof2; idof++, i++)
+            wn = wnor(jm);
+            for (jdof = 0; jdof < trial_dof1; jdof++, j++)
+               for (idof = 0, i = test_dof1; idof < test_dof2; idof++, i++)
                   elmat(i, j) += wn * shape2(idof) * trshape1(jdof);
          }
          // for (int i = 0; i < test_dof2; i++)
@@ -994,11 +1000,11 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
          //       elmat(test_dof1+i, j) += w * shape2(i) * vshape1_n(j);
          //    }
 
-         for (int jm = 0, j = trial_vdof1; jm < dim; jm++)
+         for (jm = 0, j = trial_vdof1; jm < dim; jm++)
          {
-            double wn = wnor(jm);
-            for (int jdof = 0; jdof < trial_dof2; jdof++, j++)
-               for (int idof = 0, i = test_dof1; idof < test_dof2; idof++, i++)
+            wn = wnor(jm);
+            for (jdof = 0; jdof < trial_dof2; jdof++, j++)
+               for (idof = 0, i = test_dof1; idof < test_dof2; idof++, i++)
                   elmat(i, j) -= wn * shape2(idof) * trshape2(jdof);
          }
          // for (int i = 0; i < test_dof2; i++)
@@ -1007,11 +1013,11 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
          //       elmat(test_dof1+i, trial_dof1+j) -= w * shape2(i) * vshape2_n(j);
          //    }
 
-         for (int jm = 0, j = trial_vdof1; jm < dim; jm++)
+         for (jm = 0, j = trial_vdof1; jm < dim; jm++)
          {
-            double wn = wnor(jm);
-            for (int jdof = 0; jdof < trial_dof2; jdof++, j++)
-               for (int idof = 0, i = 0; idof < test_dof1; idof++, i++)
+            wn = wnor(jm);
+            for (jdof = 0; jdof < trial_dof2; jdof++, j++)
+               for (idof = 0, i = 0; idof < test_dof1; idof++, i++)
                   elmat(i, j) -= wn * shape1(idof) * trshape2(jdof);
          }
          // for (int i = 0; i < test_dof1; i++)
@@ -1020,7 +1026,7 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
          //       elmat(i, trial_dof1+j) -= w * shape1(i) * vshape2_n(j);
          //    }
       }  // if (trial_dof2)
-   }  // for (int p = 0; p < ir->GetNPoints(); p++)
+   }  // for (p = 0; p < ir->GetNPoints(); p++)
 }
 
 void DGVectorDiffusionIntegrator::AssembleFaceMatrix(
