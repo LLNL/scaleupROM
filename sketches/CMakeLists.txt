@@ -16,6 +16,7 @@ add_executable(mixed_dg_trace mixed_dg_trace_sketch.cpp $<TARGET_OBJECTS:scaleup
 add_executable(stokes stokes.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(stokes_mms stokes_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(stokes_mms2 stokes_mms2.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_executable(stokes_mms3 stokes_mms3.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(stokes_dg stokes_dg.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(stokes_dg_mms stokes_dg_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
