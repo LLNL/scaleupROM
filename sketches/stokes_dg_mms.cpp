@@ -388,8 +388,8 @@ int main(int argc, char *argv[])
    FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
-   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
-   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
+   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, dg_coll, dim);
+   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, pdg_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
    //    offsets for each variable. The last component of the Array is the sum
@@ -467,10 +467,10 @@ int main(int argc, char *argv[])
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    // fform->AddDomainIntegrator(new VectorDomainLFIntegrator(mlap_ucoeff));
 
-   // Currently, mfem does not have a way to impose general tensor bc.
-   // dg fe space does not support boundary integrators. needs reimplmentation.
-   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
-   fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
+   // // Currently, mfem does not have a way to impose general tensor bc.
+   // // dg fe space does not support boundary integrators. needs reimplmentation.
+   // fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
+   // fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
 
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
 
@@ -482,8 +482,8 @@ int main(int argc, char *argv[])
    gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
    // dg fe space does not support boundary integrators. needs reimplmentation.
    // Below two operators are essentially the same. Integration order must be set as 2 * order to guarantee the right convergence rate.
-   gform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(ucoeff, 2, 0), u_ess_attr);
-   // gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
+   // gform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(ucoeff, 2, 0), u_ess_attr);
+   gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
 
@@ -499,11 +499,13 @@ int main(int argc, char *argv[])
    MixedBilinearFormDGExtension *bVarf(new MixedBilinearFormDGExtension(ufes, pfes));
 
    mVarf->AddDomainIntegrator(new VectorDiffusionIntegrator(k));
+   mVarf->AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(k, sigma, kappa));
    mVarf->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(k, sigma, kappa), u_ess_attr);
    mVarf->Assemble();
    mVarf->Finalize();
 
    bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+   bVarf->AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
    bVarf->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, u_ess_attr);
    bVarf->Assemble();
    bVarf->Finalize();
