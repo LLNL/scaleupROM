@@ -341,6 +341,7 @@ int main(int argc, char *argv[])
    bool pa = false;
    const char *device_config = "cpu";
    bool visualization = 1;
+   bool ph = true;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -349,6 +350,8 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
                   "Number of refinements.");
+   args.AddOption(&ph, "-ph", "--phcoll", "-no-ph", "--no-phcoll",
+                  "Use ph1_call.");
    args.Parse();
    if (!args.Good())
    {
@@ -356,9 +359,6 @@ int main(int argc, char *argv[])
       return 1;
    }
    args.PrintOptions(cout);
-
-   double sigma = -1.0;
-   double kappa = (order + 1) * (order + 1);
 
    // 3. Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
@@ -375,6 +375,9 @@ int main(int argc, char *argv[])
       mesh->UniformRefinement();
    }
 
+   double sigma = -1.0;
+   double kappa;
+
    // 5. Define a finite element space on the mesh. Here we use the
    //    Raviart-Thomas finite elements of the specified order.
    FiniteElementCollection *dg_coll(new DG_FECollection(order+1, dim));
@@ -384,7 +387,17 @@ int main(int argc, char *argv[])
    FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
-   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
+   FiniteElementSpace *ufes = NULL;
+   if (ph)
+   {
+      kappa = (order + 1) * (order + 1);
+      ufes = new FiniteElementSpace(mesh, ph1_coll, dim);
+   }
+   else
+   {
+      kappa = (order + 2) * (order + 2);
+      ufes = new FiniteElementSpace(mesh, h1_coll, dim);
+   }
    FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
@@ -583,8 +596,8 @@ int main(int argc, char *argv[])
    // AU = F - B^T * P;
    Vector F3(ufes->GetVSize());
    F3 = 0.0;
-   // bVarf->MultTranspose(p, F3);
-   // F3 *= -1.0;
+   bVarf->MultTranspose(p, F3);
+   F3 *= -1.0;
    F3 += (*fform);
 
    printf("Solving for velocity\n");
