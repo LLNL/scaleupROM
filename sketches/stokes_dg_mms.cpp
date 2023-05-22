@@ -341,7 +341,7 @@ int main(int argc, char *argv[])
    bool pa = false;
    const char *device_config = "cpu";
    bool visualization = 1;
-   bool ph = true;
+   bool pres_dbc = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -350,8 +350,8 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
                   "Number of refinements.");
-   args.AddOption(&ph, "-ph", "--phcoll", "-no-ph", "--no-phcoll",
-                  "Use ph1_call.");
+   args.AddOption(&pres_dbc, "-pd", "--pdirichlet", "-no-pd", "--no-pdirichlet",
+                  "Use pressure dirichlet condition.");
    args.Parse();
    if (!args.Good())
    {
@@ -376,7 +376,8 @@ int main(int argc, char *argv[])
    }
 
    double sigma = -1.0;
-   double kappa;
+   // DG terms are employed for velocity space, which is order+1. resulting kappa becomes (order+2)^2.
+   double kappa = (order + 2) * (order + 2);
 
    // 5. Define a finite element space on the mesh. Here we use the
    //    Raviart-Thomas finite elements of the specified order.
@@ -387,17 +388,7 @@ int main(int argc, char *argv[])
    FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
-   FiniteElementSpace *ufes = NULL;
-   if (ph)
-   {
-      kappa = (order + 1) * (order + 1);
-      ufes = new FiniteElementSpace(mesh, ph1_coll, dim);
-   }
-   else
-   {
-      kappa = (order + 2) * (order + 2);
-      ufes = new FiniteElementSpace(mesh, h1_coll, dim);
-   }
+   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
    FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
@@ -423,13 +414,14 @@ int main(int argc, char *argv[])
    // If value is 1, then it is Dirichlet.
    u_ess_attr = 1;
    p_ess_attr = 0;
-   // u_ess_attr[1] = 0;
-   // p_ess_attr[1] = 1;
+   if (pres_dbc)
+   {
+      u_ess_attr[1] = 0;
+      p_ess_attr[1] = 1;  
+   }
    Array<int> u_ess_tdof, p_ess_tdof, empty;
    ufes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
    pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
-   bool pres_dbc = false;
-   // for (int k = 0; k < p_ess_attr.Size(); k++) pres_dbc = (pres_dbc || static_cast<bool>(p_ess_attr[k]));
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
    ConstantCoefficient k(1.0), minus_one(-1.0), one(1.0), zero(0.0);
@@ -475,10 +467,10 @@ int main(int argc, char *argv[])
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    // fform->AddDomainIntegrator(new VectorDomainLFIntegrator(mlap_ucoeff));
 
-   // // Currently, mfem does not have a way to impose general tensor bc.
-   // // dg fe space does not support boundary integrators. needs reimplmentation.
-   // fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
-   // fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
+   // Currently, mfem does not have a way to impose general tensor bc.
+   // dg fe space does not support boundary integrators. needs reimplmentation.
+   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
+   fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
 
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
 
@@ -743,8 +735,8 @@ void dudx_ex(const Vector & x, Vector & y)
    double xi(x(0));
    double yi(x(1));
 
-   y(0) = - exp(xi)*sin(yi);
-   y(1) = - exp(xi)*cos(yi);
+   y(0) = - sin(xi)*sin(yi);
+   y(1) = - cos(xi)*cos(yi);
 }
 
 MixedBilinearFormDGExtension::MixedBilinearFormDGExtension(FiniteElementSpace *tr_fes,
