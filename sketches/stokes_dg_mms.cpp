@@ -308,6 +308,28 @@ public:
    using LinearFormIntegrator::AssembleRHSElementVect;
 };
 
+/// Class for boundary integration \f$ L(v) = (g \cdot n, v) \f$
+class DGBoundaryNormalLFIntegrator : public LinearFormIntegrator
+{
+private:
+   Vector shape;
+   VectorCoefficient &Q;
+public:
+   /// Constructs a boundary integrator with a given Coefficient QG
+   DGBoundaryNormalLFIntegrator(VectorCoefficient &QG)
+      : Q(QG) { }
+
+   virtual bool SupportsDevice() { return false; }
+
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       ElementTransformation &Tr,
+                                       Vector &elvect);
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       FaceElementTransformations &Tr,
+                                       Vector &elvect);
+   using LinearFormIntegrator::AssembleRHSElementVect;
+};
+
 int main(int argc, char *argv[])
 {
    StopWatch chrono;
@@ -410,8 +432,9 @@ int main(int argc, char *argv[])
 
    VectorFunctionCoefficient ucoeff(dim, uFun_ex);
    FunctionCoefficient pcoeff(pFun_ex);
-   GridFunction u_ex(ufes);
+   GridFunction u_ex(ufes), p_ex(pfes);
    u_ex.ProjectCoefficient(ucoeff);
+   p_ex.ProjectCoefficient(pcoeff);
 
    // 8. Allocate memory (x, rhs) for the analytical solution and the right hand
    //    side.  Define the GridFunction u,p for the finite element solution and
@@ -427,7 +450,7 @@ int main(int argc, char *argv[])
    p.MakeRef(pfes, x.GetBlock(dim), 0);
 
    u = 0.0;
-   u.ProjectBdrCoefficient(ucoeff, u_ess_attr);
+   // u.ProjectBdrCoefficient(ucoeff, u_ess_attr);
 
    p.ProjectCoefficient(pcoeff);
    const double p_const = p.Sum() / static_cast<double>(p.Size());
@@ -452,8 +475,10 @@ int main(int argc, char *argv[])
    LinearForm *gform(new LinearForm);
    gform->Update(pfes, rhs.GetBlock(dim), 0);
    gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
-   // // dg fe space does not support boundary integrators. needs reimplmentation.
-   // gform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
+   // dg fe space does not support boundary integrators. needs reimplmentation.
+   // Below two operators are essentially the same. Integration order must be set as 2 * order to guarantee the right convergence rate.
+   gform->AddBoundaryIntegrator(new BoundaryNormalLFIntegrator(ucoeff, 2, 0), u_ess_attr);
+   // gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
 
@@ -479,8 +504,9 @@ int main(int argc, char *argv[])
    bVarf->Finalize();
 
    Vector R1(ufes->GetVSize());
-   SparseMatrix M;
-   Vector F1(ufes->GetVSize());
+   R1 = 0.0;
+   // SparseMatrix M;
+   // Vector F1(ufes->GetVSize());
    // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, M, R1, F1);
 
 // {
@@ -505,6 +531,7 @@ int main(int argc, char *argv[])
    solver.SetPrintLevel(0);
    // x = 0.0;
    solver.Mult(*fform, R1);
+   // solver.Mult(*fform, u);
    // mVarf->RecoverFEMSolution(R1, *fform, u);
    // if (device.IsEnabled()) { x.HostRead(); }
    // chrono.Stop();
@@ -524,90 +551,63 @@ int main(int argc, char *argv[])
 //    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
 // }
 
-   // // B * A^{-1} * F1 - G1
-   // Vector R2(pfes->GetVSize());
-   // bVarf->Mult(R1, R2);
-   // R2 -= (*gform);
+   // B * A^{-1} * F1 - G1
+   Vector R2(pfes->GetVSize());
+   bVarf->Mult(R1, R2);
+   R2 -= (*gform);
 
-   // SchurOperator schur(mVarf, bVarf);
-   // CGSolver solver2;
-   // solver2.SetOperator(schur);
-   // solver2.SetPrintLevel(1);
-   // solver2.SetAbsTol(rtol);
-   // solver2.SetMaxIter(maxIter);
+   SchurOperator schur(mVarf, bVarf);
+   CGSolver solver2;
+   solver2.SetOperator(schur);
+   solver2.SetPrintLevel(0);
+   solver2.SetAbsTol(rtol);
+   solver2.SetMaxIter(maxIter);
    
-   // OrthoSolver ortho;
-   // if (!pres_dbc)
-   // {
-   //    printf("Setting up OrthoSolver\n");
-   //    ortho.SetSolver(solver2);
-   //    ortho.SetOperator(schur);
-   //    printf("OrthoSolver Set up.\n");
-   // }
+   OrthoSolver ortho;
+   if (!pres_dbc)
+   {
+      printf("Setting up OrthoSolver\n");
+      ortho.SetSolver(solver2);
+      ortho.SetOperator(schur);
+      printf("OrthoSolver Set up.\n");
+   }
    
-   // printf("Solving for pressure\n");
-   // // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
-   // if (pres_dbc)
-   //    solver2.Mult(R2, p);
-   // else
-   //    ortho.Mult(R2, p);
-   // printf("Pressure is solved.\n");
+   printf("Solving for pressure\n");
+   // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
+   if (pres_dbc)
+      solver2.Mult(R2, p);
+   else
+      ortho.Mult(R2, p);
+   printf("Pressure is solved.\n");
 
-   // BilinearForm *uVarf(new BilinearForm(ufes));
-   // uVarf->AddDomainIntegrator(new VectorDiffusionIntegrator(k));
-   // uVarf->Assemble();
-   // uVarf->Finalize();
+   // AU = F - B^T * P;
+   Vector F3(ufes->GetVSize());
+   F3 = 0.0;
+   // bVarf->MultTranspose(p, F3);
+   // F3 *= -1.0;
+   F3 += (*fform);
 
-   // GradientGridFunctionCoefficient grad_pcoeff(&p);
-   // OperatorHandle Bh;
-   // MixedBilinearForm *bVarf(new MixedBilinearForm(pfes, ufes));
-   // bVarf->AddDomainIntegrator(new GradientIntegrator);
-   // bVarf->Assemble();
-   // bVarf->FormRectangularSystemMatrix(empty, empty, Bh);
-   // bVarf->Finalize();
+   printf("Solving for velocity\n");
+   solver.Mult(F3, u);
+   printf("Velocity is solved.\n");
 
-   // LinearForm *uform(new LinearForm);
-   // uform->Update(ufes, rhs.GetBlock(0), 0);
-   // uform->AddDomainIntegrator(new VectorDomainLFIntegrator(minus_fcoeff));
-   // // uform->AddDomainIntegrator(new VectorDomainLFIntegrator(grad_pcoeff));
-   // uform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
-   // // uform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(minus_fcoeff), p_ess_attr);
-   // uform->AddBoundaryIntegrator(new VectorBoundaryTangentLFIntegrator(minus_fcoeff), p_ess_attr);
-   // uform->Assemble();
-   // bVarf->AddMult(p, *uform);
-   // uform->SyncAliasMemory(rhs);
+   if (!pres_dbc)
+      p += p_const;
 
-   // SparseMatrix AU;
-   // Vector U1, F1;
-   // uVarf->FormLinearSystem(u_ess_tdof, u, *uform, AU, U1, F1);
+   int order_quad = max(2, 2*(order+1)+1);
+   const IntegrationRule *irs[Geometry::NumGeom];
+   for (int i=0; i < Geometry::NumGeom; ++i)
+   {
+      irs[i] = &(IntRules.Get(i, order_quad));
+   }
 
-   // CGSolver solver;
-   // solver.SetRelTol(rtol);
-   // solver.SetMaxIter(maxIter);
-   // solver.SetOperator(AU);
-   // solver.SetPrintLevel(0);
+   double err_u  = u.ComputeL2Error(ucoeff, irs);
+   double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+   double err_p  = p.ComputeL2Error(pcoeff, irs);
+   double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
 
-   // printf("Solving for velocity\n");
-   // solver.Mult(F1, U1);
-   // printf("Velocity is solved.\n");
-
-//    if (!pres_dbc)
-//       p += p_const;
-
-//    int order_quad = max(2, 2*(order+1)+1);
-//    const IntegrationRule *irs[Geometry::NumGeom];
-//    for (int i=0; i < Geometry::NumGeom; ++i)
-//    {
-//       irs[i] = &(IntRules.Get(i, order_quad));
-//    }
-
-//    // double err_u  = u.ComputeL2Error(ucoeff, irs);
-//    // double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
-//    double err_p  = p.ComputeL2Error(pcoeff, irs);
-//    double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
-
-//    // printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-//    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+   printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
    // 15. Save data in the ParaView format
    ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
@@ -619,7 +619,8 @@ int main(int argc, char *argv[])
 //    paraview_dc.SetTime(0.0); // set the time
    paraview_dc.RegisterField("velocity",&u);
    paraview_dc.RegisterField("u_exact",&u_ex);
-   // paraview_dc.RegisterField("pressure",&p);
+   paraview_dc.RegisterField("pressure",&p);
+   paraview_dc.RegisterField("p_exact",&p_ex);
    paraview_dc.Save();
 
    // 17. Free the used memory.
@@ -1372,5 +1373,54 @@ void DGVectorDirichletLFIntegrator::AssembleRHSElementVect(
             elvect(i) += (t2*dshape_dn(idof) + tj*shape(idof));
          }
       }
+   }
+}
+
+void DGBoundaryNormalLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
+{
+   mfem_error("DGBoundaryNormalLFIntegrator::AssembleRHSElementVect");
+}
+
+void DGBoundaryNormalLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, FaceElementTransformations &Tr, Vector &elvect)
+{
+   int dim = el.GetDim();
+   int dof = el.GetDof();
+   Vector nor(dim), Qvec;
+
+   shape.SetSize(dof);
+   elvect.SetSize(dof);
+   elvect = 0.0;
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = 2 * el.GetOrder();  // <----------
+      ir = &IntRules.Get(el.GetGeomType(), intorder);
+   }
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Tr.SetAllIntPoints(&ip);
+
+      // Access the neighboring element's integration point
+      const IntegrationPoint &eip = Tr.GetElement1IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+      Q.Eval(Qvec, *Tr.Elem1, eip);
+
+      el.CalcShape(eip, shape);
+
+      elvect.Add(ip.weight*(Qvec*nor), shape);
    }
 }
