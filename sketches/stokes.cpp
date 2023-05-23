@@ -303,7 +303,7 @@ int main(int argc, char *argv[])
    Array<int> bdrAttr(mesh->bdr_attributes.Max());
    bdrAttr = 0;
    bdrAttr[2] = 1;
-   u.ProjectBdrCoefficient(one, bdrAttr);
+   u.ProjectBdrCoefficient(ucoeff, bdrAttr);
    // {
    //    std::string filename;
    //    filename = "stokes.u.txt";
@@ -556,21 +556,12 @@ int main(int argc, char *argv[])
 
 void uFun_ex(const Vector & x, Vector & u)
 {
+   assert(x.Size() == 2);
    double xi(x(0));
    double yi(x(1));
-   double zi(0.0);
-   if (x.Size() == 3)
-   {
-      zi = x(2);
-   }
 
-   u(0) = - exp(xi)*sin(yi)*cos(zi);
-   u(1) = - exp(xi)*cos(yi)*cos(zi);
-
-   if (x.Size() == 3)
-   {
-      u(2) = exp(xi)*sin(yi)*sin(zi);
-   }
+   u(0) = xi * (1.0 - xi);
+   u(1) = 0.0;
 }
 
 // Change if needed
