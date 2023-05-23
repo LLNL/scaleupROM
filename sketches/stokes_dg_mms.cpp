@@ -345,9 +345,9 @@ public:
    virtual void AssembleRHSElementVect(const FiniteElement &el,
                                        ElementTransformation &Tr,
                                        Vector &elvect);
-   // virtual void AssembleRHSElementVect(const FiniteElement &el,
-   //                                     FaceElementTransformations &Tr,
-   //                                     Vector &elvect);
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       FaceElementTransformations &Tr,
+                                       Vector &elvect);
 
    using LinearFormIntegrator::AssembleRHSElementVect;
 };
@@ -364,6 +364,7 @@ int main(int argc, char *argv[])
    const char *device_config = "cpu";
    bool visualization = 1;
    bool pres_dbc = false;
+   bool use_dg = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -374,6 +375,8 @@ int main(int argc, char *argv[])
                   "Number of refinements.");
    args.AddOption(&pres_dbc, "-pd", "--pdirichlet", "-no-pd", "--no-pdirichlet",
                   "Use pressure dirichlet condition.");
+   args.AddOption(&use_dg, "-dg", "--use-dg", "-no-dg", "--no-use-dg",
+                  "Use discontinuous Galerkin scheme.");
    args.Parse();
    if (!args.Good())
    {
@@ -410,8 +413,17 @@ int main(int argc, char *argv[])
    FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
-   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
-   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
+   FiniteElementSpace *ufes, *pfes;
+   if (use_dg)
+   {
+      ufes = new FiniteElementSpace(mesh, dg_coll, dim);
+      pfes = new FiniteElementSpace(mesh, pdg_coll);
+   }
+   else
+   {
+      ufes = new FiniteElementSpace(mesh, h1_coll, dim);
+      pfes = new FiniteElementSpace(mesh, ph1_coll);
+   }
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
    //    offsets for each variable. The last component of the Array is the sum
@@ -494,8 +506,11 @@ int main(int argc, char *argv[])
    // // dg fe space does not support boundary integrators. needs reimplmentation.
    // fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
    // fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
-   fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
-
+   if (use_dg)
+      fform->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
+   else
+      fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
+   
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
 
    fform->Assemble();
@@ -523,13 +538,15 @@ int main(int argc, char *argv[])
    MixedBilinearFormDGExtension *bVarf(new MixedBilinearFormDGExtension(ufes, pfes));
 
    mVarf->AddDomainIntegrator(new VectorDiffusionIntegrator(k));
-   // mVarf->AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(k, sigma, kappa));
+   if (use_dg)
+      mVarf->AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(k, sigma, kappa));
    mVarf->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(k, sigma, kappa), u_ess_attr);
    mVarf->Assemble();
    mVarf->Finalize();
 
    bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
-   // bVarf->AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+   if (use_dg)
+      bVarf->AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
    bVarf->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, u_ess_attr);
    bVarf->Assemble();
    bVarf->Finalize();
@@ -1513,10 +1530,59 @@ void BoundaryNormalStressLFIntegrator::AssembleRHSElementVect(
       Fmat.Mult(nor, Fn);
       Fn *= ip.weight;
       for (int k = 0, j = 0; k < dim; k++)
-      for (int jdof = 0; jdof < dof; jdof++, j++)
-         
-         {
+         for (int jdof = 0; jdof < dof; jdof++, j++)
             elvect(j) += Fn(k) * shape(jdof);
-         }
+   }
+}
+
+void BoundaryNormalStressLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, FaceElementTransformations &Tr, Vector &elvect)
+{
+   int dim = el.GetDim();
+   int dof  = el.GetDof();
+
+   shape.SetSize(dof);
+   nor.SetSize (dim);
+   Fvec.SetSize (dim * dim);
+   Fn.SetSize (dim);
+
+   elvect.SetSize (dim*dof);
+   elvect = 0.0;
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = 2*el.GetOrder();
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   }
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      // Set the integration point in the face and the neighboring element
+      Tr.SetAllIntPoints(&ip);
+
+      // Access the neighboring element's integration point
+      const IntegrationPoint &eip = Tr.GetElement1IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+
+      el.CalcShape (eip, shape);
+      F.Eval(Fvec, *Tr.Face, ip);
+      // column-major reshaping.
+      Fmat.UseExternalData(Fvec.ReadWrite(), dim, dim);
+      Fmat.Mult(nor, Fn);
+      Fn *= ip.weight;
+      for (int k = 0, j = 0; k < dim; k++)
+         for (int jdof = 0; jdof < dof; jdof++, j++)
+            elvect(j) += Fn(k) * shape(jdof);
    }
 }
