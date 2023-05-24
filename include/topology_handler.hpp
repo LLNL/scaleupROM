@@ -147,6 +147,7 @@ class SubMeshTopologyHandler : public TopologyHandler
 protected:
    // Global parent mesh that will be decomposed.
    Mesh *pmesh;
+   bool own_pmesh = false;
 
    // SubMesh does not allow creating Array of its pointers. Use std::shared_ptr.
    std::vector<std::shared_ptr<SubMesh>> meshes;
