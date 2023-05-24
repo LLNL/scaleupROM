@@ -359,4 +359,270 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
    }  // not if (kappa_is_nonzero)
 }
 
+void InterfaceDGVectorDiffusionIntegrator::AssembleInterfaceMatrix(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
+   Array2D<DenseMatrix*> &elmats)
+{
+   const int dim = el1.GetDim();
+   const int ndofs1 = el1.GetDof();
+   const int ndofs2 = (Trans2.Elem1No >= 0) ? el2.GetDof() : 0;
+   const int nvdofs1 = dim * ndofs1;
+   const int nvdofs2 = dim * ndofs2;
+   assert(ndofs2 > 0);
+
+   // Initially 'elmat' corresponds to the term:
+   //    < { mu grad(u) . n }, [v] >
+   // But eventually, it's going to be replaced by:
+   //    elmat := -elmat + alpha*elmat^T + jmat
+   elmats.SetSize(2,2);
+   elmats(0,0) = new DenseMatrix(nvdofs1, nvdofs1);
+   elmats(0,1) = new DenseMatrix(nvdofs1, nvdofs2);
+   elmats(1,0) = new DenseMatrix(nvdofs2, nvdofs1);
+   elmats(1,1) = new DenseMatrix(nvdofs2, nvdofs2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) *elmats(i,j) = 0.0;
+   // elmat.SetSize(nvdofs);
+   // elmat = 0.0;
+
+   const bool kappa_is_nonzero = (kappa != 0.0);
+   jmats.SetSize(2,2);
+   if (kappa_is_nonzero)
+   {
+      jmats(0,0) = new DenseMatrix(nvdofs1, nvdofs1);
+      // only the lower-triangular part of jmat is assembled.
+      jmats(0,1) = NULL;
+      jmats(1,0) = new DenseMatrix(nvdofs2, nvdofs1);
+      jmats(1,1) = new DenseMatrix(nvdofs2, nvdofs2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j <= i; j++) *jmats(i,j) = 0.0;
+      // jmat.SetSize(nvdofs);
+      // jmat = 0.;
+   }
+
+   adjJ.SetSize(dim);
+   shape1.SetSize(ndofs1);
+   dshape1.SetSize(ndofs1, dim);
+   dshape1_ps.SetSize(ndofs1, dim);
+   nor.SetSize(dim);
+   // nL1.SetSize(dim);
+   nM1.SetSize(dim);
+   dshape1_dnM.SetSize(ndofs1);
+
+   if (ndofs2)
+   {
+      shape2.SetSize(ndofs2);
+      dshape2.SetSize(ndofs2, dim);
+      dshape2_ps.SetSize(ndofs2, dim);
+      // nL2.SetSize(dim);
+      nM2.SetSize(dim);
+      dshape2_dnM.SetSize(ndofs2);
+   }
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // a simple choice for the integration order; is this OK?
+      const int order = 2 * max(el1.GetOrder(), ndofs2 ? el2.GetOrder() : 0);
+      ir = &IntRules.Get(Trans1.GetGeometryType(), order);
+
+      assert(Trans1.GetGeometryType() == Trans2.GetGeometryType());
+   }
+
+   for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(pind);
+
+      // Set the integration point in the face and the neighboring elements
+      Trans1.SetAllIntPoints(&ip);
+      Trans2.SetAllIntPoints(&ip);
+
+      // Access the neighboring elements' integration points
+      // Note: eip2 will only contain valid data if Elem2 exists
+      const IntegrationPoint &eip1 = Trans1.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Trans2.GetElement1IntPoint();
+
+      el1.CalcShape(eip1, shape1);
+      el1.CalcDShape(eip1, dshape1);
+
+      CalcAdjugate(Trans1.Elem1->Jacobian(), adjJ);
+      Mult(dshape1, adjJ, dshape1_ps);
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip1.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Trans1.Jacobian(), nor);
+      }
+
+      double w, wLM;
+      if (ndofs2)
+      {
+         el2.CalcShape(eip2, shape2);
+         el2.CalcDShape(eip2, dshape2);
+         CalcAdjugate(Trans2.Elem1->Jacobian(), adjJ);
+         Mult(dshape2, adjJ, dshape2_ps);
+
+         w = ip.weight/2;
+         const double w2 = w / Trans2.Elem1->Weight();
+         // const double wL2 = w2 * lambda->Eval(*Trans.Elem2, eip2);
+         const double wM2 = w2 * mu->Eval(*Trans2.Elem1, eip2);
+         // nL2.Set(wL2, nor);
+         nM2.Set(wM2, nor);
+         // wLM = (wL2 + 2.0*wM2);
+         wLM = wM2;
+         dshape2_ps.Mult(nM2, dshape2_dnM);
+      }
+      else
+      {
+         w = ip.weight;
+         wLM = 0.0;
+      }
+
+      {
+         const double w1 = w / Trans1.Elem1->Weight();
+         // const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
+         const double wM1 = w1 * mu->Eval(*Trans1.Elem1, eip1);
+         // nL1.Set(wL1, nor);
+         nM1.Set(wM1, nor);
+         // wLM += (wL1 + 2.0*wM1);
+         wLM += wM1;
+         dshape1_ps.Mult(nM1, dshape1_dnM);
+      }
+
+      const double jmatcoef = kappa * (nor*nor) * wLM;
+
+      // (1,1) block
+      AssembleBlock(
+         dim, ndofs1, ndofs1, 0, 0, jmatcoef,
+         shape1, shape1, dshape1_dnM, *elmats(0,0), *jmats(0,0));
+
+      if (ndofs2 == 0) { continue; }
+
+      // In both elmat and jmat, shape2 appears only with a minus sign.
+      shape2.Neg();
+
+      // (1,2) block
+      // jmats(0,1) is never used. set jmatcoef = 0 for this case only.
+      AssembleBlock(
+         dim, ndofs1, ndofs2, 0, nvdofs1, 0.0,
+         shape1, shape2, dshape2_dnM, *elmats(0,1), *jmats(0,1));
+      // (2,1) block
+      AssembleBlock(
+         dim, ndofs2, ndofs1, nvdofs1, 0, jmatcoef,
+         shape2, shape1, dshape1_dnM, *elmats(1,0), *jmats(1,0));
+      // (2,2) block
+      AssembleBlock(
+         dim, ndofs2, ndofs2, nvdofs1, nvdofs1, jmatcoef,
+         shape2, shape2, dshape2_dnM, *elmats(1,1), *jmats(1,1));
+   }
+
+   // elmat := -elmat + alpha*elmat^t + jmat
+   Array<int> nvdof_array(2);
+   nvdof_array[0] = nvdofs1;
+   nvdof_array[1] = nvdofs2;
+   DenseMatrix *elmat = NULL, *jmat = NULL;
+   DenseMatrix *elmat12 = NULL;
+   if (kappa_is_nonzero)
+   {
+      for (int I = 0; I < 2; I++)
+      {
+         elmat = elmats(I,I);
+         jmat = jmats(I,I); 
+         for (int i = 0; i < nvdof_array[I]; i++)
+         {
+            for (int j = 0; j < i; j++)
+            {
+               double aij = (*elmat)(i,j), aji = (*elmat)(j,i), mij = (*jmat)(i,j);
+               (*elmat)(i,j) = alpha*aji - aij + mij;
+               (*elmat)(j,i) = alpha*aij - aji + mij;
+            }
+            (*elmat)(i,i) = (alpha - 1.) * (*elmat)(i,i) + (*jmat)(i,i);
+         }  // for (int i = 0; i < nvdofs_array[I]; i++)
+      }  // for (int I = 0; I < 2; I++)
+      elmat = elmats(1,0);
+      jmat = jmats(1,0);
+      assert(jmat != NULL);
+      elmat12 = elmats(0,1);
+      for (int i = 0; i < nvdofs2; i++)
+      {
+         for (int j = 0; j < nvdofs1; j++)
+         {
+            double aij = (*elmat)(i,j), aji = (*elmat12)(j,i), mij = (*jmat)(i,j);
+            (*elmat)(i,j) = alpha*aji - aij + mij;
+            (*elmat12)(j,i) = alpha*aij - aji + mij;
+         }  // for (int j = 0; j < nvdofs1; j++)
+      }  // for (int i = 0; i < nvdofs2; i++)
+   }  // if (kappa_is_nonzero)
+   else
+   {
+      for (int I = 0; I < 2; I++)
+      {
+         elmat = elmats(I,I);
+         for (int i = 0; i < nvdof_array[I]; i++)
+         {
+            for (int j = 0; j < i; j++)
+            {
+               double aij = (*elmat)(i,j), aji = (*elmat)(j,i);
+               (*elmat)(i,j) = alpha*aji - aij;
+               (*elmat)(j,i) = alpha*aij - aji;
+            }
+            (*elmat)(i,i) *= (alpha - 1.);
+         }  // for (int i = 0; i < nvdofs_array[I]; i++)
+      }  // for (int I = 0; I < 2; I++)
+      elmat = elmats(1,0);
+      elmat12 = elmats(0,1);
+      for (int i = 0; i < nvdofs2; i++)
+      {
+         for (int j = 0; j < nvdofs1; j++)
+         {
+            double aij = (*elmat)(i,j), aji = (*elmat12)(j,i);
+            (*elmat)(i,j) = alpha*aji - aij;
+            (*elmat12)(j,i) = alpha*aij - aji;
+         }  // for (int j = 0; j < nvdofs1; j++)
+      }  // for (int i = 0; i < nvdofs2; i++)
+   }  // not if (kappa_is_nonzero)
+}
+
+// static method
+void InterfaceDGVectorDiffusionIntegrator::AssembleBlock(
+   const int dim, const int row_ndofs, const int col_ndofs,
+   const int row_offset, const int col_offset, const double jmatcoef,
+   const Vector &row_shape, const Vector &col_shape, const Vector &col_dshape_dnM,
+   DenseMatrix &elmat, DenseMatrix &jmat)
+{
+   // row_offset and col_offset are not needed for elmat.
+   for (int d = 0; d < dim; ++d)
+   {
+      int j = d * col_ndofs;
+      for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+      {
+         int i = d * row_ndofs;
+         const double t2 = col_dshape_dnM(jdof);
+         for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+            elmat(i, j) += row_shape(idof) * t2;
+      }
+   }
+
+   if (jmatcoef == 0.0) { return; }
+
+   // row_offset and col_offset are only needed to determine the lower-triangular part.
+   for (int d = 0; d < dim; ++d)
+   {
+      const int jo = d*col_ndofs;
+      const int io = d*row_ndofs;
+      for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
+      {
+         const double sj = jmatcoef * col_shape(jdof);
+         int i_start = (io + row_offset > j + col_offset) ? io : j;
+         for (int i = i_start, idof = i - io; idof < row_ndofs; ++idof, ++i)
+         {
+            jmat(i, j) += row_shape(idof) * sj;
+         }
+      }
+   }
+}
+
 }

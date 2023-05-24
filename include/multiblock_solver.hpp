@@ -167,7 +167,9 @@ public:
    void AssembleRHS();
    void AssembleOperator();
    // For bilinear case.
+   // system-specific.
    void AssembleInterfaceMatrixes();
+   // universal operator.
    void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
                                  FiniteElementSpace *fes1,
                                  FiniteElementSpace *fes2,
