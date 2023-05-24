@@ -567,16 +567,16 @@ int main(int argc, char *argv[])
       ortho.Mult(R2, p_view);
    printf("Pressure is solved.\n");
 
-//    // AU = F - B^T * P;
-//    Vector F3(ufes->GetVSize());
-//    F3 = 0.0;
-//    bVarf->MultTranspose(p, F3);
-//    F3 *= -1.0;
-//    F3 += (*fform);
+   // AU = F - B^T * P;
+   Vector F3(u_view.Size());
+   F3 = 0.0;
+   B->MultTranspose(p_view, F3);
+   F3 *= -1.0;
+   F3 += urhs_view;
 
-//    printf("Solving for velocity\n");
-//    solver.Mult(F3, u);
-//    printf("Velocity is solved.\n");
+   printf("Solving for velocity\n");
+   solver.Mult(F3, u_view);
+   printf("Velocity is solved.\n");
 
    if (!pres_dbc)
       p_view += p_const;
@@ -592,32 +592,28 @@ int main(int argc, char *argv[])
    double err_p = 0.0, norm_p = 0.0;
    for (int m = 0; m < numSub; m++)
    {
-      // err_u += u[m]->ComputeL2Error(ucoeff, irs);
-      // norm_u += ComputeLpNorm(2., ucoeff, *(meshes[m]), irs);
+      err_u += u[m]->ComputeL2Error(ucoeff, irs);
+      norm_u += ComputeLpNorm(2., ucoeff, *(meshes[m]), irs);
       err_p += p[m]->ComputeL2Error(pcoeff, irs);
       norm_p += ComputeLpNorm(2., pcoeff, *(meshes[m]), irs);
    }
 
-   // printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
-   // // 15. Save data in the ParaView format
-   // for (int m = 0; m < numSub; m++)
-   // {
-   //    std::string filename = "stokes_mms_paraview" + std::to_string(m);
-   //    ParaViewDataCollection paraview_dc(filename.c_str(), meshes[m]);
-   //    // paraview_dc.SetPrefixPath("ParaView");
-   //    paraview_dc.SetLevelsOfDetail(order+1);
-   //    // paraview_dc.SetCycle(0);
-   // //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
-   // //    paraview_dc.SetHighOrderOutput(true);
-   // //    paraview_dc.SetTime(0.0); // set the time
-   //    // paraview_dc.RegisterField("velocity", u[m]);
-   //    // paraview_dc.RegisterField("u_exact",&u_ex);
-   //    // paraview_dc.RegisterField("pressure",&p);
-   //    // paraview_dc.RegisterField("p_exact",&p_ex);
-   //    paraview_dc.Save();
-   // }
+   // 15. Save data in the ParaView format
+   for (int m = 0; m < numSub; m++)
+   {
+      std::string filename = "stokes_mms_paraview" + std::to_string(m);
+      ParaViewDataCollection paraview_dc(filename.c_str(), meshes[m]);
+      // paraview_dc.SetPrefixPath("ParaView");
+      paraview_dc.SetLevelsOfDetail(order+1);
+      paraview_dc.RegisterField("velocity", u[m]);
+      // paraview_dc.RegisterField("u_exact",&u_ex);
+      paraview_dc.RegisterField("pressure", p[m]);
+      // paraview_dc.RegisterField("p_exact",&p_ex);
+      paraview_dc.Save();
+   }
 
    // 17. Free the used memory.
    delete vector_diff;
