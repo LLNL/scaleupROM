@@ -1,6 +1,6 @@
 #include<gtest/gtest.h>
 #include "mfem.hpp"
-#include "multiblock_solver.hpp"
+#include "poisson_solver.hpp"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -16,7 +16,7 @@ static double constant;
 
 double ExactSolution(const Vector &);
 double ExactRHS(const Vector &);
-MultiBlockSolver *SolveWithRefinement(const int num_refinement);
+PoissonSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 
 /**
@@ -84,10 +84,10 @@ double ExactRHS(const Vector &x)
    return result;
 }
 
-MultiBlockSolver *SolveWithRefinement(const int num_refinement)
+PoissonSolver *SolveWithRefinement(const int num_refinement)
 {
    config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   MultiBlockSolver *test = new MultiBlockSolver();
+   PoissonSolver *test = new PoissonSolver();
 
    test->InitVariables();
    test->InitVisualization();
@@ -131,7 +131,7 @@ void CheckConvergence()
    double error1 = 0.0;
    for (int r = 0; r < num_refine; r++)
    {
-      MultiBlockSolver *test = SolveWithRefinement(r);
+      PoissonSolver *test = SolveWithRefinement(r);
 
       int order = test->GetDiscretizationOrder();
       int order_quad = max(2, 2*order+1);

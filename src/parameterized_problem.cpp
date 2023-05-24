@@ -150,8 +150,10 @@ Poisson0::Poisson0()
    : ParameterizedProblem()
 {
    param_num = 2;
+   battr = -1;
 
    // pointer to static function.
+   scalar_bdr_ptr = NULL;
    scalar_rhs_ptr = &(function_factory::poisson0::rhs);
 
    // Default values.
@@ -166,25 +168,25 @@ Poisson0::Poisson0()
    param_ptr[1] = &(function_factory::poisson0::offset);
 }
 
-void Poisson0::SetParameterizedProblem(MultiBlockSolver *solver)
-{
-   // clean up rhs for parametrized problem.
-   if (solver->rhs_coeffs.Size() > 0)
-   {
-      for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
-      solver->rhs_coeffs.SetSize(0);
-   }
-   // clean up boundary functions for parametrized problem.
-   solver->bdr_coeffs = NULL;
+// void Poisson0::SetParameterizedProblem(PoissonSolver *solver)
+// {
+//    // clean up rhs for parametrized problem.
+//    if (solver->rhs_coeffs.Size() > 0)
+//    {
+//       for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
+//       solver->rhs_coeffs.SetSize(0);
+//    }
+//    // clean up boundary functions for parametrized problem.
+//    solver->bdr_coeffs = NULL;
 
-   // std::string problem_name = GetProblemName();
+//    // std::string problem_name = GetProblemName();
 
-   // This problem is set on homogenous Dirichlet BC.
-   solver->AddBCFunction(0.0);
+//    // This problem is set on homogenous Dirichlet BC.
+//    solver->AddBCFunction(0.0);
 
-   // parameter values are set in the namespace function_factory::poisson0.
-   solver->AddRHSFunction(*scalar_rhs_ptr);
-}
+//    // parameter values are set in the namespace function_factory::poisson0.
+//    solver->AddRHSFunction(*scalar_rhs_ptr);
+// }
 
 /*
    PoissonComponent
@@ -195,6 +197,7 @@ PoissonComponent::PoissonComponent()
 {
    // k (max 3) + offset (1) + bdr_k (max 3) + bdr_offset(1) + bdr_idx(1)
    param_num = 9;
+   battr = -1;
 
    // pointer to static function.
    scalar_rhs_ptr = &(function_factory::poisson_component::rhs);
@@ -227,29 +230,52 @@ PoissonComponent::PoissonComponent()
    param_ptr[8] = &(function_factory::poisson_component::bdr_idx);
 }
 
-void PoissonComponent::SetParameterizedProblem(MultiBlockSolver *solver)
-{
-   // clean up rhs for parametrized problem.
-   if (solver->rhs_coeffs.Size() > 0)
-   {
-      for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
-      solver->rhs_coeffs.SetSize(0);
-   }
-   // clean up boundary functions for parametrized problem.
-   solver->bdr_coeffs = NULL;
+// void PoissonComponent::SetParameterizedProblem(PoissonSolver *solver)
+// {
+//    // clean up rhs for parametrized problem.
+//    if (solver->rhs_coeffs.Size() > 0)
+//    {
+//       for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
+//       solver->rhs_coeffs.SetSize(0);
+//    }
+//    // clean up boundary functions for parametrized problem.
+//    solver->bdr_coeffs = NULL;
 
-   // parameter values are set in the namespace function_factory::poisson_component.
+//    // parameter values are set in the namespace function_factory::poisson_component.
+//    double bidx = function_factory::poisson_component::bdr_idx;
+//    int battr = -1;
+//    if (bidx >= 0.0)
+//    {
+//       battr = 1 + floor(bidx);
+//       assert((battr >= 1) && (battr <= 4));
+//    }
+//    solver->AddBCFunction(*scalar_bdr_ptr, battr);
+
+//    // parameter values are set in the namespace function_factory::poisson_component.
+//    solver->AddRHSFunction(*scalar_rhs_ptr);
+// }
+
+void PoissonComponent::SetBattr()
+{
    double bidx = function_factory::poisson_component::bdr_idx;
-   int battr = -1;
+   battr = -1;
    if (bidx >= 0.0)
    {
       battr = 1 + floor(bidx);
       assert((battr >= 1) && (battr <= 4));
    }
-   solver->AddBCFunction(*scalar_bdr_ptr, battr);
+}
 
-   // parameter values are set in the namespace function_factory::poisson_component.
-   solver->AddRHSFunction(*scalar_rhs_ptr);
+void PoissonComponent::SetParams(const std::string &key, const double &value)
+{
+   ParameterizedProblem::SetParams(key, value);
+   SetBattr();
+}
+
+void PoissonComponent::SetParams(const Array<int> &indexes, const Vector &values)
+{
+   ParameterizedProblem::SetParams(indexes, values);
+   SetBattr();
 }
 
 /*
@@ -260,8 +286,10 @@ PoissonSpiral::PoissonSpiral()
    : ParameterizedProblem()
 {
    param_num = 3;
+   battr = -1;
 
    // pointer to static function.
+   scalar_bdr_ptr = NULL;
    scalar_rhs_ptr = &(function_factory::poisson_spiral::rhs);
 
    // Default values.
@@ -279,20 +307,20 @@ PoissonSpiral::PoissonSpiral()
    param_ptr[2] = &(function_factory::poisson_spiral::k);
 }
 
-void PoissonSpiral::SetParameterizedProblem(MultiBlockSolver *solver)
-{
-   // clean up rhs for parametrized problem.
-   if (solver->rhs_coeffs.Size() > 0)
-   {
-      for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
-      solver->rhs_coeffs.SetSize(0);
-   }
-   // clean up boundary functions for parametrized problem.
-   solver->bdr_coeffs = NULL;
+// void PoissonSpiral::SetParameterizedProblem(PoissonSolver *solver)
+// {
+//    // clean up rhs for parametrized problem.
+//    if (solver->rhs_coeffs.Size() > 0)
+//    {
+//       for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
+//       solver->rhs_coeffs.SetSize(0);
+//    }
+//    // clean up boundary functions for parametrized problem.
+//    solver->bdr_coeffs = NULL;
 
-   // This problem is set on homogenous Dirichlet BC.
-   solver->AddBCFunction(0.0);
+//    // This problem is set on homogenous Dirichlet BC.
+//    solver->AddBCFunction(0.0);
 
-   // parameter values are set in the namespace function_factory::poisson0.
-   solver->AddRHSFunction(*scalar_rhs_ptr);
-}
+//    // parameter values are set in the namespace function_factory::poisson0.
+//    solver->AddRHSFunction(*scalar_rhs_ptr);
+// }

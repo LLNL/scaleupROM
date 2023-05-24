@@ -13,7 +13,9 @@
 #define PARAMETERIZED_PROBLEM_HPP
 
 #include "mfem.hpp"
-#include "multiblock_solver.hpp"
+#include "input_parser.hpp"
+// #include "multiblock_solver.hpp"
+// #include "poisson_solver.hpp"
 
 using namespace mfem;
 
@@ -89,14 +91,15 @@ public:
    // Instead use pointers to static functions.
    function_factory::GeneralScalarFunction *scalar_rhs_ptr = NULL;
    function_factory::GeneralScalarFunction *scalar_bdr_ptr = NULL;
+   int battr = -1;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
 
-   virtual void SetParameterizedProblem(MultiBlockSolver *solver)
-   { mfem_error("Abstract class method SetParameterizedProblem is executed!\n"); }
+   // virtual void SetParameterizedProblem(PoissonSolver *solver)
+   // { mfem_error("Abstract class method SetParameterizedProblem is executed!\n"); }
 };
 
 class Poisson0 : public ParameterizedProblem
@@ -105,7 +108,7 @@ public:
    Poisson0();
    ~Poisson0() {};
 
-   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
+   // virtual void SetParameterizedProblem(PoissonSolver *solver);
 };
 
 class PoissonComponent : public ParameterizedProblem
@@ -114,7 +117,12 @@ public:
    PoissonComponent();
    ~PoissonComponent() {};
 
-   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
+   // virtual void SetParameterizedProblem(PoissonSolver *solver);
+   virtual void SetParams(const std::string &key, const double &value);
+   virtual void SetParams(const Array<int> &indexes, const Vector &values);
+
+private:
+   void SetBattr();
 };
 
 class PoissonSpiral : public ParameterizedProblem
@@ -123,7 +131,7 @@ public:
    PoissonSpiral();
    ~PoissonSpiral() {};
 
-   virtual void SetParameterizedProblem(MultiBlockSolver *solver);
+   // virtual void SetParameterizedProblem(PoissonSolver *solver);
 };
 
 ParameterizedProblem* InitParameterizedProblem();
