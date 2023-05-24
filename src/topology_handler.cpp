@@ -158,7 +158,8 @@ void TopologyHandler::PrintInterfaceInfo(const int k)
 
 SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
    : TopologyHandler(SUBMESH),
-     pmesh(pmesh_)
+     pmesh(pmesh_),
+     own_pmesh(false)
 {
    // Input meshes may not have up-to-date attributes array.
    UpdateAttributes(*pmesh);
@@ -234,6 +235,7 @@ SubMeshTopologyHandler::SubMeshTopologyHandler()
    : SubMeshTopologyHandler(new Mesh(config.GetRequiredOption<std::string>("mesh/filename").c_str()))
 {
    // Do not use *this = SubMeshTopologyHandler(...), unless you define operator=!
+   own_pmesh = true;
 }
 
 void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
@@ -253,7 +255,8 @@ SubMeshTopologyHandler::~SubMeshTopologyHandler()
 {
    for (int k = 0; k < parent_elem_map.Size(); k++) delete parent_elem_map[k];
    for (int k = 0; k < parent_face_map.Size(); k++) delete parent_face_map[k];
-   delete pmesh;
+   if (own_pmesh)
+      delete pmesh;
 }
 
 Array<int> SubMeshTopologyHandler::BuildFaceMap2D(const Mesh& pm, const SubMesh& sm)

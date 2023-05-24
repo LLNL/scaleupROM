@@ -145,6 +145,15 @@ set(scaleupROMObj_SOURCES
   include/interfaceinteg.hpp
   src/interfaceinteg.cpp
 
+  include/dg_bilinear.hpp
+  src/dg_bilinear.cpp
+
+  include/dg_mixed_bilin.hpp
+  src/dg_mixed_bilin.cpp
+
+  include/dg_linear.hpp
+  src/dg_linear.cpp
+
   # include/multiblock_nonlinearform.hpp
   # src/multiblock_nonlinearform.cpp
 
