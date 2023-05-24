@@ -46,6 +46,17 @@ public:
                                        FaceElementTransformations &Trans1,
                                        FaceElementTransformations &Trans2,
                                        Array2D<DenseMatrix*> &elmats);
+
+   /** Abstract method used for assembling InteriorFaceIntegrators in a
+       MixedBilinearFormDGExtension. */
+   virtual void AssembleInterfaceMatrix(const FiniteElement &trial_fe1,
+                                       const FiniteElement &trial_fe2,
+                                       const FiniteElement &test_fe1,
+                                       const FiniteElement &test_fe2,
+                                       FaceElementTransformations &Trans1,
+                                       FaceElementTransformations &Trans2,
+                                       Array2D<DenseMatrix*> &elmats)
+   { mfem_error("Abstract method InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix!\n"); }
 };
 
 class InterfaceDGDiffusionIntegrator : public InterfaceNonlinearFormIntegrator
@@ -124,6 +135,41 @@ protected:
       const int row_offset, const int col_offset, const double jmatcoef,
       const Vector &row_shape, const Vector &col_shape, const Vector &col_dshape_dnM,
       DenseMatrix &elmat, DenseMatrix &jmat);
+};
+
+class InterfaceDGNormalFluxIntegrator : public InterfaceNonlinearFormIntegrator
+{
+private:
+   int dim;
+   int order;
+   int p;
+
+   int trial_dof1, trial_dof2, test_dof1, test_dof2;
+   int trial_vdof1, trial_vdof2;
+
+   double w, wn;
+   int i, j, idof, jdof, jm;
+
+   Vector nor, wnor;
+   Vector shape1, shape2;
+   // Vector divshape;
+   Vector trshape1, trshape2;
+   // DenseMatrix vshape1, vshape2;
+   // Vector vshape1_n, vshape2_n;
+
+public:
+   InterfaceDGNormalFluxIntegrator() {};
+   virtual ~InterfaceDGNormalFluxIntegrator() {};
+
+   virtual void AssembleInterfaceMatrix(const FiniteElement &trial_fe1,
+                                       const FiniteElement &trial_fe2,
+                                       const FiniteElement &test_fe1,
+                                       const FiniteElement &test_fe2,
+                                       FaceElementTransformations &Trans1,
+                                       FaceElementTransformations &Trans2,
+                                       Array2D<DenseMatrix*> &elmats);
+
+   using InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix;
 };
 
 } // namespace mfem

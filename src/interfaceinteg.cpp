@@ -625,4 +625,169 @@ void InterfaceDGVectorDiffusionIntegrator::AssembleBlock(
    }
 }
 
+void InterfaceDGNormalFluxIntegrator::AssembleInterfaceMatrix(
+   const FiniteElement &trial_fe1, const FiniteElement &trial_fe2,
+   const FiniteElement &test_fe1, const FiniteElement &test_fe2,
+   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
+   Array2D<DenseMatrix *> &elmats)
+{
+   dim = trial_fe1.GetDim();
+   trial_dof1 = trial_fe1.GetDof();
+   trial_vdof1 = dim * trial_dof1;
+   test_dof1 = test_fe1.GetDof();
+
+   nor.SetSize(dim);
+   wnor.SetSize(dim);
+
+   // vshape1.SetSize(trial_dof1, dim);
+   // vshape1_n.SetSize(trial_dof1);
+   trshape1.SetSize(trial_dof1);
+   shape1.SetSize(test_dof1);
+
+   if (Trans2.Elem1No >= 0)
+   {
+      trial_dof2 = trial_fe2.GetDof();
+      trial_vdof2 = dim * trial_dof2;
+      test_dof2 = test_fe2.GetDof();
+
+      // vshape2.SetSize(trial_dof2, dim);
+      // vshape2_n.SetSize(trial_dof2);
+      trshape2.SetSize(trial_dof2);
+      shape2.SetSize(test_dof2);
+   }
+   else
+   {
+      trial_dof2 = 0;
+      test_dof2 = 0;
+   }
+   assert((trial_dof2 > 0) && (test_dof2 > 0));
+
+   elmats.SetSize(2,2);
+   elmats(0,0) = new DenseMatrix(test_dof1, trial_vdof1);
+   elmats(0,1) = new DenseMatrix(test_dof1, trial_vdof2);
+   elmats(1,0) = new DenseMatrix(test_dof2, trial_vdof1);
+   elmats(1,1) = new DenseMatrix(test_dof2, trial_vdof2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) *elmats(i,j) = 0.0;
+   // elmat.SetSize((test_dof1 + test_dof2), (trial_vdof1 + trial_vdof2));
+   // elmat = 0.0;
+
+   // TODO: need to revisit this part for proper convergence rate.
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // Assuming order(u)==order(mesh)
+      if (Trans2.Elem1No >= 0)
+         order = (min(Trans1.Elem1->OrderW(), Trans2.Elem1->OrderW()) +
+                  max(trial_fe1.GetOrder(), trial_fe2.GetOrder()) +
+                  max(test_fe1.GetOrder(), test_fe2.GetOrder()));
+      else
+      {
+         order = Trans1.Elem1->OrderW() + trial_fe1.GetOrder() + test_fe1.GetOrder();
+      }
+      if (trial_fe1.Space() == FunctionSpace::Pk)
+      {
+         order++;
+      }
+      ir = &IntRules.Get(Trans1.GetGeometryType(), order);
+
+      assert(Trans1.GetGeometryType() == Trans2.GetGeometryType());
+   }  // if (ir == NULL)
+
+   for (p = 0; p < ir->GetNPoints(); p++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(p);
+
+      // Set the integration point in the face and the neighboring elements
+      Trans1.SetAllIntPoints(&ip);
+      Trans2.SetAllIntPoints(&ip);
+
+      // Access the neighboring elements' integration points
+      // Note: eip2 will only contain valid data if Elem2 exists
+      const IntegrationPoint &eip1 = Trans1.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Trans2.GetElement1IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip1.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Trans1.Jacobian(), nor);
+      }
+
+      // trial_fe1.CalcVShape(eip1, vshape1);
+      trial_fe1.CalcShape(eip1, trshape1);
+      test_fe1.CalcShape(eip1, shape1);
+      // vshape1.Mult(nor, vshape1_n);
+
+      w = ip.weight;
+      if (trial_dof2)
+         w *= 0.5;
+
+      wnor.Set(w, nor);
+
+      DenseMatrix *elmat = NULL;
+      
+      elmat = elmats(0,0);
+      for (jm = 0, j = 0; jm < dim; jm++)
+      {
+         wn = wnor(jm);
+         for (jdof = 0; jdof < trial_dof1; jdof++, j++)
+            for (idof = 0, i = 0; idof < test_dof1; idof++, i++)
+               (*elmat)(i, j) += wn * shape1(idof) * trshape1(jdof);
+      }
+
+      if (trial_dof2)
+      {
+         // trial_fe2.CalcVShape(eip2, vshape2);
+         trial_fe2.CalcShape(eip2, trshape2);
+         test_fe2.CalcShape(eip2, shape2);
+         // vshape2.Mult(nor, vshape2_n);
+
+         elmat = elmats(1,0);
+         for (jm = 0, j = 0; jm < dim; jm++)
+         {
+            wn = wnor(jm);
+            for (jdof = 0; jdof < trial_dof1; jdof++, j++)
+               for (idof = 0, i = 0; idof < test_dof2; idof++, i++)
+                  (*elmat)(i, j) += wn * shape2(idof) * trshape1(jdof);
+         }
+         // for (int i = 0; i < test_dof2; i++)
+         //    for (int j = 0; j < trial_dof1; j++)
+         //    {
+         //       elmat(test_dof1+i, j) += w * shape2(i) * vshape1_n(j);
+         //    }
+
+         elmat = elmats(1,1);
+         for (jm = 0, j = 0; jm < dim; jm++)
+         {
+            wn = wnor(jm);
+            for (jdof = 0; jdof < trial_dof2; jdof++, j++)
+               for (idof = 0, i = 0; idof < test_dof2; idof++, i++)
+                  (*elmat)(i, j) -= wn * shape2(idof) * trshape2(jdof);
+         }
+         // for (int i = 0; i < test_dof2; i++)
+         //    for (int j = 0; j < trial_dof2; j++)
+         //    {
+         //       elmat(test_dof1+i, trial_dof1+j) -= w * shape2(i) * vshape2_n(j);
+         //    }
+
+         elmat = elmats(0,1);
+         for (jm = 0, j = 0; jm < dim; jm++)
+         {
+            wn = wnor(jm);
+            for (jdof = 0; jdof < trial_dof2; jdof++, j++)
+               for (idof = 0, i = 0; idof < test_dof1; idof++, i++)
+                  (*elmat)(i, j) -= wn * shape1(idof) * trshape2(jdof);
+         }
+         // for (int i = 0; i < test_dof1; i++)
+         //    for (int j = 0; j < trial_dof2; j++)
+         //    {
+         //       elmat(i, trial_dof1+j) -= w * shape1(i) * vshape2_n(j);
+         //    }
+      }  // if (trial_dof2)
+   }  // for (p = 0; p < ir->GetNPoints(); p++)
+}
+
 }

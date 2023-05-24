@@ -70,6 +70,13 @@ void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
                               Array<InterfaceInfo> *interface_infos,
                               Array2D<SparseMatrix*> &mats);
 
+void AssembleInterfaceMatrix(
+   Mesh *mesh1, Mesh *mesh2, FiniteElementSpace *trial_fes1, 
+   FiniteElementSpace *trial_fes2, FiniteElementSpace *test_fes1,
+   FiniteElementSpace *test_fes2, TopologyHandler *topol_handler,
+   InterfaceNonlinearFormIntegrator *interface_integ,
+   Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
+
 class SchurOperator : public Operator
 {
 protected:
@@ -360,8 +367,8 @@ int main(int argc, char *argv[])
    {
       fform[m] = new LinearForm;
       fform[m]->Update(ufes[m], rhs.GetBlock(m), 0);
-      // fform[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
-      fform[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(mlap_ucoeff));
+      fform[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
+      // fform[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(mlap_ucoeff));
 
       // // Currently, mfem does not have a way to impose general tensor bc.
       // // dg fe space does not support boundary integrators. needs reimplmentation.
@@ -437,7 +444,7 @@ int main(int argc, char *argv[])
       }
 
    InterfaceNonlinearFormIntegrator *vector_diff = new InterfaceDGVectorDiffusionIntegrator(k, sigma, kappa);
-
+   InterfaceNonlinearFormIntegrator *normal_flux = new InterfaceDGNormalFluxIntegrator;
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
@@ -445,46 +452,46 @@ int main(int argc, char *argv[])
       Array<int> midx(2);
       midx[0] = pInfo->Mesh1;
       midx[1] = pInfo->Mesh2;
-      Array2D<SparseMatrix *> mats_p(2,2);
+      Array2D<SparseMatrix *> m_mats_p(2,2), b_mats_p(2,2);
       for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++) mats_p(i, j) = m_mats(midx[i], midx[j]);
+         for (int j = 0; j < 2; j++)
+         {
+            m_mats_p(i, j) = m_mats(midx[i], midx[j]);
+            b_mats_p(i, j) = b_mats(midx[i], midx[j]);
+         }
 
       Mesh *mesh1, *mesh2;
       mesh1 = meshes[midx[0]];
       mesh2 = meshes[midx[1]];
 
-      FiniteElementSpace *fes1, *fes2;
-      fes1 = ufes[midx[0]];
-      fes2 = ufes[midx[1]];
+      FiniteElementSpace *ufes1, *ufes2, *pfes1, *pfes2;
+      ufes1 = ufes[midx[0]];
+      ufes2 = ufes[midx[1]];
+      pfes1 = pfes[midx[0]];
+      pfes2 = pfes[midx[1]];
 
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      AssembleInterfaceMatrix(mesh1, mesh2, fes1, fes2, topol_handler, vector_diff, interface_infos, mats_p);
+      AssembleInterfaceMatrix(mesh1, mesh2, ufes1, ufes2, topol_handler, vector_diff, interface_infos, m_mats_p);
+      AssembleInterfaceMatrix(mesh1, mesh2, ufes1, ufes2, pfes1, pfes2, topol_handler, normal_flux, interface_infos, b_mats_p);
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 
    for (int i = 0; i < numSub; i++)
       for (int j = 0; j < numSub; j++)
       {
          m_mats(i, j)->Finalize();
+         b_mats(i, j)->Finalize();
          mMat.SetBlock(i, j, m_mats(i, j));
-         // bMat.SetBlock(i, j, b_mats(i, j));
+         bMat.SetBlock(i, j, b_mats(i, j));
       }
 
    SparseMatrix *M = mMat.CreateMonolithic();
-
-   // Vector R1(x_var->GetBlock(0).Size());
-   // R1 = 0.0;
-//    // SparseMatrix M;
-//    // Vector F1(ufes->GetVSize());
-//    // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, M, R1, F1);
-
-// // {
-// //    PrintMatrix(M, "stokes.M.txt");
-// //    PrintVector(F1, "stokes.f.txt");
-// // }
+   SparseMatrix *B = bMat.CreateMonolithic();
 
    Vector u_view, urhs_view;
    u_view.MakeRef(x, 0, var_offsets[1] - var_offsets[0]);
    urhs_view.MakeRef(rhs, 0, var_offsets[1] - var_offsets[0]);
+   Vector R1(u_view.Size());
+   R1 = 0.0;
 
    printf("Setting up pressure RHS\n");
    int maxIter(10000);
@@ -502,70 +509,63 @@ int main(int argc, char *argv[])
    // solver.SetPreconditioner(darcyPrec);
    solver.SetPrintLevel(0);
    // x = 0.0;
-   solver.Mult(urhs_view, u_view);
+   solver.Mult(urhs_view, R1);
    // solver.Mult(*fform, u);
    // mVarf->RecoverFEMSolution(R1, *fform, u);
    // if (device.IsEnabled()) { x.HostRead(); }
    // chrono.Stop();
    printf("Set up pressure RHS\n");
-   // printf("is rhs_var saved?\n");
-   // for (int i = 0; i < var_offsets[1]; i++) printf("%.3E\n", (rhs)[i]);
-   // printf("what about fform?\n");
-   // for (int m = 0; m < numSub; m++)
-   //    for (int i = 0; i < fform[m]->Size(); i++) printf("%.3E\n", (*fform[m])[i]);
-   // // printf("is x_var saved?\n");
-   // // for (int i = 0; i < var_offsets[1]; i++) printf("%.3E\n", (*x_var)[i]);
 
-   // // printf("is u saved?\n");
-   // // for (int m = 0; m < numSub; m++)
-   // //    for (int i = 0; i < u[m]->Size(); i++) printf("%.3E\n", (*u[m])[i]);
-
-{
-   int order_quad = max(2, 2*(order+1)+1);
-   const IntegrationRule *irs[Geometry::NumGeom];
-   for (int i=0; i < Geometry::NumGeom; ++i)
-   {
-      irs[i] = &(IntRules.Get(i, order_quad));
-   }
-
-   double err_u = 0.0, norm_u = 0.0;
-   for (int m = 0; m < numSub; m++)
-   {
-      err_u += u[m]->ComputeL2Error(ucoeff, irs);
-      norm_u += ComputeLpNorm(2., ucoeff, *(meshes[m]), irs);
-   }
-
-   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-}
-
-//    // B * A^{-1} * F1 - G1
-//    Vector R2(pfes->GetVSize());
-//    bVarf->Mult(R1, R2);
-//    R2 -= (*gform);
-
-//    SchurOperator schur(mVarf, bVarf);
-//    CGSolver solver2;
-//    solver2.SetOperator(schur);
-//    solver2.SetPrintLevel(0);
-//    solver2.SetAbsTol(rtol);
-//    solver2.SetMaxIter(maxIter);
-   
-//    OrthoSolver ortho;
-//    if (!pres_dbc)
+// {
+//    int order_quad = max(2, 2*(order+1)+1);
+//    const IntegrationRule *irs[Geometry::NumGeom];
+//    for (int i=0; i < Geometry::NumGeom; ++i)
 //    {
-//       printf("Setting up OrthoSolver\n");
-//       ortho.SetSolver(solver2);
-//       ortho.SetOperator(schur);
-//       printf("OrthoSolver Set up.\n");
+//       irs[i] = &(IntRules.Get(i, order_quad));
 //    }
+
+//    double err_u = 0.0, norm_u = 0.0;
+//    for (int m = 0; m < numSub; m++)
+//    {
+//       err_u += u[m]->ComputeL2Error(ucoeff, irs);
+//       norm_u += ComputeLpNorm(2., ucoeff, *(meshes[m]), irs);
+//    }
+
+//    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+// }
+
+   // B * A^{-1} * F1 - G1
+   Vector p_view, prhs_view;
+   p_view.MakeRef(x, var_offsets[1], var_offsets[2] - var_offsets[1]);
+   prhs_view.MakeRef(rhs, var_offsets[1], var_offsets[2] - var_offsets[1]);
+
+   Vector R2(p_view.Size());
+   B->Mult(R1, R2);
+   R2 -= prhs_view;
+
+   SchurOperator schur(M, B);
+   CGSolver solver2;
+   solver2.SetOperator(schur);
+   solver2.SetPrintLevel(0);
+   solver2.SetAbsTol(rtol);
+   solver2.SetMaxIter(maxIter);
    
-//    printf("Solving for pressure\n");
-//    // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
-//    if (pres_dbc)
-//       solver2.Mult(R2, p);
-//    else
-//       ortho.Mult(R2, p);
-//    printf("Pressure is solved.\n");
+   OrthoSolver ortho;
+   if (!pres_dbc)
+   {
+      printf("Setting up OrthoSolver\n");
+      ortho.SetSolver(solver2);
+      ortho.SetOperator(schur);
+      printf("OrthoSolver Set up.\n");
+   }
+   
+   printf("Solving for pressure\n");
+   // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
+   if (pres_dbc)
+      solver2.Mult(R2, p_view);
+   else
+      ortho.Mult(R2, p_view);
+   printf("Pressure is solved.\n");
 
 //    // AU = F - B^T * P;
 //    Vector F3(ufes->GetVSize());
@@ -578,44 +578,50 @@ int main(int argc, char *argv[])
 //    solver.Mult(F3, u);
 //    printf("Velocity is solved.\n");
 
-//    if (!pres_dbc)
-//       p += p_const;
+   if (!pres_dbc)
+      p_view += p_const;
 
-//    int order_quad = max(2, 2*(order+1)+1);
-//    const IntegrationRule *irs[Geometry::NumGeom];
-//    for (int i=0; i < Geometry::NumGeom; ++i)
-//    {
-//       irs[i] = &(IntRules.Get(i, order_quad));
-//    }
+   int order_quad = max(2, 2*(order+1)+1);
+   const IntegrationRule *irs[Geometry::NumGeom];
+   for (int i=0; i < Geometry::NumGeom; ++i)
+   {
+      irs[i] = &(IntRules.Get(i, order_quad));
+   }
 
-//    double err_u  = u.ComputeL2Error(ucoeff, irs);
-//    double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
-//    double err_p  = p.ComputeL2Error(pcoeff, irs);
-//    double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
-
-//    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-//    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
-
-   // 15. Save data in the ParaView format
+   double err_u = 0.0, norm_u = 0.0;
+   double err_p = 0.0, norm_p = 0.0;
    for (int m = 0; m < numSub; m++)
    {
-      std::string filename = "stokes_mms_paraview" + std::to_string(m);
-      ParaViewDataCollection paraview_dc(filename.c_str(), meshes[m]);
-      // paraview_dc.SetPrefixPath("ParaView");
-      paraview_dc.SetLevelsOfDetail(order+1);
-      // paraview_dc.SetCycle(0);
-   //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
-   //    paraview_dc.SetHighOrderOutput(true);
-   //    paraview_dc.SetTime(0.0); // set the time
-      paraview_dc.RegisterField("velocity", u[m]);
-      // paraview_dc.RegisterField("u_exact",&u_ex);
-      // paraview_dc.RegisterField("pressure",&p);
-      // paraview_dc.RegisterField("p_exact",&p_ex);
-      paraview_dc.Save();
+      // err_u += u[m]->ComputeL2Error(ucoeff, irs);
+      // norm_u += ComputeLpNorm(2., ucoeff, *(meshes[m]), irs);
+      err_p += p[m]->ComputeL2Error(pcoeff, irs);
+      norm_p += ComputeLpNorm(2., pcoeff, *(meshes[m]), irs);
    }
+
+   // printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+   printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+
+   // // 15. Save data in the ParaView format
+   // for (int m = 0; m < numSub; m++)
+   // {
+   //    std::string filename = "stokes_mms_paraview" + std::to_string(m);
+   //    ParaViewDataCollection paraview_dc(filename.c_str(), meshes[m]);
+   //    // paraview_dc.SetPrefixPath("ParaView");
+   //    paraview_dc.SetLevelsOfDetail(order+1);
+   //    // paraview_dc.SetCycle(0);
+   // //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
+   // //    paraview_dc.SetHighOrderOutput(true);
+   // //    paraview_dc.SetTime(0.0); // set the time
+   //    // paraview_dc.RegisterField("velocity", u[m]);
+   //    // paraview_dc.RegisterField("u_exact",&u_ex);
+   //    // paraview_dc.RegisterField("pressure",&p);
+   //    // paraview_dc.RegisterField("p_exact",&p_ex);
+   //    paraview_dc.Save();
+   // }
 
    // 17. Free the used memory.
    delete vector_diff;
+   delete normal_flux;
    for (int m = 0; m < numSub; m++)
    {
       delete fform[m];
@@ -787,6 +793,54 @@ void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
          for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
                mats(i, j)->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
+            }
+         }
+      }  // if ((tr1 != NULL) && (tr2 != NULL))
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+}
+
+void AssembleInterfaceMatrix(
+   Mesh *mesh1, Mesh *mesh2, FiniteElementSpace *trial_fes1, 
+   FiniteElementSpace *trial_fes2, FiniteElementSpace *test_fes1,
+   FiniteElementSpace *test_fes2, TopologyHandler *topol_handler,
+   InterfaceNonlinearFormIntegrator *interface_integ,
+   Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats)
+{
+   const int skip_zeros = 0;
+
+   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   {
+      InterfaceInfo *if_info = &((*interface_infos)[bn]);
+      
+      Array2D<DenseMatrix*> elemmats;
+      FaceElementTransformations *tr1, *tr2;
+      const FiniteElement *trial_fe1, *trial_fe2, *test_fe1, *test_fe2;
+      Array<Array<int> *> test_vdofs(2), trial_vdofs(2);
+      trial_vdofs[0] = new Array<int>;
+      trial_vdofs[1] = new Array<int>;
+      test_vdofs[0] = new Array<int>;
+      test_vdofs[1] = new Array<int>;
+
+      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+
+      if ((tr1 != NULL) && (tr2 != NULL))
+      {
+         trial_fes1->GetElementVDofs(tr1->Elem1No, *trial_vdofs[0]);
+         trial_fes2->GetElementVDofs(tr2->Elem1No, *trial_vdofs[1]);
+         test_fes1->GetElementVDofs(tr1->Elem1No, *test_vdofs[0]);
+         test_fes2->GetElementVDofs(tr2->Elem1No, *test_vdofs[1]);
+         // Both domains will have the adjacent element as Elem1.
+         trial_fe1 = trial_fes1->GetFE(tr1->Elem1No);
+         trial_fe2 = trial_fes2->GetFE(tr2->Elem1No);
+         test_fe1 = test_fes1->GetFE(tr1->Elem1No);
+         test_fe2 = test_fes2->GetFE(tr2->Elem1No);
+
+         interface_integ->AssembleInterfaceMatrix(
+            *trial_fe1, *trial_fe2, *test_fe1, *test_fe2, *tr1, *tr2, elemmats);
+
+         for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+               mats(i, j)->AddSubMatrix(*test_vdofs[i], *trial_vdofs[j], *elemmats(i,j), skip_zeros);
             }
          }
       }  // if ((tr1 != NULL) && (tr2 != NULL))
