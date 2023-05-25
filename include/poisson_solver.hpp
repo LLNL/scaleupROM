@@ -35,69 +35,10 @@ friend class PoissonComponent;
 friend class PoissonSpiral;
 
 protected:
-   /*
-      Base variables needed for all systems (potentially)
-   */
-   // int order = 1;
    // Finite element collection for all fe spaces.
    FiniteElementCollection *fec;
    // Finite element spaces
    Array<FiniteElementSpace *> fes;
-
-   // bool full_dg = true;
-
-   // TopologyHandlerMode topol_mode = NUM_TOPOL_MODE;
-   // TopologyHandler *topol_handler = NULL;
-
-   // // MultiBlockSolver does not own these. Owned by TopologyHandler.
-   // Array<Mesh*> meshes;
-
-   // // Informations received from Topology Handler.
-   // int numSub;   // number of subdomains.
-   // int dim;      // Spatial dimension.
-   // Array<int> global_bdr_attributes;   // boundary attributes of global system.
-
-   // // Solution dimension, by default 1 (scalar).
-   // int udim = -1;       // vector dimension of the entire solution variable
-   // int num_var = -1;    // number of variables
-   // Array<int> vdim;     // vector dimension of each variable
-
-   // 
-   // Array<int> block_offsets;  // Size(numSub * udim + 1). each block corresponds to a component of vector solution.
-   // Array<int> domain_offsets; // Size(numSub + 1). each block corresponds to the vector solution.
-   // Array<int> num_vdofs;       // Size(numSub). number of vdofs of the vector solution in each subdomain.
-   // BlockVector *U, *RHS;
-
-   // Array<GridFunction *> us;
-
-   // // boundary infos
-   // bool strong_bc = false;
-   // Array<Array<int> *> ess_attrs;
-   // Array<Array<int> *> ess_tdof_lists;
-
-   // int max_bdr_attr;
-   // Array<Array<int> *> bdr_markers;
-
-   // // MFEM solver options
-   // bool use_amg;
-
-   // // visualization variables
-   // bool save_visual = false;
-   // bool unified_paraview = false;
-   // std::string visual_dir = ".";
-   // std::string visual_prefix;
-   // Array<ParaViewDataCollection *> paraviewColls;
-   // // Used only for the unified visualization.
-   // FiniteElementSpace *global_fes = NULL;
-   // GridFunction *global_us_visual = NULL;
-
-   // // rom variables.
-   // ROMHandler *rom_handler = NULL;
-   // bool use_rom = false;
-
-   /*
-      System-specific variables (will separated to derived classes)
-   */
 
    // interface integrator
    InterfaceNonlinearFormIntegrator *interface_integ;
@@ -135,20 +76,6 @@ public:
 
    virtual ~PoissonSolver();
 
-   // // Parse some base input options. 
-   // void ParseInputs();
-
-   // // access
-   // const int GetNumSubdomains() { return numSub; }
-   // Mesh* GetMesh(const int k) { return &(*meshes[k]); }
-   // GridFunction* GetGridFunction(const int k) { return us[k]; }
-   // const int GetDiscretizationOrder() { return order; }
-   // const bool UseRom() { return use_rom; }
-   // ROMHandler* GetROMHandler() { return rom_handler; }
-   // const bool IsVisualizationSaved() { return save_visual; }
-   // const std::string GetVisualizationPrefix() { return visual_prefix; }
-   // const TopologyHandlerMode GetTopologyMode() { return topol_mode; }
-
    virtual void SetupBCVariables() override;
    virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
    virtual void AddBCFunction(const double &F, const int battr = -1);
@@ -173,12 +100,6 @@ public:
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrixes();
-   // // universal operator.
-   // void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
-   //                               FiniteElementSpace *fes1,
-   //                               FiniteElementSpace *fes2,
-   //                               Array<InterfaceInfo> *interface_infos,
-   //                               Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
    virtual void AllocateROMElements();
@@ -189,22 +110,10 @@ public:
 
    virtual void Solve();
 
-   // void InitVisualization(const std::string& output_dir = "");
    void InitUnifiedParaview(const std::string &file_prefix) override;
-   // void InitIndividualParaview(const std::string &file_prefix);
-   // void SaveVisualization();
 
-   // void InitROMHandler();
-   // void SaveSnapshot(const int &sample_index)
-   // { rom_handler->SaveSnapshot(us, sample_index); }
-   // void FormReducedBasis(const int &total_samples)
-   // { rom_handler->FormReducedBasis(total_samples); }
-   // void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis()
    { rom_handler->ProjectOperatorOnReducedBasis(mats); }
-   // void ProjectRHSOnReducedBasis()
-   // { rom_handler->ProjectRHSOnReducedBasis(RHS); }
-   // void SolveROM() { rom_handler->Solve(U); }
    virtual double CompareSolution();
    virtual void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes); }

@@ -14,8 +14,6 @@
 
 #include "mfem.hpp"
 #include "input_parser.hpp"
-// #include "multiblock_solver.hpp"
-// #include "poisson_solver.hpp"
 
 using namespace mfem;
 
@@ -97,9 +95,6 @@ public:
    // TODO: support other datatypes such as integer?
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
-
-   // virtual void SetParameterizedProblem(PoissonSolver *solver)
-   // { mfem_error("Abstract class method SetParameterizedProblem is executed!\n"); }
 };
 
 class Poisson0 : public ParameterizedProblem
@@ -107,8 +102,6 @@ class Poisson0 : public ParameterizedProblem
 public:
    Poisson0();
    ~Poisson0() {};
-
-   // virtual void SetParameterizedProblem(PoissonSolver *solver);
 };
 
 class PoissonComponent : public ParameterizedProblem
@@ -116,8 +109,6 @@ class PoissonComponent : public ParameterizedProblem
 public:
    PoissonComponent();
    ~PoissonComponent() {};
-
-   // virtual void SetParameterizedProblem(PoissonSolver *solver);
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
 
@@ -130,8 +121,6 @@ class PoissonSpiral : public ParameterizedProblem
 public:
    PoissonSpiral();
    ~PoissonSpiral() {};
-
-   // virtual void SetParameterizedProblem(PoissonSolver *solver);
 };
 
 ParameterizedProblem* InitParameterizedProblem();

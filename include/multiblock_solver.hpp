@@ -12,15 +12,11 @@
 #ifndef SCALEUPROM_MULTIBLOCK_SOLVER_HPP
 #define SCALEUPROM_MULTIBLOCK_SOLVER_HPP
 
-// #include "input_parser.hpp"
 #include "topology_handler.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
-// #include "linalg/BasisGenerator.h"
-// #include "linalg/BasisReader.h"
-// #include "mfem/Utilities.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -35,10 +31,6 @@ protected:
       Base variables needed for all systems (potentially)
    */
    int order = 1;
-   // // Finite element collection for all fe spaces.
-   // FiniteElementCollection *fec;
-   // // Finite element spaces
-   // Array<FiniteElementSpace *> fes;
 
    bool full_dg = true;
    int skip_zeros = 1;
@@ -67,11 +59,6 @@ protected:
 
    Array<GridFunction *> us;
 
-   // // boundary infos
-   // bool strong_bc = false;
-   // Array<Array<int> *> ess_attrs;
-   // Array<Array<int> *> ess_tdof_lists;
-
    int max_bdr_attr;
    int numBdr;
    Array<Array<int> *> bdr_markers;
@@ -92,40 +79,6 @@ protected:
    // rom variables.
    ROMHandler *rom_handler = NULL;
    bool use_rom = false;
-
-   /*
-      System-specific variables (will separated to derived classes)
-   */
-
-   // // interface integrator
-   // InterfaceNonlinearFormIntegrator *interface_integ;
-
-   // // System matrix for Bilinear case.
-   // Array2D<SparseMatrix *> mats;
-   // // For nonlinear problem
-   // // BlockOperator *globalMat;
-   // BlockMatrix *globalMat;
-   // SparseMatrix *globalMat_mono;
-
-   // // operators
-   // Array<LinearForm *> bs;
-   // Array<BilinearForm *> as;
-
-   // // rhs coefficients
-   // // The solution dimension is 1 by default, for which using VectorCoefficient is not allowed. (in LinearForm Assemble.)
-   // // For a derived class for vector solution, this is the first one needs to be changed to Array<VectorCoefficient*>.
-   // Array<Coefficient *> rhs_coeffs;
-   // Array<Coefficient *> bdr_coeffs;
-
-   // // DG parameters specific to Poisson equation.
-   // double sigma = -1.0;
-   // double kappa = -1.0;
-
-   // // Used for bottom-up building, only with ComponentTopologyHandler.
-   // Array<DenseMatrix *> comp_mats;
-   // // boundary condition is enforced via forcing term.
-   // Array<Array<DenseMatrix *> *> bdr_mats;
-   // Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
 
 public:
    MultiBlockSolver();
@@ -206,8 +159,6 @@ public:
    void SolveROM() { rom_handler->Solve(U); }
    virtual double CompareSolution() = 0;
    virtual void SaveBasisVisualization() = 0;
-
-   // void SanityCheckOnCoeffs();
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
 };

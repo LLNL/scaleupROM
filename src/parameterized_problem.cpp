@@ -168,26 +168,6 @@ Poisson0::Poisson0()
    param_ptr[1] = &(function_factory::poisson0::offset);
 }
 
-// void Poisson0::SetParameterizedProblem(PoissonSolver *solver)
-// {
-//    // clean up rhs for parametrized problem.
-//    if (solver->rhs_coeffs.Size() > 0)
-//    {
-//       for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
-//       solver->rhs_coeffs.SetSize(0);
-//    }
-//    // clean up boundary functions for parametrized problem.
-//    solver->bdr_coeffs = NULL;
-
-//    // std::string problem_name = GetProblemName();
-
-//    // This problem is set on homogenous Dirichlet BC.
-//    solver->AddBCFunction(0.0);
-
-//    // parameter values are set in the namespace function_factory::poisson0.
-//    solver->AddRHSFunction(*scalar_rhs_ptr);
-// }
-
 /*
    PoissonComponent
 */
@@ -229,31 +209,6 @@ PoissonComponent::PoissonComponent()
    param_ptr[7] = &(function_factory::poisson_component::bdr_offset);
    param_ptr[8] = &(function_factory::poisson_component::bdr_idx);
 }
-
-// void PoissonComponent::SetParameterizedProblem(PoissonSolver *solver)
-// {
-//    // clean up rhs for parametrized problem.
-//    if (solver->rhs_coeffs.Size() > 0)
-//    {
-//       for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
-//       solver->rhs_coeffs.SetSize(0);
-//    }
-//    // clean up boundary functions for parametrized problem.
-//    solver->bdr_coeffs = NULL;
-
-//    // parameter values are set in the namespace function_factory::poisson_component.
-//    double bidx = function_factory::poisson_component::bdr_idx;
-//    int battr = -1;
-//    if (bidx >= 0.0)
-//    {
-//       battr = 1 + floor(bidx);
-//       assert((battr >= 1) && (battr <= 4));
-//    }
-//    solver->AddBCFunction(*scalar_bdr_ptr, battr);
-
-//    // parameter values are set in the namespace function_factory::poisson_component.
-//    solver->AddRHSFunction(*scalar_rhs_ptr);
-// }
 
 void PoissonComponent::SetBattr()
 {
@@ -306,21 +261,3 @@ PoissonSpiral::PoissonSpiral()
    param_ptr[1] = &(function_factory::poisson_spiral::Lw);
    param_ptr[2] = &(function_factory::poisson_spiral::k);
 }
-
-// void PoissonSpiral::SetParameterizedProblem(PoissonSolver *solver)
-// {
-//    // clean up rhs for parametrized problem.
-//    if (solver->rhs_coeffs.Size() > 0)
-//    {
-//       for (int k = 0; k < solver->rhs_coeffs.Size(); k++) delete solver->rhs_coeffs[k];
-//       solver->rhs_coeffs.SetSize(0);
-//    }
-//    // clean up boundary functions for parametrized problem.
-//    solver->bdr_coeffs = NULL;
-
-//    // This problem is set on homogenous Dirichlet BC.
-//    solver->AddBCFunction(0.0);
-
-//    // parameter values are set in the namespace function_factory::poisson0.
-//    solver->AddRHSFunction(*scalar_rhs_ptr);
-// }
