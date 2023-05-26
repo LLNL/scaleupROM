@@ -4,7 +4,7 @@ mms_suite.cpp
 $<TARGET_OBJECTS:scaleupROMObj>)
 
 add_executable(poisson_dd_mms poisson_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
-add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 file(COPY inputs/dd_mms.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY inputs/dd_mms.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
