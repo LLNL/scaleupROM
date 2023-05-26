@@ -863,13 +863,13 @@ void StokesSolver::Solve()
    // BlockVector R1(u_offsets);
    Vector R1(urhs.Size());
 
-{
-   PrintMatrix(*M, "stokes.M.txt");
-   PrintMatrix(*B, "stokes.B.txt");
+// {
+//    PrintMatrix(*M, "stokes.M.txt");
+//    PrintMatrix(*B, "stokes.B.txt");
 
-   PrintVector(urhs, "stokes.urhs.txt");
-   PrintVector(prhs, "stokes.prhs.txt");
-}
+//    PrintVector(urhs, "stokes.urhs.txt");
+//    PrintVector(prhs, "stokes.prhs.txt");
+// }
 
    CGSolver solver;
    solver.SetAbsTol(atol);
