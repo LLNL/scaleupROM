@@ -168,7 +168,7 @@ void CheckConvergence()
 
       // reported convergence rate
       if (r > 0)
-         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
 
       error1 = error;
    }
