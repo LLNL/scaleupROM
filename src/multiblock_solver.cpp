@@ -102,6 +102,40 @@ void MultiBlockSolver::ParseInputs()
    use_rom = config.GetOption<bool>("main/use_rom", false);
 }
 
+void MultiBlockSolver::GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var)
+{
+   assert((var_idx >= 0) && (var_idx < num_var));
+   assert(global.NumBlocks() == (num_var * numSub));
+   assert(var.NumBlocks() == (numSub));
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int g_idx = num_var * m + var_idx;
+      assert(var.BlockSize(m) == global.BlockSize(g_idx));
+
+      Vector tmp;
+      var.GetBlockView(m, tmp);
+      tmp = global.GetBlock(g_idx);
+   }
+}
+
+void MultiBlockSolver::SetVariableVector(const int &var_idx, BlockVector &var, BlockVector &global)
+{
+   assert((var_idx >= 0) && (var_idx < num_var));
+   assert(global.NumBlocks() == (num_var * numSub));
+   assert(var.NumBlocks() == (numSub));
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int g_idx = num_var * m + var_idx;
+      assert(var.BlockSize(m) == global.BlockSize(g_idx));
+
+      Vector tmp;
+      global.GetBlockView(g_idx, tmp);
+      tmp = var.GetBlock(m);
+   }
+}
+
 void MultiBlockSolver::SetupBCVariables()
 {
    // Set up boundary markers.
@@ -156,6 +190,51 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
          for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
                mats(i, j)->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
+            }
+         }
+      }  // if ((tr1 != NULL) && (tr2 != NULL))
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+}
+
+void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+   FiniteElementSpace *trial_fes1, FiniteElementSpace *trial_fes2,
+   FiniteElementSpace *test_fes1, FiniteElementSpace *test_fes2,
+   InterfaceNonlinearFormIntegrator *interface_integ,
+   Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats)
+{
+   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   {
+      InterfaceInfo *if_info = &((*interface_infos)[bn]);
+      
+      Array2D<DenseMatrix*> elemmats;
+      FaceElementTransformations *tr1, *tr2;
+      const FiniteElement *trial_fe1, *trial_fe2, *test_fe1, *test_fe2;
+      Array<Array<int> *> test_vdofs(2), trial_vdofs(2);
+      trial_vdofs[0] = new Array<int>;
+      trial_vdofs[1] = new Array<int>;
+      test_vdofs[0] = new Array<int>;
+      test_vdofs[1] = new Array<int>;
+
+      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+
+      if ((tr1 != NULL) && (tr2 != NULL))
+      {
+         trial_fes1->GetElementVDofs(tr1->Elem1No, *trial_vdofs[0]);
+         trial_fes2->GetElementVDofs(tr2->Elem1No, *trial_vdofs[1]);
+         test_fes1->GetElementVDofs(tr1->Elem1No, *test_vdofs[0]);
+         test_fes2->GetElementVDofs(tr2->Elem1No, *test_vdofs[1]);
+         // Both domains will have the adjacent element as Elem1.
+         trial_fe1 = trial_fes1->GetFE(tr1->Elem1No);
+         trial_fe2 = trial_fes2->GetFE(tr2->Elem1No);
+         test_fe1 = test_fes1->GetFE(tr1->Elem1No);
+         test_fe2 = test_fes2->GetFE(tr2->Elem1No);
+
+         interface_integ->AssembleInterfaceMatrix(
+            *trial_fe1, *trial_fe2, *test_fe1, *test_fe2, *tr1, *tr2, elemmats);
+
+         for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+               mats(i, j)->AddSubMatrix(*test_vdofs[i], *trial_vdofs[j], *elemmats(i,j), skip_zeros);
             }
          }
       }  // if ((tr1 != NULL) && (tr2 != NULL))

@@ -20,7 +20,7 @@ compile:
     - cmake .. -DBUILD_SKETCHES=ON
     - make -j 4
 
-dd_mms:
+poisson_dd_mms:
   stage: test
   dependencies:
     - compile
@@ -29,7 +29,18 @@ dd_mms:
     - quartz
   script:
     - cd ci-build/test
-    - ./dd_mms
+    - ./poisson_dd_mms
+
+stokes_dd_mms:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./stokes_dd_mms
 
 param_prob:
   stage: test

@@ -122,16 +122,18 @@ void CheckConvergence()
       for (int k = 0; k < test->GetNumSubdomains(); k++)
       {
          Mesh *mk = test->GetMesh(k);
-         norm += ComputeLpNorm(2.0, exact_sol, *mk, irs);
+         norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
          numEl += mk->GetNE();
       }
+      norm = sqrt(norm);
 
       double error = 0.0;
       for (int k = 0; k < test->GetNumSubdomains(); k++)
       {
          GridFunction *uk = test->GetGridFunction(k);
-         error += uk->ComputeLpError(2, exact_sol);
+         error += pow(uk->ComputeLpError(2, exact_sol), 2);
       }
+      error = sqrt(error);
       error /= norm;
       
       if (r > base_refine)
@@ -142,7 +144,7 @@ void CheckConvergence()
 
       // reported convergence rate
       if (r > base_refine)
-         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
 
       error1 = error;
    }

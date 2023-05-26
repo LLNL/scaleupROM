@@ -892,7 +892,7 @@ void PoissonSolver::SanityCheckOnCoeffs()
    if (all_null)
       MFEM_WARNING("All rhs coefficents are NULL! Make sure to set rhs coefficients before BuildOperator.\n");
 
-   all_null = false;
+   all_null = true;
    for (int i = 0; i < bdr_coeffs.Size(); i++)
       if (bdr_coeffs[i] != NULL)
       {

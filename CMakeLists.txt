@@ -166,6 +166,9 @@ set(scaleupROMObj_SOURCES
   include/poisson_solver.hpp
   src/poisson_solver.cpp
 
+  include/stokes_solver.hpp
+  src/stokes_solver.cpp
+
   include/input_parser.hpp
   src/input_parser.cpp
 

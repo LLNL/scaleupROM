@@ -12,16 +12,9 @@
 #ifndef SCALEUPROM_POISSON_SOLVER_HPP
 #define SCALEUPROM_POISSON_SOLVER_HPP
 
-// #include "input_parser.hpp"
-// #include "topology_handler.hpp"
 #include "multiblock_solver.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
-// #include "parameterized_problem.hpp"
-// #include "rom_handler.hpp"
-// #include "linalg/BasisGenerator.h"
-// #include "linalg/BasisReader.h"
-// #include "mfem/Utilities.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;

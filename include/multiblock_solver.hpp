@@ -89,20 +89,28 @@ public:
    void ParseInputs();
 
    // access
-   const int GetNumSubdomains() { return numSub; }
-   Mesh* GetMesh(const int k) { return &(*meshes[k]); }
-   GridFunction* GetGridFunction(const int k) { return us[k]; }
-   const int GetDiscretizationOrder() { return order; }
-   const bool UseRom() { return use_rom; }
-   ROMHandler* GetROMHandler() { return rom_handler; }
-   const bool IsVisualizationSaved() { return save_visual; }
-   const std::string GetVisualizationPrefix() { return visual_prefix; }
-   const TopologyHandlerMode GetTopologyMode() { return topol_mode; }
+   const int GetDim() const { return dim; }
+   const int GetNumSubdomains() const { return numSub; }
+   Mesh* GetMesh(const int k) const { return &(*meshes[k]); }
+   GridFunction* GetGridFunction(const int k) const { return us[k]; }
+   const int GetDiscretizationOrder() const { return order; }
+   const bool UseRom() const { return use_rom; }
+   ROMHandler* GetROMHandler() const { return rom_handler; }
+   const bool IsVisualizationSaved() const { return save_visual; }
+   const std::string GetVisualizationPrefix() const { return visual_prefix; }
+   const TopologyHandlerMode GetTopologyMode() const { return topol_mode; }
+
+   void GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var);
+   void SetVariableVector(const int &var_idx, BlockVector &var, BlockVector &global);
 
    virtual void SetupBCVariables();
    virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
    virtual void AddBCFunction(const double &F, const int battr = -1)
+   { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
+   virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1)
+   { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
+   virtual void AddBCFunction(const Vector &F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
    virtual void InitVariables() = 0;
 
@@ -118,6 +126,10 @@ public:
    { mfem_error("Abstract method MultiBlockSolver::AddRHSFunction!\n"); }
    virtual void AddRHSFunction(const double F)
    { mfem_error("Abstract method MultiBlockSolver::AddRHSFunction!\n"); }
+   virtual void AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
+   { mfem_error("Abstract method MultiBlockSolver::AddRHSFunction!\n"); }
+   virtual void AddRHSFunction(const Vector &F)
+   { mfem_error("Abstract method MultiBlockSolver::AddRHSFunction!\n"); }
 
    virtual void Assemble() = 0;
    virtual void AssembleRHS() = 0;
@@ -125,13 +137,19 @@ public:
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrixes() = 0;
-   // universal operator.
+
+   // BilinearForm interface operator.
    void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
-                                 FiniteElementSpace *fes1,
-                                 FiniteElementSpace *fes2,
-                                 InterfaceNonlinearFormIntegrator *interface_integ,
-                                 Array<InterfaceInfo> *interface_infos,
-                                 Array2D<SparseMatrix*> &mats);
+      FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+      InterfaceNonlinearFormIntegrator *interface_integ,
+      Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
+      
+   // MixedBilinearForm interface operator.
+   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+      FiniteElementSpace *trial_fes1, FiniteElementSpace *trial_fes2,
+      FiniteElementSpace *test_fes1, FiniteElementSpace *test_fes2, 
+      InterfaceNonlinearFormIntegrator *interface_integ,
+      Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
    virtual void AllocateROMElements() = 0;
