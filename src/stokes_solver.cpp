@@ -851,11 +851,14 @@ void StokesSolver::Solve()
 
    BlockVector urhs(u_offsets), prhs(p_offsets);
    BlockVector uvec(u_offsets), pvec(p_offsets);
+   urhs = 0.0; prhs = 0.0;
+   uvec = 0.0; pvec = 0.0;
    // copy each component of the right-hand side.
    GetVariableVector(0, *RHS, urhs);
    GetVariableVector(1, *RHS, prhs);
    // BlockVector R1(u_offsets);
    Vector R1(urhs.Size());
+   R1 = 0.0;
 
 // {
 //    PrintMatrix(*M, "stokes.M.txt");
@@ -872,6 +875,8 @@ void StokesSolver::Solve()
    solver.SetOperator(*M);
    solver.SetPrintLevel(print_level);
    solver.Mult(urhs, R1);
+   if (!solver.GetConverged())
+      mfem_error("M^{-1} * urhs fails to converge!\n");
 
 // {
 //    SetVariableVector(0, R1, *U);
@@ -880,6 +885,7 @@ void StokesSolver::Solve()
 
    // B * A^{-1} * F1 - G1
    Vector R2(prhs.Size());
+   R2 = 0.0;
    B->Mult(R1, R2);
    R2 -= prhs;
 
@@ -903,7 +909,11 @@ void StokesSolver::Solve()
    printf("Solving for pressure\n");
    // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
    if (pres_dbc)
+   {
       solver2.Mult(R2, pvec);
+      if (!solver2.GetConverged())
+         mfem_error("Pressure Solver fails to converge!\n");
+   }
    else
       ortho.Mult(R2, pvec);
    printf("Pressure is solved.\n");
@@ -917,6 +927,8 @@ void StokesSolver::Solve()
 
    printf("Solving for velocity\n");
    solver.Mult(F3, uvec);
+   if (!solver.GetConverged())
+      mfem_error("Velocity Solver fails to converge!\n");
    printf("Velocity is solved.\n");
 
    // Copy back to global vector.
