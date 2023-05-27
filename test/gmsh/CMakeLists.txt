@@ -24,6 +24,11 @@ add_executable(multi_comp_dd_mms multi_comp_dd_mms.cpp
                 ${CMAKE_BINARY_DIR}/test/gmsh/square-circle.msh.mfem
                 )
 
+add_executable(stokes_multi_comp_dd_mms stokes_multi_comp_dd_mms.cpp
+                $<TARGET_OBJECTS:scaleupROMObj>
+                $<TARGET_OBJECTS:mmsSuiteObj>
+                )
+
 add_executable(test_multi_comp_workflow test_multi_comp_workflow.cpp
                 $<TARGET_OBJECTS:scaleupROMObj>
                 )

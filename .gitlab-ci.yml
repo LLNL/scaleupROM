@@ -100,6 +100,17 @@ multi_comp_dd_mms:
     - cd ci-build/test/gmsh
     - if [ -f "./multi_comp_dd_mms" ]; then ./multi_comp_dd_mms; else echo "multi_comp_dd_mms does not exist. Passing the test."; fi
 
+stokes_multi_comp_dd_mms:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test/gmsh
+    - if [ -f "./stokes_multi_comp_dd_mms" ]; then ./stokes_multi_comp_dd_mms; else echo "stokes_multi_comp_dd_mms does not exist. Passing the test."; fi
+
 multi_comp_workflow:
   stage: test
   dependencies:
