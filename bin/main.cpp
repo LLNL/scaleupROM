@@ -16,31 +16,21 @@ int main(int argc, char *argv[])
    args.AddOption(&input_file, "-i", "--input", "Input file to use.");
    args.ParseCheck();
    config = InputParser(input_file);
-   
+
    std::string mode = config.GetOption<std::string>("main/mode", "run_example");
    if (mode == "run_example")
-   {
       if (rank == 0) RunExample();
-   }
-   else if (mode == "sample_generation")
+   else 
    {
-      GenerateSamples(MPI_COMM_WORLD);
+      if (mode == "sample_generation") GenerateSamples(MPI_COMM_WORLD);
+      else if (mode == "build_rom")    BuildROM(MPI_COMM_WORLD);
+      else if (mode == "single_run")   double dump = SingleRun();
+      else
+      {
+         if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());
+         exit(-1);
+      }
    }
-   else if (mode == "build_rom")
-   {
-      // TODO: need some refactoring to fully separate from single run.
-      BuildROM(MPI_COMM_WORLD);
-   }
-   else if (mode == "single_run")
-   {
-      // TODO: make it parallel-run compatible.
-      double dump = SingleRun();
-   }
-   else
-   {
-      if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());
-      exit(-1);
-   }
-
+   
    MPI_Finalize();
 }

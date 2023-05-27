@@ -590,13 +590,25 @@ int main(int argc, char *argv[])
 
    double err_u = 0.0, norm_u = 0.0;
    double err_p = 0.0, norm_p = 0.0;
+   double tmpv = 0.0;
    for (int m = 0; m < numSub; m++)
    {
-      err_u += u[m]->ComputeL2Error(ucoeff, irs);
-      norm_u += ComputeLpNorm(2., ucoeff, *(meshes[m]), irs);
-      err_p += p[m]->ComputeL2Error(pcoeff, irs);
-      norm_p += ComputeLpNorm(2., pcoeff, *(meshes[m]), irs);
+      err_u += pow(u[m]->ComputeL2Error(ucoeff, irs), 2);
+      norm_u += pow(ComputeLpNorm(2., ucoeff, *(meshes[m]), irs), 2);
+      err_p += pow(p[m]->ComputeL2Error(pcoeff, irs), 2);
+      norm_p += pow(ComputeLpNorm(2., pcoeff, *(meshes[m]), irs), 2);
+
+      tmpv += pow(ComputeLpNorm(2., one, *(meshes[m]), irs), 2);
    }
+   err_u = sqrt(err_u);
+   err_p = sqrt(err_p);
+   norm_u = sqrt(norm_u);
+   norm_p = sqrt(norm_p);
+   tmpv = sqrt(tmpv);
+
+   printf("norm_u = %.5E\n", norm_u);
+   printf("norm_p = %.5E\n", norm_p);
+   printf("volume = %.5E\n", tmpv);
 
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
@@ -761,7 +773,7 @@ void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
                               Array<InterfaceInfo> *interface_infos,
                               Array2D<SparseMatrix*> &mats)
 {
-   const int skip_zeros = 0;
+   const int skip_zeros = 1;
 
    for (int bn = 0; bn < interface_infos->Size(); bn++)
    {
@@ -802,7 +814,7 @@ void AssembleInterfaceMatrix(
    InterfaceNonlinearFormIntegrator *interface_integ,
    Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats)
 {
-   const int skip_zeros = 0;
+   const int skip_zeros = 1;
 
    for (int bn = 0; bn < interface_infos->Size(); bn++)
    {

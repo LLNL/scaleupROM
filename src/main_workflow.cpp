@@ -13,6 +13,8 @@
 
 #include "main_workflow.hpp"
 #include "multiblock_solver.hpp"
+#include "poisson_solver.hpp"
+#include "stokes_solver.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -31,7 +33,7 @@ double dbc4(const Vector &x)
 
 void RunExample()
 {
-   MultiBlockSolver test;
+   PoissonSolver test;
 
    test.InitVariables();
    test.InitVisualization();
@@ -48,6 +50,21 @@ void RunExample()
 
    test.Solve();
    test.SaveVisualization();
+}
+
+MultiBlockSolver* InitSolver()
+{
+   std::string solver_type = config.GetOption<std::string>("main/solver", "poisson");
+   MultiBlockSolver *solver = NULL;
+   if (solver_type == "poisson")       solver = new PoissonSolver;
+   else if (solver_type == "stokes")   solver = new StokesSolver;
+   else
+   {
+      printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
+      exit(-1);
+   }
+
+   return solver;
 }
 
 SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem)
@@ -83,12 +100,12 @@ void GenerateSamples(MPI_Comm comm)
    {
       if (!sample_generator->IsMyJob(s)) continue;
 
-      test = new MultiBlockSolver();
+      test = InitSolver();
       if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
       sample_generator->SetSampleParams(s);
-      problem->SetParameterizedProblem(test);
+      test->SetParameterizedProblem(problem);
 
       int file_idx = s + sample_generator->GetFileOffset();
       const std::string visual_path = sample_generator->GetSamplePath(file_idx, test->GetVisualizationPrefix());
@@ -113,14 +130,14 @@ void BuildROM(MPI_Comm comm)
    ParameterizedProblem *problem = InitParameterizedProblem();
    MultiBlockSolver *test = NULL;
 
-   test = new MultiBlockSolver();
+   test = InitSolver();
    if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
    test->InitVariables();
    // test->InitVisualization();
 
    // NOTE: you need this to set bc/rhs coefficients!
    // This case, we can use default parameter values of the problem.
-   problem->SetParameterizedProblem(test);
+   test->SetParameterizedProblem(problem);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
@@ -188,7 +205,7 @@ void BuildROM(MPI_Comm comm)
 double SingleRun()
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
-   MultiBlockSolver *test = new MultiBlockSolver();
+   MultiBlockSolver *test = InitSolver();
    test->InitVariables();
    test->InitVisualization();
 
@@ -208,7 +225,7 @@ double SingleRun()
       problem->SetParams(param_name, value);
    }
 
-   problem->SetParameterizedProblem(test);
+   test->SetParameterizedProblem(problem);
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildRHSOperators();
