@@ -26,7 +26,7 @@ protected:
    Operator *A, *B;//, *Bt;
    CGSolver *solver = NULL;
 
-   int maxIter = 10000;
+   int maxIter = 5000;
    double rtol = 1.0e-15;
    double atol = 1.0e-15;
 
@@ -38,7 +38,7 @@ public:
       solver->SetRelTol(rtol);
       solver->SetMaxIter(maxIter);
       solver->SetOperator(*A);
-      solver->SetPrintLevel(0);
+      solver->SetPrintLevel(1);
    };
 
    virtual ~SchurOperator()
@@ -53,6 +53,8 @@ public:
 
       Vector y1(x1.Size());
       solver->Mult(x1, y1);
+      if (!solver->GetConverged())
+         mfem_error("SchurOperator: A^{-1} fails to converge!\n");
 
       B->Mult(y1, y);
    }

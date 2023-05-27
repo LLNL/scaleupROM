@@ -26,6 +26,12 @@ StokesSolver::StokesSolver()
 {
    nu = config.GetOption<double>("stokes/nu", 1.0);
    nu_coeff = new ConstantCoefficient(nu);
+// {
+//    ElementTransformation *T=NULL;
+//    IntegrationPoint ip;
+//    double tmp = nu_coeff->Eval(*T, ip);
+//    printf("StokesSolver::StokesSolver nu: %.3E\n", tmp);
+// }
 
    porder = order;
    uorder = porder + 1;
@@ -239,6 +245,12 @@ void StokesSolver::BuildDomainOperators()
 
    ms.SetSize(numSub);
    bs.SetSize(numSub);
+// {
+//    ElementTransformation *T=NULL;
+//    IntegrationPoint ip;
+//    double tmp = nu_coeff->Eval(*T, ip);
+//    printf("StokesSolver::BuildDomainOperators nu: %.3E\n", tmp);
+// }
 
    for (int m = 0; m < numSub; m++)
    {
@@ -276,6 +288,12 @@ void StokesSolver::SetupRHSBCOperators()
 
    assert(fs.Size() == numSub);
    assert(gs.Size() == numSub);
+// {
+//    ElementTransformation *T=NULL;
+//    IntegrationPoint ip;
+//    double tmp = nu_coeff->Eval(*T, ip);
+//    printf("StokesSolver::SetupRHSBCOperators nu: %.3E\n", tmp);
+// }
 
    for (int m = 0; m < numSub; m++)
    {
@@ -306,6 +324,12 @@ void StokesSolver::SetupDomainBCOperators()
 
    assert(ms.Size() == numSub);
    assert(bs.Size() == numSub);
+// {
+//    ElementTransformation *T=NULL;
+//    IntegrationPoint ip;
+//    double tmp = nu_coeff->Eval(*T, ip);
+//    printf("StokesSolver::SetupDomainBCOperators nu: %.3E\n", tmp);
+// }
 
    for (int m = 0; m < numSub; m++)
    {
@@ -851,19 +875,22 @@ void StokesSolver::Solve()
 
    BlockVector urhs(u_offsets), prhs(p_offsets);
    BlockVector uvec(u_offsets), pvec(p_offsets);
+   urhs = 0.0; prhs = 0.0;
+   uvec = 0.0; pvec = 0.0;
    // copy each component of the right-hand side.
    GetVariableVector(0, *RHS, urhs);
    GetVariableVector(1, *RHS, prhs);
    // BlockVector R1(u_offsets);
    Vector R1(urhs.Size());
+   R1 = 0.0;
 
-// {
-//    PrintMatrix(*M, "stokes.M.txt");
-//    PrintMatrix(*B, "stokes.B.txt");
+{
+   PrintMatrix(*M, "stokes.M.txt");
+   PrintMatrix(*B, "stokes.B.txt");
 
-//    PrintVector(urhs, "stokes.urhs.txt");
-//    PrintVector(prhs, "stokes.prhs.txt");
-// }
+   PrintVector(urhs, "stokes.urhs.txt");
+   PrintVector(prhs, "stokes.prhs.txt");
+}
 
    CGSolver solver;
    solver.SetAbsTol(atol);
@@ -880,6 +907,7 @@ void StokesSolver::Solve()
 
    // B * A^{-1} * F1 - G1
    Vector R2(prhs.Size());
+   R2 = 0.0;
    B->Mult(R1, R2);
    R2 -= prhs;
 
