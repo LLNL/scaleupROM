@@ -26,19 +26,21 @@ protected:
    Operator *A, *B;//, *Bt;
    CGSolver *solver = NULL;
 
-   int maxIter = 5000;
-   double rtol = 1.0e-15;
-   double atol = 1.0e-15;
+   int maxIter = -1;
+   double rtol = -1.0;
+   double atol = -1.0;
 
 public:
-   SchurOperator(Operator* const A_, Operator* const B_)
-      : Operator(B_->Height()), A(A_), B(B_)
+   SchurOperator(Operator* const A_, Operator* const B_,
+                  const int &max_iter_ = 10000, const double rtol_ = 1.0e-15, const double atol_ = 1.0e-15)
+      : Operator(B_->Height()), A(A_), B(B_),
+        maxIter(max_iter_), rtol(rtol_), atol(atol_)
    {
       solver = new CGSolver();
       solver->SetRelTol(rtol);
       solver->SetMaxIter(maxIter);
       solver->SetOperator(*A);
-      solver->SetPrintLevel(1);
+      solver->SetPrintLevel(0);
    };
 
    virtual ~SchurOperator()
@@ -52,6 +54,7 @@ public:
       B->MultTranspose(x, x1);
 
       Vector y1(x1.Size());
+      y1 = 0.0;
       solver->Mult(x1, y1);
       if (!solver->GetConverged())
          mfem_error("SchurOperator: A^{-1} fails to converge!\n");

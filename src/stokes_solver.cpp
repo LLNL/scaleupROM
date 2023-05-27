@@ -26,12 +26,6 @@ StokesSolver::StokesSolver()
 {
    nu = config.GetOption<double>("stokes/nu", 1.0);
    nu_coeff = new ConstantCoefficient(nu);
-// {
-//    ElementTransformation *T=NULL;
-//    IntegrationPoint ip;
-//    double tmp = nu_coeff->Eval(*T, ip);
-//    printf("StokesSolver::StokesSolver nu: %.3E\n", tmp);
-// }
 
    porder = order;
    uorder = porder + 1;
@@ -245,12 +239,6 @@ void StokesSolver::BuildDomainOperators()
 
    ms.SetSize(numSub);
    bs.SetSize(numSub);
-// {
-//    ElementTransformation *T=NULL;
-//    IntegrationPoint ip;
-//    double tmp = nu_coeff->Eval(*T, ip);
-//    printf("StokesSolver::BuildDomainOperators nu: %.3E\n", tmp);
-// }
 
    for (int m = 0; m < numSub; m++)
    {
@@ -288,12 +276,6 @@ void StokesSolver::SetupRHSBCOperators()
 
    assert(fs.Size() == numSub);
    assert(gs.Size() == numSub);
-// {
-//    ElementTransformation *T=NULL;
-//    IntegrationPoint ip;
-//    double tmp = nu_coeff->Eval(*T, ip);
-//    printf("StokesSolver::SetupRHSBCOperators nu: %.3E\n", tmp);
-// }
 
    for (int m = 0; m < numSub; m++)
    {
@@ -324,12 +306,6 @@ void StokesSolver::SetupDomainBCOperators()
 
    assert(ms.Size() == numSub);
    assert(bs.Size() == numSub);
-// {
-//    ElementTransformation *T=NULL;
-//    IntegrationPoint ip;
-//    double tmp = nu_coeff->Eval(*T, ip);
-//    printf("StokesSolver::SetupDomainBCOperators nu: %.3E\n", tmp);
-// }
 
    for (int m = 0; m < numSub; m++)
    {
@@ -884,13 +860,13 @@ void StokesSolver::Solve()
    Vector R1(urhs.Size());
    R1 = 0.0;
 
-{
-   PrintMatrix(*M, "stokes.M.txt");
-   PrintMatrix(*B, "stokes.B.txt");
+// {
+//    PrintMatrix(*M, "stokes.M.txt");
+//    PrintMatrix(*B, "stokes.B.txt");
 
-   PrintVector(urhs, "stokes.urhs.txt");
-   PrintVector(prhs, "stokes.prhs.txt");
-}
+//    PrintVector(urhs, "stokes.urhs.txt");
+//    PrintVector(prhs, "stokes.prhs.txt");
+// }
 
    CGSolver solver;
    solver.SetAbsTol(atol);
@@ -899,6 +875,8 @@ void StokesSolver::Solve()
    solver.SetOperator(*M);
    solver.SetPrintLevel(print_level);
    solver.Mult(urhs, R1);
+   if (!solver.GetConverged())
+      mfem_error("M^{-1} * urhs fails to converge!\n");
 
 // {
 //    SetVariableVector(0, R1, *U);
@@ -931,7 +909,11 @@ void StokesSolver::Solve()
    printf("Solving for pressure\n");
    // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
    if (pres_dbc)
+   {
       solver2.Mult(R2, pvec);
+      if (!solver2.GetConverged())
+         mfem_error("Pressure Solver fails to converge!\n");
+   }
    else
       ortho.Mult(R2, pvec);
    printf("Pressure is solved.\n");
@@ -945,6 +927,8 @@ void StokesSolver::Solve()
 
    printf("Solving for velocity\n");
    solver.Mult(F3, uvec);
+   if (!solver.GetConverged())
+      mfem_error("Velocity Solver fails to converge!\n");
    printf("Velocity is solved.\n");
 
    // Copy back to global vector.
