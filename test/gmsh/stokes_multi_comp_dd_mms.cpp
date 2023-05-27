@@ -3,7 +3,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace mms::poisson;
+using namespace mms::stokes;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -15,7 +15,12 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 TEST(DDSerialTest, Test_convergence)
 {
    config = InputParser("test.component.yml");
-   CheckConvergence();
+   config.dict_["discretization"]["order"] = 2;
+   config.dict_["manufactured_solution"]["baseline_refinement"] = 0;
+   config.dict_["manufactured_solution"]["number_of_refinement"] = 2;
+   // TODO: add ROM capability for stokes solver.
+   config.dict_["main"]["use_rom"] = false;
+   CheckConvergence(1.0);
 
    return;
 }

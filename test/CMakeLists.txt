@@ -1,8 +1,16 @@
-add_executable(dd_mms dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_library(mmsSuiteObj OBJECT
+mms_suite.hpp
+mms_suite.cpp
+$<TARGET_OBJECTS:scaleupROMObj>)
+
+add_executable(poisson_dd_mms poisson_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
+add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
+add_executable(dg_integ_mms dg_integ_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 file(COPY inputs/dd_mms.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY inputs/dd_mms.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.unit.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
+file(COPY meshes/square.tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/dd_mms.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY inputs/dd_mms.comp.3d.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.3d.hex.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)

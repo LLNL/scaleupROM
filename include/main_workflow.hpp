@@ -13,12 +13,15 @@
 #define MAIN_WORKFLOW_HPP
 
 #include "mfem.hpp"
+#include "multiblock_solver.hpp"
 #include "parameterized_problem.hpp"
 #include "random_sample_generator.hpp"
 
 double dbc2(const Vector &);
 double dbc4(const Vector &);
 void RunExample();
+
+MultiBlockSolver* InitSolver();
 
 SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem);
 void GenerateSamples(MPI_Comm comm);

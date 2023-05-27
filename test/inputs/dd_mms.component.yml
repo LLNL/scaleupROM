@@ -38,3 +38,6 @@ manufactured_solution:
   amp1: 1.23
   amp2: 3.13
   constant: 1.11
+
+stokes:
+  nu: 1.2

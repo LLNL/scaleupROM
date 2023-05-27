@@ -303,8 +303,12 @@ int main(int argc, char *argv[])
    // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, M, R1, F1);
 
 // {
-//    PrintMatrix(M, "stokes.M.txt");
-//    PrintVector(F1, "stokes.f.txt");
+//    SparseMatrix &M(mVarf->SpMat());
+//    SparseMatrix &B(bVarf->SpMat());
+//    PrintMatrix(M, "sketch.M.txt");
+//    PrintMatrix(B, "sketch.B.txt");
+//    PrintVector(*fform, "sketch.urhs.txt");
+//    PrintVector(*gform, "sketch.prhs.txt");
 // }
 
    printf("Setting up pressure RHS\n");
@@ -398,6 +402,11 @@ int main(int argc, char *argv[])
    double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
    double err_p  = p.ComputeL2Error(pcoeff, irs);
    double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
+   double tmp = ComputeLpNorm(2., one, *mesh, irs);;
+
+   printf("norm_u = %.5E\n", norm_u);
+   printf("norm_p = %.5E\n", norm_p);
+   printf("volume = %.5E\n", tmp);
 
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);

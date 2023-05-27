@@ -196,7 +196,6 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
    if (Trans.Elem2No >= 0)
    {
       trial_dof2 = trial_fe2.GetDof();
-      trial_vdof2 = dim * trial_dof2;
       test_dof2 = test_fe2.GetDof();
 
       // vshape2.SetSize(trial_dof2, dim);
@@ -209,6 +208,7 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
       trial_dof2 = 0;
       test_dof2 = 0;
    }
+   trial_vdof2 = dim * trial_dof2;
 
    elmat.SetSize((test_dof1 + test_dof2), (trial_vdof1 + trial_vdof2));
    elmat = 0.0;
@@ -264,7 +264,7 @@ void DGNormalFluxIntegrator::AssembleFaceMatrix(const FiniteElement &trial_fe1,
          w *= 0.5;
 
       wnor.Set(w, nor);
-      
+
       for (jm = 0, j = 0; jm < dim; jm++)
       {
          wn = wnor(jm);
