@@ -21,16 +21,6 @@
 using namespace std;
 using namespace mfem;
 
-void uFun_ex_tmp(const Vector & x, Vector & u)
-{
-   double xi(x(0));
-   double yi(x(1));
-   assert(x.Size() == 2);
-
-   u(0) = cos(xi)*sin(yi);
-   u(1) = - sin(xi)*cos(yi);
-}
-
 StokesSolver::StokesSolver()
    : MultiBlockSolver(), minus_one(-1.0)
 {
@@ -48,6 +38,7 @@ StokesSolver::StokesSolver()
    {
       ufec = new DG_FECollection(uorder, dim);
       pfec = new DG_FECollection(porder, dim);
+      mfem_error("StokesSolver currently cannot support full DG scheme!\n");
    }
    else
    {
@@ -301,7 +292,10 @@ void StokesSolver::SetupRHSBCOperators()
          // TODO: Non-homogeneous Neumann stress bc
          // fs[m]->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(*sn_coeffs[b]), p_ess_attr);
 
-         gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
+         // TODO: develop full-dg compatiable integrator.
+         // Currently full-dg is not possible due to this operator.
+         // gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
+         gs[m]->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
       }
    }
 }

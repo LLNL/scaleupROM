@@ -1,5 +1,6 @@
 #include "mms_suite.hpp"
 #include<gtest/gtest.h>
+#include "dg_linear.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -186,11 +187,12 @@ StokesSolver *SolveWithRefinement(const int num_refinement)
    return test;
 }
 
-void CheckConvergence()
+void CheckConvergence(const double &threshold)
 {
    nu = config.GetOption<double>("stokes/nu", 1.0);
 
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
 
    printf("Num. Elem.\tRel. vel. Error\tConv Rate\tNorm\tRel. pres. Error\tConv Rate\tNorm\n");
 
@@ -198,7 +200,7 @@ void CheckConvergence()
    uconv_rate = 0.0;
    pconv_rate = 0.0;
    double uerror1 = 0.0, perror1 = 0.0;
-   for (int r = 0; r < num_refine; r++)
+   for (int r = base_refine; r < num_refine; r++)
    {
       StokesSolver *test = SolveWithRefinement(r);
 
@@ -264,7 +266,7 @@ void CheckConvergence()
       uerror /= unorm;
       perror /= pnorm;
       
-      if (r > 0)
+      if (r > base_refine)
       {
          uconv_rate(r) = uerror1 / uerror;
          pconv_rate(r) = perror1 / perror;
@@ -272,10 +274,10 @@ void CheckConvergence()
       printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\t%.5E\t%.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
 
       // reported convergence rate
-      if (r > 0)
+      if (r > base_refine)
       {
-         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - 0.1);
-         EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - 0.1);
+         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - threshold);
+         EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - threshold);
       }
 
       uerror1 = uerror;
@@ -287,6 +289,131 @@ void CheckConvergence()
    return;
 }
 
+}  // namespace stokes
+
+namespace fem
+{
+
+namespace dg_bdr_normal_lf
+{
+
+void uFun_ex(const Vector & x, Vector & u)
+{
+   double xi(x(0));
+   double yi(x(1));
+   assert(x.Size() == 2);
+
+   u(0) = cos(xi)*sin(yi);
+   u(1) = - sin(xi)*cos(yi);
 }
+
+double pFun_ex(const Vector & x)
+{
+   double xi(x(0));
+   double yi(x(1));
+
+   assert(x.Size() == 2);
+
+   return 2.0 * sin(xi)*sin(yi);
+}
+
+double EvalWithRefinement(const int num_refinement, int &order_out)
+{  
+   // 1. Parse command-line options.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+   bool use_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   int order = config.GetOption<int>("discretization/order", 1);
+   order_out = order;
+
+   Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
+   int dim = mesh->Dimension();
+
+   for (int l = 0; l < num_refinement; l++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+
+   FiniteElementSpace *fes;
+   if (use_dg)
+   {
+      fes = new FiniteElementSpace(mesh, dg_coll);
+   }
+   else
+   {
+      fes = new FiniteElementSpace(mesh, h1_coll);
+   }
+
+   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   p_ess_attr = 0;
+   p_ess_attr[1] = 1;
+
+   VectorFunctionCoefficient ucoeff(dim, uFun_ex);
+   FunctionCoefficient pcoeff(pFun_ex);
+
+   // 12. Create the grid functions u and p. Compute the L2 error norms.
+   GridFunction p(fes);
+
+   p.ProjectCoefficient(pcoeff);
+
+   LinearForm *gform = new LinearForm(fes);
+   // gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), p_ess_attr);
+   gform->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), p_ess_attr);
+   gform->Assemble();
+
+   double product = p * (*gform);
+
+   // 17. Free the used memory.
+   delete gform;
+   delete fes;
+   delete dg_coll;
+   delete h1_coll;
+   delete mesh;
+
+   return product;
+}
+
+void CheckConvergence()
+{
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+
+   double Lx = 1.0, Ly = 1.0;
+   double product_ex = sin(Lx) * cos(Lx) * (Ly - 0.5 * sin(2.0 * Ly));
+   printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
+
+   printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
+
+   Vector conv_rate(num_refine);
+   conv_rate = 0.0;
+   double error1 = 0.0;
+   for (int r = 0; r < num_refine; r++)
+   {
+      int order = -1;
+      double product = EvalWithRefinement(r, order);
+
+      double error = abs(product - product_ex) / abs(product_ex);
+      
+      if (r > 0)
+         conv_rate(r) = error1 / error;
+      printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\n", r, error, conv_rate(r), product, product_ex);
+
+      // reported convergence rate
+      if (r > 0)
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
+
+      error1 = error;
+   }
+
+   return;
+}
+
+}  // namespace dg_bdr_normal_lf
+
+}  // namespace fem
 
 }  // namespace mms

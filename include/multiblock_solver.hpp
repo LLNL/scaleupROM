@@ -91,14 +91,15 @@ public:
    // access
    const int GetDim() const { return dim; }
    const int GetNumSubdomains() const { return numSub; }
-   Mesh* GetMesh(const int k) const { return &(*meshes[k]); }
-   GridFunction* GetGridFunction(const int k) const { return us[k]; }
+   Mesh* GetMesh(const int k) { return &(*meshes[k]); }
+   GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() const { return order; }
    const bool UseRom() const { return use_rom; }
    ROMHandler* GetROMHandler() const { return rom_handler; }
    const bool IsVisualizationSaved() const { return save_visual; }
    const std::string GetVisualizationPrefix() const { return visual_prefix; }
    const TopologyHandlerMode GetTopologyMode() const { return topol_mode; }
+   ParaViewDataCollection* GetParaViewColl(const int &k) { return paraviewColls[k]; }
 
    void GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var);
    void SetVariableVector(const int &var_idx, BlockVector &var, BlockVector &global);

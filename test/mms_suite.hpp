@@ -50,9 +50,25 @@ void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 
 StokesSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence(const double &threshold = 0.1);
+
+}   // namespace stokes
+
+namespace fem
+{
+
+namespace dg_bdr_normal_lf
+{
+
+void uFun_ex(const Vector & x, Vector & u);
+double pFun_ex(const Vector & x);
+
+double EvalWithRefinement(const int num_refinement);
 void CheckConvergence();
 
-}
+}   // namespace dg_bdr_normal_lf
+
+}   // namespace fem
 
 }  // namespace mms
 
