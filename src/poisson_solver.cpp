@@ -914,11 +914,22 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    // clean up boundary functions for parametrized problem.
    bdr_coeffs = NULL;
 
-   if (problem->scalar_bdr_ptr != NULL)
-      for (int k = 0; k < problem->battr.Size(); k++)
-         AddBCFunction(*(problem->scalar_bdr_ptr), problem->battr[k]);
-   else
-      AddBCFunction(0.0);
+   for (int b = 0; b < problem->battr.Size(); b++)
+   {
+      switch (problem->bdr_type[b])
+      {
+         case PoissonProblem::BoundaryType::DIRICHLET:
+         { 
+            assert(problem->scalar_bdr_ptr[b]);
+            AddBCFunction(*(problem->scalar_bdr_ptr[b]), problem->battr[b]);
+            break;
+         }
+         case PoissonProblem::BoundaryType::NEUMANN: break;
+         default:
+         case PoissonProblem::BoundaryType::ZERO:
+         { AddBCFunction(0.0, problem->battr[b]); break; }
+      }
+   }
 
    if (problem->scalar_rhs_ptr != NULL)
       AddRHSFunction(*(problem->scalar_rhs_ptr));

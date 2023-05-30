@@ -107,12 +107,25 @@ void ubdr(const Vector &x, Vector &y)
    y.SetSize(dim);
    y = 0.0;
 
-   y(0) = U * (L - x(0)) * x(0);
+   y(0) = U * (L - x(1)) * x(1);
 }
 
 }  // namespace stokes_channel
 
 }  // namespace function_factory
+
+ParameterizedProblem::ParameterizedProblem()
+   : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name"))
+{ 
+   battr.SetSize(1); battr = -1;
+   bdr_type.SetSize(1); bdr_type = -1;
+
+   scalar_bdr_ptr.SetSize(1);
+   vector_bdr_ptr.SetSize(1);
+
+   scalar_bdr_ptr = NULL;
+   vector_bdr_ptr = NULL;
+};
 
 void ParameterizedProblem::SetParams(const std::string &key, const double &value)
 {
@@ -167,10 +180,14 @@ ParameterizedProblem* InitParameterizedProblem()
 */
 
 Poisson0::Poisson0()
-   : ParameterizedProblem()
+   : PoissonProblem()
 {
    param_num = 2;
    battr = -1;
+   bdr_type = PoissonProblem::ZERO;
+
+   scalar_bdr_ptr.SetSize(1);
+   vector_bdr_ptr.SetSize(1);
 
    // pointer to static function.
    scalar_bdr_ptr = NULL;
@@ -193,11 +210,12 @@ Poisson0::Poisson0()
 */
 
 PoissonComponent::PoissonComponent()
-   : ParameterizedProblem()
+   : PoissonProblem()
 {
    // k (max 3) + offset (1) + bdr_k (max 3) + bdr_offset(1) + bdr_idx(1)
    param_num = 9;
    battr = -1;
+   bdr_type = PoissonProblem::DIRICHLET;
 
    // pointer to static function.
    scalar_rhs_ptr = &(function_factory::poisson_component::rhs);
@@ -259,10 +277,11 @@ void PoissonComponent::SetParams(const Array<int> &indexes, const Vector &values
 */
 
 PoissonSpiral::PoissonSpiral()
-   : ParameterizedProblem()
+   : PoissonProblem()
 {
    param_num = 3;
    battr = -1;
+   bdr_type = PoissonProblem::ZERO;
 
    // pointer to static function.
    scalar_bdr_ptr = NULL;
@@ -288,17 +307,23 @@ PoissonSpiral::PoissonSpiral()
 */
 
 StokesChannel::StokesChannel()
-   : ParameterizedProblem()
+   : StokesProblem()
 {
-   param_num = 2;
-   battr.SetSize(3);
+   battr.SetSize(4);
    battr[0] = 1;
-   battr[0] = 3;
-   battr[0] = 4;
+   battr[1] = 3;
+   battr[2] = 4;
+   battr[3] = 5;
+   bdr_type.SetSize(4);
+   bdr_type = StokesProblem::DIRICHLET;
+   bdr_type[3] = StokesProblem::ZERO;
 
    // pointer to static function.
+   vector_bdr_ptr.SetSize(4);
    vector_rhs_ptr = NULL;
    vector_bdr_ptr = &(function_factory::stokes_channel::ubdr);
+
+   param_num = 2;
 
    // Default values.
    function_factory::stokes_channel::L = 1.0;

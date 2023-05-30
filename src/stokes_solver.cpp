@@ -116,24 +116,30 @@ void StokesSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F
 {
    assert(ud_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? battr - 1 : 0;
+   int idx = (battr > 0) ? global_bdr_attributes.Find(battr) : 0;
+   assert(idx >= 0);
    ud_coeffs[idx] = new VectorFunctionCoefficient(vdim[0], F);
 
    if (battr < 0)
       for (int k = 1; k < ud_coeffs.Size(); k++)
          ud_coeffs[k] = new VectorFunctionCoefficient(vdim[0], F);
+
+   DeterminePressureDirichlet();
 }
 
 void StokesSolver::AddBCFunction(const Vector &F, const int battr)
 {
    assert(ud_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? battr - 1 : 0;
+   int idx = (battr > 0) ? global_bdr_attributes.Find(battr) : 0;
+   assert(idx >= 0);
    ud_coeffs[idx] = new VectorConstantCoefficient(F);
 
    if (battr < 0)
       for (int k = 1; k < ud_coeffs.Size(); k++)
          ud_coeffs[k] = new VectorConstantCoefficient(F);
+
+   DeterminePressureDirichlet();
 }
 
 void StokesSolver::InitVariables()
@@ -203,6 +209,16 @@ void StokesSolver::InitVariables()
    // if (use_rom) MultiBlockSolver::InitROMHandler();
 }
 
+void StokesSolver::DeterminePressureDirichlet()
+{
+   pres_dbc = false;
+
+   // If any boundary does not have velocity dirichlet bc profile,
+   // then it has pressure dirichlet bc (stress neumann bc).
+   for (int b = 0; b < global_bdr_attributes.Size(); b++)
+      if (ud_coeffs[b] == NULL) { pres_dbc = true; break; }
+}
+
 void StokesSolver::BuildOperators()
 {
    BuildRHSOperators();
@@ -263,11 +279,6 @@ void StokesSolver::SetupBCOperators()
    SetupRHSBCOperators();
 
    SetupDomainBCOperators();
-
-   // If any boundary does not have velocity dirichlet bc profile,
-   // then it has pressure dirichlet bc (stress neumann bc).
-   for (int b = 0; b < global_bdr_attributes.Size(); b++)
-      if (ud_coeffs[b] == NULL) { pres_dbc = true; break; }
 }
 
 void StokesSolver::SetupRHSBCOperators()
@@ -1058,11 +1069,22 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    Vector zero(vdim[0]);
    zero = 0.0;
 
-   if (problem->vector_bdr_ptr != NULL)
-      for (int k = 0; k < problem->battr.Size(); k++)
-         AddBCFunction(*(problem->vector_bdr_ptr), problem->battr[k]);
-   else
-      AddBCFunction(zero);
+   for (int b = 0; b < problem->battr.Size(); b++)
+   {
+      switch (problem->bdr_type[b])
+      {
+         case StokesProblem::BoundaryType::DIRICHLET:
+         { 
+            assert(problem->vector_bdr_ptr[b]);
+            AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+            break;
+         }
+         case StokesProblem::BoundaryType::NEUMANN: break;
+         default:
+         case StokesProblem::BoundaryType::ZERO:
+         { AddBCFunction(zero, problem->battr[b]); break; }
+      }
+   }
 
    if (problem->vector_rhs_ptr != NULL)
       AddRHSFunction(*(problem->vector_rhs_ptr));

@@ -76,10 +76,7 @@ protected:
    int local_sample_index;
 
 public:
-   ParameterizedProblem()
-      : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name")),
-        battr({-1})
-   {};
+   ParameterizedProblem();
 
    virtual ~ParameterizedProblem() {};
 
@@ -96,10 +93,11 @@ public:
    // virtual member functions cannot be passed down as argument.
    // Instead use pointers to static functions.
    function_factory::GeneralScalarFunction *scalar_rhs_ptr = NULL;
-   function_factory::GeneralScalarFunction *scalar_bdr_ptr = NULL;
+   Array<function_factory::GeneralScalarFunction *> scalar_bdr_ptr;
    function_factory::GeneralVectorFunction *vector_rhs_ptr = NULL;
-   function_factory::GeneralVectorFunction *vector_bdr_ptr = NULL;
+   Array<function_factory::GeneralVectorFunction *> vector_bdr_ptr;
    Array<int> battr;
+   Array<int> bdr_type; // abstract boundary type
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
@@ -107,14 +105,26 @@ public:
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
 };
 
-class Poisson0 : public ParameterizedProblem
+class PoissonProblem : public ParameterizedProblem
+{
+friend class PoissonSolver;
+
+protected:
+   enum BoundaryType
+   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
+
+public:
+   virtual ~PoissonProblem() {};
+};
+
+class Poisson0 : public PoissonProblem
 {
 public:
    Poisson0();
    virtual ~Poisson0() {};
 };
 
-class PoissonComponent : public ParameterizedProblem
+class PoissonComponent : public PoissonProblem
 {
 public:
    PoissonComponent();
@@ -126,14 +136,26 @@ private:
    void SetBattr();
 };
 
-class PoissonSpiral : public ParameterizedProblem
+class PoissonSpiral : public PoissonProblem
 {
 public:
    PoissonSpiral();
    virtual ~PoissonSpiral() {};
 };
 
-class StokesChannel : public ParameterizedProblem
+class StokesProblem : public ParameterizedProblem
+{
+friend class StokesSolver;
+
+protected:
+   enum BoundaryType
+   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
+
+public:
+   virtual ~StokesProblem() {};
+};
+
+class StokesChannel : public StokesProblem
 {
 public:
    StokesChannel();

@@ -134,6 +134,8 @@ public:
    virtual void AddBCFunction(const Vector &F, const int battr = -1);
    virtual void InitVariables();
 
+   void DeterminePressureDirichlet();
+
    virtual void BuildOperators();
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
