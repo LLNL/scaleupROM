@@ -1,6 +1,67 @@
 import numpy as np
 import h5py
 
+def ConfigStokesChannel():
+    n_mesh = 4
+    mesh_type = [0, 1, 2, 3]
+    mesh_configs = np.zeros([n_mesh, 6])
+    mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
+    mesh_configs[2,:] = [0., 1., 0., 0., 0., 0.]
+    mesh_configs[3,:] = [1., 1., 0., 0., 0., 0.]
+
+    # interface data
+    # mesh1 / mesh2 / battr1 / battr2 / port_idx
+    if_data = np.zeros([4, 5])
+    if_data[0, :] = [0, 1, 2, 4, 0]
+    if_data[1, :] = [0, 2, 3, 1, 1]
+    if_data[2, :] = [2, 3, 2, 4, 2]
+    if_data[3, :] = [1, 3, 3, 1, 3]
+
+    # boundary attributes
+    # global_battr / mesh_idx / comp_battr
+    bdr_data = []
+    bdr_data += [[1, 0, 1]]
+    bdr_data += [[1, 1, 1]]
+    bdr_data += [[3, 1, 3]]
+    bdr_data += [[3, 3, 3]]
+    bdr_data += [[2, 2, 2]]
+    bdr_data += [[2, 3, 2]]
+    bdr_data += [[4, 0, 4]]
+    bdr_data += [[4, 2, 4]]
+    # holes
+    bdr_data += [[5, 1, 5]]
+    bdr_data += [[5, 2, 5]]
+    bdr_data += [[5, 3, 5]]
+    bdr_data = np.array(bdr_data)
+    print(bdr_data.shape)
+
+    filename = "stokes.channel.h5"
+    with h5py.File(filename, 'w') as f:
+        # c++ currently cannot read datasets of string.
+        # change to multiple attributes, only as a temporary implementation.
+        grp = f.create_group("components")
+        grp.attrs["number_of_components"] = 4
+        grp.attrs["0"] = "empty"
+        grp.attrs["1"] = "circle"
+        grp.attrs["2"] = "square"
+        grp.attrs["3"] = "triangle"
+        # component index of each mesh
+        grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
+        # 3-dimension vector for translation / rotation
+        grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
+
+        grp = f.create_group("ports")
+        grp.attrs["number_of_references"] = 4
+        grp.attrs["0"] = "port1"
+        grp.attrs["1"] = "port2"
+        grp.attrs["2"] = "port3"
+        grp.attrs["3"] = "port4"
+        grp.create_dataset("interface", if_data.shape, data=if_data)
+
+        # boundary attributes
+        f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
+    return
+
 def ConfigTestMultiComponent():
     n_mesh = 3
     mesh_type = [0, 1, 1]
@@ -251,8 +312,9 @@ def Config3D():
 
 
 if __name__ == "__main__":
+    ConfigStokesChannel()
     #ConfigScaleUp(128)
-    ConfigTestMultiComponent()
+    # ConfigTestMultiComponent()
     #for ncomp in [4,8,16,32,64]:
     #    ConfigScaleUp(ncomp)
     # Config2D()
