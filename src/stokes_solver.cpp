@@ -1042,24 +1042,30 @@ void StokesSolver::SanityCheckOnCoeffs()
       MFEM_WARNING("All velocity bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
 }
 
-// void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
-// {
-//    // clean up rhs for parametrized problem.
-//    if (rhs_coeffs.Size() > 0)
-//    {
-//       for (int k = 0; k < rhs_coeffs.Size(); k++) delete rhs_coeffs[k];
-//       rhs_coeffs.SetSize(0);
-//    }
-//    // clean up boundary functions for parametrized problem.
-//    bdr_coeffs = NULL;
+void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   // clean up rhs for parametrized problem.
+   if (f_coeffs.Size() > 0)
+   {
+      for (int k = 0; k < f_coeffs.Size(); k++) delete f_coeffs[k];
+      f_coeffs.SetSize(0);
+   }
+   // clean up boundary functions for parametrized problem.
+   ud_coeffs = NULL;
+   sn_coeffs = NULL;
 
-//    if (problem->scalar_bdr_ptr != NULL)
-//       AddBCFunction(*(problem->scalar_bdr_ptr), problem->battr);
-//    else
-//       AddBCFunction(0.0);
+   // no-slip dirichlet velocity bc.
+   Vector zero(vdim[0]);
+   zero = 0.0;
 
-//    if (problem->scalar_rhs_ptr != NULL)
-//       AddRHSFunction(*(problem->scalar_rhs_ptr));
-//    else
-//       AddRHSFunction(0.0);
-// }
+   if (problem->vector_bdr_ptr != NULL)
+      for (int k = 0; k < problem->battr.Size(); k++)
+         AddBCFunction(*(problem->vector_bdr_ptr), problem->battr[k]);
+   else
+      AddBCFunction(zero);
+
+   if (problem->vector_rhs_ptr != NULL)
+      AddRHSFunction(*(problem->vector_rhs_ptr));
+   else
+      AddRHSFunction(zero);
+}

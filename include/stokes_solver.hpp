@@ -175,7 +175,7 @@ public:
 
    void SanityCheckOnCoeffs();
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem) {}
+   virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
 };
 
 #endif

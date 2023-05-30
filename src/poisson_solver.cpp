@@ -915,7 +915,8 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    bdr_coeffs = NULL;
 
    if (problem->scalar_bdr_ptr != NULL)
-      AddBCFunction(*(problem->scalar_bdr_ptr), problem->battr);
+      for (int k = 0; k < problem->battr.Size(); k++)
+         AddBCFunction(*(problem->scalar_bdr_ptr), problem->battr[k]);
    else
       AddBCFunction(0.0);
 

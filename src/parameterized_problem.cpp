@@ -96,6 +96,22 @@ double rhs(const Vector &x)
 
 }  // namespace poisson_spiral
 
+namespace stokes_channel
+{
+
+double L, U;
+
+void ubdr(const Vector &x, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   y = 0.0;
+
+   y(0) = U * (L - x(0)) * x(0);
+}
+
+}  // namespace stokes_channel
+
 }  // namespace function_factory
 
 void ParameterizedProblem::SetParams(const std::string &key, const double &value)
@@ -133,6 +149,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "poisson_spiral")
    {
       problem = new PoissonSpiral();
+   }
+   else if (problem_name == "stokes_channel")
+   {
+      problem = new StokesChannel();
    }
    else
    {
@@ -213,11 +233,12 @@ PoissonComponent::PoissonComponent()
 void PoissonComponent::SetBattr()
 {
    double bidx = function_factory::poisson_component::bdr_idx;
+   battr.SetSize(1);
    battr = -1;
    if (bidx >= 0.0)
    {
       battr = 1 + floor(bidx);
-      assert((battr >= 1) && (battr <= 4));
+      assert((battr[0] >= 1) && (battr[0] <= 4));
    }
 }
 
@@ -260,4 +281,33 @@ PoissonSpiral::PoissonSpiral()
    param_ptr[0] = &(function_factory::poisson_spiral::L);
    param_ptr[1] = &(function_factory::poisson_spiral::Lw);
    param_ptr[2] = &(function_factory::poisson_spiral::k);
+}
+
+/*
+   StokesChannel
+*/
+
+StokesChannel::StokesChannel()
+   : ParameterizedProblem()
+{
+   param_num = 2;
+   battr.SetSize(3);
+   battr[0] = 1;
+   battr[0] = 3;
+   battr[0] = 4;
+
+   // pointer to static function.
+   vector_rhs_ptr = NULL;
+   vector_bdr_ptr = &(function_factory::stokes_channel::ubdr);
+
+   // Default values.
+   function_factory::stokes_channel::L = 1.0;
+   function_factory::stokes_channel::U = 1.0;
+
+   param_map["L"] = 0;
+   param_map["U"] = 1;
+
+   param_ptr.SetSize(param_num);
+   param_ptr[0] = &(function_factory::stokes_channel::L);
+   param_ptr[1] = &(function_factory::stokes_channel::U);
 }

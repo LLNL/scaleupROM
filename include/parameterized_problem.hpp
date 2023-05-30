@@ -21,6 +21,7 @@ namespace function_factory
 {
 
 typedef double GeneralScalarFunction(const Vector &);
+typedef void GeneralVectorFunction(const Vector &, Vector &);
 
 static const double pi = 4.0 * atan(1.0);
 
@@ -50,6 +51,12 @@ namespace poisson_spiral
    double rhs(const Vector &x);
 }
 
+namespace stokes_channel
+{
+   extern double L, U;
+   void ubdr(const Vector &x, Vector &y);
+}
+
 }
 
 class ParameterizedProblem
@@ -70,10 +77,11 @@ protected:
 
 public:
    ParameterizedProblem()
-      : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name"))
+      : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name")),
+        battr({-1})
    {};
 
-   ~ParameterizedProblem() {};
+   virtual ~ParameterizedProblem() {};
 
    const std::string GetProblemName() { return problem_name; }
    const int GetNumParams() { return param_num; }
@@ -89,7 +97,9 @@ public:
    // Instead use pointers to static functions.
    function_factory::GeneralScalarFunction *scalar_rhs_ptr = NULL;
    function_factory::GeneralScalarFunction *scalar_bdr_ptr = NULL;
-   int battr = -1;
+   function_factory::GeneralVectorFunction *vector_rhs_ptr = NULL;
+   function_factory::GeneralVectorFunction *vector_bdr_ptr = NULL;
+   Array<int> battr;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
@@ -101,14 +111,14 @@ class Poisson0 : public ParameterizedProblem
 {
 public:
    Poisson0();
-   ~Poisson0() {};
+   virtual ~Poisson0() {};
 };
 
 class PoissonComponent : public ParameterizedProblem
 {
 public:
    PoissonComponent();
-   ~PoissonComponent() {};
+   virtual ~PoissonComponent() {};
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
 
@@ -120,7 +130,14 @@ class PoissonSpiral : public ParameterizedProblem
 {
 public:
    PoissonSpiral();
-   ~PoissonSpiral() {};
+   virtual ~PoissonSpiral() {};
+};
+
+class StokesChannel : public ParameterizedProblem
+{
+public:
+   StokesChannel();
+   virtual ~StokesChannel() {};
 };
 
 ParameterizedProblem* InitParameterizedProblem();
