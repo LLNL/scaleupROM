@@ -4,6 +4,8 @@ import h5py
 def ConfigStokesChannel():
     n_mesh = 4
     mesh_type = [0, 1, 2, 3]
+    # n_mesh = 2
+    # mesh_type = [0, 1]
     mesh_configs = np.zeros([n_mesh, 6])
     mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
     mesh_configs[2,:] = [0., 1., 0., 0., 0., 0.]
@@ -22,10 +24,13 @@ def ConfigStokesChannel():
     bdr_data = []
     bdr_data += [[1, 0, 1]]
     bdr_data += [[1, 1, 1]]
-    bdr_data += [[3, 1, 3]]
-    bdr_data += [[3, 3, 3]]
-    bdr_data += [[2, 2, 2]]
+    bdr_data += [[2, 1, 2]]
     bdr_data += [[2, 3, 2]]
+    # bdr_data += [[3, 1, 3]]
+    # bdr_data += [[3, 0, 3]]
+    bdr_data += [[3, 3, 3]]
+    bdr_data += [[3, 2, 3]]
+    # bdr_data += [[2, 2, 2]]
     bdr_data += [[4, 0, 4]]
     bdr_data += [[4, 2, 4]]
     # holes
@@ -41,6 +46,7 @@ def ConfigStokesChannel():
         # change to multiple attributes, only as a temporary implementation.
         grp = f.create_group("components")
         grp.attrs["number_of_components"] = 4
+        # grp.attrs["number_of_components"] = 2
         grp.attrs["0"] = "empty"
         grp.attrs["1"] = "circle"
         grp.attrs["2"] = "square"

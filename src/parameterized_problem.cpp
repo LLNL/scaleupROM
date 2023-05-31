@@ -107,7 +107,8 @@ void ubdr(const Vector &x, Vector &y)
    y.SetSize(dim);
    y = 0.0;
 
-   y(0) = U * (L - x(1)) * x(1);
+   double yc = x(1) / L;
+   y(0) = 4.0 * U * (1.0 - yc) * yc;
 }
 
 }  // namespace stokes_channel
