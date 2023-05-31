@@ -117,13 +117,13 @@ void PoissonSolver::InitVariables()
 {
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
-   domain_offsets.SetSize(numSub + 1);
+   var_offsets.SetSize(numSub + 1);
    num_vdofs.SetSize(numSub);
    block_offsets[0] = 0;
-   domain_offsets[0] = 0;
+   var_offsets[0] = 0;
    for (int i = 0; i < numSub; i++)
    {
-      domain_offsets[i + 1] = fes[i]->GetTrueVSize();
+      var_offsets[i + 1] = fes[i]->GetTrueVSize();
       num_vdofs[i] = fes[i]->GetTrueVSize();
       for (int d = 0; d < udim; d++)
       {
@@ -131,13 +131,14 @@ void PoissonSolver::InitVariables()
       }
    }
    block_offsets.PartialSum();
-   domain_offsets.PartialSum();
+   var_offsets.PartialSum();
+   domain_offsets = var_offsets;
 
    SetupBCVariables();
 
    // Set up solution/rhs variables/
-   U = new BlockVector(domain_offsets);
-   RHS = new BlockVector(domain_offsets);
+   U = new BlockVector(var_offsets);
+   RHS = new BlockVector(var_offsets);
    /* 
       Note: for compatibility with ROM, it's better to split with domain_offsets.
       For vector-component operations, can set up a view BlockVector like below:
@@ -307,7 +308,7 @@ void PoissonSolver::AssembleOperator()
    // NOTE: currently, domain-decomposed system will have a significantly different sparsity pattern.
    // This is especially true for vector solution, where ordering of component is changed.
    // This is quite inevitable, but is it desirable?
-   globalMat = new BlockMatrix(domain_offsets);
+   globalMat = new BlockMatrix(var_offsets);
    for (int i = 0; i < numSub; i++)
    {
       for (int j = 0; j < numSub; j++)
@@ -783,7 +784,7 @@ void PoissonSolver::Solve()
       
       if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
       {
-         globalPrec = new BlockDiagonalPreconditioner(domain_offsets);
+         globalPrec = new BlockDiagonalPreconditioner(var_offsets);
          solver->SetPreconditioner(*globalPrec);
       }
       solver->SetOperator(*globalMat);
@@ -828,7 +829,7 @@ void PoissonSolver::InitUnifiedParaview(const std::string& file_prefix)
 double PoissonSolver::CompareSolution()
 {
    // Copy the rom solution.
-   BlockVector romU(domain_offsets);
+   BlockVector romU(var_offsets);
    romU = *U;
    Array<GridFunction *> rom_us;
    Array<VectorGridFunctionCoefficient *> rom_u_coeffs;

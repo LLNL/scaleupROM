@@ -146,33 +146,37 @@ void StokesSolver::InitVariables()
 {
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
-   domain_offsets.SetSize(num_var * numSub + 1);
+   var_offsets.SetSize(num_var * numSub + 1);
    num_vdofs.SetSize(num_var * numSub);
    u_offsets.SetSize(numSub + 1);
    p_offsets.SetSize(numSub + 1);
 
    block_offsets[0] = 0;
-   domain_offsets[0] = 0;
+   var_offsets[0] = 0;
    u_offsets[0] = 0;
    p_offsets[0] = 0;
 
-   for (int m = 0, block_idx = 1, domain_idx=1; m < numSub; m++)
+   domain_offsets.SetSize(numSub + 1);
+   domain_offsets = 0;
+
+   for (int m = 0, block_idx = 1, var_idx=1; m < numSub; m++)
    {
-      for (int v = 0; v < num_var; v++, domain_idx++)
+      for (int v = 0; v < num_var; v++, var_idx++)
       {
          FiniteElementSpace *fes = (v == 0) ? ufes[m] : pfes[m];
-         domain_offsets[domain_idx] = fes->GetVSize();
+         var_offsets[var_idx] = fes->GetVSize();
          for (int d = 0; d < vdim[v]; d++, block_idx++)
          {
             block_offsets[block_idx] = fes->GetNDofs();
          }
-         // var_offsets[v+1] += fes->GetVSize();
+         domain_offsets[m+1] += fes->GetVSize();
       }
       u_offsets[m + 1] = ufes[m]->GetVSize();
       p_offsets[m + 1] = pfes[m]->GetVSize();
    }
    block_offsets.PartialSum();
-   domain_offsets.GetSubArray(1, num_var * numSub, num_vdofs);
+   var_offsets.GetSubArray(1, num_var * numSub, num_vdofs);
+   var_offsets.PartialSum();
    domain_offsets.PartialSum();
    u_offsets.PartialSum();
    p_offsets.PartialSum();
@@ -180,8 +184,8 @@ void StokesSolver::InitVariables()
    SetupBCVariables();
 
    // Set up solution/rhs variables/
-   U = new BlockVector(domain_offsets);
-   RHS = new BlockVector(domain_offsets);
+   U = new BlockVector(var_offsets);
+   RHS = new BlockVector(var_offsets);
    /* 
       Note: for compatibility with ROM, it's better to split with domain_offsets.
       For vector-component operations, can set up a view BlockVector like below:
@@ -981,7 +985,7 @@ void StokesSolver::InitIndividualParaview(const std::string& file_prefix)
 // double PoissonSolver::CompareSolution()
 // {
 //    // Copy the rom solution.
-//    BlockVector romU(domain_offsets);
+//    BlockVector romU(var_offsets);
 //    romU = *U;
 //    Array<GridFunction *> rom_us;
 //    Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
