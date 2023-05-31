@@ -32,6 +32,8 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    verbose = config.GetOption<bool>("mesh/component-wise/verbose", false);
    write_ports = config.GetOption<bool>("mesh/component-wise/write_ports", false);
 
+   vtx_gap_thrs = config.GetOption<double>("mesh/component-wise/vertex_gap_threshold", 1.0e-10);
+
    // read global file.
    std::string global_config = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
    ReadComponentsFromFile(global_config);
@@ -732,7 +734,7 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
       (*tf_ptr)(tmp, *x2_trns[v2]);
    }
 
-   double threshold = 1.e-10;
+   // double threshold = 1.e-10;
    for (int v1 = 0; v1 < vtx1.Size(); v1++)
    {
       double *x1 = comp1->GetVertex(vtx1[v1]);
@@ -752,7 +754,7 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
          {
             double tmp = abs(x1[d] - x2[d]);
             tmp1 = max(tmp1, tmp);
-            match = (tmp < threshold);
+            match = (tmp < vtx_gap_thrs);
             if (!match) break;
          }
          mingap = min(mingap, tmp1);

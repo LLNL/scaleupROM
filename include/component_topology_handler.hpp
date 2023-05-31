@@ -106,6 +106,9 @@ protected:
    // Reference meshes for components.
    Array<BlockMesh*> components;
 
+   // threshold for matching vertices in BuildPortDataFromInput.
+   double vtx_gap_thrs = -1.0;
+
    struct MeshConfig {
       double trans[3];
       double rotate[3];
