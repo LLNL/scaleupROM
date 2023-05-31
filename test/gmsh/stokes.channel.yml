@@ -1,0 +1,83 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: false
+  solver: stokes
+
+mesh:
+#  type: submesh
+#  filename: "meshes/square-circle.msh.mfem"
+  type: component-wise
+  component-wise:
+    vertex_gap_threshold: 1.0e-3
+    global_config: "meshes/stokes.channel.h5"
+    components:
+      - name: "empty"
+        file: "meshes/test.8x8.mesh"
+      - name: "circle"
+        file: "meshes/square-circle.msh.mfem"
+      - name: "square"
+        file: "meshes/square-square.mesh"
+      - name: "triangle"
+        file: "meshes/square-triangle.mesh"
+    ports:
+      - name: "port1"
+        file: "meshes/test.port1.h5"
+        comp1:
+          name: "empty"
+          attr: 2
+        comp2:
+          name: "circle"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "meshes/test.port2.h5"
+        comp1:
+          name: "empty"
+          attr: 3
+        comp2:
+          name: "square"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+      - name: "port3"
+        file: "meshes/test.port3.h5"
+        comp1:
+          name: "square"
+          attr: 2
+        comp2:
+          name: "triangle"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
+      - name: "port4"
+        file: "meshes/test.port4.h5"
+        comp1:
+          name: "circle"
+          attr: 3
+        comp2:
+          name: "triangle"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+visualization:
+  enabled: true
+  unified_paraview: false
+  file_path:
+    prefix: stokes_channel_output
+
+parameterized_problem:
+  name: stokes_channel
+
+single_run:
+  stokes_channel:
+    - parameter_name: L
+      value: 2.0
+    - parameter_name: U
+      value: 1.0
+

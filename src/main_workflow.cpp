@@ -56,8 +56,8 @@ MultiBlockSolver* InitSolver()
 {
    std::string solver_type = config.GetOption<std::string>("main/solver", "poisson");
    MultiBlockSolver *solver = NULL;
-   if (solver_type == "poisson")       solver = new PoissonSolver;
-   else if (solver_type == "stokes")   solver = new StokesSolver;
+   if (solver_type == "poisson")       { solver = new PoissonSolver; }
+   else if (solver_type == "stokes")   { solver = new StokesSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());

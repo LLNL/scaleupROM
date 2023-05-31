@@ -18,8 +18,9 @@ int main(int argc, char *argv[])
    config = InputParser(input_file);
 
    std::string mode = config.GetOption<std::string>("main/mode", "run_example");
+
    if (mode == "run_example")
-      if (rank == 0) RunExample();
+   { if (rank == 0) RunExample(); }
    else 
    {
       if (mode == "sample_generation") GenerateSamples(MPI_COMM_WORLD);
