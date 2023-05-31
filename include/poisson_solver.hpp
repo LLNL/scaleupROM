@@ -23,9 +23,6 @@ class PoissonSolver : public MultiBlockSolver
 {
 
 friend class ParameterizedProblem;
-friend class Poisson0;
-friend class PoissonComponent;
-friend class PoissonSpiral;
 
 protected:
    // Finite element collection for all fe spaces.
