@@ -37,6 +37,9 @@ PoissonSolver::PoissonSolver()
    
    // solution dimension is determined by initialization.
    udim = 1;
+   num_var = 1;
+   vdim.SetSize(num_var);
+   vdim = 1;
    fes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
       fes[m] = new FiniteElementSpace(meshes[m], fec, udim);
@@ -93,11 +96,19 @@ void PoissonSolver::AddBCFunction(std::function<double(const Vector &)> F, const
 {
    assert(bdr_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? battr - 1 : 0;
-   bdr_coeffs[idx] = new FunctionCoefficient(F);
-
-   if (battr < 0)
-      for (int k = 1; k < bdr_coeffs.Size(); k++)
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      bdr_coeffs[idx] = new FunctionCoefficient(F);
+   }
+   else
+      for (int k = 0; k < bdr_coeffs.Size(); k++)
          bdr_coeffs[k] = new FunctionCoefficient(F);
 }
 
@@ -105,11 +116,19 @@ void PoissonSolver::AddBCFunction(const double &F, const int battr)
 {
    assert(bdr_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? battr - 1 : 0;
-   bdr_coeffs[idx] = new ConstantCoefficient(F);
-
-   if (battr < 0)
-      for (int k = 1; k < bdr_coeffs.Size(); k++)
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      bdr_coeffs[idx] = new ConstantCoefficient(F);
+   }
+   else
+      for (int k = 0; k < bdr_coeffs.Size(); k++)
          bdr_coeffs[k] = new ConstantCoefficient(F);
 }
 

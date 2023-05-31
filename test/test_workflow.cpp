@@ -14,7 +14,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
-TEST(BaseIndividualTest, Test_Workflow)
+TEST(Poisson_Workflow, BaseIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
    
@@ -34,7 +34,7 @@ TEST(BaseIndividualTest, Test_Workflow)
    return;
 }
 
-TEST(BaseUniversalTest, Test_Workflow)
+TEST(Poisson_Workflow, BaseUniversalTest)
 {
    config = InputParser("inputs/test.base.yml");
 
@@ -61,7 +61,7 @@ TEST(BaseUniversalTest, Test_Workflow)
    return;
 }
 
-TEST(MFEMIndividualTest, Test_Workflow)
+TEST(Poisson_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
 
@@ -85,7 +85,7 @@ TEST(MFEMIndividualTest, Test_Workflow)
    return;
 }
 
-TEST(MFEMUniversalTest, Test_Workflow)
+TEST(Poisson_Workflow, MFEMUniversalTest)
 {
    config = InputParser("inputs/test.base.yml");
 
@@ -118,7 +118,7 @@ TEST(MFEMUniversalTest, Test_Workflow)
    return;
 }
 
-TEST(ComponentWiseTest, Test_Workflow)
+TEST(Poisson_Workflow, ComponentWiseTest)
 {
    config = InputParser("inputs/test.component.yml");
 
@@ -142,6 +142,26 @@ TEST(ComponentWiseTest, Test_Workflow)
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
    EXPECT_TRUE(error < threshold);
+
+   return;
+}
+
+TEST(Stokes_Workflow, BaseIndividualTest)
+{
+   config = InputParser("inputs/stokes.base.yml");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   // config.dict_["main"]["mode"] = "build_rom";
+   // BuildROM(MPI_COMM_WORLD);
+
+   // config.dict_["main"]["mode"] = "single_run";
+   // double error = SingleRun();
+
+   // // This reproductive case must have a very small error at the level of finite-precision.
+   // printf("Error: %.15E\n", error);
+   // EXPECT_TRUE(error < threshold);
 
    return;
 }

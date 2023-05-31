@@ -116,12 +116,19 @@ void StokesSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F
 {
    assert(ud_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? global_bdr_attributes.Find(battr) : 0;
-   assert(idx >= 0);
-   ud_coeffs[idx] = new VectorFunctionCoefficient(vdim[0], F);
-
-   if (battr < 0)
-      for (int k = 1; k < ud_coeffs.Size(); k++)
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      ud_coeffs[idx] = new VectorFunctionCoefficient(vdim[0], F);
+   }
+   else
+      for (int k = 0; k < ud_coeffs.Size(); k++)
          ud_coeffs[k] = new VectorFunctionCoefficient(vdim[0], F);
 
    DeterminePressureDirichlet();
@@ -131,12 +138,19 @@ void StokesSolver::AddBCFunction(const Vector &F, const int battr)
 {
    assert(ud_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? global_bdr_attributes.Find(battr) : 0;
-   assert(idx >= 0);
-   ud_coeffs[idx] = new VectorConstantCoefficient(F);
-
-   if (battr < 0)
-      for (int k = 1; k < ud_coeffs.Size(); k++)
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      ud_coeffs[idx] = new VectorConstantCoefficient(F);
+   }
+   else
+      for (int k = 0; k < ud_coeffs.Size(); k++)
          ud_coeffs[k] = new VectorConstantCoefficient(F);
 
    DeterminePressureDirichlet();
@@ -147,7 +161,7 @@ void StokesSolver::InitVariables()
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
    var_offsets.SetSize(num_var * numSub + 1);
-   num_vdofs.SetSize(num_var * numSub);
+   num_vdofs.SetSize(numSub);
    u_offsets.SetSize(numSub + 1);
    p_offsets.SetSize(numSub + 1);
 
@@ -175,7 +189,7 @@ void StokesSolver::InitVariables()
       p_offsets[m + 1] = pfes[m]->GetVSize();
    }
    block_offsets.PartialSum();
-   var_offsets.GetSubArray(1, num_var * numSub, num_vdofs);
+   domain_offsets.GetSubArray(1, numSub, num_vdofs);
    var_offsets.PartialSum();
    domain_offsets.PartialSum();
    u_offsets.PartialSum();
@@ -208,9 +222,7 @@ void StokesSolver::InitVariables()
 
    f_coeffs.SetSize(0);
 
-   if (use_rom)
-      mfem_error("StokesSolver does not support ROM yet!\n");
-   // if (use_rom) MultiBlockSolver::InitROMHandler();
+   if (use_rom) MultiBlockSolver::InitROMHandler();
 }
 
 void StokesSolver::DeterminePressureDirichlet()
@@ -1059,6 +1071,8 @@ void StokesSolver::SanityCheckOnCoeffs()
 
 void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   nu = function_factory::stokes_problem::nu;
+
    // clean up rhs for parametrized problem.
    if (f_coeffs.Size() > 0)
    {

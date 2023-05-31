@@ -57,7 +57,9 @@ protected:
 // public:
    int numSub = -1;          // number of subdomains.
    int udim = -1;            // solution dimension.
+   int num_var = -1;         // number of variables for which linear subspace method is applied.
    int num_basis_sets = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
+   Array<int> vdim;          // dimension of each variable.
    Array<int> fom_num_vdofs;
 
    // rom options.
@@ -104,7 +106,7 @@ protected:
 
    void ParseInputs();
 public:
-   ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
+   ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~ROMHandler() {};
 
@@ -122,7 +124,7 @@ public:
    const Array<int> GetBlockOffsets() { return rom_block_offsets; }
    
    // cannot do const GridFunction* due to librom function definitions.
-   virtual void SaveSnapshot(Array<GridFunction*> &us, const int &sample_index);
+   virtual void SaveSnapshot(BlockVector *sol, const int &sample_index);
 
    virtual void FormReducedBasis(const int &total_samples);
    virtual void FormReducedBasisUniversal(const int &total_samples);
@@ -165,7 +167,7 @@ protected:
    mfem::BlockVector *reduced_rhs;
 
 public:
-   MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs);
+   MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler() {}; 
    

@@ -102,6 +102,8 @@ public:
 
    void InitUnifiedParaview(const std::string &file_prefix) override;
 
+   virtual void SaveSnapshot(const int &sample_index)
+   { rom_handler->SaveSnapshot(U, sample_index); }
    virtual void ProjectOperatorOnReducedBasis()
    { rom_handler->ProjectOperatorOnReducedBasis(mats); }
    virtual double CompareSolution();

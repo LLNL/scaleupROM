@@ -22,15 +22,17 @@ using namespace std;
 namespace mfem
 {
 
-ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
+ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
    : topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
-     udim(input_udim),
+     vdim(input_vdim),
      fom_num_vdofs(input_num_vdofs),
      basis_loaded(false),
      operator_loaded(false)
 {
-   assert(fom_num_vdofs.Size() == (numSub));
+   num_var = vdim.Size();
+   udim = vdim.Sum();
+   assert(fom_num_vdofs.Size() == (num_var * numSub));
 
    ParseInputs();
 
@@ -152,17 +154,30 @@ void ROMHandler::ParseInputs()
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
 }
 
-void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
+void ROMHandler::SaveSnapshot(BlockVector *sol, const int &sample_index)
 {
-   assert(us.Size() == numSub);
+   assert(sol->NumBlocks() == (num_var * numSub));
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0, idx = 0; m < numSub; m++)
    {
+      // for (int v = 0; v < num_var; v++, idx++)
+      // {
+      //    const std::string filename = GetSnapshotPrefix(sample_index, m, v);
+      //    rom_options = new CAROM::Options(fom_num_vdofs[idx], max_num_snapshots, 1, update_right_SV);
+      //    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
+
+      //    bool addSample = basis_generator->takeSample(sol->GetBlock(idx).GetData(), 0.0, 0.01);
+      //    assert(addSample);
+      //    basis_generator->writeSnapshot();
+
+      //    delete basis_generator;
+      //    delete rom_options;
+      // }
       const std::string filename = GetSnapshotPrefix(sample_index, m);
       rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
-      bool addSample = basis_generator->takeSample(us[m]->GetData(), 0.0, 0.01);
+      bool addSample = basis_generator->takeSample(sol->GetBlock(m).GetData(), 0.0, 0.01);
       assert(addSample);
       basis_generator->writeSnapshot();
 
@@ -535,8 +550,8 @@ void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
-   : ROMHandler(input_topol, input_udim, input_num_vdofs)
+MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+   : ROMHandler(input_topol, input_vdim, input_num_vdofs)
 {
    romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
 }

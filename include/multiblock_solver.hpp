@@ -168,8 +168,7 @@ public:
    virtual void SaveVisualization();
 
    void InitROMHandler();
-   void SaveSnapshot(const int &sample_index)
-   { rom_handler->SaveSnapshot(us, sample_index); }
+   virtual void SaveSnapshot(const int &sample_index) = 0;
    void FormReducedBasis(const int &total_samples)
    { rom_handler->FormReducedBasis(total_samples); }
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }

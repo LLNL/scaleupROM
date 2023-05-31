@@ -51,10 +51,17 @@ namespace poisson_spiral
    double rhs(const Vector &x);
 }
 
+namespace stokes_problem
+{
+
+extern double nu;
+
 namespace stokes_channel
 {
    extern double L, U;
    void ubdr(const Vector &x, Vector &y);
+}
+
 }
 
 }

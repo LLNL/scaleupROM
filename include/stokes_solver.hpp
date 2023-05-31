@@ -169,6 +169,11 @@ public:
    { mfem_error("StokesSolver::InitUnifiedParaview is not implemented yet!\n"); }
    void InitIndividualParaview(const std::string& file_prefix) override;
 
+   virtual void SaveSnapshot(const int &sample_index)
+   {  
+      BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+      rom_handler->SaveSnapshot(&U_domain, sample_index);
+   }
    virtual void ProjectOperatorOnReducedBasis() {}
    // { rom_handler->ProjectOperatorOnReducedBasis(mats); }
    virtual double CompareSolution() { return -1.; }

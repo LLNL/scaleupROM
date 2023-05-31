@@ -96,6 +96,11 @@ double rhs(const Vector &x)
 
 }  // namespace poisson_spiral
 
+namespace stokes_problem
+{
+
+double nu;
+
 namespace stokes_channel
 {
 
@@ -112,6 +117,8 @@ void ubdr(const Vector &x, Vector &y)
 }
 
 }  // namespace stokes_channel
+
+}  // namespace stokes_problem
 
 }  // namespace function_factory
 
@@ -322,18 +329,21 @@ StokesChannel::StokesChannel()
    // pointer to static function.
    vector_bdr_ptr.SetSize(4);
    vector_rhs_ptr = NULL;
-   vector_bdr_ptr = &(function_factory::stokes_channel::ubdr);
+   vector_bdr_ptr = &(function_factory::stokes_problem::stokes_channel::ubdr);
 
-   param_num = 2;
+   param_num = 3;
 
    // Default values.
-   function_factory::stokes_channel::L = 1.0;
-   function_factory::stokes_channel::U = 1.0;
+   function_factory::stokes_problem::nu = 1.0;
+   function_factory::stokes_problem::stokes_channel::L = 1.0;
+   function_factory::stokes_problem::stokes_channel::U = 1.0;
 
-   param_map["L"] = 0;
-   param_map["U"] = 1;
+   param_map["nu"] = 0;
+   param_map["L"] = 1;
+   param_map["U"] = 2;
 
    param_ptr.SetSize(param_num);
-   param_ptr[0] = &(function_factory::stokes_channel::L);
-   param_ptr[1] = &(function_factory::stokes_channel::U);
+   param_ptr[0] = &(function_factory::stokes_problem::nu);
+   param_ptr[1] = &(function_factory::stokes_problem::stokes_channel::L);
+   param_ptr[2] = &(function_factory::stokes_problem::stokes_channel::U);
 }
