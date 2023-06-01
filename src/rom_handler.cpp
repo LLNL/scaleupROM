@@ -356,7 +356,7 @@ void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Ma
    return;
 }
 
-void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats)
+void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    printf("Project Operators on reduced basis.\n");
    assert(mats.NumRows() == numSub);
@@ -599,7 +599,7 @@ void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix
    GetBasis(idx, basis);
 }
 
-void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats)
+void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    assert(mats.NumRows() == numSub);
    assert(mats.NumCols() == numSub);

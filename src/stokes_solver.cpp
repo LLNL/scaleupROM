@@ -1002,7 +1002,36 @@ void StokesSolver::SaveSnapshot(const int &sample_index)
 
 void StokesSolver::ProjectOperatorOnReducedBasis()
 {
+   Array2D<Operator *> tmp(numSub, numSub);
+   Array2D<SparseMatrix *> bt_mats(numSub, numSub);
+   Array<int> offsets_i(num_var+1), offsets_j(num_var+1);
+   int ofs = 0;
+   for (int i = 0; i < tmp.NumRows(); i++)
+   {
+      var_offsets.GetSubArray(i * num_var, num_var+1, offsets_i);
+      ofs = offsets_i[0];
+      for (int oi = 0; oi < offsets_i.Size(); oi++) offsets_i[oi] -= ofs;
 
+      for (int j = 0; j < tmp.NumCols(); j++)
+      {
+         bt_mats(i, j) = Transpose(*b_mats(i, j));
+         var_offsets.GetSubArray(j * num_var, num_var+1, offsets_j);
+         ofs = offsets_j[0];
+         for (int oj = 0; oj < offsets_j.Size(); oj++) offsets_j[oj] -= ofs;
+
+         BlockMatrix *tmp_mat = new BlockMatrix(offsets_i, offsets_j);
+         tmp_mat->SetBlock(0, 0, m_mats(i, j));
+         tmp_mat->SetBlock(1, 0, b_mats(i, j));
+         tmp_mat->SetBlock(0, 1, bt_mats(i, j));
+         tmp(i, j) = tmp_mat;
+      }
+   }
+         
+   rom_handler->ProjectOperatorOnReducedBasis(tmp);
+
+   for (int i = 0; i < bt_mats.NumRows(); i++)
+      for (int j = 0; j < bt_mats.NumCols(); j++)
+      { delete bt_mats(i, j); delete tmp(i, j); }   
 }
 
 // double PoissonSolver::CompareSolution()

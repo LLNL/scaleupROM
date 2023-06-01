@@ -845,6 +845,16 @@ void PoissonSolver::InitUnifiedParaview(const std::string& file_prefix)
    MultiBlockSolver::InitUnifiedParaview(file_prefix);
 }
 
+void PoissonSolver::ProjectOperatorOnReducedBasis()
+{ 
+   Array2D<Operator *> tmp(mats.NumRows(), mats.NumCols());
+   for (int i = 0; i < tmp.NumRows(); i++)
+      for (int j = 0; j < tmp.NumCols(); j++)
+         tmp(i, j) = mats(i, j);
+         
+   rom_handler->ProjectOperatorOnReducedBasis(tmp);
+}
+
 double PoissonSolver::CompareSolution()
 {
    // Copy the rom solution.

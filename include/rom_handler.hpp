@@ -137,7 +137,7 @@ public:
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
-   virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
+   virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();
@@ -181,7 +181,7 @@ public:
    void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
    // virtual void AllocROMMat() override;  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
-   virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
+   virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    // void CompareSolution();

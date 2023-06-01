@@ -153,39 +153,8 @@ TEST(Stokes_Workflow, BaseIndividualTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
-   ParameterizedProblem *problem = InitParameterizedProblem();
-   MultiBlockSolver *test = NULL;
-
-   test = InitSolver();
-   if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
-   test->InitVariables();
-   // test->InitVisualization();
-
-   // NOTE: you need this to set bc/rhs coefficients!
-   // This case, we can use default parameter values of the problem.
-   problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
-
-   // TODO: there are skippable operations depending on rom/fom mode.
-   test->BuildOperators();
-   test->SetupBCOperators();
-   test->Assemble();
-   
-   ROMHandler *rom = test->GetROMHandler();
-   if (!rom->UseExistingBasis())
-   {
-      // TODO: basis for multiple components
-      SampleGenerator *sample_generator = InitSampleGenerator(MPI_COMM_WORLD, problem);
-      sample_generator->SetParamSpaceSizes();
-      const int total_samples = sample_generator->GetTotalSampleSize();
-      
-      test->FormReducedBasis(total_samples);
-      delete sample_generator;
-   }
-   rom->LoadReducedBasis();
-
-   // config.dict_["main"]["mode"] = "build_rom";
-   // BuildROM(MPI_COMM_WORLD);
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
 
    // config.dict_["main"]["mode"] = "single_run";
    // double error = SingleRun();
