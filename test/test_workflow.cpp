@@ -162,7 +162,7 @@ TEST(Stokes_Workflow, BaseIndividualTest)
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
+   EXPECT_TRUE(error < stokes_threshold);
 
    return;
 }

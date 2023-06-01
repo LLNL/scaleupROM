@@ -882,8 +882,8 @@ void StokesSolver::AssembleInterfaceMatrixes()
 void StokesSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 3.e-15);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 3.e-15);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    BlockVector urhs(u_offsets), prhs(p_offsets);
