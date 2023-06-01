@@ -76,15 +76,12 @@ protected:
 
    int porder, uorder;
 
-   // Finite element collection for all fe spaces.
-   FiniteElementCollection *ufec;   // for velocity
-   FiniteElementCollection *pfec;   // for pressure
-   // Finite element spaces
+   // // Finite element collection for all fe spaces.
+   // View array for Finite element spaces
    Array<FiniteElementSpace *> ufes, pfes;
 
-   // GridFunction for pressure
-   Array<GridFunction *> ps;
-   // Will use us for velocity GridFunction.
+   // View Array for GridFunctions. Size(numSub);
+   Array<GridFunction *> vels, ps;
 
    // interface integrator
    InterfaceNonlinearFormIntegrator *vec_diff, *norm_flux;
@@ -125,7 +122,7 @@ public:
 
    virtual ~StokesSolver();
 
-   GridFunction* GetVelGridFunction(const int k) const { return us[k]; }
+   GridFunction* GetVelGridFunction(const int k) const { return vels[k]; }
    GridFunction* GetPresGridFunction(const int k) const { return ps[k]; }
    const int GetVelFEOrder() const { return uorder; }
    const int GetPresFEOrder() const { return porder; }
@@ -166,15 +163,7 @@ public:
 
    virtual void Solve();
 
-   void InitUnifiedParaview(const std::string &file_prefix) override
-   { mfem_error("StokesSolver::InitUnifiedParaview is not implemented yet!\n"); }
-   void InitIndividualParaview(const std::string& file_prefix) override;
-
-   virtual void SaveSnapshot(const int &sample_index);
    virtual void ProjectOperatorOnReducedBasis();
-   virtual void ProjectRHSOnReducedBasis();
-   virtual void SolveROM();
-   virtual double CompareSolution();
    virtual void SaveBasisVisualization() {}
    // { rom_handler->SaveBasisVisualization(fes); }
 

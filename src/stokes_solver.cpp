@@ -32,19 +32,6 @@ StokesSolver::StokesSolver()
 
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (uorder + 1) * (uorder + 1));
- 
-   // Set up FE collection/spaces.
-   if (full_dg)
-   {
-      ufec = new DG_FECollection(uorder, dim);
-      pfec = new DG_FECollection(porder, dim);
-      mfem_error("StokesSolver currently cannot support full DG scheme!\n");
-   }
-   else
-   {
-      ufec = new H1_FECollection(uorder, dim);
-      pfec = new H1_FECollection(porder, dim);
-   }
    
    // solution dimension is determined by initialization.
    udim = dim + 1;
@@ -53,12 +40,34 @@ StokesSolver::StokesSolver()
    vdim[0] = dim;
    vdim[1] = 1;
 
+   fec.SetSize(num_var);
+   // Set up FE collection/spaces.
+   if (full_dg)
+   {
+      fec[0] = new DG_FECollection(uorder, dim);
+      fec[1] = new DG_FECollection(porder, dim);
+      mfem_error("StokesSolver currently cannot support full DG scheme!\n");
+   }
+   else
+   {
+      fec[0] = new H1_FECollection(uorder, dim);
+      fec[1] = new H1_FECollection(porder, dim);
+   }
+
+   fes.SetSize(num_var * numSub);
    ufes.SetSize(numSub);
    pfes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
-      ufes[m] = new FiniteElementSpace(meshes[m], ufec, dim);
-      pfes[m] = new FiniteElementSpace(meshes[m], pfec);
+      ufes[m] = new FiniteElementSpace(meshes[m], fec[0], dim);
+      pfes[m] = new FiniteElementSpace(meshes[m], fec[1]);
+      // NOTE: ownership is in fes, not ufes and pfes!
+      fes[m * num_var] = ufes[m];
+      fes[m * num_var + 1] = pfes[m];
    }
+
+   var_names.resize(num_var);
+   var_names[0] = "vel";
+   var_names[1] = "pres";
 }
 
 StokesSolver::~StokesSolver()
@@ -70,10 +79,6 @@ StokesSolver::~StokesSolver()
    for (int k = 0; k < gs.Size(); k++) delete gs[k];
    for (int k = 0; k < ms.Size(); k++) delete ms[k];
    for (int k = 0; k < bs.Size(); k++) delete bs[k];
-   for (int k = 0; k < ufes.Size(); k++) delete ufes[k];
-   for (int k = 0; k < pfes.Size(); k++) delete pfes[k];
-
-   delete ufec, pfec;
 
    for (int k = 0; k < ud_coeffs.Size(); k++)
       delete ud_coeffs[k];
@@ -210,14 +215,19 @@ void StokesSolver::InitVariables()
       These are system-specific, therefore not defining it now.
    */
 
-   us.SetSize(numSub);
+   us.SetSize(num_var * numSub);
+   vels.SetSize(numSub);
    ps.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
-      us[m] = new GridFunction(ufes[m], U->GetBlock(num_var * m), 0);
+      vels[m] = new GridFunction(ufes[m], U->GetBlock(num_var * m), 0);
       ps[m] = new GridFunction(pfes[m], U->GetBlock(num_var * m + 1), 0);
-      (*us[m]) = 0.0;
+      (*vels[m]) = 0.0;
       (*ps[m]) = 0.0;
+
+      // NOTE: ownership is on us, not vels and ps!
+      us[m * num_var] = vels[m];
+      us[m * num_var + 1] = ps[m];
    }
 
    f_coeffs.SetSize(0);
@@ -918,7 +928,7 @@ void StokesSolver::Solve()
 
    printf("Set up pressure RHS\n");
 
-   SchurOperator schur(M, B);
+   SchurOperator schur(M, B, maxIter, rtol, atol);
    CGSolver solver2;
    solver2.SetOperator(schur);
    solver2.SetPrintLevel(print_level);
@@ -964,43 +974,6 @@ void StokesSolver::Solve()
    SetVariableVector(1, pvec, *U);
 }
 
-void StokesSolver::InitIndividualParaview(const std::string& file_prefix)
-{
-   paraviewColls.SetSize(numSub);
-
-   for (int m = 0; m < numSub; m++) {
-      ostringstream oss;
-      // Each subdomain needs to be save separately.
-      oss << file_prefix << "_" << std::to_string(m);
-
-      paraviewColls[m] = new ParaViewDataCollection(oss.str().c_str(), &(*meshes[m]));
-      paraviewColls[m]->SetLevelsOfDetail(uorder);
-      paraviewColls[m]->SetHighOrderOutput(true);
-      paraviewColls[m]->SetPrecision(8);
-
-      paraviewColls[m]->RegisterField("vel", us[m]);
-      paraviewColls[m]->RegisterField("pres", ps[m]);
-      paraviewColls[m]->SetOwnData(false);
-   }
-}
-
-// void PoissonSolver::InitUnifiedParaview(const std::string& file_prefix)
-// {
-//    // grid function initialization for visual.
-//    // TODO: for vector solution.
-//    pmesh = topol_handler->GetGlobalMesh();
-//    global_fes = new FiniteElementSpace(pmesh, fec, udim);
-//    global_us_visual = new GridFunction(global_fes);
-
-//    MultiBlockSolver::InitUnifiedParaview(file_prefix);
-// }
-
-void StokesSolver::SaveSnapshot(const int &sample_index)
-{  
-   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
-   rom_handler->SaveSnapshot(&U_domain, sample_index);
-}
-
 void StokesSolver::ProjectOperatorOnReducedBasis()
 {
    Array2D<Operator *> tmp(numSub, numSub);
@@ -1035,76 +1008,6 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
    for (int i = 0; i < bt_mats.NumRows(); i++)
       for (int j = 0; j < bt_mats.NumCols(); j++)
       { delete bt_mats(i, j); delete tmp(i, j); }   
-}
-
-void StokesSolver::ProjectRHSOnReducedBasis()
-{
-   BlockVector RHS_domain(RHS->GetData(), domain_offsets); // View vector for RHS.
-   rom_handler->ProjectRHSOnReducedBasis(&RHS_domain);
-}
-
-void StokesSolver::SolveROM()
-{
-   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
-   rom_handler->Solve(&U_domain);
-}
-
-double StokesSolver::CompareSolution()
-{
-   // Copy the rom solution.
-   BlockVector romU(var_offsets);
-   romU = *U;
-
-   Array<GridFunction *> rom_us, rom_ps;
-
-   Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
-   Array<GridFunctionCoefficient *> rom_p_coeffs;
-
-   ConstantCoefficient zero(0.0);
-   Vector zero_vec(dim); zero_vec = 0.0;
-   VectorConstantCoefficient zero_v(zero_vec);
-
-   rom_us.SetSize(numSub);
-   rom_ps.SetSize(numSub);
-   rom_u_coeffs.SetSize(numSub);
-   rom_p_coeffs.SetSize(numSub);
-   for (int m = 0; m < numSub; m++)
-   {
-      rom_us[m] = new GridFunction(ufes[m], romU.GetBlock(m * num_var), 0);
-      rom_ps[m] = new GridFunction(pfes[m], romU.GetBlock(m * num_var + 1), 0);
-
-      // BC's are weakly constrained and there is no essential dofs.
-      // Does this make any difference?
-      rom_us[m]->SetTrueVector();
-      rom_ps[m]->SetTrueVector();
-
-      rom_u_coeffs[m] = new VectorGridFunctionCoefficient(rom_us[m]);
-      rom_p_coeffs[m] = new GridFunctionCoefficient(rom_ps[m]);
-   }
-
-   // TODO: right now we solve the full-order system to compare the solution.
-   // Need to implement loading the fom solution file?
-   StopWatch solveTimer;
-   solveTimer.Start();
-   Solve();
-   solveTimer.Stop();
-   printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
-
-   // Compare the solution.
-   double uerror = ComputeRelativeError(us, rom_u_coeffs);
-   double perror = ComputeRelativeError(ps, rom_p_coeffs);
-   printf("Relative vel error: %.5E\n", uerror);
-   printf("Relative pres error: %.5E\n", perror);
-
-   for (int m = 0; m < numSub; m++)
-   {
-      delete rom_us[m];
-      delete rom_u_coeffs[m];
-      delete rom_ps[m];
-      delete rom_p_coeffs[m];
-   }
-
-   return max(uerror, perror);
 }
 
 void StokesSolver::SanityCheckOnCoeffs()

@@ -25,7 +25,14 @@ PoissonSolver::PoissonSolver()
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
  
+   // solution dimension is determined by initialization.
+   udim = 1;
+   num_var = 1;
+   vdim.SetSize(num_var);
+   vdim = 1;
+
    // Set up FE collection/spaces.
+   fec.SetSize(num_var);
    if (full_dg)
    {
       fec = new DG_FECollection(order, dim);
@@ -34,17 +41,14 @@ PoissonSolver::PoissonSolver()
    {
       fec = new H1_FECollection(order, dim);
    }
-   
-   // solution dimension is determined by initialization.
-   udim = 1;
-   num_var = 1;
-   vdim.SetSize(num_var);
-   vdim = 1;
+
    fes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
-      fes[m] = new FiniteElementSpace(meshes[m], fec, udim);
+      fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
 
+   var_names.resize(num_var);
+   var_names[0] = "solution";
 }
 
 PoissonSolver::~PoissonSolver()
@@ -53,9 +57,6 @@ PoissonSolver::~PoissonSolver()
 
    for (int k = 0; k < bs.Size(); k++) delete bs[k];
    for (int k = 0; k < as.Size(); k++) delete as[k];
-   for (int k = 0; k < fes.Size(); k++) delete fes[k];
-
-   delete fec;
 
    for (int k = 0; k < bdr_coeffs.Size(); k++)
       delete bdr_coeffs[k];
@@ -411,7 +412,7 @@ void PoissonSolver::BuildROMElements()
    fes_comp = NULL;
    for (int c = 0; c < num_comp; c++) {
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      fes_comp[c] = new FiniteElementSpace(comp, fec, udim);
+      fes_comp[c] = new FiniteElementSpace(comp, fec[0], udim);
    }
 
    {
@@ -834,17 +835,6 @@ void PoissonSolver::Solve()
    delete solver;
 }
 
-void PoissonSolver::InitUnifiedParaview(const std::string& file_prefix)
-{
-   // grid function initialization for visual.
-   // TODO: for vector solution.
-   pmesh = topol_handler->GetGlobalMesh();
-   global_fes = new FiniteElementSpace(pmesh, fec, udim);
-   global_us_visual = new GridFunction(global_fes);
-
-   MultiBlockSolver::InitUnifiedParaview(file_prefix);
-}
-
 void PoissonSolver::ProjectOperatorOnReducedBasis()
 { 
    Array2D<Operator *> tmp(mats.NumRows(), mats.NumCols());
@@ -853,48 +843,6 @@ void PoissonSolver::ProjectOperatorOnReducedBasis()
          tmp(i, j) = mats(i, j);
          
    rom_handler->ProjectOperatorOnReducedBasis(tmp);
-}
-
-double PoissonSolver::CompareSolution()
-{
-   // Copy the rom solution.
-   BlockVector romU(var_offsets);
-   romU = *U;
-   Array<GridFunction *> rom_us;
-   Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
-   ConstantCoefficient zero(0.0);
-   rom_us.SetSize(numSub);
-   rom_u_coeffs.SetSize(numSub);
-   for (int m = 0; m < numSub; m++)
-   {
-      rom_us[m] = new GridFunction(fes[m], romU.GetBlock(m), 0);
-
-      // BC's are weakly constrained and there is no essential dofs.
-      // Does this make any difference?
-      rom_us[m]->SetTrueVector();
-
-      rom_u_coeffs[m] = new VectorGridFunctionCoefficient(rom_us[m]);
-   }
-
-   // TODO: right now we solve the full-order system to compare the solution.
-   // Need to implement loading the fom solution file?
-   StopWatch solveTimer;
-   solveTimer.Start();
-   Solve();
-   solveTimer.Stop();
-   printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
-
-   // Compare the solution.
-   double error = ComputeRelativeError(us, rom_u_coeffs);
-   printf("Relative error: %.5E\n", error);
-
-   for (int m = 0; m < numSub; m++)
-   {
-      delete rom_us[m];
-      delete rom_u_coeffs[m];
-   }
-
-   return error;
 }
 
 void PoissonSolver::SanityCheckOnCoeffs()

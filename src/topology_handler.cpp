@@ -417,8 +417,12 @@ Array<int> SubMeshTopologyHandler::FindParentInterfaceInfo(const int pface,
    return Infs;
 }
 
-void SubMeshTopologyHandler::TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u)
+void SubMeshTopologyHandler::TransferToGlobal(Array<GridFunction*> &us, Array<GridFunction*> &global_u, const int &num_var)
 {
-   for (int m = 0; m < numSub; m++)
-      meshes[m]->Transfer(*us[m], *global_u);
+   assert(us.Size() == num_var * numSub);
+   assert(global_u.Size() == num_var);
+
+   for (int m = 0, idx = 0; m < numSub; m++)
+      for (int v = 0; v < num_var; v++, idx++)
+         meshes[m]->Transfer(*us[idx], *global_u[v]);
 }

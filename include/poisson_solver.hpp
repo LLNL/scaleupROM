@@ -25,11 +25,6 @@ class PoissonSolver : public MultiBlockSolver
 friend class ParameterizedProblem;
 
 protected:
-   // Finite element collection for all fe spaces.
-   FiniteElementCollection *fec;
-   // Finite element spaces
-   Array<FiniteElementSpace *> fes;
-
    // interface integrator
    InterfaceNonlinearFormIntegrator *interface_integ;
    // int skip_zeros = 1;
@@ -100,15 +95,7 @@ public:
 
    virtual void Solve();
 
-   void InitUnifiedParaview(const std::string &file_prefix) override;
-
-   virtual void SaveSnapshot(const int &sample_index)
-   { rom_handler->SaveSnapshot(U, sample_index); }
    virtual void ProjectOperatorOnReducedBasis();
-   virtual void ProjectRHSOnReducedBasis()
-   { rom_handler->ProjectRHSOnReducedBasis(RHS); }
-   virtual void SolveROM() { rom_handler->Solve(U); }
-   virtual double CompareSolution();
    virtual void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes); }
 

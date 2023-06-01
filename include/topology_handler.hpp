@@ -132,7 +132,7 @@ public:
                                              FaceElementTransformations* &tr1,
                                              FaceElementTransformations* &tr2);
 
-   virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u) = 0;
+   virtual void TransferToGlobal(Array<GridFunction*> &us, Array<GridFunction*> &global_u, const int &num_var) = 0;
 
    virtual void PrintPortInfo(const int k = -1);
    virtual void PrintInterfaceInfo(const int k = -1);
@@ -170,7 +170,7 @@ public:
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);
 
-   virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u);
+   virtual void TransferToGlobal(Array<GridFunction*> &us, Array<GridFunction*> &global_u, const int &num_var);
 
 protected:
    // SubMesh does not support face mapping for 2d meshes.

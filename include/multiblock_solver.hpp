@@ -50,7 +50,8 @@ protected:
    // Solution dimension, by default -1 (scalar).
    int udim = -1;       // vector dimension of the entire solution variable
    int num_var = -1;    // number of variables
-   Array<int> vdim;     // vector dimension of each variable   //
+   Array<int> vdim;     // vector dimension of each variable
+   std::vector<std::string> var_names;
 
    Array<int> block_offsets;  // Size(numSub * udim + 1). each block corresponds to a component of vector solution.
    Array<int> var_offsets; // Size(num_var * numSub + 1). each block corresponds to the variable of the solution in each domain.
@@ -58,7 +59,10 @@ protected:
    Array<int> num_vdofs;       // Size(numSub). number of vdofs of the vector solution in each subdomain.
    BlockVector *U, *RHS;
 
-   Array<GridFunction *> us;
+   // Each Variable is separated by distinct FiniteElementSpace.
+   Array<FiniteElementCollection *> fec;  // Size(num_var);
+   Array<FiniteElementSpace *> fes;       // Size(num_var * numSub);
+   Array<GridFunction *> us;              // Size(num_var * numSub);
 
    int max_bdr_attr;
    int numBdr;
@@ -73,9 +77,9 @@ protected:
    std::string visual_dir = ".";
    std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
-   // Used only for the unified visualization.
-   FiniteElementSpace *global_fes = NULL;
-   GridFunction *global_us_visual = NULL;
+   // Used only for the unified visualization. Size(num_var).
+   Array<FiniteElementSpace *> global_fes;
+   Array<GridFunction *> global_us_visual;
 
    // rom variables.
    ROMHandler *rom_handler = NULL;
@@ -168,20 +172,20 @@ public:
    virtual void SaveVisualization();
 
    void InitROMHandler();
-   virtual void SaveSnapshot(const int &sample_index) = 0;
+   virtual void SaveSnapshot(const int &sample_index);
    void FormReducedBasis(const int &total_samples)
    { rom_handler->FormReducedBasis(total_samples); }
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
-   virtual void ProjectRHSOnReducedBasis() = 0;
-   virtual void SolveROM() = 0;
-   virtual double CompareSolution() = 0;
+   virtual void ProjectRHSOnReducedBasis();
+   virtual void SolveROM();
    virtual void SaveBasisVisualization() = 0;
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
 
-   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunctionCoefficient *> rom_sol_coeffs);
-   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<VectorGridFunctionCoefficient *> rom_sol_coeffs);
+   void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
+   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols);
+   double CompareSolution();
 };
 
 #endif
