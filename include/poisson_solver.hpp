@@ -105,6 +105,9 @@ public:
    virtual void SaveSnapshot(const int &sample_index)
    { rom_handler->SaveSnapshot(U, sample_index); }
    virtual void ProjectOperatorOnReducedBasis();
+   virtual void ProjectRHSOnReducedBasis()
+   { rom_handler->ProjectRHSOnReducedBasis(RHS); }
+   virtual void SolveROM() { rom_handler->Solve(U); }
    virtual double CompareSolution();
    virtual void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes); }

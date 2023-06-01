@@ -885,14 +885,7 @@ double PoissonSolver::CompareSolution()
    printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
 
    // Compare the solution.
-   double norm = 0.0;
-   double error = 0.0;
-   for (int m = 0; m < numSub; m++)
-   {
-      norm += us[m]->ComputeLpError(2, zero);
-      error += us[m]->ComputeLpError(2, *rom_u_coeffs[m]);
-   }
-   error /= norm;
+   double error = ComputeRelativeError(us, rom_u_coeffs);
    printf("Relative error: %.5E\n", error);
 
    for (int m = 0; m < numSub; m++)

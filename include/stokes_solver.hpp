@@ -38,6 +38,7 @@ public:
    {
       solver = new CGSolver();
       solver->SetRelTol(rtol);
+      solver->SetAbsTol(atol);
       solver->SetMaxIter(maxIter);
       solver->SetOperator(*A);
       solver->SetPrintLevel(0);
@@ -171,7 +172,9 @@ public:
 
    virtual void SaveSnapshot(const int &sample_index);
    virtual void ProjectOperatorOnReducedBasis();
-   virtual double CompareSolution() { return -1.; }
+   virtual void ProjectRHSOnReducedBasis();
+   virtual void SolveROM();
+   virtual double CompareSolution();
    virtual void SaveBasisVisualization() {}
    // { rom_handler->SaveBasisVisualization(fes); }
 

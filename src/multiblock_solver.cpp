@@ -340,3 +340,46 @@ void MultiBlockSolver::InitROMHandler()
       mfem_error("Unknown ROM handler type!\n");
    }
 }
+
+double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunctionCoefficient *> rom_sol_coeffs)
+{
+   assert(fom_sols.Size() == numSub);
+   assert(rom_sol_coeffs.Size() == numSub);
+
+   ConstantCoefficient zero(0.0);
+
+   double norm = 0.0, error = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(fom_sols[m] && rom_sol_coeffs[m]);
+      norm += pow(fom_sols[m]->ComputeLpError(2, zero), 2);
+      error += pow(fom_sols[m]->ComputeLpError(2, *rom_sol_coeffs[m]), 2);
+   }
+   norm = sqrt(norm);
+   error = sqrt(error);
+
+   return error / norm;
+}
+
+double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<VectorGridFunctionCoefficient *> rom_sol_coeffs)
+{
+   assert(fom_sols.Size() == numSub);
+   assert(rom_sol_coeffs.Size() == numSub);
+
+   assert(rom_sol_coeffs[0]);
+   Vector zero_v(rom_sol_coeffs[0]->GetVDim());
+   zero_v = 0.0;
+   VectorConstantCoefficient zero(zero_v);
+
+   double norm = 0.0, error = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(fom_sols[m] && rom_sol_coeffs[m]);
+      norm += pow(fom_sols[m]->ComputeLpError(2, zero), 2);
+      error += pow(fom_sols[m]->ComputeLpError(2, *rom_sol_coeffs[m]), 2);
+   }
+   norm = sqrt(norm);
+   error = sqrt(error);
+
+   return error / norm;
+}

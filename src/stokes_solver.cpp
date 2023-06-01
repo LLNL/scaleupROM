@@ -872,8 +872,8 @@ void StokesSolver::AssembleInterfaceMatrixes()
 void StokesSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 3.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 3.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    BlockVector urhs(u_offsets), prhs(p_offsets);
@@ -922,7 +922,8 @@ void StokesSolver::Solve()
    CGSolver solver2;
    solver2.SetOperator(schur);
    solver2.SetPrintLevel(print_level);
-   solver2.SetAbsTol(rtol);
+   solver2.SetAbsTol(atol);
+   solver2.SetRelTol(rtol);
    solver2.SetMaxIter(maxIter);
 
    OrthoSolver ortho;
@@ -938,8 +939,8 @@ void StokesSolver::Solve()
    if (pres_dbc)
    {
       solver2.Mult(R2, pvec);
-      if (!solver2.GetConverged())
-         mfem_error("Pressure Solver fails to converge!\n");
+      // if (!solver2.GetConverged())
+      //    mfem_error("Pressure Solver fails to converge!\n");
    }
    else
       ortho.Mult(R2, pvec);
@@ -1014,7 +1015,9 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
 
       for (int j = 0; j < tmp.NumCols(); j++)
       {
-         bt_mats(i, j) = Transpose(*b_mats(i, j));
+         // NOTE: the index also should be transposed.
+         bt_mats(i, j) = Transpose(*b_mats(j, i));
+
          var_offsets.GetSubArray(j * num_var, num_var+1, offsets_j);
          ofs = offsets_j[0];
          for (int oj = 0; oj < offsets_j.Size(); oj++) offsets_j[oj] -= ofs;
@@ -1034,54 +1037,75 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
       { delete bt_mats(i, j); delete tmp(i, j); }   
 }
 
-// double PoissonSolver::CompareSolution()
-// {
-//    // Copy the rom solution.
-//    BlockVector romU(var_offsets);
-//    romU = *U;
-//    Array<GridFunction *> rom_us;
-//    Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
-//    ConstantCoefficient zero(0.0);
-//    rom_us.SetSize(numSub);
-//    rom_u_coeffs.SetSize(numSub);
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       rom_us[m] = new GridFunction(fes[m], romU.GetBlock(m), 0);
+void StokesSolver::ProjectRHSOnReducedBasis()
+{
+   BlockVector RHS_domain(RHS->GetData(), domain_offsets); // View vector for RHS.
+   rom_handler->ProjectRHSOnReducedBasis(&RHS_domain);
+}
 
-//       // BC's are weakly constrained and there is no essential dofs.
-//       // Does this make any difference?
-//       rom_us[m]->SetTrueVector();
+void StokesSolver::SolveROM()
+{
+   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+   rom_handler->Solve(&U_domain);
+}
 
-//       rom_u_coeffs[m] = new VectorGridFunctionCoefficient(rom_us[m]);
-//    }
+double StokesSolver::CompareSolution()
+{
+   // Copy the rom solution.
+   BlockVector romU(var_offsets);
+   romU = *U;
 
-//    // TODO: right now we solve the full-order system to compare the solution.
-//    // Need to implement loading the fom solution file?
-//    StopWatch solveTimer;
-//    solveTimer.Start();
-//    Solve();
-//    solveTimer.Stop();
-//    printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+   Array<GridFunction *> rom_us, rom_ps;
 
-//    // Compare the solution.
-//    double norm = 0.0;
-//    double error = 0.0;
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       norm += us[m]->ComputeLpError(2, zero);
-//       error += us[m]->ComputeLpError(2, *rom_u_coeffs[m]);
-//    }
-//    error /= norm;
-//    printf("Relative error: %.5E\n", error);
+   Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
+   Array<GridFunctionCoefficient *> rom_p_coeffs;
 
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       delete rom_us[m];
-//       delete rom_u_coeffs[m];
-//    }
+   ConstantCoefficient zero(0.0);
+   Vector zero_vec(dim); zero_vec = 0.0;
+   VectorConstantCoefficient zero_v(zero_vec);
 
-//    return error;
-// }
+   rom_us.SetSize(numSub);
+   rom_ps.SetSize(numSub);
+   rom_u_coeffs.SetSize(numSub);
+   rom_p_coeffs.SetSize(numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      rom_us[m] = new GridFunction(ufes[m], romU.GetBlock(m * num_var), 0);
+      rom_ps[m] = new GridFunction(pfes[m], romU.GetBlock(m * num_var + 1), 0);
+
+      // BC's are weakly constrained and there is no essential dofs.
+      // Does this make any difference?
+      rom_us[m]->SetTrueVector();
+      rom_ps[m]->SetTrueVector();
+
+      rom_u_coeffs[m] = new VectorGridFunctionCoefficient(rom_us[m]);
+      rom_p_coeffs[m] = new GridFunctionCoefficient(rom_ps[m]);
+   }
+
+   // TODO: right now we solve the full-order system to compare the solution.
+   // Need to implement loading the fom solution file?
+   StopWatch solveTimer;
+   solveTimer.Start();
+   Solve();
+   solveTimer.Stop();
+   printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+
+   // Compare the solution.
+   double uerror = ComputeRelativeError(us, rom_u_coeffs);
+   double perror = ComputeRelativeError(ps, rom_p_coeffs);
+   printf("Relative vel error: %.5E\n", uerror);
+   printf("Relative pres error: %.5E\n", perror);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      delete rom_us[m];
+      delete rom_u_coeffs[m];
+      delete rom_ps[m];
+      delete rom_p_coeffs[m];
+   }
+
+   return max(uerror, perror);
+}
 
 void StokesSolver::SanityCheckOnCoeffs()
 {

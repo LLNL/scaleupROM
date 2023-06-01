@@ -173,13 +173,15 @@ public:
    { rom_handler->FormReducedBasis(total_samples); }
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
-   void ProjectRHSOnReducedBasis()
-   { rom_handler->ProjectRHSOnReducedBasis(RHS); }
-   void SolveROM() { rom_handler->Solve(U); }
+   virtual void ProjectRHSOnReducedBasis() = 0;
+   virtual void SolveROM() = 0;
    virtual double CompareSolution() = 0;
    virtual void SaveBasisVisualization() = 0;
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
+
+   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunctionCoefficient *> rom_sol_coeffs);
+   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<VectorGridFunctionCoefficient *> rom_sol_coeffs);
 };
 
 #endif
