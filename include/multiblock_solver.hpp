@@ -179,7 +179,8 @@ public:
    virtual void ProjectOperatorOnReducedBasis() = 0;
    virtual void ProjectRHSOnReducedBasis();
    virtual void SolveROM();
-   virtual void SaveBasisVisualization() = 0;
+   virtual void SaveBasisVisualization()
+   { rom_handler->SaveBasisVisualization(fes, var_names); }
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
 

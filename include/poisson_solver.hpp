@@ -96,8 +96,6 @@ public:
    virtual void Solve();
 
    virtual void ProjectOperatorOnReducedBasis();
-   virtual void SaveBasisVisualization()
-   { rom_handler->SaveBasisVisualization(fes); }
 
    void SanityCheckOnCoeffs();
 

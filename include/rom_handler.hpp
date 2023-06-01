@@ -153,7 +153,7 @@ public:
 
    const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
 
-   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
    virtual void SaveSV(const std::string& prefix, const int& basis_idx);
@@ -192,7 +192,7 @@ public:
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(SparseMatrix *input_mat);
 
-   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes);
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
 };
 
 

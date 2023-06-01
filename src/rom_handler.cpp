@@ -793,10 +793,14 @@ void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
    operator_loaded = true;
 }
 
-void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+void MFEMROMHandler::SaveBasisVisualization(
+   const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
 {
    if (!save_basis_visual) return;
    assert(basis_loaded);
+
+   const int num_var = var_names.size();
+   assert(fes.Size() == num_var * numSub);
 
    std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
    if (train_mode == TrainMode::UNIVERSAL)
@@ -820,23 +824,34 @@ void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &f
       }
       assert(midx >= 0);
 
-      Mesh *mesh = fes[midx]->GetMesh();
-      const int order = fes[midx]->FEColl()->GetOrder();
+      Mesh *mesh = fes[midx * num_var]->GetMesh();
+      const int order = fes[midx * num_var]->FEColl()->GetOrder();
       ParaViewDataCollection coll = ParaViewDataCollection(file_prefix.c_str(), mesh);
+
+      Array<int> var_offsets(num_basis[c] * num_var + 1);
+      var_offsets[0] = 0;
+      for (int k = 0, vidx = 1; k < num_basis[c]; k++)
+         for (int v = 0, idx = midx * num_var; v < num_var; v++, idx++, vidx++)
+            var_offsets[vidx] = fes[idx]->GetVSize();
+      var_offsets.PartialSum();
+      BlockVector basis_view(spatialbasis[c]->GetData(), var_offsets);
+
+      Array<GridFunction*> basis_gf(num_basis[c] * num_var);
+      basis_gf = NULL;
+      for (int k = 0, idx = 0; k < num_basis[c]; k++)
+      {
+         for (int v = 0, fidx = midx * num_var; v < num_var; v++, idx++, fidx++)
+         {
+            std::string field_name = var_names[v] + "_basis_" + std::to_string(k);
+            basis_gf[idx] = new GridFunction(fes[fidx], basis_view.GetBlock(idx), 0);
+            coll.RegisterField(field_name.c_str(), basis_gf[idx]);   
+         }
+      }
+
       coll.SetLevelsOfDetail(order);
       coll.SetHighOrderOutput(true);
       coll.SetPrecision(8);
-
-      Array<GridFunction*> basis_gf(num_basis[c]);
-      basis_gf = NULL;
-      for (int k = 0; k < num_basis[c]; k++)
-      {
-         std::string field_name = "basis_" + std::to_string(k);
-         basis_gf[k] = new GridFunction(fes[midx], spatialbasis[c]->GetColumn(k));
-         coll.RegisterField(field_name.c_str(), basis_gf[k]);
-         coll.SetOwnData(false);
-      }
-
+      coll.SetOwnData(false);
       coll.Save();
 
       for (int k = 0; k < basis_gf.Size(); k++) delete basis_gf[k];
