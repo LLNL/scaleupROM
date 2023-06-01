@@ -928,7 +928,7 @@ void StokesSolver::Solve()
 
    printf("Set up pressure RHS\n");
 
-   SchurOperator schur(M, B, maxIter, rtol, atol);
+   SchurOperator schur(M, B);
    CGSolver solver2;
    solver2.SetOperator(schur);
    solver2.SetPrintLevel(print_level);
