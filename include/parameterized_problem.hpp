@@ -110,6 +110,8 @@ public:
    // TODO: support other datatypes such as integer?
    virtual void SetParams(const std::string &key, const double &value);
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
+
+   void SetSingleRun();
 };
 
 class PoissonProblem : public ParameterizedProblem
@@ -136,8 +138,8 @@ class PoissonComponent : public PoissonProblem
 public:
    PoissonComponent();
    virtual ~PoissonComponent() {};
-   virtual void SetParams(const std::string &key, const double &value);
-   virtual void SetParams(const Array<int> &indexes, const Vector &values);
+   virtual void SetParams(const std::string &key, const double &value) override;
+   virtual void SetParams(const Array<int> &indexes, const Vector &values) override;
 
 private:
    void SetBattr();

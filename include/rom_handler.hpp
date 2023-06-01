@@ -131,6 +131,8 @@ public:
    virtual void FormReducedBasisIndividual(const int &total_samples);
 
    virtual void LoadReducedBasis();
+   int GetBasisIndexForSubdomain(const int &subdomain_index);
+   void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
@@ -141,8 +143,9 @@ public:
    // void CompareSolution();
 
    // P_i^T * mat * P_j
-   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat)
-   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(const int &, const int &, SparseMatrix *) is not supported!\n"); }
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat);
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat)
+   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(...)\n"); }
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(SparseMatrix *input_mat)
@@ -174,8 +177,8 @@ public:
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis);
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
+   void GetBasis(const int &basis_index, DenseMatrix* &basis);
+   void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
    // virtual void AllocROMMat() override;  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats);
@@ -184,7 +187,7 @@ public:
    // void CompareSolution();
    
    // P_i^T * mat * P_j
-   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat);
+   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(SparseMatrix *input_mat);

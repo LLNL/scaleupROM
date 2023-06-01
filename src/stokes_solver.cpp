@@ -994,6 +994,17 @@ void StokesSolver::InitIndividualParaview(const std::string& file_prefix)
 //    MultiBlockSolver::InitUnifiedParaview(file_prefix);
 // }
 
+void StokesSolver::SaveSnapshot(const int &sample_index)
+{  
+   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+   rom_handler->SaveSnapshot(&U_domain, sample_index);
+}
+
+void StokesSolver::ProjectOperatorOnReducedBasis()
+{
+
+}
+
 // double PoissonSolver::CompareSolution()
 // {
 //    // Copy the rom solution.
