@@ -457,6 +457,124 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
    return;
 }
 
+void MultiBlockSolver::LoadROMElements(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // components
+   LoadCompBdrROMElement(file_id);
+
+   // (reference) ports
+   LoadInterfaceROMElement(file_id);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
+   return;
+}
+
+void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
+{
+   assert(file_id >= 0);
+   herr_t errf;
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   int num_comp;
+   hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
+   assert(num_comp == topol_handler->GetNumComponents());
+   assert(comp_mats.Size() == num_comp);
+   assert(bdr_mats.Size() == num_comp);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      hid_t comp_grp_id;
+      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      assert(comp_grp_id >= 0);
+
+      hdf5_utils::ReadDataset(comp_grp_id, "domain", *(comp_mats[c]));
+
+      // boundary
+      LoadBdrROMElement(comp_grp_id, c);
+
+      errf = H5Gclose(comp_grp_id);
+      assert(errf >= 0);
+   }  // for (int c = 0; c < num_comp; c++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+}
+
+void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx)
+{
+   assert(comp_grp_id >= 0);
+   herr_t errf;
+   hid_t bdr_grp_id;
+   bdr_grp_id = H5Gopen2(comp_grp_id, "boundary", H5P_DEFAULT);
+   assert(bdr_grp_id >= 0);
+
+   int num_bdr;
+   hdf5_utils::ReadAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
+
+   Mesh *comp = topol_handler->GetComponentMesh(comp_idx);
+   assert(num_bdr == comp->bdr_attributes.Size());
+   assert(num_bdr = bdr_mats[comp_idx]->Size());
+
+   Array<DenseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
+   for (int b = 0; b < num_bdr; b++)
+      hdf5_utils::ReadDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
+
+   errf = H5Gclose(bdr_grp_id);
+   assert(errf >= 0);
+   return;
+}
+
+void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
+{
+   assert(file_id >= 0);
+   herr_t errf;
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   int num_ref_ports;
+   hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
+   assert(num_ref_ports == topol_handler->GetNumRefPorts());
+   assert(port_mats.Size() == num_ref_ports);
+
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      assert(port_mats[p]->NumRows() == 2);
+      assert(port_mats[p]->NumCols() == 2);
+
+      hid_t port_grp_id;
+      port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
+      assert(port_grp_id >= 0);
+
+      Array2D<DenseMatrix *> *port_mat = port_mats[p];
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            std::string dset_name = std::to_string(i) + std::to_string(j);
+            hdf5_utils::ReadDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
+         }
+      
+      errf = H5Gclose(port_grp_id);
+      assert(errf >= 0);
+   }  // for (int p = 0; p < num_ref_ports; p++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+}
+
 void MultiBlockSolver::InitVisualization(const std::string& output_path)
 {
    if (!save_visual) return;

@@ -174,13 +174,20 @@ public:
    virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
    virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
 
-   virtual void SaveROMElements(const std::string &filename);
+   void SaveROMElements(const std::string &filename);
    // Save ROM Elements in a hdf5-format file specified with file_id.
-   virtual void SaveCompBdrROMElement(hid_t &file_id);
-   virtual void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   virtual void SaveInterfaceROMElement(hid_t &file_id);
+   // TODO: add more arguments to support more general data structures of ROM Elements.
+   void SaveCompBdrROMElement(hid_t &file_id);
+   void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   void SaveInterfaceROMElement(hid_t &file_id);
 
-   virtual void LoadROMElements(const std::string &filename) = 0;
+   void LoadROMElements(const std::string &filename);
+   // Load ROM Elements in a hdf5-format file specified with file_id.
+   // TODO: add more arguments to support more general data structures of ROM Elements.
+   void LoadCompBdrROMElement(hid_t &file_id);
+   void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   void LoadInterfaceROMElement(hid_t &file_id);
+
    virtual void AssembleROM() = 0;
 
    virtual void Solve() = 0;

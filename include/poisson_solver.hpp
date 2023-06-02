@@ -85,7 +85,6 @@ public:
    virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
    virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
-   virtual void LoadROMElements(const std::string &filename);
    virtual void AssembleROM();
 
    virtual void Solve();
