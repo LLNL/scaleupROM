@@ -50,12 +50,6 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
-   // Used for bottom-up building, only with ComponentTopologyHandler.
-   Array<DenseMatrix *> comp_mats;
-   // boundary condition is enforced via forcing term.
-   Array<Array<DenseMatrix *> *> bdr_mats;
-   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
-
 public:
    PoissonSolver();
 
@@ -87,7 +81,6 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
-   virtual void AllocateROMElements();
    virtual void BuildROMElements();
    virtual void SaveROMElements(const std::string &filename);
    virtual void LoadROMElements(const std::string &filename);

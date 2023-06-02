@@ -85,6 +85,13 @@ protected:
    ROMHandler *rom_handler = NULL;
    bool use_rom = false;
 
+   // Used for bottom-up building, only with ComponentTopologyHandler.
+   // For now, assumes ROM basis represents the entire vector solution.
+   Array<DenseMatrix *> comp_mats;     // Size(num_components);
+   // boundary condition is enforced via forcing term.
+   Array<Array<DenseMatrix *> *> bdr_mats;
+   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
+
 public:
    MultiBlockSolver();
 
@@ -159,7 +166,7 @@ public:
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
-   virtual void AllocateROMElements() = 0;
+   void AllocateROMElements();
    virtual void BuildROMElements() = 0;
    virtual void SaveROMElements(const std::string &filename) = 0;
    virtual void LoadROMElements(const std::string &filename) = 0;

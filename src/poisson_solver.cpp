@@ -63,26 +63,6 @@ PoissonSolver::~PoissonSolver()
       
    for (int k = 0; k < rhs_coeffs.Size(); k++)
       delete rhs_coeffs[k];
-
-   for (int c = 0; c < comp_mats.Size(); c++)
-      delete comp_mats[c];
-
-   for (int c = 0; c < bdr_mats.Size(); c++)
-   {
-      for (int b = 0; b < bdr_mats[c]->Size(); b++)
-         delete (*bdr_mats[c])[b];
-
-      delete bdr_mats[c];
-   }
-
-   for (int p = 0; p < port_mats.Size(); p++)
-   {
-      for (int i = 0; i < port_mats[p]->NumRows(); i++)
-         for (int j = 0; j < port_mats[p]->NumCols(); j++)
-            delete (*port_mats[p])(i,j);
-
-      delete port_mats[p];
-   }
 }
 
 void PoissonSolver::SetupBCVariables()
@@ -367,36 +347,6 @@ void PoissonSolver::AssembleInterfaceMatrixes()
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
       AssembleInterfaceMatrix(mesh1, mesh2, fes1, fes2, interface_integ, interface_infos, mats_p);
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-}
-
-void PoissonSolver::AllocateROMElements()
-{
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
-   assert(train_mode == UNIVERSAL);
-
-   const int num_comp = topol_handler->GetNumComponents();
-   const int num_ref_ports = topol_handler->GetNumRefPorts();
-
-   comp_mats.SetSize(num_comp);
-   bdr_mats.SetSize(num_comp);
-   for (int c = 0; c < num_comp; c++)
-   {
-      comp_mats[c] = new DenseMatrix();
-
-      Mesh *comp = topol_handler->GetComponentMesh(c);
-      bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
-      for (int b = 0; b < bdr_mats[c]->Size(); b++)
-         (*bdr_mats[c])[b] = new DenseMatrix();
-   }
-   port_mats.SetSize(num_ref_ports);
-   for (int p = 0; p < num_ref_ports; p++)
-   {
-      port_mats[p] = new Array2D<DenseMatrix *>(2,2);
-
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++) (*port_mats[p])(i,j) = new DenseMatrix();
-   }
 }
 
 void PoissonSolver::BuildROMElements()
