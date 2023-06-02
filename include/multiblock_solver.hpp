@@ -158,6 +158,7 @@ public:
       Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
+   void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
    virtual void AllocateROMElements() = 0;
    virtual void BuildROMElements() = 0;
    virtual void SaveROMElements(const std::string &filename) = 0;

@@ -246,6 +246,25 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 }
 
+void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(fec.Size() == num_var);
+   assert(vdim.Size() == num_var);
+
+   // Component domain system
+   const int num_comp = topol_handler->GetNumComponents();
+   comp_fes.SetSize(num_var * num_comp);
+   comp_fes = NULL;
+
+   for (int c = 0, idx = 0; c < num_comp; c++)
+   {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      for (int v = 0; v < num_var; v++, idx++)
+         comp_fes[idx] = new FiniteElementSpace(comp, fec[v], vdim[v]);
+   }
+}
+
 void MultiBlockSolver::InitVisualization(const std::string& output_path)
 {
    if (!save_visual) return;

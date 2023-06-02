@@ -408,12 +408,8 @@ void PoissonSolver::BuildROMElements()
 
    // Component domain system
    const int num_comp = topol_handler->GetNumComponents();
-   Array<FiniteElementSpace *> fes_comp(num_comp);
-   fes_comp = NULL;
-   for (int c = 0; c < num_comp; c++) {
-      Mesh *comp = topol_handler->GetComponentMesh(c);
-      fes_comp[c] = new FiniteElementSpace(comp, fec[0], udim);
-   }
+   Array<FiniteElementSpace *> fes_comp;
+   GetComponentFESpaces(fes_comp);
 
    {
       assert(comp_mats.Size() == num_comp);
