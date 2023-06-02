@@ -17,6 +17,7 @@
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
+#include "hdf5_utils.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -167,8 +168,18 @@ public:
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
    void AllocateROMElements();
-   virtual void BuildROMElements() = 0;
-   virtual void SaveROMElements(const std::string &filename) = 0;
+
+   void BuildROMElements();
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+
+   virtual void SaveROMElements(const std::string &filename);
+   // Save ROM Elements in a hdf5-format file specified with file_id.
+   virtual void SaveCompBdrROMElement(hid_t &file_id);
+   virtual void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   virtual void SaveInterfaceROMElement(hid_t &file_id);
+
    virtual void LoadROMElements(const std::string &filename) = 0;
    virtual void AssembleROM() = 0;
 

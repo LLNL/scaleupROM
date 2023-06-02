@@ -81,8 +81,10 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
-   virtual void BuildROMElements();
-   virtual void SaveROMElements(const std::string &filename);
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
+
    virtual void LoadROMElements(const std::string &filename);
    virtual void AssembleROM();
 

@@ -13,7 +13,6 @@
 
 #include "poisson_solver.hpp"
 #include "input_parser.hpp"
-#include "hdf5_utils.hpp"
 #include "linalg_utils.hpp"
 
 using namespace std;
@@ -349,202 +348,108 @@ void PoissonSolver::AssembleInterfaceMatrixes()
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 }
 
-void PoissonSolver::BuildROMElements()
+void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   const int num_comp = fes_comp.Size();
+   assert(comp_mats.Size() == num_comp);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      BilinearForm a_comp(fes_comp[c]);
+
+      a_comp.AddDomainIntegrator(new DiffusionIntegrator);
+      if (full_dg)
+         a_comp.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
+
+      a_comp.Assemble();
+      a_comp.Finalize();
+
+      rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), comp_mats[c]);
+   }
+}
+
+void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   const int num_comp = fes_comp.Size();
+   assert(bdr_mats.Size() == num_comp);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
+      Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
+
+      for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+      {
+         Array<int> bdr_marker(comp->bdr_attributes.Max());
+         bdr_marker = 0;
+         bdr_marker[comp->bdr_attributes[b] - 1] = 1;
+         BilinearForm a_comp(fes_comp[c]);
+         a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
+
+         a_comp.Assemble();
+         a_comp.Finalize();
+
+         rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), (*bdr_mats_c)[b]);
+      }
+   }
+}
+
+void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
-   // Component domain system
-   const int num_comp = topol_handler->GetNumComponents();
-   Array<FiniteElementSpace *> fes_comp;
-   GetComponentFESpaces(fes_comp);
-
-   {
-      assert(comp_mats.Size() == num_comp);
-      for (int c = 0; c < num_comp; c++)
-      {
-         Mesh *comp = topol_handler->GetComponentMesh(c);
-         BilinearForm a_comp(fes_comp[c]);
-
-         a_comp.AddDomainIntegrator(new DiffusionIntegrator);
-         if (full_dg)
-            a_comp.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
-
-         a_comp.Assemble();
-         a_comp.Finalize();
-
-         rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), comp_mats[c]);
-      }
-   }
-
-   // Boundary penalty matrixes
-   {
-      assert(bdr_mats.Size() == num_comp);
-      for (int c = 0; c < num_comp; c++)
-      {
-         Mesh *comp = topol_handler->GetComponentMesh(c);
-         assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-         Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
-
-         for (int b = 0; b < comp->bdr_attributes.Size(); b++)
-         {
-            Array<int> bdr_marker(comp->bdr_attributes.Max());
-            bdr_marker = 0;
-            bdr_marker[comp->bdr_attributes[b] - 1] = 1;
-            BilinearForm a_comp(fes_comp[c]);
-            a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
-
-            a_comp.Assemble();
-            a_comp.Finalize();
-
-            rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), (*bdr_mats_c)[b]);
-         }
-      }
-   }
-
-   // Port penalty matrixes
    const int num_ref_ports = topol_handler->GetNumRefPorts();
+   assert(port_mats.Size() == num_ref_ports);
+   for (int p = 0; p < num_ref_ports; p++)
    {
-      assert(port_mats.Size() == num_ref_ports);
-      for (int p = 0; p < num_ref_ports; p++)
-      {
-         assert(port_mats[p]->NumRows() == 2);
-         assert(port_mats[p]->NumCols() == 2);
+      assert(port_mats[p]->NumRows() == 2);
+      assert(port_mats[p]->NumCols() == 2);
 
-         int c1, c2;
-         topol_handler->GetComponentPair(p, c1, c2);
-         Mesh *comp1 = topol_handler->GetComponentMesh(c1);
-         Mesh *comp2 = topol_handler->GetComponentMesh(c2);
+      int c1, c2;
+      topol_handler->GetComponentPair(p, c1, c2);
+      Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+      Mesh *comp2 = topol_handler->GetComponentMesh(c2);
 
-         Mesh mesh1(*comp1);
-         Mesh mesh2(*comp2);
+      Mesh mesh1(*comp1);
+      Mesh mesh2(*comp2);
 
-         Array<int> c_idx(2);
-         c_idx[0] = c1;
-         c_idx[1] = c2;
-         Array2D<SparseMatrix *> spmats(2,2);
-         for (int i = 0; i < 2; i++)
-            for (int j = 0; j < 2; j++)
-               spmats(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
+      Array<int> c_idx(2);
+      c_idx[0] = c1;
+      c_idx[1] = c2;
+      Array2D<SparseMatrix *> spmats(2,2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            spmats(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
 
-         Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
+      Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
 
-         // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
-         // Need to use two copied instances.
-         AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], interface_integ, if_infos, spmats);
+      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+      // Need to use two copied instances.
+      AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], interface_integ, if_infos, spmats);
 
-         for (int i = 0; i < 2; i++)
-            for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();
 
-         for (int i = 0; i < 2; i++)
-            for (int j = 0; j < 2; j++)
-               rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j), (*port_mats[p])(i, j));
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j), (*port_mats[p])(i, j));
 
-         for (int i = 0; i < 2; i++)
-            for (int j = 0; j < 2; j++) delete spmats(i, j);
-      }  // for (int p = 0; p < num_ref_ports; p++)
-   }
-
-   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
-}
-
-void PoissonSolver::SaveROMElements(const std::string &filename)
-{
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
-   assert(train_mode == UNIVERSAL);
-
-   hid_t file_id;
-   herr_t errf = 0;
-   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-   assert(file_id >= 0);
-
-   {  // components + boundary
-      hid_t grp_id;
-      grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(grp_id >= 0);
-
-      const int num_comp = topol_handler->GetNumComponents();
-      assert(comp_mats.Size() == num_comp);
-      assert(bdr_mats.Size() == num_comp);
-
-      hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
-
-      for (int c = 0; c < num_comp; c++)
-      {
-         hid_t comp_grp_id;
-         comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-         assert(comp_grp_id >= 0);
-
-         hdf5_utils::WriteDataset(comp_grp_id, "domain", *(comp_mats[c]));
-
-         {  // boundary
-            hid_t bdr_grp_id;
-            bdr_grp_id = H5Gcreate(comp_grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-            assert(bdr_grp_id >= 0);
-
-            const int num_bdr = bdr_mats[c]->Size();
-            Mesh *comp = topol_handler->GetComponentMesh(c);
-            assert(num_bdr == comp->bdr_attributes.Size());
-
-            hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
-            
-            Array<DenseMatrix *> *bdr_mat_c = bdr_mats[c];
-            for (int b = 0; b < num_bdr; b++)
-               hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
-
-            errf = H5Gclose(bdr_grp_id);
-            assert(errf >= 0);
-         }
-
-         errf = H5Gclose(comp_grp_id);
-         assert(errf >= 0);
-      }  // for (int c = 0; c < num_comp; c++)
-
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
-   }
-
-   {  // (reference) ports
-      hid_t grp_id;
-      grp_id = H5Gcreate(file_id, "ports", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(grp_id >= 0);
-
-      const int num_ref_ports = topol_handler->GetNumRefPorts();
-      assert(port_mats.Size() == num_ref_ports);
-
-      hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
-      
-      for (int p = 0; p < num_ref_ports; p++)
-      {
-         assert(port_mats[p]->NumRows() == 2);
-         assert(port_mats[p]->NumCols() == 2);
-
-         hid_t port_grp_id;
-         port_grp_id = H5Gcreate(grp_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-         assert(port_grp_id >= 0);
-
-         Array2D<DenseMatrix *> *port_mat = port_mats[p];
-         for (int i = 0; i < 2; i++)
-            for (int j = 0; j < 2; j++)
-            {
-               std::string dset_name = std::to_string(i) + std::to_string(j);
-               hdf5_utils::WriteDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
-            }
-         
-         errf = H5Gclose(port_grp_id);
-         assert(errf >= 0);
-      }  // for (int p = 0; p < num_ref_ports; p++)
-
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
-   }
-
-   errf = H5Fclose(file_id);
-   assert(errf >= 0);
-   return;
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++) delete spmats(i, j);
+   }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
 void PoissonSolver::LoadROMElements(const std::string &filename)
