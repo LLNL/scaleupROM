@@ -188,7 +188,7 @@ public:
    void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
    void LoadInterfaceROMElement(hid_t &file_id);
 
-   virtual void AssembleROM() = 0;
+   void AssembleROM();
 
    virtual void Solve() = 0;
 

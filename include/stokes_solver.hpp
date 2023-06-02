@@ -159,8 +159,6 @@ public:
    virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) {}
    virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) {}
 
-   virtual void AssembleROM() {}
-
    virtual void Solve();
 
    virtual void ProjectOperatorOnReducedBasis();
