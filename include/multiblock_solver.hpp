@@ -132,6 +132,7 @@ public:
    virtual void BuildRHSOperators() = 0;
    virtual void BuildDomainOperators() = 0;
    
+   virtual bool BCExistsOnBdr(const int &global_battr_idx) = 0;
    virtual void SetupBCOperators() = 0;
    virtual void SetupRHSBCOperators() = 0;
    virtual void SetupDomainBCOperators() = 0;

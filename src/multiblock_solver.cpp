@@ -602,8 +602,9 @@ void MultiBlockSolver::AssembleROM()
 
       for (int b = 0; b < bdr_c2g->Size(); b++)
       {
-         int is_global = global_bdr_attributes.Find((*bdr_c2g)[b]);
-         if (is_global < 0) continue;
+         int global_idx = global_bdr_attributes.Find((*bdr_c2g)[b]);
+         if (global_idx < 0) continue;
+         if (!BCExistsOnBdr(global_idx)) continue;
 
          romMat->AddSubMatrix(vdofs, vdofs, *(*bdr_mat)[b]);
       }

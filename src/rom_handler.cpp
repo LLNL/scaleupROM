@@ -676,9 +676,10 @@ void MFEMROMHandler::Solve(BlockVector* U)
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
+   std::string solver_type = config.GetOption<std::string>("model_reduction/solver_type", "cg");
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
 
-   CGSolver *solver = NULL;
+   IterativeSolver *solver = SetSolver(solver_type, prec_str);
    HypreParMatrix *parRomMat = NULL;
    Solver *M = NULL;    // preconditioner.
    Operator *K = NULL;  // operator.
@@ -687,8 +688,6 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
    if (prec_str == "amg")
    {
-      solver = new CGSolver(MPI_COMM_WORLD);
-
       // TODO: need to change when the actual parallelization is implemented.
       HYPRE_BigInt glob_size = rom_block_offsets.Last();
       HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
@@ -696,10 +695,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       K = parRomMat;
    }
    else
-   {
-      solver = new CGSolver();
       K = romMat;
-   }
 
    if (prec_str == "amg")
    {
@@ -858,4 +854,25 @@ void MFEMROMHandler::SaveBasisVisualization(
    }
 }
 
+IterativeSolver* MFEMROMHandler::SetSolver(const std::string &solver_type, const std::string &prec_type)
+{
+   IterativeSolver *solver;
+   if (solver_type == "cg")
+   {
+      if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+      else                    solver = new CGSolver();
+   }
+   else if (solver_type == "minres")
+   {
+      if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
+      else                    solver = new MINRESSolver();
+   }
+   else
+   {
+      mfem_error("Unknown ROM solver type!\n");
+   }
+
+   return solver;
 }
+
+}  // namespace mfem

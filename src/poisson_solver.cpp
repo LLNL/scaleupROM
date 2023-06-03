@@ -204,6 +204,13 @@ void PoissonSolver::BuildDomainOperators()
    interface_integ = new InterfaceDGDiffusionIntegrator(sigma, kappa);
 }
 
+bool PoissonSolver::BCExistsOnBdr(const int &global_battr_idx)
+{
+   assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
+   assert(bdr_coeffs.Size() == global_bdr_attributes.Size());
+   return (bdr_coeffs[global_battr_idx]);
+}
+
 void PoissonSolver::SetupBCOperators()
 {
    SetupRHSBCOperators();
@@ -224,7 +231,7 @@ void PoissonSolver::SetupRHSBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         if (bdr_coeffs[b] == NULL) continue;
+         if (!BCExistsOnBdr(b)) continue;
 
          bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
       }
@@ -244,7 +251,7 @@ void PoissonSolver::SetupDomainBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         if (bdr_coeffs[b] == NULL) continue;
+         if (!BCExistsOnBdr(b)) continue;
 
          as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), *bdr_markers[b]);
       }
@@ -423,6 +430,8 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
       Mesh *comp1 = topol_handler->GetComponentMesh(c1);
       Mesh *comp2 = topol_handler->GetComponentMesh(c2);
 
+      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+      // Need to use two copied instances.
       Mesh mesh1(*comp1);
       Mesh mesh2(*comp2);
 

@@ -138,6 +138,7 @@ public:
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
    
+   virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators() override;
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
@@ -155,9 +156,9 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
-   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) {}
-   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) {}
-   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) {}
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
    virtual void Solve();
 
@@ -166,6 +167,12 @@ public:
    void SanityCheckOnCoeffs();
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
+
+private:
+   // NOTE: Block Matrix does not own the offsets,
+   // and will access to invalid memory if the offsets variable is destroyed.
+   BlockMatrix* FormBlockMatrix(SparseMatrix* const m, SparseMatrix* const b, SparseMatrix* const bt,
+                                Array<int> &row_offsets, Array<int> &col_offsets);
 };
 
 #endif

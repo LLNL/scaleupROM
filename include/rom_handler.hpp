@@ -193,6 +193,9 @@ public:
    virtual void LoadOperator(SparseMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
+
+private:
+   IterativeSolver* SetSolver(const std::string &solver_type, const std::string &prec_type);
 };
 
 

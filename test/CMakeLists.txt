@@ -25,6 +25,7 @@ file(COPY inputs/stokes.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/test.2x2.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 
 file(COPY inputs/test.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
+file(COPY inputs/stokes.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/test.1x1.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/test.global.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 

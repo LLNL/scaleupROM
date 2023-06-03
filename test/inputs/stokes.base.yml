@@ -56,3 +56,4 @@ model_reduction:
     update_right_sv: false
   visualization:
     enabled: false
+  solver_type: minres
