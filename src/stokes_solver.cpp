@@ -761,24 +761,26 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
 {
    Array2D<Operator *> tmp(numSub, numSub);
    Array2D<SparseMatrix *> bt_mats(numSub, numSub);
-   // TODO: BlockMatrix offsets are indeed used for its Mult() in ProjectOperatorOnReducedBasis below.
-   // dumping them into one variable can cause an issue for multi-component case.
-   Array<int> dummy1, dummy2;
-   int ofs = 0;
+   // NOTE: BlockMatrix offsets are indeed used for its Mult() in ProjectOperatorOnReducedBasis below.
+   // Offsets should be stored for multi-component case, until ProjectOperatorOnReducedBasis is done.
+   Array2D<Array<int> *> ioffsets(numSub, numSub), joffsets(numSub, numSub);
    for (int i = 0; i < tmp.NumRows(); i++)
       for (int j = 0; j < tmp.NumCols(); j++)
       {
          // NOTE: the index also should be transposed.
          bt_mats(i, j) = Transpose(*b_mats(j, i));
 
-         tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j), dummy1, dummy2);
+         ioffsets(i, j) = new Array<int>;
+         joffsets(i, j) = new Array<int>;
+         tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j),
+                                    *(ioffsets(i,j)), *(joffsets(i,j)));
       }
          
    rom_handler->ProjectOperatorOnReducedBasis(tmp);
 
    for (int i = 0; i < bt_mats.NumRows(); i++)
       for (int j = 0; j < bt_mats.NumCols(); j++)
-      { delete bt_mats(i, j); delete tmp(i, j); }   
+      { delete bt_mats(i, j), tmp(i, j), ioffsets(i, j), joffsets(i, j); }
 }
 
 void StokesSolver::SanityCheckOnCoeffs()
