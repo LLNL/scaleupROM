@@ -1,0 +1,94 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: true
+  solver: stokes
+
+stokes:
+  nu: 1.2
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "test.multi_comp.h5"
+    components:
+      - name: "empty"
+        file: "square.mesh"
+      - name: "circle"
+        file: "square-circle.msh.mfem"
+    ports:
+      - name: "port1"
+        file: "test.port1.h5"
+        comp1:
+          name: "empty"
+          attr: 2
+        comp2:
+          name: "circle"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "test.port2.h5"
+        comp1:
+          name: "empty"
+          attr: 3
+        comp2:
+          name: "circle"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: false
+
+visualization:
+  enable: false
+  output_dir: dd_mms_output
+
+parameterized_problem:
+  name: stokes_channel
+
+single_run:
+  stokes_channel:
+    - parameter_name: U
+      value: 2.5
+
+sample_generation:
+  component_sampling: false
+  file_path:
+    prefix: "stokes"
+  stokes_channel:
+    - parameter_name: U
+      sample_size: 2
+      minimum: 2.0
+      maximum: 2.5
+
+model_reduction:
+  rom_handler_type: mfem
+  basis:
+    prefix: "stokes"
+  # individual/universal
+  subdomain_training: universal
+  number_of_basis: [2,4]
+  save_operator:
+    level: component
+    prefix: "test.rom_elem"
+  compare_solution: true
+  svd:
+    save_spectrum: true
+    maximum_number_of_snapshots: 400
+    update_right_sv: false
+  visualization:
+    enabled: false
+  solver_type: minres
+
+manufactured_solution:
+  baseline_refinement: 1
+  number_of_refinement: 4
+  amp1: 1.23
+  amp2: 3.13
+  constant: 1.11
+
+

@@ -2,6 +2,7 @@ file(COPY square-circle.geo DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY square.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY test.multi_comp.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY test.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
+file(COPY stokes.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 
 ADD_CUSTOM_COMMAND(
     OUTPUT ${CMAKE_BINARY_DIR}/test/gmsh/square-circle.msh
