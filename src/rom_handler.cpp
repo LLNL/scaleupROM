@@ -22,15 +22,17 @@ using namespace std;
 namespace mfem
 {
 
-ROMHandler::ROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
+ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
    : topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
-     udim(input_udim),
+     vdim(input_vdim),
      fom_num_vdofs(input_num_vdofs),
      basis_loaded(false),
      operator_loaded(false)
 {
-   assert(fom_num_vdofs.Size() == (numSub));
+   num_var = vdim.Size();
+   udim = vdim.Sum();
+   assert(fom_num_vdofs.Size() == (num_var * numSub));
 
    ParseInputs();
 
@@ -152,17 +154,30 @@ void ROMHandler::ParseInputs()
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
 }
 
-void ROMHandler::SaveSnapshot(Array<GridFunction*> &us, const int &sample_index)
+void ROMHandler::SaveSnapshot(BlockVector *sol, const int &sample_index)
 {
-   assert(us.Size() == numSub);
+   assert(sol->NumBlocks() == (num_var * numSub));
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0, idx = 0; m < numSub; m++)
    {
+      // for (int v = 0; v < num_var; v++, idx++)
+      // {
+      //    const std::string filename = GetSnapshotPrefix(sample_index, m, v);
+      //    rom_options = new CAROM::Options(fom_num_vdofs[idx], max_num_snapshots, 1, update_right_SV);
+      //    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
+
+      //    bool addSample = basis_generator->takeSample(sol->GetBlock(idx).GetData(), 0.0, 0.01);
+      //    assert(addSample);
+      //    basis_generator->writeSnapshot();
+
+      //    delete basis_generator;
+      //    delete rom_options;
+      // }
       const std::string filename = GetSnapshotPrefix(sample_index, m);
       rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
 
-      bool addSample = basis_generator->takeSample(us[m]->GetData(), 0.0, 0.01);
+      bool addSample = basis_generator->takeSample(sol->GetBlock(m).GetData(), 0.0, 0.01);
       assert(addSample);
       basis_generator->writeSnapshot();
 
@@ -307,35 +322,41 @@ void ROMHandler::LoadReducedBasis()
    basis_loaded = true;
 }
 
-void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis)
+int ROMHandler::GetBasisIndexForSubdomain(const int &subdomain_index)
 {
-   MFEM_ASSERT(basis_loaded, "GetBasisOnSubdomain: reduced basis is not loaded!\n");
-
+   int idx = -1;
    switch (train_mode)
    {
       case TrainMode::UNIVERSAL:
-      {
-         // TODO: when using more than one component domain.
-         basis = carom_spatialbasis[0];
-         break;
-      }
+      { idx = topol_handler->GetMeshType(subdomain_index); break; }
       case TrainMode::INDIVIDUAL:
-      {
-         basis = carom_spatialbasis[subdomain_index];
-         break;
-      }
+      { idx = subdomain_index; break; }
       default:
-      {
-         mfem_error("LoadBasis: unknown TrainMode!\n");
-         basis = NULL;
-         break;
-      }
+      { mfem_error("LoadBasis: unknown TrainMode!\n"); break; }
    }  // switch (train_mode)
 
+   assert(idx >= 0);
+   return idx;
+}
+
+void ROMHandler::GetBasis(const int &basis_index, const CAROM::Matrix* &basis)
+{
+   assert(num_basis_sets > 0);
+   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+
+   basis = carom_spatialbasis[basis_index];
+}
+
+void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis)
+{
+   assert(basis_loaded);
+
+   int idx = GetBasisIndexForSubdomain(subdomain_index);
+   GetBasis(idx, basis);
    return;
 }
 
-void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats)
+void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    printf("Project Operators on reduced basis.\n");
    assert(mats.NumRows() == numSub);
@@ -343,37 +364,22 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mat
 
    if (!basis_loaded) LoadReducedBasis();
 
-   // // Prepare matrixes.
-   // AllocROMMat();
-
    // Each basis is applied to the same column blocks.
-   const CAROM::Matrix *basis_i, *basis_j;
-   int num_basis_i, num_basis_j;
-   for (int i = 0; i < numSub; i++)
-   {
-      GetBasisOnSubdomain(i, basis_i);
-      num_basis_i = basis_i->numColumns();
-
-      for (int j = 0; j < numSub; j++)
-      {
-         GetBasisOnSubdomain(j, basis_j);
-         num_basis_j = basis_j->numColumns();
-
-         // 21. form inverse ROM operator
-         assert(mats(i,j) != NULL);
-         assert(mats(i,j)->Finalized());
-
-         carom_mats(i,j) = new CAROM::Matrix(num_basis_i, num_basis_j, false);
-         CAROM::ComputeCtAB(*mats(i,j), *basis_j, *basis_i, *carom_mats(i,j));
-      }
-   }  // for (int j = 0; j < numSub; j++)
-
    // Form inverse matrix
-   // TODO: which linear algbra utilities should I use? MFEM or CAROM?
    for (int i = 0; i < numSub; i++)
    {
+      int num_rows = rom_block_offsets[i+1] - rom_block_offsets[i];
+      int basis_i = GetBasisIndexForSubdomain(i);
       for (int j = 0; j < numSub; j++)
       {
+         int num_cols = rom_block_offsets[j+1] - rom_block_offsets[j];
+         int basis_j = GetBasisIndexForSubdomain(j);
+
+         assert(mats(i,j) != NULL);
+
+         carom_mats(i,j) = new CAROM::Matrix(num_rows, num_cols, false);
+         ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j), carom_mats(i,j));
+
          CAROM::SetBlock(*carom_mats(i,j), rom_block_offsets[i], rom_block_offsets[i+1],
                          rom_block_offsets[j], rom_block_offsets[j+1], *romMat_inv);
       }
@@ -461,6 +467,27 @@ void ROMHandler::Solve(BlockVector* U)
    }
 }
 
+void ROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat)
+{
+   assert(proj_mat != NULL);
+   assert((i >= 0) && (i < num_basis_sets));
+   assert((j >= 0) && (j < num_basis_sets));
+   // assert(mat->Finalized());
+   assert(basis_loaded);
+   
+   const CAROM::Matrix *basis_i, *basis_j;
+   int num_basis_i, num_basis_j;
+   GetBasis(i, basis_i);
+   num_basis_i = basis_i->numColumns();
+   GetBasis(j, basis_j);
+   num_basis_j = basis_j->numColumns();
+
+   // TODO: multi-component case.
+   proj_mat->setSize(num_basis_i, num_basis_j);
+   CAROM::ComputeCtAB(*mat, *basis_j, *basis_i, *proj_mat);
+   return;
+}
+
 void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 {
    assert(save_operator == ROMBuildingLevel::GLOBAL);
@@ -535,8 +562,8 @@ void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const int &input_udim, const Array<int> &input_num_vdofs)
-   : ROMHandler(input_topol, input_udim, input_num_vdofs)
+MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+   : ROMHandler(input_topol, input_vdim, input_num_vdofs)
 {
    romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
 }
@@ -562,38 +589,17 @@ void MFEMROMHandler::GetBasis(const int &basis_index, DenseMatrix* &basis)
    assert((basis_index >= 0) && (basis_index < num_basis_sets));
 
    basis = spatialbasis[basis_index];
-   return;
 }
 
 void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
 {
-   MFEM_ASSERT(basis_loaded, "GetBasisOnSubdomain: reduced basis is not loaded!\n");
+   assert(basis_loaded);
 
-   switch (train_mode)
-   {
-      case TrainMode::UNIVERSAL:
-      {
-         int c = topol_handler->GetMeshType(subdomain_index);
-         basis = spatialbasis[c];
-         break;
-      }
-      case TrainMode::INDIVIDUAL:
-      {
-         basis = spatialbasis[subdomain_index];
-         break;
-      }
-      default:
-      {
-         mfem_error("LoadBasis: unknown TrainMode!\n");
-         basis = NULL;
-         break;
-      }
-   }  // switch (train_mode)
-
-   return;
+   int idx = GetBasisIndexForSubdomain(subdomain_index);
+   GetBasis(idx, basis);
 }
 
-void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> &mats)
+void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    assert(mats.NumRows() == numSub);
    assert(mats.NumCols() == numSub);
@@ -602,26 +608,28 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<SparseMatrix*> 
 
    // This is pretty much the same as Assemble().
    // Each basis is applied to the same column blocks.
-   DenseMatrix *basis_i, *basis_j;
    int num_basis_i, num_basis_j;
+   int basis_i, basis_j;
    for (int i = 0; i < numSub; i++)
    {
-      GetBasisOnSubdomain(i, basis_i);
-      num_basis_i = basis_i->NumCols();
+      num_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
+      basis_i = GetBasisIndexForSubdomain(i);
 
       Array<int> vdof_i(num_basis_i);
-      for (int k = 0; k < num_basis_i; k++) vdof_i[k] = k + rom_block_offsets[i];
+      for (int k = 0, vdof = rom_block_offsets[i]; vdof < rom_block_offsets[i+1]; k++, vdof++)
+         vdof_i[k] = vdof;
 
       for (int j = 0; j < numSub; j++)
       {
-         GetBasisOnSubdomain(j, basis_j);
-         num_basis_j = basis_j->NumCols();
+         num_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
+         basis_j = GetBasisIndexForSubdomain(j);
 
          Array<int> vdof_j(num_basis_j);
-         for (int k = 0; k < num_basis_j; k++) vdof_j[k] = k + rom_block_offsets[j];
+         for (int k = 0, vdof = rom_block_offsets[j]; vdof < rom_block_offsets[j+1]; k++, vdof++)
+            vdof_j[k] = vdof;
          
          DenseMatrix elemmat(num_basis_i, num_basis_j);
-         mfem::RtAP(*basis_i, *mats(i,j), *basis_j, elemmat);
+         ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j), &elemmat);
          romMat->SetSubMatrix(vdof_i, vdof_j, elemmat);
       }
    }  // for (int j = 0; j < numSub; j++)
@@ -668,9 +676,10 @@ void MFEMROMHandler::Solve(BlockVector* U)
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
+   std::string solver_type = config.GetOption<std::string>("model_reduction/solver_type", "cg");
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
 
-   CGSolver *solver = NULL;
+   IterativeSolver *solver = SetSolver(solver_type, prec_str);
    HypreParMatrix *parRomMat = NULL;
    Solver *M = NULL;    // preconditioner.
    Operator *K = NULL;  // operator.
@@ -679,8 +688,6 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
    if (prec_str == "amg")
    {
-      solver = new CGSolver(MPI_COMM_WORLD);
-
       // TODO: need to change when the actual parallelization is implemented.
       HYPRE_BigInt glob_size = rom_block_offsets.Last();
       HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
@@ -688,10 +695,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       K = parRomMat;
    }
    else
-   {
-      solver = new CGSolver();
       K = romMat;
-   }
 
    if (prec_str == "amg")
    {
@@ -742,12 +746,12 @@ void MFEMROMHandler::Solve(BlockVector* U)
    delete solver;
 }
 
-void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const SparseMatrix *mat, DenseMatrix *proj_mat)
+void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat)
 {
    assert(proj_mat != NULL);
    assert((i >= 0) && (i < num_basis_sets));
    assert((j >= 0) && (j < num_basis_sets));
-   assert(mat->Finalized());
+   // assert(mat->Finalized());
    assert(basis_loaded);
    
    DenseMatrix *basis_i, *basis_j;
@@ -785,10 +789,14 @@ void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
    operator_loaded = true;
 }
 
-void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &fes)
+void MFEMROMHandler::SaveBasisVisualization(
+   const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
 {
    if (!save_basis_visual) return;
    assert(basis_loaded);
+
+   const int num_var = var_names.size();
+   assert(fes.Size() == num_var * numSub);
 
    std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
    if (train_mode == TrainMode::UNIVERSAL)
@@ -812,27 +820,59 @@ void MFEMROMHandler::SaveBasisVisualization(const Array<FiniteElementSpace *> &f
       }
       assert(midx >= 0);
 
-      Mesh *mesh = fes[midx]->GetMesh();
-      const int order = fes[midx]->FEColl()->GetOrder();
+      Mesh *mesh = fes[midx * num_var]->GetMesh();
+      const int order = fes[midx * num_var]->FEColl()->GetOrder();
       ParaViewDataCollection coll = ParaViewDataCollection(file_prefix.c_str(), mesh);
+
+      Array<int> var_offsets(num_basis[c] * num_var + 1);
+      var_offsets[0] = 0;
+      for (int k = 0, vidx = 1; k < num_basis[c]; k++)
+         for (int v = 0, idx = midx * num_var; v < num_var; v++, idx++, vidx++)
+            var_offsets[vidx] = fes[idx]->GetVSize();
+      var_offsets.PartialSum();
+      BlockVector basis_view(spatialbasis[c]->GetData(), var_offsets);
+
+      Array<GridFunction*> basis_gf(num_basis[c] * num_var);
+      basis_gf = NULL;
+      for (int k = 0, idx = 0; k < num_basis[c]; k++)
+      {
+         for (int v = 0, fidx = midx * num_var; v < num_var; v++, idx++, fidx++)
+         {
+            std::string field_name = var_names[v] + "_basis_" + std::to_string(k);
+            basis_gf[idx] = new GridFunction(fes[fidx], basis_view.GetBlock(idx), 0);
+            coll.RegisterField(field_name.c_str(), basis_gf[idx]);   
+         }
+      }
+
       coll.SetLevelsOfDetail(order);
       coll.SetHighOrderOutput(true);
       coll.SetPrecision(8);
-
-      Array<GridFunction*> basis_gf(num_basis[c]);
-      basis_gf = NULL;
-      for (int k = 0; k < num_basis[c]; k++)
-      {
-         std::string field_name = "basis_" + std::to_string(k);
-         basis_gf[k] = new GridFunction(fes[midx], spatialbasis[c]->GetColumn(k));
-         coll.RegisterField(field_name.c_str(), basis_gf[k]);
-         coll.SetOwnData(false);
-      }
-
+      coll.SetOwnData(false);
       coll.Save();
 
       for (int k = 0; k < basis_gf.Size(); k++) delete basis_gf[k];
    }
 }
 
+IterativeSolver* MFEMROMHandler::SetSolver(const std::string &solver_type, const std::string &prec_type)
+{
+   IterativeSolver *solver;
+   if (solver_type == "cg")
+   {
+      if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+      else                    solver = new CGSolver();
+   }
+   else if (solver_type == "minres")
+   {
+      if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
+      else                    solver = new MINRESSolver();
+   }
+   else
+   {
+      mfem_error("Unknown ROM solver type!\n");
+   }
+
+   return solver;
 }
+
+}  // namespace mfem

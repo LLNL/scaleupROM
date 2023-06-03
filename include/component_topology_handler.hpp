@@ -156,7 +156,7 @@ public:
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);
 
-   virtual void TransferToGlobal(Array<GridFunction*> &us, GridFunction* &global_u)
+   virtual void TransferToGlobal(Array<GridFunction*> &us, Array<GridFunction*> &global_u, const int &num_var)
    { mfem_error("ComponentTopologyHandler does not yet support global grid function/mesh!\n"); }
 
 protected:

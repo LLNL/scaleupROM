@@ -96,6 +96,11 @@ double rhs(const Vector &x)
 
 }  // namespace poisson_spiral
 
+namespace stokes_problem
+{
+
+double nu;
+
 namespace stokes_channel
 {
 
@@ -112,6 +117,8 @@ void ubdr(const Vector &x, Vector &y)
 }
 
 }  // namespace stokes_channel
+
+}  // namespace stokes_problem
 
 }  // namespace function_factory
 
@@ -145,6 +152,22 @@ void ParameterizedProblem::SetParams(const Array<int> &indexes, const Vector &va
 
    for (int idx = 0; idx < indexes.Size(); idx++)
       (*param_ptr[indexes[idx]]) = values(idx);
+}
+
+void ParameterizedProblem::SetSingleRun()
+{
+   std::string problem_name = GetProblemName();
+   std::string param_list_str("single_run/" + problem_name);
+   YAML::Node param_list = config.FindNode(param_list_str);
+   if (!param_list) mfem_error("Single Run - cannot find the problem name!\n");
+
+   size_t num_params = param_list.size();
+   for (int p = 0; p < num_params; p++)
+   {
+      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+      double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+      SetParams(param_name, value);
+   }
 }
 
 ParameterizedProblem* InitParameterizedProblem()
@@ -322,18 +345,21 @@ StokesChannel::StokesChannel()
    // pointer to static function.
    vector_bdr_ptr.SetSize(4);
    vector_rhs_ptr = NULL;
-   vector_bdr_ptr = &(function_factory::stokes_channel::ubdr);
+   vector_bdr_ptr = &(function_factory::stokes_problem::stokes_channel::ubdr);
 
-   param_num = 2;
+   param_num = 3;
 
    // Default values.
-   function_factory::stokes_channel::L = 1.0;
-   function_factory::stokes_channel::U = 1.0;
+   function_factory::stokes_problem::nu = 1.0;
+   function_factory::stokes_problem::stokes_channel::L = 1.0;
+   function_factory::stokes_problem::stokes_channel::U = 1.0;
 
-   param_map["L"] = 0;
-   param_map["U"] = 1;
+   param_map["nu"] = 0;
+   param_map["L"] = 1;
+   param_map["U"] = 2;
 
    param_ptr.SetSize(param_num);
-   param_ptr[0] = &(function_factory::stokes_channel::L);
-   param_ptr[1] = &(function_factory::stokes_channel::U);
+   param_ptr[0] = &(function_factory::stokes_problem::nu);
+   param_ptr[1] = &(function_factory::stokes_problem::stokes_channel::L);
+   param_ptr[2] = &(function_factory::stokes_problem::stokes_channel::U);
 }

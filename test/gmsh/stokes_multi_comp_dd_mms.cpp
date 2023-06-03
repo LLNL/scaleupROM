@@ -18,6 +18,8 @@ TEST(DDSerialTest, Test_convergence)
    config.dict_["discretization"]["order"] = 2;
    config.dict_["manufactured_solution"]["baseline_refinement"] = 0;
    config.dict_["manufactured_solution"]["number_of_refinement"] = 2;
+   config.dict_["solver"]["absolute_tolerance"] = 1.0E-12;
+   config.dict_["solver"]["relative_tolerance"] = 1.0E-12;
    // TODO: add ROM capability for stokes solver.
    config.dict_["main"]["use_rom"] = false;
    CheckConvergence(1.0);

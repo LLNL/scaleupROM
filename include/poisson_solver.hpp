@@ -25,11 +25,6 @@ class PoissonSolver : public MultiBlockSolver
 friend class ParameterizedProblem;
 
 protected:
-   // Finite element collection for all fe spaces.
-   FiniteElementCollection *fec;
-   // Finite element spaces
-   Array<FiniteElementSpace *> fes;
-
    // interface integrator
    InterfaceNonlinearFormIntegrator *interface_integ;
    // int skip_zeros = 1;
@@ -55,12 +50,6 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
-   // Used for bottom-up building, only with ComponentTopologyHandler.
-   Array<DenseMatrix *> comp_mats;
-   // boundary condition is enforced via forcing term.
-   Array<Array<DenseMatrix *> *> bdr_mats;
-   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
-
 public:
    PoissonSolver();
 
@@ -75,6 +64,7 @@ public:
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
    
+   virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
@@ -92,21 +82,13 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
-   virtual void AllocateROMElements();
-   virtual void BuildROMElements();
-   virtual void SaveROMElements(const std::string &filename);
-   virtual void LoadROMElements(const std::string &filename);
-   virtual void AssembleROM();
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
    virtual void Solve();
 
-   void InitUnifiedParaview(const std::string &file_prefix) override;
-
-   virtual void ProjectOperatorOnReducedBasis()
-   { rom_handler->ProjectOperatorOnReducedBasis(mats); }
-   virtual double CompareSolution();
-   virtual void SaveBasisVisualization()
-   { rom_handler->SaveBasisVisualization(fes); }
+   virtual void ProjectOperatorOnReducedBasis();
 
    void SanityCheckOnCoeffs();
 

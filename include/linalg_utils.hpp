@@ -21,7 +21,7 @@ namespace CAROM
 {
 
 // Serial case interface between CAROM and MFEM
-void ComputeCtAB(const SparseMatrix& A,
+void ComputeCtAB(const Operator& A,
                  const CAROM::Matrix& B,  // Distributed matrix
                  const CAROM::Matrix& C,  // Distributed matrix
                  CAROM::Matrix& CtAB);    // Non-distributed (local) matrix
@@ -53,7 +53,7 @@ namespace mfem
 {
 // Compute Rt * A * P
 void RtAP(DenseMatrix& R,
-        const SparseMatrix& A,
+        const Operator& A,
         DenseMatrix& P,
         DenseMatrix& RAP);
 

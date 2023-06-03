@@ -135,8 +135,8 @@ void BuildROM(MPI_Comm comm)
    test->InitVariables();
    // test->InitVisualization();
 
-   // NOTE: you need this to set bc/rhs coefficients!
-   // This case, we can use default parameter values of the problem.
+   // The ROM operator will be built based on the parameter specified for single-run.
+   problem->SetSingleRun();
    test->SetParameterizedProblem(problem);
 
    // TODO: there are skippable operations depending on rom/fom mode.
@@ -212,19 +212,7 @@ double SingleRun()
    StopWatch solveTimer;
    std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
 
-   std::string problem_name = problem->GetProblemName();
-   std::string param_list_str("single_run/" + problem_name);
-   YAML::Node param_list = config.FindNode(param_list_str);
-   if (!param_list) printf("Single Run - cannot find the problem name!\n");
-
-   size_t num_params = param_list.size();
-   for (int p = 0; p < num_params; p++)
-   {
-      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-      double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
-      problem->SetParams(param_name, value);
-   }
-
+   problem->SetSingleRun();
    test->SetParameterizedProblem(problem);
 
    // TODO: there are skippable operations depending on rom/fom mode.

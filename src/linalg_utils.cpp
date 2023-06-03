@@ -20,7 +20,7 @@ using namespace std;
 namespace CAROM
 {
 
-void ComputeCtAB(const SparseMatrix& A,
+void ComputeCtAB(const Operator& A,
                  const CAROM::Matrix& B,  // Non-Distributed matrix
                  const CAROM::Matrix& C,  // Non-Distributed matrix
                  CAROM::Matrix& CtAB)     // Non-distributed (local) matrix
@@ -144,7 +144,7 @@ namespace mfem
 {
 
 void RtAP(DenseMatrix& R,
-         const SparseMatrix& A,
+         const Operator& A,
          DenseMatrix& P,
          DenseMatrix& RtAP)
 {
@@ -161,7 +161,10 @@ void RtAP(DenseMatrix& R,
          R.GetColumnReference(i, vec_i);
          P.GetColumnReference(j, vec_j);
          // NOTE: mfem::SparseMatrix.InnerProduct(x, y) computes y^t A x
-         RtAP(i, j) = A.InnerProduct(vec_j, vec_i);
+         Vector tmp(vec_i.Size());
+         tmp = 0.0;
+         A.Mult(vec_j, tmp);
+         RtAP(i, j) = vec_i * tmp;
       }
 }
 
