@@ -38,6 +38,7 @@ public:
    {
       solver = new CGSolver();
       solver->SetRelTol(rtol);
+      solver->SetAbsTol(atol);
       solver->SetMaxIter(maxIter);
       solver->SetOperator(*A);
       solver->SetPrintLevel(0);
@@ -75,15 +76,12 @@ protected:
 
    int porder, uorder;
 
-   // Finite element collection for all fe spaces.
-   FiniteElementCollection *ufec;   // for velocity
-   FiniteElementCollection *pfec;   // for pressure
-   // Finite element spaces
+   // // Finite element collection for all fe spaces.
+   // View array for Finite element spaces
    Array<FiniteElementSpace *> ufes, pfes;
 
-   // GridFunction for pressure
-   Array<GridFunction *> ps;
-   // Will use us for velocity GridFunction.
+   // View Array for GridFunctions. Size(numSub);
+   Array<GridFunction *> vels, ps;
 
    // interface integrator
    InterfaceNonlinearFormIntegrator *vec_diff, *norm_flux;
@@ -124,7 +122,7 @@ public:
 
    virtual ~StokesSolver();
 
-   GridFunction* GetVelGridFunction(const int k) const { return us[k]; }
+   GridFunction* GetVelGridFunction(const int k) const { return vels[k]; }
    GridFunction* GetPresGridFunction(const int k) const { return ps[k]; }
    const int GetVelFEOrder() const { return uorder; }
    const int GetPresFEOrder() const { return porder; }
@@ -140,6 +138,7 @@ public:
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
    
+   virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators() override;
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
@@ -157,27 +156,23 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
-   virtual void AllocateROMElements() {}
-   virtual void BuildROMElements() {}
-   virtual void SaveROMElements(const std::string &filename) {}
-   virtual void LoadROMElements(const std::string &filename) {}
-   virtual void AssembleROM() {}
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
    virtual void Solve();
 
-   void InitUnifiedParaview(const std::string &file_prefix) override
-   { mfem_error("StokesSolver::InitUnifiedParaview is not implemented yet!\n"); }
-   void InitIndividualParaview(const std::string& file_prefix) override;
-
-   virtual void ProjectOperatorOnReducedBasis() {}
-   // { rom_handler->ProjectOperatorOnReducedBasis(mats); }
-   virtual double CompareSolution() { return -1.; }
-   virtual void SaveBasisVisualization() {}
-   // { rom_handler->SaveBasisVisualization(fes); }
+   virtual void ProjectOperatorOnReducedBasis();
 
    void SanityCheckOnCoeffs();
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
+
+private:
+   // NOTE: Block Matrix does not own the offsets,
+   // and will access to invalid memory if the offsets variable is destroyed.
+   BlockMatrix* FormBlockMatrix(SparseMatrix* const m, SparseMatrix* const b, SparseMatrix* const bt,
+                                Array<int> &row_offsets, Array<int> &col_offsets);
 };
 
 #endif

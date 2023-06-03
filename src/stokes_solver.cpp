@@ -32,19 +32,6 @@ StokesSolver::StokesSolver()
 
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (uorder + 1) * (uorder + 1));
- 
-   // Set up FE collection/spaces.
-   if (full_dg)
-   {
-      ufec = new DG_FECollection(uorder, dim);
-      pfec = new DG_FECollection(porder, dim);
-      mfem_error("StokesSolver currently cannot support full DG scheme!\n");
-   }
-   else
-   {
-      ufec = new H1_FECollection(uorder, dim);
-      pfec = new H1_FECollection(porder, dim);
-   }
    
    // solution dimension is determined by initialization.
    udim = dim + 1;
@@ -53,12 +40,34 @@ StokesSolver::StokesSolver()
    vdim[0] = dim;
    vdim[1] = 1;
 
+   fec.SetSize(num_var);
+   // Set up FE collection/spaces.
+   if (full_dg)
+   {
+      fec[0] = new DG_FECollection(uorder, dim);
+      fec[1] = new DG_FECollection(porder, dim);
+      mfem_error("StokesSolver currently cannot support full DG scheme!\n");
+   }
+   else
+   {
+      fec[0] = new H1_FECollection(uorder, dim);
+      fec[1] = new H1_FECollection(porder, dim);
+   }
+
+   fes.SetSize(num_var * numSub);
    ufes.SetSize(numSub);
    pfes.SetSize(numSub);
    for (int m = 0; m < numSub; m++) {
-      ufes[m] = new FiniteElementSpace(meshes[m], ufec, dim);
-      pfes[m] = new FiniteElementSpace(meshes[m], pfec);
+      ufes[m] = new FiniteElementSpace(meshes[m], fec[0], dim);
+      pfes[m] = new FiniteElementSpace(meshes[m], fec[1]);
+      // NOTE: ownership is in fes, not ufes and pfes!
+      fes[m * num_var] = ufes[m];
+      fes[m * num_var + 1] = pfes[m];
    }
+
+   var_names.resize(num_var);
+   var_names[0] = "vel";
+   var_names[1] = "pres";
 }
 
 StokesSolver::~StokesSolver()
@@ -70,10 +79,6 @@ StokesSolver::~StokesSolver()
    for (int k = 0; k < gs.Size(); k++) delete gs[k];
    for (int k = 0; k < ms.Size(); k++) delete ms[k];
    for (int k = 0; k < bs.Size(); k++) delete bs[k];
-   for (int k = 0; k < ufes.Size(); k++) delete ufes[k];
-   for (int k = 0; k < pfes.Size(); k++) delete pfes[k];
-
-   delete ufec, pfec;
 
    for (int k = 0; k < ud_coeffs.Size(); k++)
       delete ud_coeffs[k];
@@ -116,12 +121,19 @@ void StokesSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F
 {
    assert(ud_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? global_bdr_attributes.Find(battr) : 0;
-   assert(idx >= 0);
-   ud_coeffs[idx] = new VectorFunctionCoefficient(vdim[0], F);
-
-   if (battr < 0)
-      for (int k = 1; k < ud_coeffs.Size(); k++)
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      ud_coeffs[idx] = new VectorFunctionCoefficient(vdim[0], F);
+   }
+   else
+      for (int k = 0; k < ud_coeffs.Size(); k++)
          ud_coeffs[k] = new VectorFunctionCoefficient(vdim[0], F);
 
    DeterminePressureDirichlet();
@@ -131,12 +143,19 @@ void StokesSolver::AddBCFunction(const Vector &F, const int battr)
 {
    assert(ud_coeffs.Size() > 0);
 
-   int idx = (battr > 0) ? global_bdr_attributes.Find(battr) : 0;
-   assert(idx >= 0);
-   ud_coeffs[idx] = new VectorConstantCoefficient(F);
-
-   if (battr < 0)
-      for (int k = 1; k < ud_coeffs.Size(); k++)
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      ud_coeffs[idx] = new VectorConstantCoefficient(F);
+   }
+   else
+      for (int k = 0; k < ud_coeffs.Size(); k++)
          ud_coeffs[k] = new VectorConstantCoefficient(F);
 
    DeterminePressureDirichlet();
@@ -146,33 +165,37 @@ void StokesSolver::InitVariables()
 {
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
-   domain_offsets.SetSize(num_var * numSub + 1);
-   num_vdofs.SetSize(num_var * numSub);
+   var_offsets.SetSize(num_var * numSub + 1);
+   num_vdofs.SetSize(numSub);
    u_offsets.SetSize(numSub + 1);
    p_offsets.SetSize(numSub + 1);
 
    block_offsets[0] = 0;
-   domain_offsets[0] = 0;
+   var_offsets[0] = 0;
    u_offsets[0] = 0;
    p_offsets[0] = 0;
 
-   for (int m = 0, block_idx = 1, domain_idx=1; m < numSub; m++)
+   domain_offsets.SetSize(numSub + 1);
+   domain_offsets = 0;
+
+   for (int m = 0, block_idx = 1, var_idx=1; m < numSub; m++)
    {
-      for (int v = 0; v < num_var; v++, domain_idx++)
+      for (int v = 0; v < num_var; v++, var_idx++)
       {
          FiniteElementSpace *fes = (v == 0) ? ufes[m] : pfes[m];
-         domain_offsets[domain_idx] = fes->GetVSize();
+         var_offsets[var_idx] = fes->GetVSize();
          for (int d = 0; d < vdim[v]; d++, block_idx++)
          {
             block_offsets[block_idx] = fes->GetNDofs();
          }
-         // var_offsets[v+1] += fes->GetVSize();
+         domain_offsets[m+1] += fes->GetVSize();
       }
       u_offsets[m + 1] = ufes[m]->GetVSize();
       p_offsets[m + 1] = pfes[m]->GetVSize();
    }
    block_offsets.PartialSum();
-   domain_offsets.GetSubArray(1, num_var * numSub, num_vdofs);
+   domain_offsets.GetSubArray(1, numSub, num_vdofs);
+   var_offsets.PartialSum();
    domain_offsets.PartialSum();
    u_offsets.PartialSum();
    p_offsets.PartialSum();
@@ -180,8 +203,8 @@ void StokesSolver::InitVariables()
    SetupBCVariables();
 
    // Set up solution/rhs variables/
-   U = new BlockVector(domain_offsets);
-   RHS = new BlockVector(domain_offsets);
+   U = new BlockVector(var_offsets);
+   RHS = new BlockVector(var_offsets);
    /* 
       Note: for compatibility with ROM, it's better to split with domain_offsets.
       For vector-component operations, can set up a view BlockVector like below:
@@ -192,21 +215,24 @@ void StokesSolver::InitVariables()
       These are system-specific, therefore not defining it now.
    */
 
-   us.SetSize(numSub);
+   us.SetSize(num_var * numSub);
+   vels.SetSize(numSub);
    ps.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
-      us[m] = new GridFunction(ufes[m], U->GetBlock(num_var * m), 0);
+      vels[m] = new GridFunction(ufes[m], U->GetBlock(num_var * m), 0);
       ps[m] = new GridFunction(pfes[m], U->GetBlock(num_var * m + 1), 0);
-      (*us[m]) = 0.0;
+      (*vels[m]) = 0.0;
       (*ps[m]) = 0.0;
+
+      // NOTE: ownership is on us, not vels and ps!
+      us[m * num_var] = vels[m];
+      us[m * num_var + 1] = ps[m];
    }
 
    f_coeffs.SetSize(0);
 
-   if (use_rom)
-      mfem_error("StokesSolver does not support ROM yet!\n");
-   // if (use_rom) MultiBlockSolver::InitROMHandler();
+   if (use_rom) MultiBlockSolver::InitROMHandler();
 }
 
 void StokesSolver::DeterminePressureDirichlet()
@@ -274,6 +300,13 @@ void StokesSolver::BuildDomainOperators()
    norm_flux = new InterfaceDGNormalFluxIntegrator;
 }
 
+bool StokesSolver::BCExistsOnBdr(const int &global_battr_idx)
+{
+   assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
+   assert(ud_coeffs.Size() == global_bdr_attributes.Size());
+   return (ud_coeffs[global_battr_idx]);
+}
+
 void StokesSolver::SetupBCOperators()
 {
    SetupRHSBCOperators();
@@ -296,7 +329,7 @@ void StokesSolver::SetupRHSBCOperators()
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
          // TODO: Non-homogeneous Neumann stress bc
-         if (ud_coeffs[b] == NULL) continue;
+         if (!BCExistsOnBdr(b)) continue;
 
          fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*ud_coeffs[b], *nu_coeff, sigma, kappa), *bdr_markers[b]);
 
@@ -325,7 +358,7 @@ void StokesSolver::SetupDomainBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         if (ud_coeffs[b] == NULL) continue;
+         if (!BCExistsOnBdr(b)) continue;
 
          ms[m]->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), *bdr_markers[b]);
          bs[m]->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, *bdr_markers[b]);
@@ -456,408 +489,184 @@ void StokesSolver::AssembleInterfaceMatrixes()
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 }
 
-// void PoissonSolver::AllocateROMElements()
-// {
-//    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-//    const TrainMode train_mode = rom_handler->GetTrainMode();
-//    assert(train_mode == UNIVERSAL);
-
-//    const int num_comp = topol_handler->GetNumComponents();
-//    const int num_ref_ports = topol_handler->GetNumRefPorts();
-
-//    comp_mats.SetSize(num_comp);
-//    bdr_mats.SetSize(num_comp);
-//    for (int c = 0; c < num_comp; c++)
-//    {
-//       comp_mats[c] = new DenseMatrix();
-
-//       Mesh *comp = topol_handler->GetComponentMesh(c);
-//       bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
-//       for (int b = 0; b < bdr_mats[c]->Size(); b++)
-//          (*bdr_mats[c])[b] = new DenseMatrix();
-//    }
-//    port_mats.SetSize(num_ref_ports);
-//    for (int p = 0; p < num_ref_ports; p++)
-//    {
-//       port_mats[p] = new Array2D<DenseMatrix *>(2,2);
-
-//       for (int i = 0; i < 2; i++)
-//          for (int j = 0; j < 2; j++) (*port_mats[p])(i,j) = new DenseMatrix();
-//    }
-// }
-
-// void PoissonSolver::BuildROMElements()
-// {
-//    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-//    const TrainMode train_mode = rom_handler->GetTrainMode();
-//    assert(train_mode == UNIVERSAL);
-//    assert(rom_handler->BasisLoaded());
-
-//    // Component domain system
-//    const int num_comp = topol_handler->GetNumComponents();
-//    Array<FiniteElementSpace *> fes_comp(num_comp);
-//    fes_comp = NULL;
-//    for (int c = 0; c < num_comp; c++) {
-//       Mesh *comp = topol_handler->GetComponentMesh(c);
-//       fes_comp[c] = new FiniteElementSpace(comp, fec, udim);
-//    }
-
-//    {
-//       assert(comp_mats.Size() == num_comp);
-//       for (int c = 0; c < num_comp; c++)
-//       {
-//          Mesh *comp = topol_handler->GetComponentMesh(c);
-//          BilinearForm a_comp(fes_comp[c]);
-
-//          a_comp.AddDomainIntegrator(new DiffusionIntegrator);
-//          if (full_dg)
-//             a_comp.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
-
-//          a_comp.Assemble();
-//          a_comp.Finalize();
-
-//          rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), comp_mats[c]);
-//       }
-//    }
-
-//    // Boundary penalty matrixes
-//    {
-//       assert(bdr_mats.Size() == num_comp);
-//       for (int c = 0; c < num_comp; c++)
-//       {
-//          Mesh *comp = topol_handler->GetComponentMesh(c);
-//          assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-//          Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
-
-//          for (int b = 0; b < comp->bdr_attributes.Size(); b++)
-//          {
-//             Array<int> bdr_marker(comp->bdr_attributes.Max());
-//             bdr_marker = 0;
-//             bdr_marker[comp->bdr_attributes[b] - 1] = 1;
-//             BilinearForm a_comp(fes_comp[c]);
-//             a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
-
-//             a_comp.Assemble();
-//             a_comp.Finalize();
-
-//             rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), (*bdr_mats_c)[b]);
-//          }
-//       }
-//    }
-
-//    // Port penalty matrixes
-//    const int num_ref_ports = topol_handler->GetNumRefPorts();
-//    {
-//       assert(port_mats.Size() == num_ref_ports);
-//       for (int p = 0; p < num_ref_ports; p++)
-//       {
-//          assert(port_mats[p]->NumRows() == 2);
-//          assert(port_mats[p]->NumCols() == 2);
-
-//          int c1, c2;
-//          topol_handler->GetComponentPair(p, c1, c2);
-//          Mesh *comp1 = topol_handler->GetComponentMesh(c1);
-//          Mesh *comp2 = topol_handler->GetComponentMesh(c2);
-
-//          Mesh mesh1(*comp1);
-//          Mesh mesh2(*comp2);
-
-//          Array<int> c_idx(2);
-//          c_idx[0] = c1;
-//          c_idx[1] = c2;
-//          Array2D<SparseMatrix *> spmats(2,2);
-//          for (int i = 0; i < 2; i++)
-//             for (int j = 0; j < 2; j++)
-//                spmats(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
-
-//          Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
-
-//          // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
-//          // Need to use two copied instances.
-//          AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], interface_integ, if_infos, spmats);
-
-//          for (int i = 0; i < 2; i++)
-//             for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();
-
-//          for (int i = 0; i < 2; i++)
-//             for (int j = 0; j < 2; j++)
-//                rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j), (*port_mats[p])(i, j));
-
-//          for (int i = 0; i < 2; i++)
-//             for (int j = 0; j < 2; j++) delete spmats(i, j);
-//       }  // for (int p = 0; p < num_ref_ports; p++)
-//    }
-
-//    for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
-// }
-
-// void PoissonSolver::SaveROMElements(const std::string &filename)
-// {
-//    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-//    const TrainMode train_mode = rom_handler->GetTrainMode();
-//    assert(train_mode == UNIVERSAL);
-
-//    hid_t file_id;
-//    herr_t errf = 0;
-//    file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-//    assert(file_id >= 0);
-
-//    {  // components + boundary
-//       hid_t grp_id;
-//       grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//       assert(grp_id >= 0);
-
-//       const int num_comp = topol_handler->GetNumComponents();
-//       assert(comp_mats.Size() == num_comp);
-//       assert(bdr_mats.Size() == num_comp);
-
-//       hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
-
-//       for (int c = 0; c < num_comp; c++)
-//       {
-//          hid_t comp_grp_id;
-//          comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//          assert(comp_grp_id >= 0);
-
-//          hdf5_utils::WriteDataset(comp_grp_id, "domain", *(comp_mats[c]));
-
-//          {  // boundary
-//             hid_t bdr_grp_id;
-//             bdr_grp_id = H5Gcreate(comp_grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//             assert(bdr_grp_id >= 0);
-
-//             const int num_bdr = bdr_mats[c]->Size();
-//             Mesh *comp = topol_handler->GetComponentMesh(c);
-//             assert(num_bdr == comp->bdr_attributes.Size());
-
-//             hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
-            
-//             Array<DenseMatrix *> *bdr_mat_c = bdr_mats[c];
-//             for (int b = 0; b < num_bdr; b++)
-//                hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
-
-//             errf = H5Gclose(bdr_grp_id);
-//             assert(errf >= 0);
-//          }
-
-//          errf = H5Gclose(comp_grp_id);
-//          assert(errf >= 0);
-//       }  // for (int c = 0; c < num_comp; c++)
-
-//       errf = H5Gclose(grp_id);
-//       assert(errf >= 0);
-//    }
-
-//    {  // (reference) ports
-//       hid_t grp_id;
-//       grp_id = H5Gcreate(file_id, "ports", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//       assert(grp_id >= 0);
-
-//       const int num_ref_ports = topol_handler->GetNumRefPorts();
-//       assert(port_mats.Size() == num_ref_ports);
-
-//       hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
-      
-//       for (int p = 0; p < num_ref_ports; p++)
-//       {
-//          assert(port_mats[p]->NumRows() == 2);
-//          assert(port_mats[p]->NumCols() == 2);
-
-//          hid_t port_grp_id;
-//          port_grp_id = H5Gcreate(grp_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//          assert(port_grp_id >= 0);
-
-//          Array2D<DenseMatrix *> *port_mat = port_mats[p];
-//          for (int i = 0; i < 2; i++)
-//             for (int j = 0; j < 2; j++)
-//             {
-//                std::string dset_name = std::to_string(i) + std::to_string(j);
-//                hdf5_utils::WriteDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
-//             }
-         
-//          errf = H5Gclose(port_grp_id);
-//          assert(errf >= 0);
-//       }  // for (int p = 0; p < num_ref_ports; p++)
-
-//       errf = H5Gclose(grp_id);
-//       assert(errf >= 0);
-//    }
-
-//    errf = H5Fclose(file_id);
-//    assert(errf >= 0);
-//    return;
-// }
-
-// void PoissonSolver::LoadROMElements(const std::string &filename)
-// {
-//    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-//    const TrainMode train_mode = rom_handler->GetTrainMode();
-//    assert(train_mode == UNIVERSAL);
-
-//    hid_t file_id;
-//    herr_t errf = 0;
-//    file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-//    assert(file_id >= 0);
-
-//    {  // components
-//       hid_t grp_id;
-//       grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
-//       assert(grp_id >= 0);
-
-//       int num_comp;
-//       hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
-//       assert(num_comp == topol_handler->GetNumComponents());
-//       assert(comp_mats.Size() == num_comp);
-//       assert(bdr_mats.Size() == num_comp);
-
-//       for (int c = 0; c < num_comp; c++)
-//       {
-//          hid_t comp_grp_id;
-//          comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
-//          assert(comp_grp_id >= 0);
-
-//          hdf5_utils::ReadDataset(comp_grp_id, "domain", *(comp_mats[c]));
-
-//          {  // boundary
-//             hid_t bdr_grp_id;
-//             bdr_grp_id = H5Gopen2(comp_grp_id, "boundary", H5P_DEFAULT);
-//             assert(bdr_grp_id >= 0);
-
-//             int num_bdr;
-//             hdf5_utils::ReadAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
-
-//             Mesh *comp = topol_handler->GetComponentMesh(c);
-//             assert(num_bdr == comp->bdr_attributes.Size());
-//             assert(num_bdr = bdr_mats[c]->Size());
-
-//             Array<DenseMatrix *> *bdr_mat_c = bdr_mats[c];
-//             for (int b = 0; b < num_bdr; b++)
-//                hdf5_utils::ReadDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
-
-//             errf = H5Gclose(bdr_grp_id);
-//             assert(errf >= 0);
-//          }
-
-//          errf = H5Gclose(comp_grp_id);
-//          assert(errf >= 0);
-//       }  // for (int c = 0; c < num_comp; c++)
-
-//       errf = H5Gclose(grp_id);
-//       assert(errf >= 0);
-//    }
-
-//    {  // (reference) ports
-//       hid_t grp_id;
-//       grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
-//       assert(grp_id >= 0);
-
-//       int num_ref_ports;
-//       hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
-//       assert(num_ref_ports == topol_handler->GetNumRefPorts());
-//       assert(port_mats.Size() == num_ref_ports);
-
-//       for (int p = 0; p < num_ref_ports; p++)
-//       {
-//          assert(port_mats[p]->NumRows() == 2);
-//          assert(port_mats[p]->NumCols() == 2);
-
-//          hid_t port_grp_id;
-//          port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
-//          assert(port_grp_id >= 0);
-
-//          Array2D<DenseMatrix *> *port_mat = port_mats[p];
-//          for (int i = 0; i < 2; i++)
-//             for (int j = 0; j < 2; j++)
-//             {
-//                std::string dset_name = std::to_string(i) + std::to_string(j);
-//                hdf5_utils::ReadDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
-//             }
-         
-//          errf = H5Gclose(port_grp_id);
-//          assert(errf >= 0);
-//       }  // for (int p = 0; p < num_ref_ports; p++)
-
-//       errf = H5Gclose(grp_id);
-//       assert(errf >= 0);
-//    }
-
-//    errf = H5Fclose(file_id);
-//    assert(errf >= 0);
-
-//    return;
-// }
-
-// void PoissonSolver::AssembleROM()
-// {
-//    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-//    const TrainMode train_mode = rom_handler->GetTrainMode();
-//    assert(train_mode == UNIVERSAL);
-
-//    const Array<int> rom_block_offsets = rom_handler->GetBlockOffsets();
-//    SparseMatrix *romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
-
-//    // component domain matrix.
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       int c_type = topol_handler->GetMeshType(m);
-//       int num_basis = rom_handler->GetNumBasis(c_type);
-
-//       Array<int> vdofs(num_basis);
-//       for (int k = rom_block_offsets[m]; k < rom_block_offsets[m+1]; k++)
-//          vdofs[k - rom_block_offsets[m]] = k;
-
-//       romMat->AddSubMatrix(vdofs, vdofs, *(comp_mats[c_type]));
-
-//       // boundary matrixes of each component.
-//       Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
-//       Array<DenseMatrix *> *bdr_mat = bdr_mats[c_type];
-
-//       for (int b = 0; b < bdr_c2g->Size(); b++)
-//       {
-//          int is_global = global_bdr_attributes.Find((*bdr_c2g)[b]);
-//          if (is_global < 0) continue;
-
-//          romMat->AddSubMatrix(vdofs, vdofs, *(*bdr_mat)[b]);
-//       }
-//    }
-
-//    // interface matrixes.
-//    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-//    {
-//       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
-//       const int p_type = topol_handler->GetPortType(p);
-//       Array2D<DenseMatrix *> *port_mat = port_mats[p_type];
-
-//       const int m1 = pInfo->Mesh1;
-//       const int m2 = pInfo->Mesh2;
-//       const int c1 = topol_handler->GetMeshType(m1);
-//       const int c2 = topol_handler->GetMeshType(m2);
-//       const int num_basis1 = rom_handler->GetNumBasis(c1);
-//       const int num_basis2 = rom_handler->GetNumBasis(c2);
-
-//       Array<int> vdofs1(num_basis1), vdofs2(num_basis2);
-//       for (int k = rom_block_offsets[m1]; k < rom_block_offsets[m1+1]; k++)
-//          vdofs1[k - rom_block_offsets[m1]] = k;
-//       for (int k = rom_block_offsets[m2]; k < rom_block_offsets[m2+1]; k++)
-//          vdofs2[k - rom_block_offsets[m2]] = k;
-//       Array<Array<int> *> vdofs(2);
-//       vdofs[0] = &vdofs1;
-//       vdofs[1] = &vdofs2;
-
-//       for (int i = 0; i < 2; i++)
-//          for (int j = 0; j < 2; j++)
-//             romMat->AddSubMatrix(*vdofs[i], *vdofs[j], *((*port_mat)(i, j)));
-//    }
-
-//    romMat->Finalize();
-//    rom_handler->LoadOperator(romMat);
-// }
+void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_mats.Size() == num_comp);
+   assert(fes_comp.Size() == num_comp * num_var);
+
+   assert(nu_coeff);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      const int fidx = c * num_var;
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+
+      BilinearForm m_comp(fes_comp[fidx]);
+      MixedBilinearFormDGExtension b_comp(fes_comp[fidx], fes_comp[fidx+1]);
+
+      m_comp.AddDomainIntegrator(new VectorDiffusionIntegrator(*nu_coeff));
+      if (full_dg)
+         m_comp.AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+
+      b_comp.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+      if (full_dg)
+         b_comp.AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+
+      m_comp.Assemble();
+      b_comp.Assemble();
+      m_comp.Finalize();      
+      b_comp.Finalize();
+
+      SparseMatrix *m_mat = &(m_comp.SpMat());
+      SparseMatrix *b_mat = &(b_comp.SpMat());
+      SparseMatrix *bt_mat = Transpose(*b_mat);
+
+      Array<int> dummy1, dummy2;
+      BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
+
+      rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp, comp_mats[c]);
+
+      delete bt_mat, sys_comp;
+   }
+}
+
+void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(bdr_mats.Size() == num_comp);
+   assert(fes_comp.Size() == num_comp * num_var);
+
+   assert(nu_coeff);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      const int fidx = c * num_var;
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
+      Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
+
+      for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+      {
+         Array<int> bdr_marker(comp->bdr_attributes.Max());
+         bdr_marker = 0;
+         bdr_marker[comp->bdr_attributes[b] - 1] = 1;
+
+         BilinearForm m_comp(fes_comp[fidx]);
+         MixedBilinearFormDGExtension b_comp(fes_comp[fidx], fes_comp[fidx+1]);
+
+         m_comp.AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), bdr_marker);
+         b_comp.AddBdrFaceIntegrator(new DGNormalFluxIntegrator, bdr_marker);
+
+         m_comp.Assemble();
+         b_comp.Assemble();
+         m_comp.Finalize();      
+         b_comp.Finalize();
+
+         SparseMatrix *m_mat = &(m_comp.SpMat());
+         SparseMatrix *b_mat = &(b_comp.SpMat());
+         SparseMatrix *bt_mat = Transpose(*b_mat);
+
+         Array<int> dummy1, dummy2;
+         BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
+
+         rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp, (*bdr_mats_c)[b]);
+
+         delete bt_mat, sys_comp;
+      }
+   }
+}
+
+void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   const TrainMode train_mode = rom_handler->GetTrainMode();
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(fes_comp.Size() == num_comp * num_var);
+
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+   assert(port_mats.Size() == num_ref_ports);
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      assert(port_mats[p]->NumRows() == 2);
+      assert(port_mats[p]->NumCols() == 2);
+
+      int c1, c2;
+      topol_handler->GetComponentPair(p, c1, c2);
+      Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+      Mesh *comp2 = topol_handler->GetComponentMesh(c2);
+
+      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+      // Need to use two copied instances.
+      Mesh mesh1(*comp1);
+      Mesh mesh2(*comp2);
+
+      Array<int> c_idx(2), f_idx(2);
+      c_idx[0] = c1; c_idx[1] = c2;
+      f_idx[0] = c1 * num_var;
+      f_idx[1] = c2 * num_var;
+
+      Array2D<SparseMatrix *> m_mats_p(2,2), b_mats_p(2,2), bt_mats_p(2,2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            m_mats_p(i, j) = new SparseMatrix(fes_comp[f_idx[i]]->GetTrueVSize(), fes_comp[f_idx[j]]->GetTrueVSize());
+            b_mats_p(i, j) = new SparseMatrix(fes_comp[f_idx[i]+1]->GetTrueVSize(), fes_comp[f_idx[j]]->GetTrueVSize());
+         }
+
+      Array<InterfaceInfo>* const if_infos = topol_handler->GetRefInterfaceInfos(p);
+
+      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+      // Need to use two copied instances.
+      AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[f_idx[0]], fes_comp[f_idx[1]],
+                              vec_diff, if_infos, m_mats_p);
+      AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[f_idx[0]], fes_comp[f_idx[1]],
+                              fes_comp[f_idx[0]+1], fes_comp[f_idx[1]+1],
+                              norm_flux, if_infos, b_mats_p);
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            m_mats_p(i, j)->Finalize();
+            b_mats_p(i, j)->Finalize();
+            // NOTE: the index also should be transposed.
+            bt_mats_p(j, i) = Transpose(*b_mats_p(i, j));
+         }
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            Array<int> dummy1, dummy2;
+            BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
+                                                   dummy1, dummy2);
+            rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat, (*port_mats[p])(i, j));
+            delete tmp_mat;
+         }
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            delete m_mats_p(i, j), b_mats_p(i, j), bt_mats_p(i, j);
+   }  // for (int p = 0; p < num_ref_ports; p++)
+}
 
 void StokesSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    BlockVector urhs(u_offsets), prhs(p_offsets);
@@ -903,10 +712,11 @@ void StokesSolver::Solve()
    printf("Set up pressure RHS\n");
 
    SchurOperator schur(M, B);
-   CGSolver solver2;
+   MINRESSolver solver2;
    solver2.SetOperator(schur);
    solver2.SetPrintLevel(print_level);
-   solver2.SetAbsTol(rtol);
+   solver2.SetAbsTol(atol);
+   solver2.SetRelTol(rtol);
    solver2.SetMaxIter(maxIter);
 
    OrthoSolver ortho;
@@ -922,8 +732,8 @@ void StokesSolver::Solve()
    if (pres_dbc)
    {
       solver2.Mult(R2, pvec);
-      if (!solver2.GetConverged())
-         mfem_error("Pressure Solver fails to converge!\n");
+      // if (!solver2.GetConverged())
+      //    mfem_error("Pressure Solver fails to converge!\n");
    }
    else
       ortho.Mult(R2, pvec);
@@ -947,85 +757,31 @@ void StokesSolver::Solve()
    SetVariableVector(1, pvec, *U);
 }
 
-void StokesSolver::InitIndividualParaview(const std::string& file_prefix)
+void StokesSolver::ProjectOperatorOnReducedBasis()
 {
-   paraviewColls.SetSize(numSub);
+   Array2D<Operator *> tmp(numSub, numSub);
+   Array2D<SparseMatrix *> bt_mats(numSub, numSub);
+   // NOTE: BlockMatrix offsets are indeed used for its Mult() in ProjectOperatorOnReducedBasis below.
+   // Offsets should be stored for multi-component case, until ProjectOperatorOnReducedBasis is done.
+   Array2D<Array<int> *> ioffsets(numSub, numSub), joffsets(numSub, numSub);
+   for (int i = 0; i < tmp.NumRows(); i++)
+      for (int j = 0; j < tmp.NumCols(); j++)
+      {
+         // NOTE: the index also should be transposed.
+         bt_mats(i, j) = Transpose(*b_mats(j, i));
 
-   for (int m = 0; m < numSub; m++) {
-      ostringstream oss;
-      // Each subdomain needs to be save separately.
-      oss << file_prefix << "_" << std::to_string(m);
+         ioffsets(i, j) = new Array<int>;
+         joffsets(i, j) = new Array<int>;
+         tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j),
+                                    *(ioffsets(i,j)), *(joffsets(i,j)));
+      }
+         
+   rom_handler->ProjectOperatorOnReducedBasis(tmp);
 
-      paraviewColls[m] = new ParaViewDataCollection(oss.str().c_str(), &(*meshes[m]));
-      paraviewColls[m]->SetLevelsOfDetail(uorder);
-      paraviewColls[m]->SetHighOrderOutput(true);
-      paraviewColls[m]->SetPrecision(8);
-
-      paraviewColls[m]->RegisterField("vel", us[m]);
-      paraviewColls[m]->RegisterField("pres", ps[m]);
-      paraviewColls[m]->SetOwnData(false);
-   }
+   for (int i = 0; i < bt_mats.NumRows(); i++)
+      for (int j = 0; j < bt_mats.NumCols(); j++)
+      { delete bt_mats(i, j), tmp(i, j), ioffsets(i, j), joffsets(i, j); }
 }
-
-// void PoissonSolver::InitUnifiedParaview(const std::string& file_prefix)
-// {
-//    // grid function initialization for visual.
-//    // TODO: for vector solution.
-//    pmesh = topol_handler->GetGlobalMesh();
-//    global_fes = new FiniteElementSpace(pmesh, fec, udim);
-//    global_us_visual = new GridFunction(global_fes);
-
-//    MultiBlockSolver::InitUnifiedParaview(file_prefix);
-// }
-
-// double PoissonSolver::CompareSolution()
-// {
-//    // Copy the rom solution.
-//    BlockVector romU(domain_offsets);
-//    romU = *U;
-//    Array<GridFunction *> rom_us;
-//    Array<VectorGridFunctionCoefficient *> rom_u_coeffs;
-//    ConstantCoefficient zero(0.0);
-//    rom_us.SetSize(numSub);
-//    rom_u_coeffs.SetSize(numSub);
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       rom_us[m] = new GridFunction(fes[m], romU.GetBlock(m), 0);
-
-//       // BC's are weakly constrained and there is no essential dofs.
-//       // Does this make any difference?
-//       rom_us[m]->SetTrueVector();
-
-//       rom_u_coeffs[m] = new VectorGridFunctionCoefficient(rom_us[m]);
-//    }
-
-//    // TODO: right now we solve the full-order system to compare the solution.
-//    // Need to implement loading the fom solution file?
-//    StopWatch solveTimer;
-//    solveTimer.Start();
-//    Solve();
-//    solveTimer.Stop();
-//    printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
-
-//    // Compare the solution.
-//    double norm = 0.0;
-//    double error = 0.0;
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       norm += us[m]->ComputeLpError(2, zero);
-//       error += us[m]->ComputeLpError(2, *rom_u_coeffs[m]);
-//    }
-//    error /= norm;
-//    printf("Relative error: %.5E\n", error);
-
-//    for (int m = 0; m < numSub; m++)
-//    {
-//       delete rom_us[m];
-//       delete rom_u_coeffs[m];
-//    }
-
-//    return error;
-// }
 
 void StokesSolver::SanityCheckOnCoeffs()
 {
@@ -1055,6 +811,8 @@ void StokesSolver::SanityCheckOnCoeffs()
 
 void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   nu = function_factory::stokes_problem::nu;
+
    // clean up rhs for parametrized problem.
    if (f_coeffs.Size() > 0)
    {
@@ -1090,4 +848,37 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->vector_rhs_ptr));
    else
       AddRHSFunction(zero);
+}
+
+BlockMatrix* StokesSolver::FormBlockMatrix(
+   SparseMatrix* const m, SparseMatrix* const b, SparseMatrix* const bt,
+   Array<int> &row_offsets, Array<int> &col_offsets)
+{
+   assert(m && b && bt);
+
+   const int row1 = m->NumRows();
+   const int row2 = b->NumRows();
+   const int col1 = m->NumCols();
+   const int col2 = bt->NumCols();
+   assert(b->NumCols() == col1);
+   assert(bt->NumRows() == row1);
+
+   row_offsets.SetSize(3);
+   row_offsets[0] = 0;
+   row_offsets[1] = row1;
+   row_offsets[2] = row2;
+   row_offsets.PartialSum();
+
+   col_offsets.SetSize(3);
+   col_offsets[0] = 0;
+   col_offsets[1] = col1;
+   col_offsets[2] = col2;
+   col_offsets.PartialSum();
+
+   BlockMatrix *sys_comp = new BlockMatrix(row_offsets, col_offsets);
+   sys_comp->SetBlock(0, 0, m);
+   sys_comp->SetBlock(1, 0, b);
+   sys_comp->SetBlock(0, 1, bt);
+
+   return sys_comp;
 }

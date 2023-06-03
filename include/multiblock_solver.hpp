@@ -17,6 +17,7 @@
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
+#include "hdf5_utils.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -50,14 +51,19 @@ protected:
    // Solution dimension, by default -1 (scalar).
    int udim = -1;       // vector dimension of the entire solution variable
    int num_var = -1;    // number of variables
-   Array<int> vdim;     // vector dimension of each variable   //
+   Array<int> vdim;     // vector dimension of each variable
+   std::vector<std::string> var_names;
 
    Array<int> block_offsets;  // Size(numSub * udim + 1). each block corresponds to a component of vector solution.
-   Array<int> domain_offsets; // Size(numSub + 1). each block corresponds to the vector solution.
+   Array<int> var_offsets; // Size(num_var * numSub + 1). each block corresponds to the variable of the solution in each domain.
+   Array<int> domain_offsets; // Size(numSub + 1). each block corresponds to the vector solution in each domain.
    Array<int> num_vdofs;       // Size(numSub). number of vdofs of the vector solution in each subdomain.
    BlockVector *U, *RHS;
 
-   Array<GridFunction *> us;
+   // Each Variable is separated by distinct FiniteElementSpace.
+   Array<FiniteElementCollection *> fec;  // Size(num_var);
+   Array<FiniteElementSpace *> fes;       // Size(num_var * numSub);
+   Array<GridFunction *> us;              // Size(num_var * numSub);
 
    int max_bdr_attr;
    int numBdr;
@@ -72,13 +78,20 @@ protected:
    std::string visual_dir = ".";
    std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
-   // Used only for the unified visualization.
-   FiniteElementSpace *global_fes = NULL;
-   GridFunction *global_us_visual = NULL;
+   // Used only for the unified visualization. Size(num_var).
+   Array<FiniteElementSpace *> global_fes;
+   Array<GridFunction *> global_us_visual;
 
    // rom variables.
    ROMHandler *rom_handler = NULL;
    bool use_rom = false;
+
+   // Used for bottom-up building, only with ComponentTopologyHandler.
+   // For now, assumes ROM basis represents the entire vector solution.
+   Array<DenseMatrix *> comp_mats;     // Size(num_components);
+   // boundary condition is enforced via forcing term.
+   Array<Array<DenseMatrix *> *> bdr_mats;
+   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
 
 public:
    MultiBlockSolver();
@@ -119,6 +132,7 @@ public:
    virtual void BuildRHSOperators() = 0;
    virtual void BuildDomainOperators() = 0;
    
+   virtual bool BCExistsOnBdr(const int &global_battr_idx) = 0;
    virtual void SetupBCOperators() = 0;
    virtual void SetupRHSBCOperators() = 0;
    virtual void SetupDomainBCOperators() = 0;
@@ -153,11 +167,29 @@ public:
       Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
 
    // Component-wise assembly
-   virtual void AllocateROMElements() = 0;
-   virtual void BuildROMElements() = 0;
-   virtual void SaveROMElements(const std::string &filename) = 0;
-   virtual void LoadROMElements(const std::string &filename) = 0;
-   virtual void AssembleROM() = 0;
+   void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
+   void AllocateROMElements();
+
+   void BuildROMElements();
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+
+   void SaveROMElements(const std::string &filename);
+   // Save ROM Elements in a hdf5-format file specified with file_id.
+   // TODO: add more arguments to support more general data structures of ROM Elements.
+   void SaveCompBdrROMElement(hid_t &file_id);
+   void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   void SaveInterfaceROMElement(hid_t &file_id);
+
+   void LoadROMElements(const std::string &filename);
+   // Load ROM Elements in a hdf5-format file specified with file_id.
+   // TODO: add more arguments to support more general data structures of ROM Elements.
+   void LoadCompBdrROMElement(hid_t &file_id);
+   void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   void LoadInterfaceROMElement(hid_t &file_id);
+
+   void AssembleROM();
 
    virtual void Solve() = 0;
 
@@ -167,19 +199,21 @@ public:
    virtual void SaveVisualization();
 
    void InitROMHandler();
-   void SaveSnapshot(const int &sample_index)
-   { rom_handler->SaveSnapshot(us, sample_index); }
+   virtual void SaveSnapshot(const int &sample_index);
    void FormReducedBasis(const int &total_samples)
    { rom_handler->FormReducedBasis(total_samples); }
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
-   void ProjectRHSOnReducedBasis()
-   { rom_handler->ProjectRHSOnReducedBasis(RHS); }
-   void SolveROM() { rom_handler->Solve(U); }
-   virtual double CompareSolution() = 0;
-   virtual void SaveBasisVisualization() = 0;
+   virtual void ProjectRHSOnReducedBasis();
+   virtual void SolveROM();
+   virtual void SaveBasisVisualization()
+   { rom_handler->SaveBasisVisualization(fes, var_names); }
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
+
+   void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
+   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols);
+   double CompareSolution();
 };
 
 #endif
