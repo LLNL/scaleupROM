@@ -175,7 +175,9 @@ StokesSolver *SolveWithRefinement(const int num_refinement)
 
    test->AddBCFunction(uFun_ex);
    test->AddRHSFunction(fFun);
-   test->SetComplementaryFlux();
+   Array<bool> nz_dbcs(test->GetNumBdr());
+   nz_dbcs = true;
+   test->SetComplementaryFlux(nz_dbcs);
 
    test->BuildOperators();
 

@@ -136,6 +136,34 @@ void ubdr(const Vector &x, Vector &y)
 
 }  // namespace stokes_channel
 
+namespace stokes_component
+{
+
+Vector u0, du, offsets;
+DenseMatrix k;
+
+void ubdr(const Vector &x, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   
+   for (int i = 0; i < dim; i++)
+   {
+      double kx = 0.0;
+      for (int j = 0; j < dim; j++) kx += k(j, i) * x(j);
+      kx -= offsets(i);
+      kx *= 2.0 * function_factory::pi;
+      y(i) = u0(i) + du(i) * sin(kx);
+   }
+
+   // ensure incompressibility.
+   Vector del_u(dim);
+   stokes_problem::flux(x, del_u);
+   y -= del_u;
+}
+
+}  // namespace stokes_component
+
 }  // namespace stokes_problem
 
 }  // namespace function_factory
@@ -157,7 +185,8 @@ void ParameterizedProblem::SetParams(const std::string &key, const double &value
 {
    if (!param_map.count(key))
    {
-      mfem_error("Poisson0: unknown parameter name!\n");
+      std::string msg = problem_name + ": unknown parameter name!\n";
+      mfem_error(msg.c_str());
    }
 
    (*param_ptr[param_map[key]]) = value;
@@ -208,6 +237,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "stokes_channel")
    {
       problem = new StokesChannel();
+   }
+   else if (problem_name == "stokes_component")
+   {
+      problem = new StokesComponent();
    }
    else
    {
@@ -380,4 +413,62 @@ StokesChannel::StokesChannel()
    param_ptr[0] = &(function_factory::stokes_problem::nu);
    param_ptr[1] = &(function_factory::stokes_problem::stokes_channel::L);
    param_ptr[2] = &(function_factory::stokes_problem::stokes_channel::U);
+}
+
+StokesComponent::StokesComponent()
+   : StokesProblem()
+{
+   battr.SetSize(5);
+   for (int b = 0; b < 5; b++)
+      battr[b] = b+1;
+   bdr_type.SetSize(5);
+   bdr_type = StokesProblem::DIRICHLET;
+   bdr_type[4] = StokesProblem::ZERO;
+
+   // pointer to static function.
+   vector_bdr_ptr.SetSize(5);
+   vector_rhs_ptr = NULL;
+   vector_bdr_ptr = &(function_factory::stokes_problem::stokes_component::ubdr);
+
+   param_num = 1 + 3 * 3 + 3 * 3;
+   function_factory::stokes_problem::stokes_component::u0.SetSize(3);
+   function_factory::stokes_problem::stokes_component::du.SetSize(3);
+   function_factory::stokes_problem::stokes_component::offsets.SetSize(3);
+   function_factory::stokes_problem::stokes_component::k.SetSize(3);
+
+   // Default values.
+   function_factory::stokes_problem::nu = 1.0;
+   function_factory::stokes_problem::stokes_component::u0 = 0.0;
+   function_factory::stokes_problem::stokes_component::du = 1.0;
+   function_factory::stokes_problem::stokes_component::offsets = 0.0;
+   function_factory::stokes_problem::stokes_component::k = 1.0;
+
+   std::vector<std::string> xc(3), uc(3);
+   xc[0] = "_x";
+   xc[1] = "_y";
+   xc[2] = "_z";
+   uc[0] = "_u";
+   uc[1] = "_v";
+   uc[2] = "_w";
+
+   param_map["nu"] = 0;
+   for (int i = 0; i < 3; i++)
+   {
+      param_map[std::string("u0") + xc[i]] = i + 1;
+      param_map[std::string("du") + xc[i]] = i + 4;
+      param_map[std::string("offsets") + xc[i]] = i + 7;
+      for (int j = 0; j < 3; j++)
+         param_map[std::string("k") + uc[i] + xc[j]] = 10 + 3*i + j;
+   }
+
+   param_ptr.SetSize(param_num);
+   param_ptr[0] = &(function_factory::stokes_problem::nu);
+   for (int i = 0; i < 3; i++)
+   {
+      param_ptr[1+i] = &(function_factory::stokes_problem::stokes_component::u0[i]);
+      param_ptr[4+i] = &(function_factory::stokes_problem::stokes_component::du[i]);
+      param_ptr[7+i] = &(function_factory::stokes_problem::stokes_component::offsets[i]);
+      for (int j = 0; j < 3; j++)
+         param_ptr[10 + 3*i + j] = &(function_factory::stokes_problem::stokes_component::k(j,i));
+   }
 }

@@ -169,7 +169,7 @@ public:
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
 
    // to ensure incompressibility for the problems with all velocity dirichlet bc.
-   void SetComplementaryFlux();
+   void SetComplementaryFlux(const Array<bool> nz_dbcs);
 
 private:
    // NOTE: Block Matrix does not own the offsets,

@@ -67,6 +67,13 @@ namespace stokes_channel
    void ubdr(const Vector &x, Vector &y);
 }
 
+namespace stokes_component
+{
+   extern Vector u0, du, offsets;
+   extern DenseMatrix k;
+   void ubdr(const Vector &x, Vector &y);
+}
+
 }
 
 }
@@ -174,6 +181,12 @@ class StokesChannel : public StokesProblem
 public:
    StokesChannel();
    virtual ~StokesChannel() {};
+};
+
+class StokesComponent : public StokesProblem
+{
+public:
+   StokesComponent();
 };
 
 ParameterizedProblem* InitParameterizedProblem();

@@ -850,7 +850,23 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(zero);
 
    // Ensure incompressibility.
-   if (!pres_dbc) SetComplementaryFlux();
+   function_factory::stokes_problem::del_u = 0.0;
+   if (!pres_dbc)
+   {
+      Array<bool> nz_dbcs(numBdr);
+      nz_dbcs = true;
+      for (int b = 0; b < problem->battr.Size(); b++)
+      {
+         if (problem->bdr_type[b] == StokesProblem::BoundaryType::ZERO)
+         {
+            if (problem->battr[b] == -1)
+            { nz_dbcs = false; break; }
+            else
+               nz_dbcs[b] = false;
+         }
+      }
+      SetComplementaryFlux(nz_dbcs);
+   }
 }
 
 BlockMatrix* StokesSolver::FormBlockMatrix(
@@ -886,9 +902,10 @@ BlockMatrix* StokesSolver::FormBlockMatrix(
    return sys_comp;
 }
 
-void StokesSolver::SetComplementaryFlux()
+void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
 {
    // This routine makes sense only for all velocity dirichlet bc.
+   assert(nz_dbcs.Size() == numBdr);
    assert(ud_coeffs.Size() == numBdr);
    for (int k = 0; k < numBdr; k++) assert(ud_coeffs[k]);
 
@@ -924,10 +941,13 @@ void StokesSolver::SetComplementaryFlux()
          const int global_idx = global_bdr_attributes.Find(bdr_attr);
          if (global_idx < 0) { continue; }
 
-         eltrans = ufesm -> GetBdrElementTransformation (i);
-         area += ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, one);
-         ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, dir_coeff, dx1);
-         x1 += dx1;
+         if (nz_dbcs[global_idx])
+         {
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            area += ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, one);
+            ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, dir_coeff, dx1);
+            x1 += dx1;
+         }
       }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
    }  // for (int m = 0; m < numSub; m++)
    x1 /= area;
@@ -948,10 +968,13 @@ void StokesSolver::SetComplementaryFlux()
          const int global_idx = global_bdr_attributes.Find(bdr_attr);
          if (global_idx < 0) { continue; }
 
-         ud = ud_coeffs[global_idx];
-         eltrans = ufesm -> GetBdrElementTransformation (i);
-         bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
-         dirflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, dir_coeff);
+         if (nz_dbcs[global_idx])
+         {
+            ud = ud_coeffs[global_idx];
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+            dirflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, dir_coeff);
+         }
       }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
    }  // for (int m = 0; m < numSub; m++)
 
@@ -972,9 +995,12 @@ void StokesSolver::SetComplementaryFlux()
          const int global_idx = global_bdr_attributes.Find(bdr_attr);
          if (global_idx < 0) { continue; }
 
-         ud = ud_coeffs[global_idx];
-         eltrans = ufesm -> GetBdrElementTransformation (i);
-         bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+         if (nz_dbcs[global_idx])
+         {
+            ud = ud_coeffs[global_idx];
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+         }
       }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
    }  // for (int m = 0; m < numSub; m++)
    if (abs(bflux) > threshold)
