@@ -55,6 +55,11 @@ namespace stokes_problem
 {
 
 extern double nu;
+extern double del_u;  // complementary flux to ensure incompressibility.
+extern Vector x0;
+
+void dir(const Vector &x, Vector &y);
+void flux(const Vector &x, Vector &y);
 
 namespace stokes_channel
 {

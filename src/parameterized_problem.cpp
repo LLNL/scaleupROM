@@ -100,6 +100,24 @@ namespace stokes_problem
 {
 
 double nu;
+double del_u;
+Vector x0;
+
+void dir(const Vector &x, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   y = x;
+
+   assert(x0.Size() == dim);
+   y -= x0;
+}
+
+void flux(const Vector &x, Vector &y)
+{
+   dir(x, y);
+   y *= del_u;
+}
 
 namespace stokes_channel
 {

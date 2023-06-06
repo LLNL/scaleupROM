@@ -848,6 +848,9 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->vector_rhs_ptr));
    else
       AddRHSFunction(zero);
+
+   // Ensure incompressibility.
+   if (!pres_dbc) SetComplementaryFlux();
 }
 
 BlockMatrix* StokesSolver::FormBlockMatrix(
@@ -881,4 +884,188 @@ BlockMatrix* StokesSolver::FormBlockMatrix(
    sys_comp->SetBlock(0, 1, bt);
 
    return sys_comp;
+}
+
+void StokesSolver::SetComplementaryFlux()
+{
+   // This routine makes sense only for all velocity dirichlet bc.
+   assert(ud_coeffs.Size() == numBdr);
+   for (int k = 0; k < numBdr; k++) assert(ud_coeffs[k]);
+
+   FiniteElementSpace *ufesm = NULL;
+   ElementTransformation *eltrans = NULL;
+   VectorCoefficient *ud = NULL;
+   Mesh *mesh = NULL;
+
+   // initializing complementary flux.
+   function_factory::stokes_problem::del_u = 0.0;
+
+   // NOTE: corresponding ParameterizedProblem should use
+   // function_factory::stokes_problem::flux
+   // to actually enforce the incompressibility.
+   Vector *x0 = &(function_factory::stokes_problem::x0);
+   x0->SetSize(dim);
+   (*x0) = 0.0;
+   VectorFunctionCoefficient dir_coeff(dim, function_factory::stokes_problem::dir);
+
+   // Determine the center of domain first.
+   Vector x1(dim), dx1(dim);
+   x1 = 0.0; dx1 = 0.0;
+   double area = 0.0;
+   ConstantCoefficient one(1.0);
+   for (int m = 0; m < numSub; m++)
+   {
+      mesh = meshes[m];
+      ufesm = ufes[m];
+
+      for (int i = 0; i < ufesm -> GetNBE(); i++)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(i);
+         const int global_idx = global_bdr_attributes.Find(bdr_attr);
+         if (global_idx < 0) { continue; }
+
+         eltrans = ufesm -> GetBdrElementTransformation (i);
+         area += ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, one);
+         ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, dir_coeff, dx1);
+         x1 += dx1;
+      }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+   }  // for (int m = 0; m < numSub; m++)
+   x1 /= area;
+
+   // set the center of domain for direction function.
+   (*x0) = x1;
+
+   // Evaluate boundary flux \int u_d \dot n dA.
+   double bflux = 0.0, dirflux = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      mesh = meshes[m];
+      ufesm = ufes[m];
+
+      for (int i = 0; i < ufesm -> GetNBE(); i++)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(i);
+         const int global_idx = global_bdr_attributes.Find(bdr_attr);
+         if (global_idx < 0) { continue; }
+
+         ud = ud_coeffs[global_idx];
+         eltrans = ufesm -> GetBdrElementTransformation (i);
+         bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+         dirflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, dir_coeff);
+      }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+   }  // for (int m = 0; m < numSub; m++)
+
+   // Set the flux to ensure incompressibility.
+   function_factory::stokes_problem::del_u = bflux / dirflux;
+
+   // Make sure the resulting flux is zero.
+   double threshold = 1.0e-12;
+   bflux = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      mesh = meshes[m];
+      ufesm = ufes[m];
+
+      for (int i = 0; i < ufesm -> GetNBE(); i++)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(i);
+         const int global_idx = global_bdr_attributes.Find(bdr_attr);
+         if (global_idx < 0) { continue; }
+
+         ud = ud_coeffs[global_idx];
+         eltrans = ufesm -> GetBdrElementTransformation (i);
+         bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+      }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+   }  // for (int m = 0; m < numSub; m++)
+   if (abs(bflux) > threshold)
+   {
+      printf("boundary flux: %.5E\n", bflux);
+      mfem_error("Current boundary setup cannot ensure incompressibility!\nMake sure BC uses function_factory::stokes_problem::flux.\n");
+   }
+   
+}
+
+double StokesSolver::ComputeBEFlux(
+   const FiniteElement &el, ElementTransformation &Tr,
+   VectorCoefficient &ud)
+{
+   // TODO: support full-dg capability.
+   if (full_dg)
+      mfem_error("StokesSolver::SetComplementaryFlux does not support full dg discretization yet!\n");
+
+   double bflux = 0.0;
+   Vector nor(dim), udvec(dim);
+
+   // int intorder = oa * el.GetOrder() + ob;  // <----------
+   int intorder = 2 * el.GetOrder();  // <----------
+   const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Tr.SetIntPoint(&ip);
+      if (dim > 1)
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+      else
+      {
+         nor[0] = 1.0;
+      }
+      ud.Eval(udvec, Tr, ip);
+
+      bflux += ip.weight * (udvec*nor);
+   }
+
+   return bflux;
+}
+
+double StokesSolver::ComputeBEIntegral(
+   const FiniteElement &el, ElementTransformation &Tr, Coefficient &Q)
+{
+   // TODO: support full-dg capability.
+   if (full_dg)
+      mfem_error("StokesSolver::SetComplementaryFlux does not support full dg discretization yet!\n");
+
+   double result = 0.0;
+
+   int intorder = 2*el.GetOrder();
+   const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      
+      Tr.SetIntPoint (&ip);
+      result += Q.Eval(Tr, ip) * Tr.Weight() * ip.weight;
+   }
+
+   return result;
+}
+
+void StokesSolver::ComputeBEIntegral(
+   const FiniteElement &el, ElementTransformation &Tr,
+   VectorCoefficient &Q, Vector &result)
+{
+   // TODO: support full-dg capability.
+   if (full_dg)
+      mfem_error("StokesSolver::SetComplementaryFlux does not support full dg discretization yet!\n");
+
+   result.SetSize(dim);
+   result = 0.0;
+   Vector Qvec(dim);
+
+   int intorder = 2*el.GetOrder();
+   const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Q.Eval(Qvec, Tr, ip);
+      Tr.SetIntPoint (&ip);
+      Qvec *= Tr.Weight() * ip.weight;
+      result += Qvec;
+   }
 }

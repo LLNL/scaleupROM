@@ -175,6 +175,7 @@ StokesSolver *SolveWithRefinement(const int num_refinement)
 
    test->AddBCFunction(uFun_ex);
    test->AddRHSFunction(fFun);
+   test->SetComplementaryFlux();
 
    test->BuildOperators();
 
