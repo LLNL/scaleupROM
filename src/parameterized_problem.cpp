@@ -390,8 +390,8 @@ StokesChannel::StokesChannel()
    battr[2] = 4;
    battr[3] = 5;
    bdr_type.SetSize(4);
-   bdr_type = StokesProblem::DIRICHLET;
-   bdr_type[3] = StokesProblem::ZERO;
+   bdr_type = StokesProblem::ZERO;
+   bdr_type[2] = StokesProblem::DIRICHLET;
 
    // pointer to static function.
    vector_bdr_ptr.SetSize(4);
