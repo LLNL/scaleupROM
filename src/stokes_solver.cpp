@@ -688,11 +688,30 @@ void StokesSolver::Solve()
 //    PrintVector(prhs, "stokes.prhs.txt");
 // }
 
+   HypreParMatrix *Mop = NULL;
+   HypreBoomerAMG *amg_prec = NULL;
+
+   // TODO: need to change when the actual parallelization is implemented.
+   HYPRE_BigInt glob_size = M->NumRows();
+   HYPRE_BigInt row_starts[2] = {0, M->NumRows()};
+   if (use_amg)
+   {
+      Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
+      amg_prec = new HypreBoomerAMG(*Mop);
+      amg_prec->SetPrintLevel(print_level);
+   }
+
    CGSolver solver;
    solver.SetAbsTol(atol);
    solver.SetRelTol(rtol);
    solver.SetMaxIter(maxIter);
-   solver.SetOperator(*M);
+   if (use_amg)
+   {
+      solver.SetOperator(*Mop);
+      solver.SetPreconditioner(*amg_prec);
+   }
+   else
+      solver.SetOperator(*M);
    solver.SetPrintLevel(print_level);
    solver.Mult(urhs, R1);
    if (!solver.GetConverged())
@@ -711,9 +730,13 @@ void StokesSolver::Solve()
 
    printf("Set up pressure RHS\n");
 
-   SchurOperator schur(M, B);
+   SchurOperator *schur;
+   if (use_amg)
+      schur = new SchurOperator(Mop, B);
+   else
+      schur = new SchurOperator(M, B);
    MINRESSolver solver2;
-   solver2.SetOperator(schur);
+   solver2.SetOperator(*schur);
    solver2.SetPrintLevel(print_level);
    solver2.SetAbsTol(atol);
    solver2.SetRelTol(rtol);
@@ -723,7 +746,7 @@ void StokesSolver::Solve()
    if (!pres_dbc)
    {
       ortho.SetSolver(solver2);
-      ortho.SetOperator(schur);
+      ortho.SetOperator(*schur);
       printf("OrthoSolver Set up.\n");
    }
 
@@ -755,6 +778,10 @@ void StokesSolver::Solve()
    // Copy back to global vector.
    SetVariableVector(0, uvec, *U);
    SetVariableVector(1, pvec, *U);
+
+   delete schur;
+   if (use_amg)
+      delete Mop, amg_prec;
 }
 
 void StokesSolver::ProjectOperatorOnReducedBasis()

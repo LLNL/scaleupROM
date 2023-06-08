@@ -25,6 +25,7 @@ class SchurOperator : public Operator
 protected:
    Operator *A, *B;//, *Bt;
    CGSolver *solver = NULL;
+   HypreBoomerAMG *amg_prec = NULL;
 
    int maxIter = -1;
    double rtol = -1.0;
@@ -42,11 +43,29 @@ public:
       solver->SetMaxIter(maxIter);
       solver->SetOperator(*A);
       solver->SetPrintLevel(0);
-   };
+   }
+
+   SchurOperator(HypreParMatrix* const A_, Operator* const B_,
+                  const int &max_iter_ = 10000, const double rtol_ = 1.0e-15, const double atol_ = 1.0e-15)
+      : Operator(B_->Height()), A(A_), B(B_),
+        maxIter(max_iter_), rtol(rtol_), atol(atol_)
+   {
+      solver = new CGSolver();
+      solver->SetRelTol(rtol);
+      solver->SetAbsTol(atol);
+      solver->SetMaxIter(maxIter);
+      solver->SetOperator(*A);
+      solver->SetPrintLevel(0);
+      
+      amg_prec = new HypreBoomerAMG(*A_);
+      amg_prec->SetPrintLevel(0);
+      solver->SetPreconditioner(*amg_prec);
+   }
 
    virtual ~SchurOperator()
    {
       delete solver;
+      delete amg_prec;
    }
    
    virtual void Mult(const Vector &x, Vector &y) const
