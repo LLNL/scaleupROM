@@ -32,8 +32,9 @@ sample_generation:
   component_sampling: false
   file_path:
     prefix: "stokes_channel"
-  stokes_channel:
-    - parameter_name: nu
+  parameters:
+    - key: single_run/stokes_channel/nu
+      type: double
       sample_size: 3
       minimum: 2.0
       maximum: 3.0

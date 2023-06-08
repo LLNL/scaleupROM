@@ -13,6 +13,7 @@
 #define SAMPLE_GENERATOR_HPP
 
 #include "mfem.hpp"
+#include "parameter.hpp"
 #include "parameterized_problem.hpp"
 
 using namespace mfem;
@@ -39,6 +40,7 @@ protected:
    // TODO: a way to incorporate all datatypes?
    // TODO: support other datatypes such as integer?
    // Array<Array<int> *> integer_paramspace;
+   Array<Parameter *> params;
    Array<Vector *> double_paramspace;
 
    // file path

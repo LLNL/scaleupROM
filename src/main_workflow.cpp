@@ -91,6 +91,7 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* proble
 
 void GenerateSamples(MPI_Comm comm)
 {
+   YAML::Node dict0 = YAML::Clone(config.dict_);
    ParameterizedProblem *problem = InitParameterizedProblem();
    SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
    sample_generator->GenerateParamSpace();
@@ -100,11 +101,13 @@ void GenerateSamples(MPI_Comm comm)
    {
       if (!sample_generator->IsMyJob(s)) continue;
 
+      sample_generator->SetSampleParams(s);
+
       test = InitSolver();
       if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
-      sample_generator->SetSampleParams(s);
+      problem->SetSingleRun();
       test->SetParameterizedProblem(problem);
 
       int file_idx = s + sample_generator->GetFileOffset();
@@ -123,6 +126,7 @@ void GenerateSamples(MPI_Comm comm)
 
    delete sample_generator;
    delete problem;
+   config.dict_ = dict0;
 }
 
 void BuildROM(MPI_Comm comm)

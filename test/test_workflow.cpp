@@ -40,7 +40,7 @@ TEST(Poisson_Workflow, BaseUniversalTest)
    config = InputParser("inputs/test.base.yml");
 
    config.dict_["single_run"]["poisson0"]["k"] = 2.0;
-   config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
    num_basis = 4;
@@ -97,7 +97,7 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
    config.dict_["single_run"]["poisson0"]["k"] = 2.0;
-   config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
    num_basis = 4;
@@ -133,7 +133,6 @@ TEST(Poisson_Workflow, ComponentWiseTest)
    printf("\nBuild ROM \n\n");
 
    config.dict_["mesh"]["type"] = "component-wise";
-   // config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 4;
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
@@ -172,7 +171,7 @@ TEST(Stokes_Workflow, BaseUniversalTest)
    config = InputParser("inputs/stokes.base.yml");
 
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["stokes_channel"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
    num_basis = 4;
@@ -229,7 +228,7 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["stokes_channel"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
    num_basis = 4;

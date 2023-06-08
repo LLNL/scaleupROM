@@ -55,8 +55,9 @@ sample_generation:
   component_sampling: false
   file_path:
     prefix: "poisson0"
-  poisson0:
-    - parameter_name: k
+  parameters:
+    - key: single_run/poisson0/k
+      type: double
       sample_size: 1
       minimum: 2.5
       maximum: 2.5

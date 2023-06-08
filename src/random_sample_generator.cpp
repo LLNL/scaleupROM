@@ -20,8 +20,12 @@ using namespace std;
 
 void RandomSampleGenerator::SetParamSpaceSizes()
 {
-   total_samples = config.GetRequiredOption<int>("sample_generation/random_sample_generator/number_of_samples");
    assert(num_sampling_params > 0);
+   assert(params.Size() == num_sampling_params);
+
+   total_samples = config.GetRequiredOption<int>("sample_generation/random_sample_generator/number_of_samples");
+   for (int p = 0; p < params.Size(); p++)
+      params[p]->SetSize(total_samples);
 
    // For random sample generator, all parameter have total_samples.
    sampling_sizes.SetSize(num_sampling_params);
@@ -99,10 +103,13 @@ const Array<int> RandomSampleGenerator::GetSampleIndex(const int &index)
 
 void RandomSampleGenerator::SetSampleParams(const int &index)
 {
+   assert(params.Size() == num_sampling_params);
    problem->local_sample_index = index;
 
-   Vector params(num_sampling_params);
+   // Vector params(num_sampling_params);
+   // for (int p = 0; p < num_sampling_params; p++)
+   //    params(p) = (*double_paramspace[p])[index];
+   // problem->SetParams(sample2problem, params);
    for (int p = 0; p < num_sampling_params; p++)
-      params(p) = (*double_paramspace[p])[index];
-   problem->SetParams(sample2problem, params);
+      params[p]->SetRandomParam(config);
 }
