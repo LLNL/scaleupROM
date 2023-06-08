@@ -688,11 +688,30 @@ void StokesSolver::Solve()
 //    PrintVector(prhs, "stokes.prhs.txt");
 // }
 
+   HypreParMatrix *Mop = NULL;
+   HypreBoomerAMG *amg_prec = NULL;
+
+   // TODO: need to change when the actual parallelization is implemented.
+   HYPRE_BigInt glob_size = M->NumRows();
+   HYPRE_BigInt row_starts[2] = {0, M->NumRows()};
+   if (use_amg)
+   {
+      Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
+      amg_prec = new HypreBoomerAMG(*Mop);
+      amg_prec->SetPrintLevel(print_level);
+   }
+
    CGSolver solver;
    solver.SetAbsTol(atol);
    solver.SetRelTol(rtol);
    solver.SetMaxIter(maxIter);
-   solver.SetOperator(*M);
+   if (use_amg)
+   {
+      solver.SetOperator(*Mop);
+      solver.SetPreconditioner(*amg_prec);
+   }
+   else
+      solver.SetOperator(*M);
    solver.SetPrintLevel(print_level);
    solver.Mult(urhs, R1);
    if (!solver.GetConverged())
@@ -711,9 +730,13 @@ void StokesSolver::Solve()
 
    printf("Set up pressure RHS\n");
 
-   SchurOperator schur(M, B);
+   SchurOperator *schur;
+   if (use_amg)
+      schur = new SchurOperator(Mop, B);
+   else
+      schur = new SchurOperator(M, B);
    MINRESSolver solver2;
-   solver2.SetOperator(schur);
+   solver2.SetOperator(*schur);
    solver2.SetPrintLevel(print_level);
    solver2.SetAbsTol(atol);
    solver2.SetRelTol(rtol);
@@ -723,7 +746,7 @@ void StokesSolver::Solve()
    if (!pres_dbc)
    {
       ortho.SetSolver(solver2);
-      ortho.SetOperator(schur);
+      ortho.SetOperator(*schur);
       printf("OrthoSolver Set up.\n");
    }
 
@@ -755,6 +778,10 @@ void StokesSolver::Solve()
    // Copy back to global vector.
    SetVariableVector(0, uvec, *U);
    SetVariableVector(1, pvec, *U);
+
+   delete schur;
+   if (use_amg)
+      delete Mop, amg_prec;
 }
 
 void StokesSolver::ProjectOperatorOnReducedBasis()
@@ -848,6 +875,25 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->vector_rhs_ptr));
    else
       AddRHSFunction(zero);
+
+   // Ensure incompressibility.
+   function_factory::stokes_problem::del_u = 0.0;
+   if (!pres_dbc)
+   {
+      Array<bool> nz_dbcs(numBdr);
+      nz_dbcs = true;
+      for (int b = 0; b < problem->battr.Size(); b++)
+      {
+         if (problem->bdr_type[b] == StokesProblem::BoundaryType::ZERO)
+         {
+            if (problem->battr[b] == -1)
+            { nz_dbcs = false; break; }
+            else
+               nz_dbcs[b] = false;
+         }
+      }
+      SetComplementaryFlux(nz_dbcs);
+   }
 }
 
 BlockMatrix* StokesSolver::FormBlockMatrix(
@@ -881,4 +927,198 @@ BlockMatrix* StokesSolver::FormBlockMatrix(
    sys_comp->SetBlock(0, 1, bt);
 
    return sys_comp;
+}
+
+void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
+{
+   // This routine makes sense only for all velocity dirichlet bc.
+   assert(nz_dbcs.Size() == numBdr);
+   assert(ud_coeffs.Size() == numBdr);
+   for (int k = 0; k < numBdr; k++) assert(ud_coeffs[k]);
+
+   FiniteElementSpace *ufesm = NULL;
+   ElementTransformation *eltrans = NULL;
+   VectorCoefficient *ud = NULL;
+   Mesh *mesh = NULL;
+
+   // initializing complementary flux.
+   function_factory::stokes_problem::del_u = 0.0;
+
+   // NOTE: corresponding ParameterizedProblem should use
+   // function_factory::stokes_problem::flux
+   // to actually enforce the incompressibility.
+   Vector *x0 = &(function_factory::stokes_problem::x0);
+   x0->SetSize(dim);
+   (*x0) = 0.0;
+   VectorFunctionCoefficient dir_coeff(dim, function_factory::stokes_problem::dir);
+
+   // Determine the center of domain first.
+   Vector x1(dim), dx1(dim);
+   x1 = 0.0; dx1 = 0.0;
+   double area = 0.0;
+   ConstantCoefficient one(1.0);
+   for (int m = 0; m < numSub; m++)
+   {
+      mesh = meshes[m];
+      ufesm = ufes[m];
+
+      for (int i = 0; i < ufesm -> GetNBE(); i++)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(i);
+         const int global_idx = global_bdr_attributes.Find(bdr_attr);
+         if (global_idx < 0) { continue; }
+
+         if (nz_dbcs[global_idx])
+         {
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            area += ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, one);
+            ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, dir_coeff, dx1);
+            x1 += dx1;
+         }
+      }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+   }  // for (int m = 0; m < numSub; m++)
+   x1 /= area;
+
+   // set the center of domain for direction function.
+   (*x0) = x1;
+
+   // Evaluate boundary flux \int u_d \dot n dA.
+   double bflux = 0.0, dirflux = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      mesh = meshes[m];
+      ufesm = ufes[m];
+
+      for (int i = 0; i < ufesm -> GetNBE(); i++)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(i);
+         const int global_idx = global_bdr_attributes.Find(bdr_attr);
+         if (global_idx < 0) { continue; }
+
+         if (nz_dbcs[global_idx])
+         {
+            ud = ud_coeffs[global_idx];
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+            dirflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, dir_coeff);
+         }
+      }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+   }  // for (int m = 0; m < numSub; m++)
+
+   // Set the flux to ensure incompressibility.
+   function_factory::stokes_problem::del_u = bflux / dirflux;
+
+   // Make sure the resulting flux is zero.
+   double threshold = 1.0e-12;
+   bflux = 0.0;
+   for (int m = 0; m < numSub; m++)
+   {
+      mesh = meshes[m];
+      ufesm = ufes[m];
+
+      for (int i = 0; i < ufesm -> GetNBE(); i++)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(i);
+         const int global_idx = global_bdr_attributes.Find(bdr_attr);
+         if (global_idx < 0) { continue; }
+
+         if (nz_dbcs[global_idx])
+         {
+            ud = ud_coeffs[global_idx];
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+         }
+      }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+   }  // for (int m = 0; m < numSub; m++)
+   if (abs(bflux) > threshold)
+   {
+      printf("boundary flux: %.5E\n", bflux);
+      mfem_error("Current boundary setup cannot ensure incompressibility!\nMake sure BC uses function_factory::stokes_problem::flux.\n");
+   }
+   
+}
+
+double StokesSolver::ComputeBEFlux(
+   const FiniteElement &el, ElementTransformation &Tr,
+   VectorCoefficient &ud)
+{
+   // TODO: support full-dg capability.
+   if (full_dg)
+      mfem_error("StokesSolver::SetComplementaryFlux does not support full dg discretization yet!\n");
+
+   double bflux = 0.0;
+   Vector nor(dim), udvec(dim);
+
+   // int intorder = oa * el.GetOrder() + ob;  // <----------
+   int intorder = 2 * el.GetOrder();  // <----------
+   const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Tr.SetIntPoint(&ip);
+      if (dim > 1)
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+      else
+      {
+         nor[0] = 1.0;
+      }
+      ud.Eval(udvec, Tr, ip);
+
+      bflux += ip.weight * (udvec*nor);
+   }
+
+   return bflux;
+}
+
+double StokesSolver::ComputeBEIntegral(
+   const FiniteElement &el, ElementTransformation &Tr, Coefficient &Q)
+{
+   // TODO: support full-dg capability.
+   if (full_dg)
+      mfem_error("StokesSolver::SetComplementaryFlux does not support full dg discretization yet!\n");
+
+   double result = 0.0;
+
+   int intorder = 2*el.GetOrder();
+   const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      
+      Tr.SetIntPoint (&ip);
+      result += Q.Eval(Tr, ip) * Tr.Weight() * ip.weight;
+   }
+
+   return result;
+}
+
+void StokesSolver::ComputeBEIntegral(
+   const FiniteElement &el, ElementTransformation &Tr,
+   VectorCoefficient &Q, Vector &result)
+{
+   // TODO: support full-dg capability.
+   if (full_dg)
+      mfem_error("StokesSolver::SetComplementaryFlux does not support full dg discretization yet!\n");
+
+   result.SetSize(dim);
+   result = 0.0;
+   Vector Qvec(dim);
+
+   int intorder = 2*el.GetOrder();
+   const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Q.Eval(Qvec, Tr, ip);
+      Tr.SetIntPoint (&ip);
+      Qvec *= Tr.Weight() * ip.weight;
+      result += Qvec;
+   }
 }

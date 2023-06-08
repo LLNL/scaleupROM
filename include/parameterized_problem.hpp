@@ -55,10 +55,22 @@ namespace stokes_problem
 {
 
 extern double nu;
+extern double del_u;  // complementary flux to ensure incompressibility.
+extern Vector x0;
+
+void dir(const Vector &x, Vector &y);
+void flux(const Vector &x, Vector &y);
 
 namespace stokes_channel
 {
-   extern double L, U;
+   extern double L, U, x0;
+   void ubdr(const Vector &x, Vector &y);
+}
+
+namespace stokes_component
+{
+   extern Vector u0, du, offsets;
+   extern DenseMatrix k;
    void ubdr(const Vector &x, Vector &y);
 }
 
@@ -169,6 +181,12 @@ class StokesChannel : public StokesProblem
 public:
    StokesChannel();
    virtual ~StokesChannel() {};
+};
+
+class StokesComponent : public StokesProblem
+{
+public:
+   StokesComponent();
 };
 
 ParameterizedProblem* InitParameterizedProblem();

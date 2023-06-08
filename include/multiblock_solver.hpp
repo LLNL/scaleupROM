@@ -104,6 +104,7 @@ public:
    // access
    const int GetDim() const { return dim; }
    const int GetNumSubdomains() const { return numSub; }
+   const int GetNumBdr() const { return numBdr; }
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() const { return order; }
