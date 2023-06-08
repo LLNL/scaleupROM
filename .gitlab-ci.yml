@@ -20,6 +20,18 @@ compile:
     - cmake .. -DBUILD_SKETCHES=ON
     - make -j 4
 
+parser:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./test_parser
+    - mpirun -n 4 ./test_parser
+
 poisson_dd_mms:
   stage: test
   dependencies:

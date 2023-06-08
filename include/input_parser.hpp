@@ -103,7 +103,7 @@ public:
       return node.as<T>();
    }
 
-   YAML::Node FindNodeFromDict(const std::string &keys, YAML::Node input_dict);
+   YAML::Node FindNodeFromDict(const std::string &keys, YAML::Node input_dict, bool create=false);
 
    template<class T>
    const T GetRequiredOption(const std::string &keys)
@@ -113,7 +113,20 @@ public:
    const T GetOption(const std::string &keys, const T &fallback)
    { return GetOptionFromDict<T>(keys, fallback, dict_); }
 
-   YAML::Node FindNode(const std::string &keys) { return FindNodeFromDict(keys, dict_); }
+   YAML::Node FindNode(const std::string &keys, bool create=false)
+   { return FindNodeFromDict(keys, dict_, create); }
+
+   template<class T>
+   void SetOptionInDict(const std::string &keys, const T &value, YAML::Node input_dict)
+   {
+      YAML::Node node = FindNodeFromDict(keys, input_dict, true);
+      node = value;
+      return;
+   }
+
+   template<class T>
+   void SetOption(const std::string &keys, const T &value)
+   { SetOptionInDict<T>(keys, value, dict_); }
 
 };
 
