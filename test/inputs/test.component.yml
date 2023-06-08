@@ -49,8 +49,7 @@ parameterized_problem:
 
 single_run:
   poisson0:
-    - parameter_name: k
-      value: 2.5
+    k: 2.5
 
 sample_generation:
   component_sampling: false

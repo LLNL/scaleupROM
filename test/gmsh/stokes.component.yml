@@ -52,8 +52,7 @@ parameterized_problem:
 
 single_run:
   stokes_channel:
-    - parameter_name: U
-      value: 2.5
+    U: 2.5
 
 sample_generation:
   component_sampling: false

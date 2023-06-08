@@ -39,7 +39,7 @@ TEST(Poisson_Workflow, BaseUniversalTest)
 {
    config = InputParser("inputs/test.base.yml");
 
-   config.dict_["single_run"]["poisson0"][0]["value"] = 2.0;
+   config.dict_["single_run"]["poisson0"]["k"] = 2.0;
    config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
@@ -96,7 +96,7 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
-   config.dict_["single_run"]["poisson0"][0]["value"] = 2.0;
+   config.dict_["single_run"]["poisson0"]["k"] = 2.0;
    config.dict_["sample_generation"]["poisson0"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
@@ -171,7 +171,7 @@ TEST(Stokes_Workflow, BaseUniversalTest)
 {
    config = InputParser("inputs/stokes.base.yml");
 
-   config.dict_["single_run"]["stokes_channel"][0]["value"] = 2.0;
+   config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["stokes_channel"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);
@@ -228,7 +228,7 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
-   config.dict_["single_run"]["stokes_channel"][0]["value"] = 2.0;
+   config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["stokes_channel"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    Array<int> num_basis(1);

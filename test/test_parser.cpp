@@ -70,6 +70,37 @@ TEST(YAML_test, SetOptionTest)
    return;
 }
 
+TEST(YAML_test, LoopingOverKeys)
+{
+   config = InputParser("inputs/test.parser.yml");
+
+   config.SetOption<int>("test/a", 1.0);
+   config.SetOption<int>("test/b", 2.0);
+   config.SetOption<int>("test/c", 3.0);
+
+   std::vector<std::string> keys(3);
+   keys[0] = "a";
+   keys[1] = "b";
+   keys[2] = "c";
+   std::vector<double> vals(3);
+   vals[0] = 1.0;
+   vals[1] = 2.0;
+   vals[2] = 3.0;
+
+   YAML::Node test = config.dict_["test"];
+   int k = 0;
+   for(YAML::const_iterator it=test.begin(); it != test.end(); ++it) {
+      std::string key = it->first.as<std::string>();       // <- key
+      double val = (it->second.as<double>()); // <- value
+      EXPECT_EQ(key, keys[k]);
+      EXPECT_EQ(val, vals[k]);
+
+      k++;
+   }
+
+   return;
+}
+
 // TODO: add more tests from sketches/yaml_example.cpp.
 
 int main(int argc, char* argv[])
