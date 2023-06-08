@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 import h5py
 
 def ManhattanDistance(loc1, loc2):
@@ -102,6 +103,7 @@ class PipeHub(Component):
         return gbattr.values(), gbattr.keys()
     
 class Configuration:
+    prefix = 'config'
     dim = 2
 
     # reference component
@@ -161,67 +163,87 @@ class Configuration:
         return
 
 class ChannelConfig(Configuration):
+    prefix = 'channel.config'
+
     def __init__(self, start_comp='empty'):
         if (start_comp == 'empty'):
             self.comps = [Empty()]
         elif (start_comp == 'pipe-hub'):
             self.comps = [PipeHub()]
-        self.meshes = [self.comps[0], self.comps[0]]
-        self.mesh_types = [0, 0]
-        self.loc = np.zeros([2, self.dim], dtype=int)
-        self.loc[1, 0] = 1
+        self.meshes = [self.comps[0]]
+        self.mesh_types = [0]
+        self.loc = np.zeros([1, self.dim], dtype=int)
+        # self.loc[1, 0] = 1
 
         # bdr_data / mesh_idx / comp_battr
-        self.bdr_data = np.array([[4, 0, 4],
-                                  [1, 0, 1],
-                                  [3, 0, 3]])
-        if (start_comp == 'pipe-hub'):
-            self.bdr_data = np.append(self.bdr_data, [[5, 0, 5]], axis=0)
+        # self.bdr_data = np.array([[4, 0, 4],
+        #                           [1, 0, 1],
+        #                           [3, 0, 3]])
+        self.bdr_data = np.array([[4, 0, 4]])
+        # if (start_comp == 'pipe-hub'):
+        #     self.bdr_data = np.append(self.bdr_data, [[5, 0, 5]], axis=0)
         
         # mesh1 / mesh2 / battr1 / battr2 / port_idx
-        self.if_data = np.array([[0, 1, 2, 4, 0]])
+        # self.if_data = np.array([[0, 1, 2, 4, 0]])
+        self.if_data = np.array([])
         self.ports = {(self.comps[0].name, self.comps[0].name, 2, 4): 0}
         return
     
     def getAvailableFaces(self):
-        assert(self.loc.shape[0] >= 2)
+        assert(self.loc.shape[0] >= 1)
         avail_faces = []
         avail_locs = []
 
-        upstream_face = self.meshes[-1].face_map[tuple(self.loc[-2] - self.loc[-1])]
+        if (self.loc.shape[0] == 1):
+            udir = (-1, 0)
+        else:
+            udir = tuple(self.loc[-2] - self.loc[-1])
+        uface = self.meshes[-1].face_map[udir]
 
         for key, val in self.meshes[-1].face_map.items():
-            if (val == upstream_face): continue
+            if (val == uface): continue
 
             test_loc = self.loc[-1] + np.array(key)
-            if (self.determineAvailableLocation(test_loc)):
+            if (self.isLocationAvailable(test_loc)):
                 avail_faces += [val]
                 avail_locs += [np.array(test_loc)]
 
         return avail_faces, avail_locs
     
-    def determineAvailableLocation(self, new_loc):
+    def isLocationAvailable(self, new_loc):
         avail = True
 
-        neighbor = 0
+        # # only one neighbor can exist
+        # neighbor = 0
+        # for k in range(len(self.meshes)):
+        #     dist = ManhattanDistance(new_loc, self.loc[k])
+        #     if (dist == 1): neighbor += 1
+        #     if (neighbor > 1):
+        #         avail = False
+        #         break
+
+        # no one can overlap
         for k in range(len(self.meshes)):
             dist = ManhattanDistance(new_loc, self.loc[k])
-            if (dist == 1): neighbor += 1
-            if (neighbor > 1):
+            if (dist == 0):
                 avail = False
                 break
 
         return avail
     
     def addMesh(self, comp_idx, new_loc):
-        assert(self.determineAvailableLocation(new_loc))
+        assert(self.isLocationAvailable(new_loc))
 
         # upstream_face = self.meshes[-1].face_map[tuple(self.loc[-2] - self.loc[-1])]
         downstream_face = self.meshes[-1].face_map[tuple(new_loc - self.loc[-1])]
 
         # no-slip wall boundary for the last mesh.
         m_idx = len(self.meshes) - 1
-        gbattrs, faces = self.meshes[-1].DetermineGlobalAttr(self.loc[-2], self.loc[-1], new_loc)
+        if (m_idx == 0):
+            uloc = np.array([-1, 0]) + self.loc[0]
+        else:
+            uloc = self.loc[-2]
+        gbattrs, faces = self.meshes[-1].DetermineGlobalAttr(uloc, self.loc[-1], new_loc)
         for gbattr, face in zip(gbattrs, faces):
             self.bdr_data = np.append(self.bdr_data, [[gbattr, m_idx, face]], axis=0)
 
@@ -244,7 +266,10 @@ class ChannelConfig(Configuration):
         else:
             if_data = [[m_idx+1, m_idx, c2_upstream, downstream_face, port]]
 
-        self.if_data = np.append(self.if_data, if_data, axis=0)
+        if (self.if_data.ndim == 1):
+            self.if_data = np.array(if_data)
+        else:
+            self.if_data = np.append(self.if_data, if_data, axis=0)
 
         # add the new mesh and its location.
         self.meshes += [self.comps[comp_idx]]
@@ -282,19 +307,38 @@ class ChannelConfig(Configuration):
                 break
 
         return closed
+    
+    def GenerateAllConfigs(self, extension, offset):
+        assert(extension >= 0)
+        if (extension == 0):
+            self.close()
+            filename = '%s-%05d.h5' % (self.prefix, offset)
+            print(filename)
+            self.save(filename)
+            return 1
+
+        avail_faces, avail_locs = self.getAvailableFaces()
+        num_finals = 0
+        for new_loc in avail_locs:
+            config = deepcopy(self)
+            config.addMesh(0, new_loc)
+            num_finals += config.GenerateAllConfigs(extension-1, offset + num_finals)
+
+        return num_finals
 
 if __name__ == "__main__":
     example = ChannelConfig('pipe-hub')
-    avail_faces, avail_locs = example.getAvailableFaces()
-    # print(avail_locs)
-
-    example.addMesh(0, avail_locs[-1])
-
+    example.GenerateAllConfigs(3, 0)
     # avail_faces, avail_locs = example.getAvailableFaces()
     # # print(avail_locs)
 
     # example.addMesh(0, avail_locs[-1])
 
-    example.close()
+    # # avail_faces, avail_locs = example.getAvailableFaces()
+    # # # print(avail_locs)
+
+    # # example.addMesh(0, avail_locs[-1])
+
+    # example.close()
     
-    example.save('channel.4.h5')
+    # example.save('channel.4.h5')
