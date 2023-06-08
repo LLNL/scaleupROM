@@ -122,7 +122,7 @@ void flux(const Vector &x, Vector &y)
 namespace stokes_channel
 {
 
-double L, U;
+double L, U, x0;
 
 void ubdr(const Vector &x, Vector &y)
 {
@@ -130,8 +130,8 @@ void ubdr(const Vector &x, Vector &y)
    y.SetSize(dim);
    y = 0.0;
 
-   double yc = x(1) / L;
-   y(0) = 4.0 * U * (1.0 - yc) * yc;
+   double yc = (x(1) - x0) / L;
+   y(0) = U * (1.0 - 4.0 * yc * yc);
 }
 
 }  // namespace stokes_channel
@@ -398,21 +398,24 @@ StokesChannel::StokesChannel()
    vector_rhs_ptr = NULL;
    vector_bdr_ptr = &(function_factory::stokes_problem::stokes_channel::ubdr);
 
-   param_num = 3;
+   param_num = 4;
 
    // Default values.
    function_factory::stokes_problem::nu = 1.0;
    function_factory::stokes_problem::stokes_channel::L = 1.0;
    function_factory::stokes_problem::stokes_channel::U = 1.0;
+   function_factory::stokes_problem::stokes_channel::x0 = 0.5;
 
    param_map["nu"] = 0;
    param_map["L"] = 1;
    param_map["U"] = 2;
+   param_map["x0"] = 3;
 
    param_ptr.SetSize(param_num);
    param_ptr[0] = &(function_factory::stokes_problem::nu);
    param_ptr[1] = &(function_factory::stokes_problem::stokes_channel::L);
    param_ptr[2] = &(function_factory::stokes_problem::stokes_channel::U);
+   param_ptr[3] = &(function_factory::stokes_problem::stokes_channel::x0);
 }
 
 StokesComponent::StokesComponent()

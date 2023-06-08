@@ -19,9 +19,16 @@ class Component:
     def __init__(self):
         return
     
-    def GetBdrAttrWRTDownstream(self, local_face_attr, ds_face_attr):
-        raise RuntimeError('Abstract method Component.GetBAttrWRTDownstream!')
+    def switchBdrAttr(self, attr_dict, target_face, target_attr):
+        # switch upstream face index with the face which has attr 4.
+        attr_list = list(attr_dict.values())
+        face_list = list(attr_dict.keys())
+        uidx = attr_list.index(target_attr)
+        if (face_list[uidx] != target_face):
+            attr_dict[face_list[uidx]] = attr_dict[target_face]
+            attr_dict[target_face] = target_attr
         return
+    
 
 class Empty(Component):
     name = 'empty'
@@ -35,19 +42,64 @@ class Empty(Component):
                          (-1, 0):  4}
         return
     
-    def GetBdrAttrWRTDownstream(self, local_face_attr, ds_face_attr):
+    def DetermineGlobalAttr(self, uloc, loc, dloc, closure=False):
+        # determine no-slip wall faces of the last mesh.
+        faces = self.ref_battr.copy()
+        uface = self.face_map[tuple(uloc - loc)]
+        dface = self.face_map[tuple(dloc - loc)]
+
         # downstream face index always has global bdr attr 2.
-        gbattr = local_face_attr - ds_face_attr + 2
-        if (gbattr < 1): gbattr += self.num_face
-        if (gbattr > self.num_face): gbattr -= self.num_face
-        return gbattr
+        gbattr = {}
+        for face in faces:
+            attr = face - dface + 2
+            if (attr < 1): attr += self.num_face
+            if (attr > self.num_face): attr -= self.num_face
+            gbattr[face] = attr
+
+        # switch upstream face index with the face which has attr 4.
+        self.switchBdrAttr(gbattr, uface, 4)
+
+        gbattr.pop(uface)
+        if (not closure): gbattr.pop(dface)
+
+        return gbattr.values(), gbattr.keys()
     
-    def GetBdrAttrWRTUpstream(self, local_face_attr, us_face_attr):
-        # upstream face index always has global bdr attr 4.
-        gbattr = local_face_attr - us_face_attr + 4
-        if (gbattr < 1): gbattr += self.num_face
-        if (gbattr >= self.num_face): gbattr -= self.num_face
-        return gbattr
+class PipeHub(Component):
+    name = 'pipe-hub'
+
+    def __init__(self):
+        self.num_face = 5
+        self.ref_battr = [1, 2, 3, 4, 5]
+        self.face_map = {(0, -1):  1,
+                         (1, 0):   2,
+                         (0, 1):   3,
+                         (-1, 0):  4}
+        return
+    
+    def DetermineGlobalAttr(self, uloc, loc, dloc, closure=False):
+        # determine no-slip wall faces of the last mesh.
+        faces = self.ref_battr.copy()
+        uface = self.face_map[tuple(uloc - loc)]
+        dface = self.face_map[tuple(dloc - loc)]
+
+        # downstream face index always has global bdr attr 2.
+        gbattr = {}
+        for face in faces:
+            attr = face - dface + 2
+            if (attr < 1): attr += self.num_face
+            if (attr > self.num_face): attr -= self.num_face
+            gbattr[face] = attr
+
+        # Keep the attr 5.
+        self.switchBdrAttr(gbattr, 5, 5)
+
+        # switch upstream face index with the face which has attr 4.
+        self.switchBdrAttr(gbattr, uface, 4)
+
+        gbattr.pop(uface)
+        if (not closure): gbattr.pop(dface)
+
+        return gbattr.values(), gbattr.keys()
     
 class Configuration:
     dim = 2
@@ -109,8 +161,11 @@ class Configuration:
         return
 
 class ChannelConfig(Configuration):
-    def __init__(self):
-        self.comps = [Empty()]
+    def __init__(self, start_comp='empty'):
+        if (start_comp == 'empty'):
+            self.comps = [Empty()]
+        elif (start_comp == 'pipe-hub'):
+            self.comps = [PipeHub()]
         self.meshes = [self.comps[0], self.comps[0]]
         self.mesh_types = [0, 0]
         self.loc = np.zeros([2, self.dim], dtype=int)
@@ -120,10 +175,12 @@ class ChannelConfig(Configuration):
         self.bdr_data = np.array([[4, 0, 4],
                                   [1, 0, 1],
                                   [3, 0, 3]])
+        if (start_comp == 'pipe-hub'):
+            self.bdr_data = np.append(self.bdr_data, [[5, 0, 5]], axis=0)
         
         # mesh1 / mesh2 / battr1 / battr2 / port_idx
         self.if_data = np.array([[0, 1, 2, 4, 0]])
-        self.ports = {('empty', 'empty', 2, 4): 0}
+        self.ports = {(self.comps[0].name, self.comps[0].name, 2, 4): 0}
         return
     
     def getAvailableFaces(self):
@@ -159,18 +216,13 @@ class ChannelConfig(Configuration):
     def addMesh(self, comp_idx, new_loc):
         assert(self.determineAvailableLocation(new_loc))
 
-        # determine no-slip wall faces of the last mesh.
-        c1_faces = self.meshes[-1].ref_battr.copy()
-        upstream_face = self.meshes[-1].face_map[tuple(self.loc[-2] - self.loc[-1])]
+        # upstream_face = self.meshes[-1].face_map[tuple(self.loc[-2] - self.loc[-1])]
         downstream_face = self.meshes[-1].face_map[tuple(new_loc - self.loc[-1])]
-        c1_faces.remove(upstream_face)
-        c1_faces.remove(downstream_face)
 
         # no-slip wall boundary for the last mesh.
         m_idx = len(self.meshes) - 1
-        for k, face in enumerate(c1_faces):
-            # gbattr = self.meshes[-1].GetBdrAttrWRTDownstream(face, downstream_face)
-            gbattr = 1 + 2*k
+        gbattrs, faces = self.meshes[-1].DetermineGlobalAttr(self.loc[-2], self.loc[-1], new_loc)
+        for gbattr, face in zip(gbattrs, faces):
             self.bdr_data = np.append(self.bdr_data, [[gbattr, m_idx, face]], axis=0)
 
         # interface between the last mesh and the new mesh
@@ -201,13 +253,10 @@ class ChannelConfig(Configuration):
         return
     
     def close(self):
-        c1_faces = self.meshes[-1].ref_battr.copy()
-        upstream_face = self.meshes[-1].face_map[tuple(self.loc[-2] - self.loc[-1])]
-        c1_faces.remove(upstream_face)
-
         m_idx = len(self.meshes) - 1
-        for k, face in enumerate(c1_faces):
-            gbattr = self.meshes[-1].GetBdrAttrWRTUpstream(face, upstream_face)
+        new_loc = self.loc[-1] + (self.loc[-1] - self.loc[-2])
+        gbattrs, faces = self.meshes[-1].DetermineGlobalAttr(self.loc[-2], self.loc[-1], new_loc, True)
+        for gbattr, face in zip(gbattrs, faces):
             self.bdr_data = np.append(self.bdr_data, [[gbattr, m_idx, face]], axis=0)
 
         if not (self.allFacesClosed()):
@@ -235,7 +284,7 @@ class ChannelConfig(Configuration):
         return closed
 
 if __name__ == "__main__":
-    example = ChannelConfig()
+    example = ChannelConfig('pipe-hub')
     avail_faces, avail_locs = example.getAvailableFaces()
     # print(avail_locs)
 
@@ -247,6 +296,5 @@ if __name__ == "__main__":
     # example.addMesh(0, avail_locs[-1])
 
     example.close()
-    print(example.bdr_data)
     
     example.save('channel.4.h5')

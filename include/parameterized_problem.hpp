@@ -63,7 +63,7 @@ void flux(const Vector &x, Vector &y);
 
 namespace stokes_channel
 {
-   extern double L, U;
+   extern double L, U, x0;
    void ubdr(const Vector &x, Vector &y);
 }
 
