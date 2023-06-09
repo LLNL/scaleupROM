@@ -94,7 +94,7 @@ void GenerateSamples(MPI_Comm comm)
    YAML::Node dict0 = YAML::Clone(config.dict_);
    ParameterizedProblem *problem = InitParameterizedProblem();
    SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
-   sample_generator->GenerateParamSpace();
+   sample_generator->SetParamSpaceSizes();
    MultiBlockSolver *test = NULL;
 
    for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)

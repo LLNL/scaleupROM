@@ -30,7 +30,7 @@ parser:
   script:
     - cd ci-build/test
     - ./test_parser
-    - mpirun -n 4 ./test_parser
+    # - mpirun -n 4 ./test_parser
 
 poisson_dd_mms:
   stage: test

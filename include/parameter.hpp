@@ -30,6 +30,8 @@ public:
       : key(input_key) {}
    virtual ~Parameter() {}
 
+   const std::string GetKey() { return key; }
+   const double GetSize() { return size; }
    void SetSize(const int &sample_size)
    { assert(sample_size > 0); size = sample_size; }
 
