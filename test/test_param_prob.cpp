@@ -22,7 +22,7 @@ TEST(SampleGeneratorTest, Test_Parsing)
    SampleGenerator sample_gen(MPI_COMM_WORLD);
    sample_gen.SetParamSpaceSizes();
 
-   EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
+   EXPECT_EQ(sample_gen.GetNumSampleParams(), 3);
 
    Parameter *param = NULL;
    param = sample_gen.GetParam(0);
@@ -49,12 +49,30 @@ TEST(SampleGeneratorTest, Test_Parsing)
       EXPECT_TRUE(abs(offset - true_y[s]) < 1.0e-15);
    }
 
+   param = sample_gen.GetParam(2);
+   EXPECT_EQ(param->GetSize(), 4);
+   EXPECT_EQ(param->GetKey(), "test/filename");
+
+   std::vector<std::string> true_filenames(4);
+   true_filenames[0] = "testfile.00000000.h5";
+   true_filenames[1] = "testfile.00000004.h5";
+   true_filenames[2] = "testfile.00000008.h5";
+   true_filenames[3] = "testfile.00000012.h5";
+   for (int s = 0; s < param->GetSize(); s++)
+   {
+      param->SetParam(s, config);
+      std::string filename = config.GetRequiredOption<std::string>(param->GetKey());
+      EXPECT_EQ(filename, true_filenames[s]);
+   }
+
    for (int s = 0; s < sample_gen.GetTotalSampleSize(); s++)
    {
       if (sample_gen.IsMyJob(s))
       {
          Array<int> local_idx = sample_gen.GetSampleIndex(s);
-         printf("%d: (%d, %d) - rank %d\n", s, local_idx[0], local_idx[1], sample_gen.GetProcRank());
+         printf("%d: (%d, %d, %d) - rank %d\n", s,
+               local_idx[0], local_idx[1], local_idx[2],
+               sample_gen.GetProcRank());
       }
    }
 
@@ -68,7 +86,7 @@ TEST(RandomSampleGeneratorTest, Test_Parsing)
    RandomSampleGenerator sample_gen(MPI_COMM_WORLD);
    sample_gen.SetParamSpaceSizes();
 
-   EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
+   EXPECT_EQ(sample_gen.GetNumSampleParams(), 3);
 
    Parameter *param = NULL;
    param = sample_gen.GetParam(0);
@@ -79,6 +97,10 @@ TEST(RandomSampleGeneratorTest, Test_Parsing)
    EXPECT_EQ(param->GetSize(), 7);
    EXPECT_EQ(param->GetKey(), "test/offset");
 
+   param = sample_gen.GetParam(2);
+   EXPECT_EQ(param->GetSize(), 7);
+   EXPECT_EQ(param->GetKey(), "test/filename");
+
    for (int s = 0; s < sample_gen.GetTotalSampleSize(); s++)
    {
       if (sample_gen.IsMyJob(s))
@@ -86,7 +108,8 @@ TEST(RandomSampleGeneratorTest, Test_Parsing)
          sample_gen.SetSampleParams(s);
          double k = config.GetRequiredOption<double>("test/k");
          double offset = config.GetRequiredOption<double>("test/offset");
-         printf("%d: (%.4f, %.4f) - rank %d\n", s, k, offset, sample_gen.GetProcRank());
+         std::string filename = config.GetRequiredOption<std::string>("test/filename");
+         printf("%d: (%.4f, %.4f, %s) - rank %d\n", s, k, offset, filename.c_str(), sample_gen.GetProcRank());
       }
    }
 

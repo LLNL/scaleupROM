@@ -13,9 +13,23 @@
 
 #include "parameter.hpp"
 #include "random.hpp"
+#include <memory>
+#include <string>
+#include <stdexcept>
 
 using namespace mfem;
 using namespace std;
+
+template<typename ... Args>
+std::string string_format( const std::string& format, Args ... args )
+{
+    int size_s = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
+    if( size_s <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
+    auto size = static_cast<size_t>( size_s );
+    std::unique_ptr<char[]> buf( new char[ size ] );
+    std::snprintf( buf.get(), size, format.c_str(), args ... );
+    return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
+}
 
 DoubleParam::DoubleParam(const std::string &input_key, YAML::Node option)
    : Parameter(input_key),
@@ -42,7 +56,7 @@ void DoubleParam::SetParam(const int &param_index, InputParser &parser)
       double dp = (maxval - minval) / static_cast<double>(Np);
       val = minval + param_index * dp;
    }
-printf("%s: %.3E\n", key.c_str(), val);
+
    parser.SetOption<double>(key, val);
 }
 
@@ -62,4 +76,43 @@ void DoubleParam::SetRandomParam(InputParser &parser)
    }
 
    parser.SetOption<double>(key, val);
+}
+
+/*
+   FilenameParam
+*/
+
+FilenameParam::FilenameParam(const std::string &input_key, YAML::Node option)
+   : Parameter(input_key),
+     format(config.GetRequiredOptionFromDict<std::string>("format", option)),
+     minval(config.GetRequiredOptionFromDict<int>("minimum", option)),
+     maxval(config.GetRequiredOptionFromDict<int>("maximum", option))
+   //   zero_pad(config.GetOptionFromDict<int>("zero_pad", 8, option))
+{}
+
+void FilenameParam::SetParam(const int &param_index, InputParser &parser)
+{
+   assert(size > 0);
+   assert((param_index >= 0) && (param_index < size));
+   int val = -1;
+
+   int Np = (size == 1) ? 1 : (size - 1);
+   int dp = (maxval - minval) / Np;
+   val = minval + param_index * dp;
+
+   std::string filename = string_format(format, val);
+
+   parser.SetOption<std::string>(key, filename);
+}
+
+void FilenameParam::SetRandomParam(InputParser &parser)
+{
+   double range = static_cast<double>(maxval - minval + 1);
+   double realval = static_cast<double>(minval) + range * UniformRandom();
+   int val = std::floor(realval);
+   if (val > maxval) val = maxval;
+
+   std::string filename = string_format(format, val);
+
+   parser.SetOption<std::string>(key, filename);
 }

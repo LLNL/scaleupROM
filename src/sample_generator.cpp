@@ -39,7 +39,8 @@ SampleGenerator::SampleGenerator(MPI_Comm comm)
       std::string param_key = config.GetRequiredOptionFromDict<std::string>("key", param_list[p]);
       std::string param_type = config.GetRequiredOptionFromDict<std::string>("type", param_list[p]);
 
-      if (param_type == "double") params[p] = new DoubleParam(param_key, param_list[p]);
+      if (param_type == "double")         params[p] = new DoubleParam(param_key, param_list[p]);
+      else if (param_type == "filename")  params[p] = new FilenameParam(param_key, param_list[p]);
       else mfem_error("SampleGenerator: Unknown parameter type!\n");
    }  // for (int p = 0; p < num_sampling_params; p++)
 }

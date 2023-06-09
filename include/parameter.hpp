@@ -54,4 +54,19 @@ public:
    virtual void SetRandomParam(InputParser &parser);
 };
 
+class FilenameParam : public Parameter
+{
+protected:
+   int minval = -1.;
+   int maxval = -1.;
+   std::string format = "";
+
+public:
+   FilenameParam(const std::string &input_key, YAML::Node option);
+   virtual ~FilenameParam() {}
+
+   virtual void SetParam(const int &param_index, InputParser &parser);
+   virtual void SetRandomParam(InputParser &parser);
+};
+
 #endif
