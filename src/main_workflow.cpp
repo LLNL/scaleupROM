@@ -67,7 +67,7 @@ MultiBlockSolver* InitSolver()
    return solver;
 }
 
-SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem)
+SampleGenerator* InitSampleGenerator(MPI_Comm comm)
 {
    SampleGenerator* generator = NULL;
 
@@ -75,11 +75,11 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* proble
 
    if (type == "base")
    {
-      generator = new SampleGenerator(comm, problem);
+      generator = new SampleGenerator(comm);
    }
    else if (type == "random")
    {
-      generator = new RandomSampleGenerator(comm, problem);
+      generator = new RandomSampleGenerator(comm);
    }
    else
    {
@@ -91,20 +91,23 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* proble
 
 void GenerateSamples(MPI_Comm comm)
 {
+   YAML::Node dict0 = YAML::Clone(config.dict_);
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
-   sample_generator->GenerateParamSpace();
+   SampleGenerator *sample_generator = InitSampleGenerator(comm);
+   sample_generator->SetParamSpaceSizes();
    MultiBlockSolver *test = NULL;
 
    for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)
    {
       if (!sample_generator->IsMyJob(s)) continue;
 
+      sample_generator->SetSampleParams(s);
+
       test = InitSolver();
       if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
-      sample_generator->SetSampleParams(s);
+      problem->SetSingleRun();
       test->SetParameterizedProblem(problem);
 
       int file_idx = s + sample_generator->GetFileOffset();
@@ -123,6 +126,7 @@ void GenerateSamples(MPI_Comm comm)
 
    delete sample_generator;
    delete problem;
+   config.dict_ = dict0;
 }
 
 void BuildROM(MPI_Comm comm)
@@ -148,7 +152,7 @@ void BuildROM(MPI_Comm comm)
    if (!rom->UseExistingBasis())
    {
       // TODO: basis for multiple components
-      SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
+      SampleGenerator *sample_generator = InitSampleGenerator(comm);
       sample_generator->SetParamSpaceSizes();
       const int total_samples = sample_generator->GetTotalSampleSize();
       

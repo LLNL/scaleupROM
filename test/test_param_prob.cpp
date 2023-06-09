@@ -1,6 +1,5 @@
 #include<gtest/gtest.h>
 #include "mfem.hpp"
-#include "parameterized_problem.hpp"
 #include "random_sample_generator.hpp"
 #include <fstream>
 #include <iostream>
@@ -20,32 +19,60 @@ TEST(SampleGeneratorTest, Test_Parsing)
 {
    config = InputParser("inputs/test_param_prob.yml");
 
-   ParameterizedProblem *test = InitParameterizedProblem();
-   SampleGenerator sample_gen(MPI_COMM_WORLD, test);
+   SampleGenerator sample_gen(MPI_COMM_WORLD);
+   sample_gen.SetParamSpaceSizes();
 
-   EXPECT_EQ(test->GetProblemName(), "poisson0");
-   EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
+   EXPECT_EQ(sample_gen.GetNumSampleParams(), 3);
 
-   sample_gen.GenerateParamSpace();
+   Parameter *param = NULL;
+   param = sample_gen.GetParam(0);
+   EXPECT_EQ(param->GetSize(), 5);
+   EXPECT_EQ(param->GetKey(), "test/k");
 
-   Vector *test_x = sample_gen.GetDoubleParamSpace("k");
    Vector true_x({0.0, 1.0, 2.0, 3.0, 4.0});
-   EXPECT_EQ(test_x->Size(), 5);
-   for (int k = 0; k < test_x->Size(); k++)
-      EXPECT_TRUE(abs((*test_x)[k] - true_x[k]) < 1.0e-15);
+   for (int s = 0; s < param->GetSize(); s++)
+   {
+      param->SetParam(s, config);
+      double k = config.GetRequiredOption<double>(param->GetKey());
+      EXPECT_TRUE(abs(k - true_x[s]) < 1.0e-15);
+   }
 
-   Vector *test_y = sample_gen.GetDoubleParamSpace("offset");
+   param = sample_gen.GetParam(1);
+   EXPECT_EQ(param->GetSize(), 8);
+   EXPECT_EQ(param->GetKey(), "test/offset");
+
    Vector true_y({1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0});
-   EXPECT_EQ(test_y->Size(), 8);
-   for (int k = 0; k < test_y->Size(); k++)
-      EXPECT_TRUE(abs((*test_y)[k] - true_y[k]) < 1.0e-15);
+   for (int s = 0; s < param->GetSize(); s++)
+   {
+      param->SetParam(s, config);
+      double offset = config.GetRequiredOption<double>(param->GetKey());
+      EXPECT_TRUE(abs(offset - true_y[s]) < 1.0e-15);
+   }
+
+   param = sample_gen.GetParam(2);
+   EXPECT_EQ(param->GetSize(), 4);
+   EXPECT_EQ(param->GetKey(), "test/filename");
+
+   std::vector<std::string> true_filenames(4);
+   true_filenames[0] = "testfile.00000000.h5";
+   true_filenames[1] = "testfile.00000004.h5";
+   true_filenames[2] = "testfile.00000008.h5";
+   true_filenames[3] = "testfile.00000012.h5";
+   for (int s = 0; s < param->GetSize(); s++)
+   {
+      param->SetParam(s, config);
+      std::string filename = config.GetRequiredOption<std::string>(param->GetKey());
+      EXPECT_EQ(filename, true_filenames[s]);
+   }
 
    for (int s = 0; s < sample_gen.GetTotalSampleSize(); s++)
    {
       if (sample_gen.IsMyJob(s))
       {
          Array<int> local_idx = sample_gen.GetSampleIndex(s);
-         printf("%d: (%d, %d) - rank %d\n", s, local_idx[0], local_idx[1], sample_gen.GetProcRank());
+         printf("%d: (%d, %d, %d) - rank %d\n", s,
+               local_idx[0], local_idx[1], local_idx[2],
+               sample_gen.GetProcRank());
       }
    }
 
@@ -56,26 +83,33 @@ TEST(RandomSampleGeneratorTest, Test_Parsing)
 {
    config = InputParser("inputs/test_param_prob.yml");
 
-   ParameterizedProblem *test = InitParameterizedProblem();
-   RandomSampleGenerator sample_gen(MPI_COMM_WORLD, test);
+   RandomSampleGenerator sample_gen(MPI_COMM_WORLD);
+   sample_gen.SetParamSpaceSizes();
 
-   EXPECT_EQ(test->GetProblemName(), "poisson0");
-   EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
+   EXPECT_EQ(sample_gen.GetNumSampleParams(), 3);
 
-   sample_gen.GenerateParamSpace();
+   Parameter *param = NULL;
+   param = sample_gen.GetParam(0);
+   EXPECT_EQ(param->GetSize(), 7);
+   EXPECT_EQ(param->GetKey(), "test/k");
 
-   Vector *test_x = sample_gen.GetDoubleParamSpace("k");
-   EXPECT_EQ(test_x->Size(), 7);
+   param = sample_gen.GetParam(1);
+   EXPECT_EQ(param->GetSize(), 7);
+   EXPECT_EQ(param->GetKey(), "test/offset");
 
-   Vector *test_y = sample_gen.GetDoubleParamSpace("offset");
-   EXPECT_EQ(test_y->Size(), 7);
+   param = sample_gen.GetParam(2);
+   EXPECT_EQ(param->GetSize(), 7);
+   EXPECT_EQ(param->GetKey(), "test/filename");
 
    for (int s = 0; s < sample_gen.GetTotalSampleSize(); s++)
    {
       if (sample_gen.IsMyJob(s))
       {
-         Array<int> local_idx = sample_gen.GetSampleIndex(s);
-         printf("%d: (%.4f, %.4f) - rank %d\n", s, (*test_x)[local_idx[0]], (*test_y)[local_idx[1]], sample_gen.GetProcRank());
+         sample_gen.SetSampleParams(s);
+         double k = config.GetRequiredOption<double>("test/k");
+         double offset = config.GetRequiredOption<double>("test/offset");
+         std::string filename = config.GetRequiredOption<std::string>("test/filename");
+         printf("%d: (%.4f, %.4f, %s) - rank %d\n", s, k, offset, filename.c_str(), sample_gen.GetProcRank());
       }
    }
 

@@ -13,7 +13,7 @@
 #define SAMPLE_GENERATOR_HPP
 
 #include "mfem.hpp"
-#include "parameterized_problem.hpp"
+#include "parameter.hpp"
 
 using namespace mfem;
 
@@ -24,22 +24,15 @@ protected:
    int proc_rank;
    Array<int> sample_offsets;
 
-   ParameterizedProblem *problem;
-
    // input path for parameter list
    std::string param_list_str;
 
    std::size_t num_sampling_params;
-   std::map<std::string, int> sample_param_map;
-   Array<int> sample2problem;
 
    Array<int> sampling_sizes;
    int total_samples;
 
-   // TODO: a way to incorporate all datatypes?
-   // TODO: support other datatypes such as integer?
-   // Array<Array<int> *> integer_paramspace;
-   Array<Vector *> double_paramspace;
+   Array<Parameter *> params;
 
    // file path
    std::string sample_dir = ".";
@@ -47,7 +40,7 @@ protected:
    int file_offset = 0;
 
 public:
-   SampleGenerator(MPI_Comm comm, ParameterizedProblem *target);
+   SampleGenerator(MPI_Comm comm);
 
    virtual ~SampleGenerator();
 
@@ -56,15 +49,10 @@ public:
    const int GetTotalSampleSize() { return total_samples; }
    const int GetProcRank() { return proc_rank; }
    const int GetFileOffset() { return file_offset; }
+   Parameter* GetParam(const int &k) { return params[k]; }
 
    // Generate parameter space as listed in sample_generation/problem_name.
    virtual void SetParamSpaceSizes();
-   virtual void GenerateParamSpace();
-
-   // These are made for tests, but are dangerous to be used elsewhere?
-   // Array<int>* GetIntParamSpace(const std::string &param_name) { return integer_paramspace[param_indexes[param_name]]; }
-   Vector* GetDoubleParamSpace(const std::string &param_name)
-   { return double_paramspace[sample_param_map[param_name]]; }
 
    virtual void SetSampleParams(const int &index);
    virtual void SetSampleParams(const Array<int> &index)

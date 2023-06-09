@@ -172,6 +172,9 @@ set(scaleupROMObj_SOURCES
   include/input_parser.hpp
   src/input_parser.cpp
 
+  include/parameter.hpp
+  src/parameter.cpp
+
   include/parameterized_problem.hpp
   src/parameterized_problem.cpp
 

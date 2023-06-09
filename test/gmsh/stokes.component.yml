@@ -52,15 +52,15 @@ parameterized_problem:
 
 single_run:
   stokes_channel:
-    - parameter_name: U
-      value: 2.5
+    U: 2.5
 
 sample_generation:
   component_sampling: false
   file_path:
     prefix: "stokes"
-  stokes_channel:
-    - parameter_name: U
+  parameters:
+    - key: single_run/stokes_channel/U
+      type: double
       sample_size: 2
       minimum: 2.0
       maximum: 2.5

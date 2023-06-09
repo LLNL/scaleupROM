@@ -19,8 +19,7 @@ using namespace mfem;
 class RandomSampleGenerator : public SampleGenerator
 {
 public:
-   RandomSampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
-      : SampleGenerator(comm, target) {}
+   RandomSampleGenerator(MPI_Comm comm) : SampleGenerator(comm) {}
 
    virtual ~RandomSampleGenerator() {}
 
@@ -28,8 +27,7 @@ public:
    // const Array<int> GetSampleSizes() { return sampling_sizes; }
 
    // Generate parameter space as listed in sample_generation/problem_name.
-   virtual void SetParamSpaceSizes();
-   virtual void GenerateParamSpace();
+   virtual void SetParamSpaceSizes() override;
 
    virtual void SetSampleParams(const int &index);
    virtual void SetSampleParams(const Array<int> &index)

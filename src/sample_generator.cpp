@@ -16,56 +16,55 @@
 using namespace mfem;
 using namespace std;
 
-SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
-   : problem(target)
+SampleGenerator::SampleGenerator(MPI_Comm comm)
 {
    MPI_Comm_size(comm, &num_procs);
    MPI_Comm_rank(comm, &proc_rank);
 
    sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
-   std::string problem_name = problem->GetProblemName();
+   std::string problem_name = config.GetOption<std::string>("parameterized_problem/name", "sample");
    sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", problem_name);
 
    file_offset = config.GetOption<int>("sample_generation/file_path/offset", 0);
 
-   // TODO: currently combined with sample generation part.
-   // TODO: Separate with sample generation.
-   param_list_str = ("sample_generation/" + problem_name);
+   param_list_str = "sample_generation/parameters";
    YAML::Node param_list = config.FindNode(param_list_str);
-   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the parameter list!\n");
 
    num_sampling_params = param_list.size();
-
-   sample2problem.SetSize(num_sampling_params);
-   sample2problem = -1;
+   params.SetSize(num_sampling_params);
 
    for (int p = 0; p < num_sampling_params; p++)
    {
-      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-      sample_param_map[param_name] = p;
-      sample2problem[p] = problem->GetParamIndex(param_name);
+      std::string param_key = config.GetRequiredOptionFromDict<std::string>("key", param_list[p]);
+      std::string param_type = config.GetRequiredOptionFromDict<std::string>("type", param_list[p]);
+
+      if (param_type == "double")         params[p] = new DoubleParam(param_key, param_list[p]);
+      else if (param_type == "filename")  params[p] = new FilenameParam(param_key, param_list[p]);
+      else mfem_error("SampleGenerator: Unknown parameter type!\n");
    }  // for (int p = 0; p < num_sampling_params; p++)
 }
 
 SampleGenerator::~SampleGenerator()
 {
-   for (int p = 0; p < double_paramspace.Size(); p++)
-   {
-      delete double_paramspace[p];
-   }
+   for (int p = 0; p < params.Size(); p++) delete params[p];
 }
 
 void SampleGenerator::SetParamSpaceSizes()
 {
    YAML::Node param_list = config.FindNode(param_list_str);
-   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
+   if (!param_list) mfem_error("SampleGenerator - cannot find the parameter list!\n");
    assert(num_sampling_params > 0);
+   assert(params.Size() == num_sampling_params);
 
    sampling_sizes.SetSize(num_sampling_params);
    sampling_sizes = -1;
 
    for (int p = 0; p < num_sampling_params; p++)
+   {
       sampling_sizes[p] = config.GetRequiredOptionFromDict<int>("sample_size", param_list[p]);
+      params[p]->SetSize(sampling_sizes[p]);
+   }
 
    total_samples = 1;
    for (int p = 0; p < num_sampling_params; p++)
@@ -73,45 +72,6 @@ void SampleGenerator::SetParamSpaceSizes()
 
    // This does not need the actual samples. distributing only indexes.
    DistributeSamples();
-}
-
-void SampleGenerator::GenerateParamSpace()
-{
-   YAML::Node param_list = config.FindNode(param_list_str);
-   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
-   assert(num_sampling_params > 0);
-
-   SetParamSpaceSizes();
-   assert(sampling_sizes.Size() == num_sampling_params);
-
-   double_paramspace.SetSize(num_sampling_params);
-   double_paramspace = NULL;
-
-   for (int p = 0; p < num_sampling_params; p++)
-   {
-      assert(sampling_sizes[p] > 0);
-
-      double_paramspace[p] = new Vector(sampling_sizes[p]);
-      double minval = config.GetRequiredOptionFromDict<double>("minimum", param_list[p]);
-      double maxval = config.GetRequiredOptionFromDict<double>("maximum", param_list[p]);
-
-      bool log_scale = config.GetOptionFromDict<bool>("log_scale", false, param_list[p]);
-      if (log_scale)
-      {
-         double dp = log(maxval / minval) / (sampling_sizes[p] - 1);
-         dp = exp(dp);
-
-         (*double_paramspace[p])[0] = minval;
-         for (int s = 1; s < double_paramspace[p]->Size(); s++)
-            (*double_paramspace[p])[s] = (*double_paramspace[p])[s-1] * dp;
-      }
-      else
-      {
-         double dp = (sampling_sizes[p] == 1) ? 0.0 : (maxval - minval) / (sampling_sizes[p] - 1);
-         for (int s = 0; s < double_paramspace[p]->Size(); s++)
-            (*double_paramspace[p])[s] = minval + s * dp;
-      }
-   }  // for (int p = 0; p < num_sampling_params; p++)
 }
 
 void SampleGenerator::DistributeSamples()
@@ -169,14 +129,12 @@ const Array<int> SampleGenerator::GetSampleIndex(const int &index)
 
 void SampleGenerator::SetSampleParams(const int &index)
 {
-   problem->local_sample_index = index;
+   assert(params.Size() == num_sampling_params);
 
    const Array<int> nested_idx = GetSampleIndex(index);
 
-   Vector params(num_sampling_params);
    for (int p = 0; p < num_sampling_params; p++)
-      params(p) = (*double_paramspace[p])[nested_idx[p]];
-   problem->SetParams(sample2problem, params);
+      params[p]->SetParam(nested_idx[p], config);
 }
 
 const std::string SampleGenerator::GetSamplePath(const int &idx, const std::string& prefix)

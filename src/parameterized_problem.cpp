@@ -208,11 +208,18 @@ void ParameterizedProblem::SetSingleRun()
    YAML::Node param_list = config.FindNode(param_list_str);
    if (!param_list) mfem_error("Single Run - cannot find the problem name!\n");
 
-   size_t num_params = param_list.size();
-   for (int p = 0; p < num_params; p++)
+   // size_t num_params = param_list.size();
+   // for (int p = 0; p < num_params; p++)
+   // {
+   //    std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
+   //    double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+   //    SetParams(param_name, value);
+   // }
+
+   for(YAML::const_iterator it=param_list.begin(); it != param_list.end(); ++it)
    {
-      std::string param_name = config.GetRequiredOptionFromDict<std::string>("parameter_name", param_list[p]);
-      double value = config.GetRequiredOptionFromDict<double>("value", param_list[p]);
+      std::string param_name = it->first.as<std::string>();
+      double value = it->second.as<double>();
       SetParams(param_name, value);
    }
 }

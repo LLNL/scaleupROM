@@ -76,8 +76,6 @@ parameterized_problem:
 
 single_run:
   stokes_channel:
-    - parameter_name: L
-      value: 2.0
-    - parameter_name: U
-      value: 1.0
+    L: 2.0
+    U: 1.0
 
