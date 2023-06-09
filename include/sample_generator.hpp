@@ -14,7 +14,6 @@
 
 #include "mfem.hpp"
 #include "parameter.hpp"
-#include "parameterized_problem.hpp"
 
 using namespace mfem;
 
@@ -24,8 +23,6 @@ protected:
    int num_procs;
    int proc_rank;
    Array<int> sample_offsets;
-
-   ParameterizedProblem *problem;
 
    // input path for parameter list
    std::string param_list_str;
@@ -43,7 +40,7 @@ protected:
    int file_offset = 0;
 
 public:
-   SampleGenerator(MPI_Comm comm, ParameterizedProblem *target);
+   SampleGenerator(MPI_Comm comm);
 
    virtual ~SampleGenerator();
 

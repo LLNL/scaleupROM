@@ -19,8 +19,7 @@ using namespace mfem;
 class RandomSampleGenerator : public SampleGenerator
 {
 public:
-   RandomSampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
-      : SampleGenerator(comm, target) {}
+   RandomSampleGenerator(MPI_Comm comm) : SampleGenerator(comm) {}
 
    virtual ~RandomSampleGenerator() {}
 

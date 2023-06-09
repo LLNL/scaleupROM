@@ -68,12 +68,7 @@ const Array<int> RandomSampleGenerator::GetSampleIndex(const int &index)
 void RandomSampleGenerator::SetSampleParams(const int &index)
 {
    assert(params.Size() == num_sampling_params);
-   problem->local_sample_index = index;
-
-   // Vector params(num_sampling_params);
-   // for (int p = 0; p < num_sampling_params; p++)
-   //    params(p) = (*double_paramspace[p])[index];
-   // problem->SetParams(sample2problem, params);
+   
    for (int p = 0; p < num_sampling_params; p++)
       params[p]->SetRandomParam(config);
 }

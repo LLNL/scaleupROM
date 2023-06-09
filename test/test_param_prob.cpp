@@ -1,6 +1,5 @@
 #include<gtest/gtest.h>
 #include "mfem.hpp"
-#include "parameterized_problem.hpp"
 #include "random_sample_generator.hpp"
 #include <fstream>
 #include <iostream>
@@ -20,11 +19,9 @@ TEST(SampleGeneratorTest, Test_Parsing)
 {
    config = InputParser("inputs/test_param_prob.yml");
 
-   ParameterizedProblem *test = InitParameterizedProblem();
-   SampleGenerator sample_gen(MPI_COMM_WORLD, test);
+   SampleGenerator sample_gen(MPI_COMM_WORLD);
    sample_gen.SetParamSpaceSizes();
 
-   EXPECT_EQ(test->GetProblemName(), "poisson0");
    EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
 
    Parameter *param = NULL;
@@ -68,11 +65,9 @@ TEST(RandomSampleGeneratorTest, Test_Parsing)
 {
    config = InputParser("inputs/test_param_prob.yml");
 
-   ParameterizedProblem *test = InitParameterizedProblem();
-   RandomSampleGenerator sample_gen(MPI_COMM_WORLD, test);
+   RandomSampleGenerator sample_gen(MPI_COMM_WORLD);
    sample_gen.SetParamSpaceSizes();
 
-   EXPECT_EQ(test->GetProblemName(), "poisson0");
    EXPECT_EQ(sample_gen.GetNumSampleParams(), 2);
 
    Parameter *param = NULL;

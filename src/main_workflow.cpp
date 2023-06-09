@@ -67,7 +67,7 @@ MultiBlockSolver* InitSolver()
    return solver;
 }
 
-SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* problem)
+SampleGenerator* InitSampleGenerator(MPI_Comm comm)
 {
    SampleGenerator* generator = NULL;
 
@@ -75,11 +75,11 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm, ParameterizedProblem* proble
 
    if (type == "base")
    {
-      generator = new SampleGenerator(comm, problem);
+      generator = new SampleGenerator(comm);
    }
    else if (type == "random")
    {
-      generator = new RandomSampleGenerator(comm, problem);
+      generator = new RandomSampleGenerator(comm);
    }
    else
    {
@@ -93,7 +93,7 @@ void GenerateSamples(MPI_Comm comm)
 {
    YAML::Node dict0 = YAML::Clone(config.dict_);
    ParameterizedProblem *problem = InitParameterizedProblem();
-   SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
+   SampleGenerator *sample_generator = InitSampleGenerator(comm);
    sample_generator->SetParamSpaceSizes();
    MultiBlockSolver *test = NULL;
 
@@ -152,7 +152,7 @@ void BuildROM(MPI_Comm comm)
    if (!rom->UseExistingBasis())
    {
       // TODO: basis for multiple components
-      SampleGenerator *sample_generator = InitSampleGenerator(comm, problem);
+      SampleGenerator *sample_generator = InitSampleGenerator(comm);
       sample_generator->SetParamSpaceSizes();
       const int total_samples = sample_generator->GetTotalSampleSize();
       

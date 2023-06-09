@@ -16,14 +16,13 @@
 using namespace mfem;
 using namespace std;
 
-SampleGenerator::SampleGenerator(MPI_Comm comm, ParameterizedProblem *target)
-   : problem(target)
+SampleGenerator::SampleGenerator(MPI_Comm comm)
 {
    MPI_Comm_size(comm, &num_procs);
    MPI_Comm_rank(comm, &proc_rank);
 
    sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
-   std::string problem_name = problem->GetProblemName();
+   std::string problem_name = config.GetOption<std::string>("parameterized_problem/name", "sample");
    sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", problem_name);
 
    file_offset = config.GetOption<int>("sample_generation/file_path/offset", 0);
@@ -130,14 +129,8 @@ const Array<int> SampleGenerator::GetSampleIndex(const int &index)
 void SampleGenerator::SetSampleParams(const int &index)
 {
    assert(params.Size() == num_sampling_params);
-   problem->local_sample_index = index;
 
    const Array<int> nested_idx = GetSampleIndex(index);
-
-   // Vector params(num_sampling_params);
-   // for (int p = 0; p < num_sampling_params; p++)
-   //    params(p) = (*double_paramspace[p])[nested_idx[p]];
-   // problem->SetParams(sample2problem, params);
 
    for (int p = 0; p < num_sampling_params; p++)
       params[p]->SetParam(nested_idx[p], config);
