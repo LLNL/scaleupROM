@@ -49,15 +49,15 @@ parameterized_problem:
 
 single_run:
   poisson0:
-    - parameter_name: k
-      value: 2.5
+    k: 2.5
 
 sample_generation:
   component_sampling: false
   file_path:
     prefix: "poisson0"
-  poisson0:
-    - parameter_name: k
+  parameters:
+    - key: single_run/poisson0/k
+      type: double
       sample_size: 2
       minimum: 2.0
       maximum: 2.5

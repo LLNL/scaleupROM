@@ -4,13 +4,21 @@ parameterized_problem:
 sample_generation:
   random_sample_generator:
     number_of_samples: 7
-  poisson0:
-    - parameter_name: k
+  parameters:
+    - key: test/k
+      type: double
       sample_size: 5
       minimum: 0.0
       maximum: 4.0
-    - parameter_name: offset
+    - key: test/offset
+      type: double
       sample_size: 8
       minimum: 1.0
       maximum: 128.0
       log_scale: true
+    - key: test/filename
+      type: filename
+      sample_size: 4
+      format: testfile.%08d.h5
+      minimum: 0
+      maximum: 12

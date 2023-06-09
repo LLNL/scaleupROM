@@ -3,6 +3,9 @@ mms_suite.hpp
 mms_suite.cpp
 $<TARGET_OBJECTS:scaleupROMObj>)
 
+add_executable(test_parser test_parser.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+file(COPY inputs/test.parser.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
+
 add_executable(poisson_dd_mms poisson_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(dg_integ_mms dg_integ_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)

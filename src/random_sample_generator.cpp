@@ -20,8 +20,12 @@ using namespace std;
 
 void RandomSampleGenerator::SetParamSpaceSizes()
 {
-   total_samples = config.GetRequiredOption<int>("sample_generation/random_sample_generator/number_of_samples");
    assert(num_sampling_params > 0);
+   assert(params.Size() == num_sampling_params);
+
+   total_samples = config.GetRequiredOption<int>("sample_generation/random_sample_generator/number_of_samples");
+   for (int p = 0; p < params.Size(); p++)
+      params[p]->SetSize(total_samples);
 
    // For random sample generator, all parameter have total_samples.
    sampling_sizes.SetSize(num_sampling_params);
@@ -32,42 +36,6 @@ void RandomSampleGenerator::SetParamSpaceSizes()
 
    // TODO: custom random seed
    srand(time(NULL));
-}
-
-void RandomSampleGenerator::GenerateParamSpace()
-{
-   YAML::Node param_list = config.FindNode(param_list_str);
-   if (!param_list) mfem_error("SampleGenerator - cannot find the problem name!\n");
-   assert(num_sampling_params > 0);
-
-   SetParamSpaceSizes();
-   assert(sampling_sizes.Size() == num_sampling_params);
-
-   double_paramspace.SetSize(num_sampling_params);
-   double_paramspace = NULL;
-
-   for (int p = 0; p < num_sampling_params; p++)
-   {
-      assert(sampling_sizes[p] == total_samples);
-
-      double_paramspace[p] = new Vector(sampling_sizes[p]);
-      double minval = config.GetRequiredOptionFromDict<double>("minimum", param_list[p]);
-      double maxval = config.GetRequiredOptionFromDict<double>("maximum", param_list[p]);
-
-      bool log_scale = config.GetOptionFromDict<bool>("log_scale", false, param_list[p]);
-      if (log_scale)
-      {
-         double dp = (maxval / minval);
-         for (int s = 0; s < double_paramspace[p]->Size(); s++)
-            (*double_paramspace[p])[s] = minval * pow(dp, UniformRandom());
-      }
-      else
-      {
-         double dp = (maxval - minval);
-         for (int s = 0; s < double_paramspace[p]->Size(); s++)
-            (*double_paramspace[p])[s] = minval + dp * UniformRandom();
-      }
-   }  // for (int p = 0; p < num_sampling_params; p++)
 }
 
 // This is not needed for RandomGenerator, but kept it for compatibility.
@@ -99,10 +67,8 @@ const Array<int> RandomSampleGenerator::GetSampleIndex(const int &index)
 
 void RandomSampleGenerator::SetSampleParams(const int &index)
 {
-   problem->local_sample_index = index;
-
-   Vector params(num_sampling_params);
+   assert(params.Size() == num_sampling_params);
+   
    for (int p = 0; p < num_sampling_params; p++)
-      params(p) = (*double_paramspace[p])[index];
-   problem->SetParams(sample2problem, params);
+      params[p]->SetRandomParam(config);
 }

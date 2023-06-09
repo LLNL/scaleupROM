@@ -91,9 +91,6 @@ protected:
 
    Array<double *> param_ptr; // address of parameters in function_factory.
 
-   // local sample index;
-   int local_sample_index;
-
 public:
    ParameterizedProblem();
 
@@ -101,7 +98,6 @@ public:
 
    const std::string GetProblemName() { return problem_name; }
    const int GetNumParams() { return param_num; }
-   const int GetLocalSampleIndex() { return local_sample_index; }
    const int GetParamIndex(const std::string &name)
    {
       if (!(param_map.count(name))) printf("%s\n", name.c_str());
