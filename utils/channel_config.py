@@ -325,10 +325,23 @@ class ChannelConfig(Configuration):
             num_finals += config.GenerateAllConfigs(extension-1, offset + num_finals)
 
         return num_finals
+    
+    def CreateRandomConfig(self, extension, filename):
+        config = deepcopy(self)
+        for k in range(extension):
+            avail_faces, avail_locs = config.getAvailableFaces()
+            idx = np.random.randint(len(avail_locs))
+            config.addMesh(0, avail_locs[idx])
+        config.close()
+        config.save(filename)
+        return
 
 if __name__ == "__main__":
     example = ChannelConfig('pipe-hub')
-    example.GenerateAllConfigs(3, 0)
+    # example.GenerateAllConfigs(3, 0)
+
+    example.CreateRandomConfig(8, 'channel.9comp.h5')
+
     # avail_faces, avail_locs = example.getAvailableFaces()
     # # print(avail_locs)
 
