@@ -8,24 +8,40 @@
 
 // As usual, we start by defining some variables:
 
-// Lc1 = 0.4;
-Lc1 = 0.125;
+Lc1 = 0.125; Lc2 = 0.04;
 
 Point(1) = {0, 0, 0, Lc1}; Point(2) = {1, 0, 0, Lc1};
 Point(3) = {0, 1, 0, Lc1}; Point(4) = {1, 1, 0, Lc1};
-
-Point(5) = {0.75, 0.25, 0, Lc1};
-Point(6) = {0.75, 0.75, 0, Lc1};
-Point(7) = {0.25, 0.5, 0, Lc1};
 
 Line(1)  = {1 , 2};
 Line(2)  = {2 , 4};
 Line(3)  = {4 , 3};
 Line(4)  = {3 , 1};
 
-Line(5)  = {5 , 6};
-Line(6)  = {6 , 7};
-Line(7)  = {7 , 5};
+nc = 3; cangle = (nc - 2) * Pi / nc;
+cx = 0.5; cy = 0.5; r0 = 0.25;
+r1 = 0.05; r2 = r0 - r1 / Cos(0.5 * cangle); r3 = r1 * Tan(0.5 * cangle);
+For i In {0:nc-1}
+    angle1 = i * 2. * Pi / nc + 1.0 * Pi;
+    ix = cx + r2 * Cos(angle1);
+    iy = cy + r2 * Sin(angle1);
+    Point(i+5) = {ix, iy, 0, Lc2};
+
+    angle2 = 0.5 * Pi - 0.5 * cangle;
+    Point((2*i+1)+5+(nc-1)) = {ix + r3 * Cos(angle1 - angle2), iy + r3 * Sin(angle1 - angle2), 0, Lc2};
+    Point((2*i+2)+5+(nc-1)) = {ix + r3 * Cos(angle1 + angle2), iy + r3 * Sin(angle1 + angle2), 0, Lc2};
+EndFor
+
+maxIdx = 2*(nc-1)+2+5+(nc-1);
+For i In {0:nc-1}
+    Circle(2*i+5) = {(2*i+1)+5+(nc-1),i+5,(2*i+2)+5+(nc-1)};
+    idx1 = (2*i+2)+5+(nc-1);
+    idx2 = idx1+1;
+    If (idx2 > maxIdx)
+        idx2 -= 2*nc;
+    EndIf
+    Line(2*i+6) = {idx1, idx2};
+EndFor
 
 // The third elementary entity is the surface. In order to define a simple
 // rectangular surface from the four curves defined above, a curve loop has
@@ -35,7 +51,7 @@ Line(7)  = {7 , 5};
 // a loop):
 
 Curve Loop(1) = {4, 1, 2, 3};
-Curve Loop(2) = {5, 6, 7};
+Curve Loop(2) = {5:5+(2*nc-1)};
 
 // We can then define the surface as a list of curve loops (only one here,
 // representing the external contour, since there are no holes--see `t4.geo' for
@@ -47,7 +63,7 @@ Physical Curve(1) = {1};
 Physical Curve(2) = {2};
 Physical Curve(3) = {3};
 Physical Curve(4) = {4};
-Physical Curve(5) = {5, 6, 7};
+Physical Curve(5) = {5:5+(2*nc-1)};
 Physical Surface(1) = {1};
 
 // Point(10) = {0.2, 0, 0, Lc1};
@@ -60,8 +76,7 @@ Physical Surface(1) = {1};
 // Point{12} In Surface {1};
 // Point{13} In Surface {1};
 
-// Mesh.Algorithm = 11; // Delaunay for quads
-Mesh.Algorithm = 4;
+Mesh.Algorithm = 1;
 Mesh.AnisoMax = 0;
 Mesh.ElementOrder = 3;
 Mesh.MshFileVersion = 2.2;
