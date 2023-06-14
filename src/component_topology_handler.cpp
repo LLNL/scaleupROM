@@ -247,8 +247,14 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
 
       // Global interface port data.
       Array2D<int> tmp;
-      hdf5_utils::ReadDataset(grp_id, "interface", tmp);
-      num_ports = tmp.NumRows();
+      if (num_ref_ports == 0) // no ports needed or used.
+         num_ports = 0;
+      else
+      {
+         hdf5_utils::ReadDataset(grp_id, "interface", tmp);
+         num_ports = tmp.NumRows();
+      }
+      
       port_infos.SetSize(num_ports);
       port_types.SetSize(num_ports);
 

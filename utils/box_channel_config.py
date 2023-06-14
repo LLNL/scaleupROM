@@ -13,6 +13,7 @@ class BoxChannelConfig(Configuration):
                 (1, 0):   2,
                 (0, 1):   3,
                 (-1, 0):  4}
+    comp_used = []
 
     def __init__(self, nx_, ny_):
         self.nx, self.ny = nx_, ny_
@@ -24,6 +25,7 @@ class BoxChannelConfig(Configuration):
 
         self.test_locs = [k for k in range(self.nmesh)]
         self.test = []
+        self.comp_used = []
         return
     
     def addComponent(self, component):
@@ -32,6 +34,7 @@ class BoxChannelConfig(Configuration):
             assert(component.face_map[key] == val)
 
         Configuration.addComponent(self, component)
+        self.comp_used += [False]
         return
 
     
@@ -54,6 +57,7 @@ class BoxChannelConfig(Configuration):
             self.appendInterface(k, -1, face1, face2)
 
         self.avail_locs.remove(new_loc)
+        self.comp_used[comp_idx] = True
         return
     
     def interfaceForPair(self, midx1, midx2):
@@ -108,15 +112,27 @@ class BoxChannelConfig(Configuration):
         config.close()
         config.save(filename)
         return
+    
+    def save(self, filename):
+        comp0 = deepcopy(self.comps)
+        from itertools import compress
+        self.comps = list(compress(self.comps, self.comp_used))
+
+        Configuration.save(self, filename)
+        self.comps = comp0
+        return
 
 if __name__ == "__main__":
-    example = BoxChannelConfig(2,2)
+    example = BoxChannelConfig(1,1)
     example.addComponent(Empty())
     example.addComponent(ObjectInSpace('square-circle'))
+    example.addComponent(ObjectInSpace('square-square'))
+    example.addComponent(ObjectInSpace('square-triangle'))
+    example.addComponent(ObjectInSpace('square-star'))
 
     example.GenerateAllConfigs(0)
 
-    example.CreateRandomConfig('channel.random.h5')
+    # example.CreateRandomConfig('channel.random.h5')
 
     # avail_faces, avail_locs = example.getAvailableFaces()
     # # print(avail_locs)

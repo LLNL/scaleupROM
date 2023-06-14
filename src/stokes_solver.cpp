@@ -878,6 +878,7 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
    // Ensure incompressibility.
    function_factory::stokes_problem::del_u = 0.0;
+   function_factory::stokes_problem::x0.SetSize(dim);
    if (!pres_dbc)
    {
       Array<bool> nz_dbcs(numBdr);
