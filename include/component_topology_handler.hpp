@@ -102,7 +102,7 @@ protected:
    bool write_ports = false;
 
    // Map from component name to array index.
-   std::unordered_map<std::string, int> comp_names;
+   std::unordered_map<std::string, int> comp_name2idx;
    // Reference meshes for components.
    Array<BlockMesh*> components;
 

@@ -112,9 +112,9 @@ void ComponentTopologyHandler::SetupComponents()
    {
       std::string comp_name = config.GetRequiredOptionFromDict<std::string>("name", comp_list[c]);
       // do not read if this component is not used in the global config.
-      if (!comp_names.count(comp_name)) continue;
+      if (!comp_name2idx.count(comp_name)) continue;
 
-      int idx = comp_names[comp_name];
+      int idx = comp_name2idx[comp_name];
       std::string filename = config.GetRequiredOptionFromDict<std::string>("file", comp_list[c]);
       components[idx] = new BlockMesh(filename.c_str());
 
@@ -172,16 +172,18 @@ void ComponentTopologyHandler::ReadComponentsFromFile(const std::string filename
    
    {  // Component list.
       // This line below currently does not work.
-      // hdf5_utils::ReadDataset(file_id, "components", comp_names);
+      // hdf5_utils::ReadDataset(file_id, "components", comp_name2idx);
       grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
       assert(grp_id >= 0);
 
       hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
+      comp_names.resize(num_comp);
       for (int c = 0; c < num_comp; c++)
       {
          std::string tmp;
          hdf5_utils::ReadAttribute(grp_id, std::to_string(c).c_str(), tmp);
-         comp_names[tmp] = c;
+         comp_name2idx[tmp] = c;
+         comp_names[c] = tmp;
       }
 
       // Mesh list.
@@ -365,8 +367,8 @@ void ComponentTopologyHandler::ReadPortDatasFromFile(const std::string filename)
       hdf5_utils::ReadAttribute(grp_id, "component1", name1);
       hdf5_utils::ReadAttribute(grp_id, "component2", name2);
 
-      int comp1 = comp_names[name1];
-      int comp2 = comp_names[name2];
+      int comp1 = comp_name2idx[name1];
+      int comp2 = comp_name2idx[name2];
       assert((comp1 >= 0) && (comp2 >= 0));
 
       Array<int> vtx1, vtx2;
@@ -441,19 +443,9 @@ void ComponentTopologyHandler::WritePortDataToFile(const PortData &port,
       hdf5_utils::WriteAttribute(grp_id, "bdr_attr1", port.Attr1);
       hdf5_utils::WriteAttribute(grp_id, "bdr_attr2", port.Attr2);
 
-      std::string comp1_name, comp2_name;
-      for (auto& it : comp_names)
-         if (it.second == port.Component1)
-         {
-            comp1_name = it.first;
-            break;
-         }
-      for (auto& it : comp_names)
-         if (it.second == port.Component2)
-         {
-            comp2_name = it.first;
-            break;
-         }
+      std::string comp1_name = comp_names[port.Component1];
+      std::string comp2_name = comp_names[port.Component2];
+
       hdf5_utils::WriteAttribute(grp_id, "component1", comp1_name);
       hdf5_utils::WriteAttribute(grp_id, "component2", comp2_name);
 
@@ -662,13 +654,13 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
    assert(components.Size() == num_comp);
    std::string name1 = config.GetRequiredOptionFromDict<std::string>("comp1/name", port_dict);
    std::string name2 = config.GetRequiredOptionFromDict<std::string>("comp2/name", port_dict);
-   if (!comp_names.count(name1))
+   if (!comp_name2idx.count(name1))
       mfem_error("component 1 for the port building does not exist!\n");
-   if (!comp_names.count(name2))
+   if (!comp_name2idx.count(name2))
       mfem_error("component 2 for the port building does not exist!\n");
    
-   int idx1 = comp_names[name1];
-   int idx2 = comp_names[name2];
+   int idx1 = comp_name2idx[name1];
+   int idx2 = comp_name2idx[name2];
    Mesh *comp1 = components[idx1];
    Mesh *comp2 = components[idx2];
    assert(comp1 != NULL);

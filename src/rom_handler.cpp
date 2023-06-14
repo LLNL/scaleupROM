@@ -517,8 +517,9 @@ const std::string ROMHandler::GetSnapshotPrefix(const int &sample_idx, const int
          int c_type = topol_handler->GetMeshType(subdomain_idx);
          int c_idx = topol_handler->GetComponentIndexOfMesh(subdomain_idx);
          int comp_sample = sample_idx * topol_handler->GetNumSubdomains(c_type) + c_idx;
+         std::string c_name = topol_handler->GetComponentName(c_type);
 
-         prefix += std::to_string(comp_sample) + "_comp" + std::to_string(c_type);
+         prefix += std::to_string(comp_sample) + "_" + c_name;
          break;
       }
       default:
