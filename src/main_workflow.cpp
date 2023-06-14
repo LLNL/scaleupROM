@@ -91,6 +91,7 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm)
 
 void GenerateSamples(MPI_Comm comm)
 {
+   // save the original config.dict_
    YAML::Node dict0 = YAML::Clone(config.dict_);
    ParameterizedProblem *problem = InitParameterizedProblem();
    SampleGenerator *sample_generator = InitSampleGenerator(comm);
@@ -101,6 +102,7 @@ void GenerateSamples(MPI_Comm comm)
    {
       if (!sample_generator->IsMyJob(s)) continue;
 
+      // NOTE: this will change config.dict_
       sample_generator->SetSampleParams(s);
 
       test = InitSolver();
@@ -126,6 +128,7 @@ void GenerateSamples(MPI_Comm comm)
 
    delete sample_generator;
    delete problem;
+   // restore the original config.dict_
    config.dict_ = dict0;
 }
 

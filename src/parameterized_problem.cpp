@@ -249,6 +249,10 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new StokesComponent();
    }
+   else if (problem_name == "stokes_flow_past_array")
+   {
+      problem = new StokesFlowPastArray();
+   }
    else
    {
       mfem_error("Unknown parameterized problem name!\n");
