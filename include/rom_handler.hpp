@@ -152,6 +152,7 @@ public:
    { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
 
    const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
+   const std::string GetBasisPrefix(const TrainMode &mode, const int &index);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }

@@ -213,7 +213,7 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
 
    for (int c = 0; c < num_basis_sets; c++)
    {
-      std::string basis_name = basis_prefix + "_universal_comp" + std::to_string(c);
+      std::string basis_name = GetBasisPrefix(TrainMode::UNIVERSAL, c);
       // Determine dimension of the basis vectors.
       int basis_dim = -1;
       for (int m = 0; m < numSub; m++)
@@ -251,7 +251,7 @@ void ROMHandler::FormReducedBasisIndividual(const int &total_samples)
 
    for (int m = 0; m < numSub; m++)
    {
-      basis_name = basis_prefix + "_dom" + std::to_string(m);
+      basis_name = GetBasisPrefix(TrainMode::INDIVIDUAL, m);
       rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
@@ -283,7 +283,7 @@ void ROMHandler::LoadReducedBasis()
          carom_spatialbasis.SetSize(num_basis_sets);
          for (int k = 0; k < num_basis_sets; k++)
          {
-            basis_name = basis_prefix + "_universal_comp" + std::to_string(k);
+            basis_name = GetBasisPrefix(TrainMode::UNIVERSAL, k);
             basis_reader = new CAROM::BasisReader(basis_name);
 
             carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
@@ -300,7 +300,7 @@ void ROMHandler::LoadReducedBasis()
          carom_spatialbasis.SetSize(numSub);
          for (int j = 0; j < numSub; j++)
          {
-            basis_name = basis_prefix + "_dom" + std::to_string(j);
+            basis_name = GetBasisPrefix(TrainMode::INDIVIDUAL, j);
             basis_reader = new CAROM::BasisReader(basis_name);
 
             carom_spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis[j]);
@@ -529,6 +529,30 @@ const std::string ROMHandler::GetSnapshotPrefix(const int &sample_idx, const int
       }
    }
    return prefix;
+}
+
+const std::string ROMHandler::GetBasisPrefix(const TrainMode &mode, const int &index)
+{
+   std::string basis_name;
+   switch (mode)
+   {
+      case (INDIVIDUAL):
+      {
+         basis_name = basis_prefix + "_dom" + std::to_string(index);
+         break;
+      }
+      case (UNIVERSAL):
+      {
+         basis_name = basis_prefix + "_universal_" + topol_handler->GetComponentName(index);
+         break;
+      }
+      default:
+      {
+         mfem_error("ROMHandler::GetSnapshotPrefix - Unknown training mode!\n");
+         break;
+      }
+   }
+   return basis_name;
 }
 
 void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
