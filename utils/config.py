@@ -46,6 +46,14 @@ class PipeHub(Component):
         self.avail_face = deepcopy(self.face_map_inv)
         return
     
+class ObjectInSpace(PipeHub):
+    name = 'object-in-space'
+
+    def __init__(self, name='square-square'):
+        PipeHub.__init__(self)
+        self.name = name
+        return
+    
 class Configuration:
     prefix = 'config'
     dim = 2
@@ -58,9 +66,9 @@ class Configuration:
     # meshes in the global configuration. These are in fact pointers to reference component.
     meshes = []
     mesh_types = []
-    loc = np.array([[]], dtype=int)
-    bdr_data = np.array([[]], dtype=int)
-    if_data = np.array([[]], dtype=int)
+    loc = np.array([], dtype=int)
+    bdr_data = np.array([], dtype=int)
+    if_data = np.array([], dtype=int)
 
     def __init__(self):
         return
@@ -87,11 +95,19 @@ class Configuration:
         assert(self.isLocationAvailable(new_loc))
 
         # add new mesh and its type.
-        self.meshes += [deepcopy(self.comps[comp_idx])]
+        # NOTE: this if-statement is necessary in order to keep proper memory address
+        #       for GenerateAllConfigs!!
+        if (len(self.meshes) == 0):
+            self.meshes = [deepcopy(self.comps[comp_idx])]
+        else:    
+            self.meshes += [deepcopy(self.comps[comp_idx])]
         self.mesh_types += [comp_idx]
 
         # add the new mesh's location.
-        self.loc = np.append(self.loc, [new_loc], axis=0)        
+        if (self.loc.ndim == 1):
+            self.loc = np.array([new_loc])
+        else:
+            self.loc = np.append(self.loc, [new_loc], axis=0)        
         return
     
     def appendBoundary(self, gbattr, m_idx, face):
@@ -99,7 +115,10 @@ class Configuration:
         if face in self.meshes[m_idx].avail_face:
             self.meshes[m_idx].avail_face.pop(face)
 
-        self.bdr_data = np.append(self.bdr_data, [[gbattr, m_idx, face]], axis=0)
+        if (self.bdr_data.ndim == 1):
+            self.bdr_data = np.array([[gbattr, m_idx, face]])
+        else:
+            self.bdr_data = np.append(self.bdr_data, [[gbattr, m_idx, face]], axis=0)
         return
     
     def appendInterface(self, midx1, midx2, face1, face2):
@@ -160,3 +179,26 @@ class Configuration:
             # boundary attributes
             f.create_dataset("boundary", self.bdr_data.shape, data=self.bdr_data)
         return
+    
+    def allFacesClosed(self):
+        for mesh in self.meshes:
+            if (len(mesh.avail_face) > 0):
+                return False
+
+        mesh_faces = []
+        for mesh in self.meshes:
+            mesh_faces += [mesh.ref_battr.copy()]
+
+        for bdr in self.bdr_data:
+            mesh_faces[bdr[1]].remove(bdr[2])
+
+        for iface in self.if_data:
+            mesh_faces[iface[0]].remove(iface[2])
+            mesh_faces[iface[1]].remove(iface[3])
+
+        closed = True
+        for mesh_face in mesh_faces:
+            if (len(mesh_face) != 0):
+                return False
+
+        return closed

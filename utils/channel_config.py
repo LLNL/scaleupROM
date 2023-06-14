@@ -103,29 +103,6 @@ class ChannelConfig(Configuration):
             raise RuntimeError('ChannelConfig is not closed even after close()!')
         return
     
-    def allFacesClosed(self):
-        for mesh in self.meshes:
-            if (len(mesh.avail_face) > 0):
-                return False
-
-        mesh_faces = []
-        for mesh in self.meshes:
-            mesh_faces += [mesh.ref_battr.copy()]
-
-        for bdr in self.bdr_data:
-            mesh_faces[bdr[1]].remove(bdr[2])
-
-        for iface in self.if_data:
-            mesh_faces[iface[0]].remove(iface[2])
-            mesh_faces[iface[1]].remove(iface[3])
-
-        closed = True
-        for mesh_face in mesh_faces:
-            if (len(mesh_face) != 0):
-                return False
-
-        return closed
-    
     def GenerateAllConfigs(self, extension, offset):
         assert(extension >= 0)
         if (extension == 0):
