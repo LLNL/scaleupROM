@@ -9,6 +9,10 @@ class BoxChannelConfig(Configuration):
     ny = -1
     nmesh = -1
     avail_locs = []
+    face_map = {(0, -1):  1,
+                (1, 0):   2,
+                (0, 1):   3,
+                (-1, 0):  4}
 
     def __init__(self, nx_, ny_):
         self.nx, self.ny = nx_, ny_
@@ -21,6 +25,15 @@ class BoxChannelConfig(Configuration):
         self.test_locs = [k for k in range(self.nmesh)]
         self.test = []
         return
+    
+    def addComponent(self, component):
+        for key, val in self.face_map.items():
+            assert(key in component.face_map)
+            assert(component.face_map[key] == val)
+
+        Configuration.addComponent(self, component)
+        return
+
     
     def isLocationAvailable(self, new_loc):
         for loc in self.avail_locs:
