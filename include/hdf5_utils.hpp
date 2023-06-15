@@ -161,6 +161,11 @@ void WriteDataset(hid_t source, std::string dataset, const Array2D<T> &value)
 void ReadDataset(hid_t source, std::string dataset, DenseMatrix &value);
 void WriteDataset(hid_t source, std::string dataset, const DenseMatrix &value);
 
+inline bool pathExists(hid_t id, const std::string& path)
+{
+  return H5Lexists(id, path.c_str(), H5P_DEFAULT) > 0;
+}
+
 }
 
 #endif

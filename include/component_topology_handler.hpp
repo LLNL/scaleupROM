@@ -12,6 +12,7 @@
 #ifndef COMPONENT_TOPOLOGY_HANDLER_HPP
 #define COMPONENT_TOPOLOGY_HANDLER_HPP
 
+#include "hdf5.h"
 #include "topology_handler.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
@@ -123,8 +124,10 @@ protected:
 
    // Reference ports between components.
    int num_ref_ports = -1;
-   std::unordered_map<std::string, int> port_names;
+   std::unordered_map<std::string, int> port_name2idx;
+   std::vector<std::string> port_names;
    Array<PortData*> ref_ports;
+   Array<YAML::Node*> port_dicts;   // TODO: need to sort out datatype/structs..
    Array<Array<InterfaceInfo>*> ref_interfaces;
 
    // Global port configuration
@@ -168,6 +171,7 @@ protected:
    void ReadComponentsFromFile(const std::string filename);
    // Read reference port list and names. not the actual port data.
    void ReadPortsFromFile(const std::string filename);
+   YAML::Node* ReadPortDict(hid_t grp_id, const std::string& port_name);
    // Read boundary attribute map between components and global.
    void ReadBoundariesFromFile(const std::string filename);
 
