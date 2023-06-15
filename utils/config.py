@@ -99,9 +99,10 @@ class Configuration:
         #       for GenerateAllConfigs!!
         if (len(self.meshes) == 0):
             self.meshes = [deepcopy(self.comps[comp_idx])]
+            self.mesh_types = [comp_idx]
         else:    
             self.meshes += [deepcopy(self.comps[comp_idx])]
-        self.mesh_types += [comp_idx]
+            self.mesh_types += [comp_idx]
 
         # add the new mesh's location.
         if (self.loc.ndim == 1):
