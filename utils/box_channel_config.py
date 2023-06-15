@@ -16,6 +16,7 @@ class BoxChannelConfig(Configuration):
     comp_used = []
 
     def __init__(self, nx_, ny_):
+        Configuration.__init__(self)
         self.nx, self.ny = nx_, ny_
         self.nmesh = self.nx * self.ny
         self.avail_locs = []
@@ -114,6 +115,7 @@ class BoxChannelConfig(Configuration):
             config.addMesh(cidx, 0)
         config.close()
         config.save(filename)
+        print('%s is saved.' % filename)
         return
     
     def save(self, filename):
@@ -144,16 +146,38 @@ class BoxChannelConfig(Configuration):
         return orig_comps, orig_mesh_types
 
 if __name__ == "__main__":
-    example = BoxChannelConfig(2,2)
-    example.addComponent(Empty())
-    example.addComponent(ObjectInSpace('square-circle'))
-    example.addComponent(ObjectInSpace('square-square'))
-    example.addComponent(ObjectInSpace('square-triangle'))
-    example.addComponent(ObjectInSpace('square-star'))
+    comp_list = {'empty': Empty(),
+                 'circle': ObjectInSpace('square-circle'),
+                 'square': ObjectInSpace('square-square'),
+                 'triange': ObjectInSpace('square-triangle'),
+                 'star': ObjectInSpace('square-star'),}
+    
+    # example.addComponent(Empty())
+    
+    # example.addComponent(ObjectInSpace('square-square'))
+    # example.addComponent(ObjectInSpace('square-triangle'))
+    # example.addComponent(ObjectInSpace('square-star'))
 
     # example.GenerateAllConfigs(0)
 
-    example.CreateRandomConfig('box-channel.2x2.random.h5')
+    for name, comp in comp_list.items():
+        example = BoxChannelConfig(2,2)
+        example.addComponent(comp)
+        example.CreateRandomConfig('box-channel.2x2.%s.h5' % name)
+
+        example = BoxChannelConfig(4,4)
+        example.addComponent(comp)
+        example.CreateRandomConfig('box-channel.4x4.%s.h5' % name)
+
+    test = BoxChannelConfig(2,2)
+    for name, comp in comp_list.items():
+        test.addComponent(comp)
+    test.CreateRandomConfig('box-channel.2x2.random.h5')
+
+    test = BoxChannelConfig(4,4)
+    for name, comp in comp_list.items():
+        test.addComponent(comp)
+    test.CreateRandomConfig('box-channel.4x4.random.h5')
 
     # avail_faces, avail_locs = example.getAvailableFaces()
     # # print(avail_locs)

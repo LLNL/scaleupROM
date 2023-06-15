@@ -71,6 +71,13 @@ class Configuration:
     if_data = np.array([], dtype=int)
 
     def __init__(self):
+        self.comps = []
+        self.ports = {}
+        self.meshes = []
+        self.mesh_types = []
+        self.loc = np.array([], dtype=int)
+        self.bdr_data = np.array([], dtype=int)
+        self.if_data = np.array([], dtype=int)
         return
     
     def addComponent(self, component):
