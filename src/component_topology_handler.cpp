@@ -350,10 +350,10 @@ YAML::Node* ComponentTopologyHandler::ReadPortDict(hid_t grp_id, const std::stri
    YAML::Node *port_dict = new YAML::Node;
 
    (*port_dict)["name"] = port_name;
-   (*port_dict)["comp1/name"] = comp1;
-   (*port_dict)["comp2/name"] = comp2;
-   (*port_dict)["comp1/attr"] = attr1;
-   (*port_dict)["comp2/attr"] = attr2;
+   (*port_dict)["comp1"]["name"] = comp1;
+   (*port_dict)["comp2"]["name"] = comp2;
+   (*port_dict)["comp1"]["attr"] = attr1;
+   (*port_dict)["comp2"]["attr"] = attr2;
    (*port_dict)["comp2_configuration"] = trnsf2;
 
    return port_dict;

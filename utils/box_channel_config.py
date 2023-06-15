@@ -144,16 +144,16 @@ class BoxChannelConfig(Configuration):
         return orig_comps, orig_mesh_types
 
 if __name__ == "__main__":
-    example = BoxChannelConfig(1,1)
+    example = BoxChannelConfig(2,2)
     example.addComponent(Empty())
     example.addComponent(ObjectInSpace('square-circle'))
     example.addComponent(ObjectInSpace('square-square'))
     example.addComponent(ObjectInSpace('square-triangle'))
     example.addComponent(ObjectInSpace('square-star'))
 
-    example.GenerateAllConfigs(0)
+    # example.GenerateAllConfigs(0)
 
-    # example.CreateRandomConfig('channel.random.h5')
+    example.CreateRandomConfig('box-channel.2x2.random.h5')
 
     # avail_faces, avail_locs = example.getAvailableFaces()
     # # print(avail_locs)

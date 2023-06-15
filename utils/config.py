@@ -155,6 +155,10 @@ class Configuration:
         return
     
     def save(self, filename):
+        comp_name2idx = {}
+        for k, comp in enumerate(self.comps):
+            comp_name2idx[comp.name] = k
+
         with h5py.File(filename, 'w') as f:
             # c++ currently cannot read datasets of string.
             # change to multiple attributes, only as a temporary implementation.
@@ -172,8 +176,18 @@ class Configuration:
 
             grp = f.create_group("ports")
             grp.attrs["number_of_references"] = len(self.ports)
-            for k in range(len(self.ports)):
-                grp.attrs["%d" % k] = "port%d" % k
+            for interface, p in self.ports.items():
+                port_name = "port%d" % p
+                grp.attrs["%d" % p] = port_name
+                port = grp.create_group(port_name)
+                port.attrs["comp1"] = interface[0]
+                port.attrs["comp2"] = interface[1]
+                port.attrs["attr1"] = interface[2]
+                port.attrs["attr2"] = interface[3]
+                config2 = np.zeros(6,)
+                config2[:2] = list(self.comps[comp_name2idx[interface[0]]].face_map_inv[interface[2]])
+
+                port.create_dataset("comp2_configuration", (6,), data=config2)
 
             grp.create_dataset("interface", self.if_data.shape, data=self.if_data)
 
