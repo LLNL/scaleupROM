@@ -13,6 +13,7 @@ class BoxChannelConfig(Configuration):
                 (1, 0):   2,
                 (0, 1):   3,
                 (-1, 0):  4}
+    comp_used = []
 
     def __init__(self, nx_, ny_):
         self.nx, self.ny = nx_, ny_
@@ -24,6 +25,7 @@ class BoxChannelConfig(Configuration):
 
         self.test_locs = [k for k in range(self.nmesh)]
         self.test = []
+        self.comp_used = []
         return
     
     def addComponent(self, component):
@@ -32,6 +34,10 @@ class BoxChannelConfig(Configuration):
             assert(component.face_map[key] == val)
 
         Configuration.addComponent(self, component)
+        if (len(self.comp_used) == 0):
+            self.comp_used = [False]
+        else:
+            self.comp_used += [False]
         return
 
     
@@ -54,6 +60,7 @@ class BoxChannelConfig(Configuration):
             self.appendInterface(k, -1, face1, face2)
 
         self.avail_locs.remove(new_loc)
+        self.comp_used[comp_idx] = True
         return
     
     def interfaceForPair(self, midx1, midx2):
@@ -108,6 +115,33 @@ class BoxChannelConfig(Configuration):
         config.close()
         config.save(filename)
         return
+    
+    def save(self, filename):
+        comp0, meshtype0 = self.removeUnusedComponents()
+
+        Configuration.save(self, filename)
+        self.comps, self.mesh_types = comp0, meshtype0
+        return
+    
+    def removeUnusedComponents(self):
+        assert(len(self.comps) == len(self.comp_used))
+        orig_comps = deepcopy(self.comps)
+        orig_mesh_types = deepcopy(self.mesh_types)
+
+        idx_map = [-1] * len(self.comps)
+        new_idx, new_comps = 0, []
+        for k, used in enumerate(self.comp_used):
+            if (used):
+                idx_map[k] = new_idx
+                new_comps += [self.comps[k]]
+                new_idx += 1
+        self.mesh_types = [idx_map[mesh_type] for mesh_type in self.mesh_types]
+        self.comps = new_comps
+
+        for mtype in self.mesh_types:
+            assert(mtype >= 0)
+
+        return orig_comps, orig_mesh_types
 
 if __name__ == "__main__":
     example = BoxChannelConfig(1,1)
