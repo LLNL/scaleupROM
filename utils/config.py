@@ -75,7 +75,10 @@ class Configuration:
     
     def addComponent(self, component):
         assert(self.dim == component.dim)
-        self.comps += [component]
+        if (len(self.comps) == 0):
+            self.comps = [component]
+        else:
+            self.comps += [component]
         return
     
     def close(self):
