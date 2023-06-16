@@ -91,10 +91,10 @@ protected:
    // SparseMatrix *romMat;
    Array<int> rom_block_offsets;
    
-   CAROM::Vector *reduced_rhs;
+   CAROM::Vector *reduced_rhs = NULL;
 
    Array2D<CAROM::Matrix *> carom_mats;
-   CAROM::Matrix *romMat_inv;
+   CAROM::Matrix *romMat_inv = NULL;
    
    CAROM::Options* rom_options;
    CAROM::BasisGenerator *basis_generator;
@@ -108,7 +108,7 @@ protected:
 public:
    ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
-   virtual ~ROMHandler() {};
+   virtual ~ROMHandler();
 
    // access
    const int GetNumSubdomains() { return numSub; }
@@ -166,14 +166,14 @@ protected:
    // rom variables.
    Array<DenseMatrix*> spatialbasis;
 
-   SparseMatrix *romMat;
+   SparseMatrix *romMat = NULL;
    
-   mfem::BlockVector *reduced_rhs;
+   mfem::BlockVector *reduced_rhs = NULL;
 
 public:
    MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
-   virtual ~MFEMROMHandler() {}; 
+   virtual ~MFEMROMHandler();
    
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);

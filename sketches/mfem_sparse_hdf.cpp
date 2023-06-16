@@ -13,7 +13,7 @@
 #include <iostream>
 #include "utils/HDFDatabase.h"
 #include "mfem.hpp"
-#include "random.hpp"
+#include "etc.hpp"
 
 using namespace mfem;
 

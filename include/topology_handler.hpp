@@ -85,7 +85,9 @@ protected:
 public:
    TopologyHandler(const TopologyHandlerMode &input_type);
 
-   virtual ~TopologyHandler() {};
+   // ownership of interface_infos changes depending on derived classes.
+   // not deleting here.
+   virtual ~TopologyHandler() {}
 
    // access
    const TopologyHandlerMode GetType() { return type; }

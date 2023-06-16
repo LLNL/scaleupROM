@@ -11,6 +11,7 @@
 
 // Implementation of Bilinear Form Integrators
 
+#include "etc.hpp"
 #include "input_parser.hpp"
 #include "rom_handler.hpp"
 #include "linalg_utils.hpp"
@@ -37,6 +38,13 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdi
    ParseInputs();
 
    AllocROMMat();
+}
+
+ROMHandler::~ROMHandler()
+{
+   DeletePointers(carom_mats);
+   delete reduced_rhs;
+   delete romMat_inv;
 }
 
 void ROMHandler::ParseInputs()
@@ -410,6 +418,7 @@ void ROMHandler::AllocROMMat()
    SetBlockSizes();
 
    carom_mats.SetSize(numSub, numSub);
+   carom_mats = NULL;
    // TODO: parallelization.
    romMat_inv = new CAROM::Matrix(rom_block_offsets.Last(), rom_block_offsets.Last(), false);
 }
@@ -593,11 +602,19 @@ MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &i
    romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
 }
 
+MFEMROMHandler::~MFEMROMHandler()
+{
+   DeletePointers(spatialbasis);
+   delete romMat;
+   delete reduced_rhs;
+}
+
 void MFEMROMHandler::LoadReducedBasis()
 {
    ROMHandler::LoadReducedBasis();
 
    spatialbasis.SetSize(carom_spatialbasis.Size());
+   spatialbasis = NULL;
    for (int k = 0; k < spatialbasis.Size(); k++)
    {
       assert(carom_spatialbasis[k] != NULL);

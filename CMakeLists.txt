@@ -127,8 +127,8 @@ link_libraries(
 
 set(scaleupROMObj_SOURCES
 
-  include/random.hpp
-  src/random.cpp
+  include/etc.hpp
+  src/etc.cpp
 
   include/hdf5_utils.hpp
   src/hdf5_utils.cpp

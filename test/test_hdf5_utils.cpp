@@ -1,6 +1,6 @@
 #include<gtest/gtest.h>
 #include "hdf5_utils.hpp"
-#include "random.hpp"
+#include "etc.hpp"
 #include <fstream>
 #include <iostream>
 

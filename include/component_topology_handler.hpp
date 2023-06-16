@@ -140,7 +140,7 @@ protected:
 public:
    ComponentTopologyHandler();
 
-//    virtual ~SubMeshTopologyHandler();
+   virtual ~ComponentTopologyHandler();
 
    // access
    virtual Mesh* GetMesh(const int k) { return &(*meshes[k]); }

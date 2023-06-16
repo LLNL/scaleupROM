@@ -12,19 +12,13 @@
 // Implementation of Bilinear Form Integrators
 
 #include "component_topology_handler.hpp"
+#include "etc.hpp"
 #include "hdf5.h"
 #include "hdf5_utils.hpp"
 #include <fstream>
 
 using namespace std;
 using namespace mfem;
-
-inline bool FileExists(const std::string& name)
-{
-   std::ifstream f(name.c_str());
-   return f.good();
-   // ifstream f will be closed upon the end of the function.
-}
 
 ComponentTopologyHandler::ComponentTopologyHandler()
    : TopologyHandler(COMPONENT)
@@ -77,6 +71,18 @@ ComponentTopologyHandler::ComponentTopologyHandler()
 
    // Do we really need to set boundary attributes of all meshes?
    SetupBdrAttributes();
+}
+
+ComponentTopologyHandler::~ComponentTopologyHandler()
+{
+   DeletePointers(components);
+   DeletePointers(meshes);
+   DeletePointers(ref_ports);
+   DeletePointers(port_dicts);
+   DeletePointers(bdr_c2g);
+   // NOTE: We do not need ~TopologyHandler,
+   // since all entries in interface_infos point toward ref_interfaces.
+   DeletePointers(ref_interfaces);
 }
 
 void ComponentTopologyHandler::GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)

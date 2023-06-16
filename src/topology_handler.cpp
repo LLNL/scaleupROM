@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "topology_handler.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -255,6 +256,8 @@ void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
 
 SubMeshTopologyHandler::~SubMeshTopologyHandler()
 {
+   DeletePointers(interface_infos);
+   
    for (int k = 0; k < parent_elem_map.Size(); k++) delete parent_elem_map[k];
    for (int k = 0; k < parent_face_map.Size(); k++) delete parent_face_map[k];
    if (own_pmesh)
