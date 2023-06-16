@@ -122,15 +122,10 @@ public:
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const Array<int> GetBlockOffsets() { return rom_block_offsets; }
-   
-   // cannot do const GridFunction* due to librom function definitions.
-   virtual void SaveSnapshot(BlockVector *sol, const int &sample_index);
 
    virtual void FormReducedBasis();
-   virtual void FormReducedBasisUniversal();
-   virtual void FormReducedBasisIndividual();
-
    virtual void LoadReducedBasis();
+
    int GetBasisIndexForSubdomain(const int &subdomain_index);
    void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
@@ -140,7 +135,6 @@ public:
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
-   // void CompareSolution();
 
    // P_i^T * mat * P_j
    virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat);
@@ -154,8 +148,6 @@ public:
    const std::string GetBasisTagForComponent(const int &comp_idx);
    const std::string GetBasisTag(const int &subdomain_index);
    void GetBasisTags(std::vector<std::string> &basis_tags);
-   const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
-   const std::string GetBasisPrefix(const TrainMode &mode, const int &index);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
@@ -188,7 +180,6 @@ public:
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
-   // void CompareSolution();
    
    // P_i^T * mat * P_j
    virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat);

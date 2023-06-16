@@ -162,73 +162,31 @@ void ROMHandler::ParseInputs()
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
 }
 
-void ROMHandler::SaveSnapshot(BlockVector *sol, const int &sample_index)
-{
-   assert(sol->NumBlocks() == (num_var * numSub));
-
-   for (int m = 0, idx = 0; m < numSub; m++)
-   {
-      // for (int v = 0; v < num_var; v++, idx++)
-      // {
-      //    const std::string filename = GetSnapshotPrefix(sample_index, m, v);
-      //    rom_options = new CAROM::Options(fom_num_vdofs[idx], max_num_snapshots, 1, update_right_SV);
-      //    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
-
-      //    bool addSample = basis_generator->takeSample(sol->GetBlock(idx).GetData(), 0.0, 0.01);
-      //    assert(addSample);
-      //    basis_generator->writeSnapshot();
-
-      //    delete basis_generator;
-      //    delete rom_options;
-      // }
-      const std::string filename = GetSnapshotPrefix(sample_index, m);
-      rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
-
-      bool addSample = basis_generator->takeSample(sol->GetBlock(m).GetData(), 0.0, 0.01);
-      assert(addSample);
-      basis_generator->writeSnapshot();
-
-      delete basis_generator;
-      delete rom_options;
-   }
-}
-
 void ROMHandler::FormReducedBasis()
 {
-   switch (train_mode)
-   {
-      case (TrainMode::UNIVERSAL):
-      {
-         FormReducedBasisUniversal();
-         break;
-      }
-      case (TrainMode::INDIVIDUAL):
-      {
-         FormReducedBasisIndividual();
-         break;
-      }
-      default:
-      {
-         mfem_error("ROMHandler: unknown train mode!\n");
-      }
-   }
-}
-
-void ROMHandler::FormReducedBasisUniversal()
-{
-   assert(train_mode == TrainMode::UNIVERSAL);
    std::string basis_name, basis_tag;
-
+   
    for (int c = 0; c < num_basis_sets; c++)
    {
-      basis_tag = GetBasisTagForComponent(c);
-      basis_name = basis_prefix + "_" + basis_tag;
-      // Determine dimension of the basis vectors.
       int basis_dim = -1;
-      for (int m = 0; m < numSub; m++)
-         if (topol_handler->GetMeshType(m) == c)
-         { basis_dim = fom_num_vdofs[m]; break; }
+      switch (train_mode)
+      {
+         case (INDIVIDUAL):
+         {
+            basis_tag = GetBasisTag(c);
+            basis_dim = fom_num_vdofs[c];
+            break;
+         }
+         case (UNIVERSAL):
+         {
+            basis_tag = GetBasisTagForComponent(c);
+            for (int m = 0; m < numSub; m++)
+               if (topol_handler->GetMeshType(m) == c)
+               { basis_dim = fom_num_vdofs[m]; break; }
+            break;
+         }
+      }
+      basis_name = basis_prefix + "_" + basis_tag;
       assert(basis_dim > 0);
 
       rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
@@ -244,30 +202,6 @@ void ROMHandler::FormReducedBasisUniversal()
       delete basis_generator;
       delete rom_options;
    }  // for (int c = 0; c < num_basis_sets; c++)
-}
-
-void ROMHandler::FormReducedBasisIndividual()
-{
-   assert(train_mode == TrainMode::INDIVIDUAL);
-   std::string basis_name, basis_tag;
-
-   for (int m = 0; m < numSub; m++)
-   {
-      basis_tag = GetBasisTag(m);
-      basis_name = basis_prefix + "_" + basis_tag;
-      rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
-
-      std::string filename = sample_dir + "/" + sample_prefix + "_sample";
-      filename += "_" + basis_tag + "_snapshot";
-      basis_generator->loadSamples(filename,"snapshot");
-
-      basis_generator->endSamples(); // save the merged basis file
-      SaveSV(basis_name, m);
-
-      delete basis_generator;
-      delete rom_options;
-   }
 }
 
 void ROMHandler::LoadReducedBasis()
@@ -520,59 +454,6 @@ void ROMHandler::GetBasisTags(std::vector<std::string> &basis_tags)
    basis_tags.resize(numSub);
    for (int m = 0; m < numSub; m++)
       basis_tags[m] = GetBasisTag(m);
-}
-
-const std::string ROMHandler::GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
-{
-   std::string prefix = sample_dir + "/" + sample_prefix + "_sample";
-   switch (train_mode)
-   {
-      case (INDIVIDUAL):
-      {
-         prefix += std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx);
-         break;
-      }
-      case (UNIVERSAL):
-      {
-         int c_type = topol_handler->GetMeshType(subdomain_idx);
-         int c_idx = topol_handler->GetComponentIndexOfMesh(subdomain_idx);
-         int comp_sample = sample_idx * topol_handler->GetNumSubdomains(c_type) + c_idx;
-         std::string c_name = topol_handler->GetComponentName(c_type);
-
-         prefix += std::to_string(comp_sample) + "_" + c_name;
-         break;
-      }
-      default:
-      {
-         mfem_error("ROMHandler::GetSnapshotPrefix - Unknown training mode!\n");
-         break;
-      }
-   }
-   return prefix;
-}
-
-const std::string ROMHandler::GetBasisPrefix(const TrainMode &mode, const int &index)
-{
-   std::string basis_name;
-   switch (mode)
-   {
-      case (INDIVIDUAL):
-      {
-         basis_name = basis_prefix + "_dom" + std::to_string(index);
-         break;
-      }
-      case (UNIVERSAL):
-      {
-         basis_name = basis_prefix + "_universal_" + topol_handler->GetComponentName(index);
-         break;
-      }
-      default:
-      {
-         mfem_error("ROMHandler::GetSnapshotPrefix - Unknown training mode!\n");
-         break;
-      }
-   }
-   return basis_name;
 }
 
 void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
