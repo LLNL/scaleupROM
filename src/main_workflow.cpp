@@ -121,10 +121,18 @@ void GenerateSamples(MPI_Comm comm)
       test->Solve();
       test->SaveVisualization();
 
-      test->SaveSnapshot(file_idx);
+      // test->SaveSnapshot(file_idx);
+      // View-Vector of the entire solution of test, splitted according to ROM basis setup.
+      BlockVector *U_snapshots = NULL;
+      // Basis tags for each block of U_snapshots.
+      std::vector<std::string> basis_tags;
+      test->PrepareSnapshots(U_snapshots, basis_tags);
+      sample_generator->SaveSnapshot(U_snapshots, basis_tags);
 
+      delete U_snapshots;
       delete test;
    }
+   sample_generator->WriteSnapshots();
 
    delete sample_generator;
    delete problem;
@@ -153,15 +161,7 @@ void BuildROM(MPI_Comm comm)
    
    ROMHandler *rom = test->GetROMHandler();
    if (!rom->UseExistingBasis())
-   {
-      // TODO: basis for multiple components
-      SampleGenerator *sample_generator = InitSampleGenerator(comm);
-      sample_generator->SetParamSpaceSizes();
-      const int total_samples = sample_generator->GetTotalSampleSize();
-      
-      test->FormReducedBasis(total_samples);
-      delete sample_generator;
-   }
+      test->FormReducedBasis();
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();

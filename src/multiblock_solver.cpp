@@ -753,10 +753,12 @@ void MultiBlockSolver::InitROMHandler()
    }
 }
 
-void MultiBlockSolver::SaveSnapshot(const int &sample_index)
-{  
-   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
-   rom_handler->SaveSnapshot(&U_domain, sample_index);
+void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags)
+{
+   // TODO: get offsets set by rom_handler.
+   U_snapshots = new BlockVector(U->GetData(), domain_offsets); // View vector for U.
+   rom_handler->GetBasisTags(basis_tags);
+   assert(U_snapshots->NumBlocks() == basis_tags.size());
 }
 
 void MultiBlockSolver::ProjectRHSOnReducedBasis()

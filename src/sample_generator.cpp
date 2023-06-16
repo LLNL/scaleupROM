@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "sample_generator.hpp"
+#include "etc.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -43,11 +44,22 @@ SampleGenerator::SampleGenerator(MPI_Comm comm)
       else if (param_type == "filename")  params[p] = new FilenameParam(param_key, param_list[p]);
       else mfem_error("SampleGenerator: Unknown parameter type!\n");
    }  // for (int p = 0; p < num_sampling_params; p++)
+
+   // NOTE: option used for BasisGenerator. must be sufficient to cover at least total_samples.
+   // As different geometric configurations are used as samples,
+   // the number of snapshots can exceed total_samples.
+   max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
+
+   // Initially no snapshot generator.
+   snapshot_generators.SetSize(0);
+   snapshot_options.SetSize(0);
 }
 
 SampleGenerator::~SampleGenerator()
 {
-   for (int p = 0; p < params.Size(); p++) delete params[p];
+   DeletePointers(params);
+   DeletePointers(snapshot_generators);
+   DeletePointers(snapshot_options);
 }
 
 void SampleGenerator::SetParamSpaceSizes()
@@ -147,4 +159,49 @@ const std::string SampleGenerator::GetSamplePath(const int &idx, const std::stri
       full_path += sample_prefix;
 
    return full_path;
+}
+
+void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags)
+{
+   assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
+
+   for (int s = 0; s < snapshot_basis_tags.size(); s++)
+   {
+      if (!basis_tag2idx.count(snapshot_basis_tags[s]))
+      {
+         const int fom_vdofs = U_snapshots->BlockSize(s);
+         AddSnapshotGenerator(fom_vdofs, snapshot_basis_tags[s]);
+      }
+
+      int index = basis_tag2idx[snapshot_basis_tags[s]];
+      bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData(), 0.0, 0.01);
+      assert(addSample);
+   }
+}
+
+void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &basis_tag)
+{
+   const std::string prefix = sample_dir + "/" + sample_prefix + "_sample";
+   const std::string filename = prefix + "_" + basis_tag;
+
+   snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
+   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename));
+
+   basis_tag2idx[basis_tag] = basis_tags.size();
+   basis_tags.push_back(basis_tag);
+
+   int size = snapshot_options.Size();
+   assert(snapshot_generators.Size() == size);
+   assert(basis_tag2idx.size() == size);
+   assert(basis_tags.size() == size);
+}
+
+void SampleGenerator::WriteSnapshots()
+{
+   assert(snapshot_generators.Size() > 0);
+   for (int s = 0; s < snapshot_generators.Size(); s++)
+   {
+      assert(snapshot_generators[s]);
+      snapshot_generators[s]->writeSnapshot();
+   }
 }

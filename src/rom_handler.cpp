@@ -154,7 +154,7 @@ void ROMHandler::ParseInputs()
    // if (proj_mode == ProjectionMode::LSPG)
    //    save_lspg_basis = config.GetOption<bool>("model_reduction/lspg/save_lspg_basis", true);
 
-   max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
+   max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
 
    save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
@@ -194,18 +194,18 @@ void ROMHandler::SaveSnapshot(BlockVector *sol, const int &sample_index)
    }
 }
 
-void ROMHandler::FormReducedBasis(const int &total_samples)
+void ROMHandler::FormReducedBasis()
 {
    switch (train_mode)
    {
       case (TrainMode::UNIVERSAL):
       {
-         FormReducedBasisUniversal(total_samples);
+         FormReducedBasisUniversal();
          break;
       }
       case (TrainMode::INDIVIDUAL):
       {
-         FormReducedBasisIndividual(total_samples);
+         FormReducedBasisIndividual();
          break;
       }
       default:
@@ -215,13 +215,15 @@ void ROMHandler::FormReducedBasis(const int &total_samples)
    }
 }
 
-void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
+void ROMHandler::FormReducedBasisUniversal()
 {
    assert(train_mode == TrainMode::UNIVERSAL);
+   std::string basis_name, basis_tag;
 
    for (int c = 0; c < num_basis_sets; c++)
    {
-      std::string basis_name = GetBasisPrefix(TrainMode::UNIVERSAL, c);
+      basis_tag = GetBasisTagForComponent(c);
+      basis_name = basis_prefix + "_" + basis_tag;
       // Determine dimension of the basis vectors.
       int basis_dim = -1;
       for (int m = 0; m < numSub; m++)
@@ -232,17 +234,9 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
       rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
 
-      for (int m = 0; m < numSub; m++)
-      {
-         // Take the snapshots of the same mesh type only.
-         if (topol_handler->GetMeshType(m) != c) continue;
-
-         for (int s = 0; s < total_samples; s++)
-         {
-            const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
-            basis_generator->loadSamples(filename,"snapshot");
-         }
-      }  // for (int m = 0; m < numSub; m++)
+      std::string filename = sample_dir + "/" + sample_prefix + "_sample";
+      filename += "_" + basis_tag + "_snapshot";
+      basis_generator->loadSamples(filename,"snapshot");
 
       basis_generator->endSamples(); // save the merged basis file
       SaveSV(basis_name, c);
@@ -252,22 +246,21 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
    }  // for (int c = 0; c < num_basis_sets; c++)
 }
 
-void ROMHandler::FormReducedBasisIndividual(const int &total_samples)
+void ROMHandler::FormReducedBasisIndividual()
 {
    assert(train_mode == TrainMode::INDIVIDUAL);
-   std::string basis_name;
+   std::string basis_name, basis_tag;
 
    for (int m = 0; m < numSub; m++)
    {
-      basis_name = GetBasisPrefix(TrainMode::INDIVIDUAL, m);
+      basis_tag = GetBasisTag(m);
+      basis_name = basis_prefix + "_" + basis_tag;
       rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
-      for (int s = 0; s < total_samples; s++)
-      {
-         const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
-         basis_generator->loadSamples(filename,"snapshot");
-      }
+      std::string filename = sample_dir + "/" + sample_prefix + "_sample";
+      filename += "_" + basis_tag + "_snapshot";
+      basis_generator->loadSamples(filename,"snapshot");
 
       basis_generator->endSamples(); // save the merged basis file
       SaveSV(basis_name, m);
@@ -284,48 +277,19 @@ void ROMHandler::LoadReducedBasis()
    std::string basis_name;
    int numRowRB, numColumnRB;
 
-   switch (train_mode)
+   carom_spatialbasis.SetSize(num_basis_sets);
+   for (int k = 0; k < num_basis_sets; k++)
    {
-      case TrainMode::UNIVERSAL:
-      {
-         carom_spatialbasis.SetSize(num_basis_sets);
-         for (int k = 0; k < num_basis_sets; k++)
-         {
-            basis_name = GetBasisPrefix(TrainMode::UNIVERSAL, k);
-            basis_reader = new CAROM::BasisReader(basis_name);
+      basis_name = basis_prefix + "_" + GetBasisTagForComponent(k);
+      basis_reader = new CAROM::BasisReader(basis_name);
 
-            carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
-            numRowRB = carom_spatialbasis[k]->numRows();
-            numColumnRB = carom_spatialbasis[k]->numColumns();
-            printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
+      carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
+      numRowRB = carom_spatialbasis[k]->numRows();
+      numColumnRB = carom_spatialbasis[k]->numColumns();
+      printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
 
-            delete basis_reader;
-         }
-         break;
-      }
-      case TrainMode::INDIVIDUAL:
-      {
-         carom_spatialbasis.SetSize(numSub);
-         for (int j = 0; j < numSub; j++)
-         {
-            basis_name = GetBasisPrefix(TrainMode::INDIVIDUAL, j);
-            basis_reader = new CAROM::BasisReader(basis_name);
-
-            carom_spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis[j]);
-            numRowRB = carom_spatialbasis[j]->numRows();
-            numColumnRB = carom_spatialbasis[j]->numColumns();
-            printf("%d domain spatial basis dimension is %d x %d\n", j, numRowRB, numColumnRB);
-
-            delete basis_reader;
-         }
-         break;
-      }
-      default:
-      {
-         mfem_error("LoadBasis: unknown TrainMode!\n");
-         break;
-      }
-   }  // switch (train_mode)
+      delete basis_reader;
+   }
 
    basis_loaded = true;
 }
@@ -509,6 +473,53 @@ void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 
    romMat_inv->read(prefix);
    operator_loaded = true;
+}
+
+const std::string ROMHandler::GetBasisTagForComponent(const int &comp_idx)
+{
+   switch (train_mode)
+   {
+      case (INDIVIDUAL):   { return "dom" + std::to_string(comp_idx); break; }
+      case (UNIVERSAL):    { return topol_handler->GetComponentName(comp_idx); break; }
+      default:
+      {
+         mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
+         break;
+      }
+   }
+   return "";
+}
+
+const std::string ROMHandler::GetBasisTag(const int &subdomain_index)
+{
+   switch (train_mode)
+   {
+      case (INDIVIDUAL):
+      {
+         return "dom" + std::to_string(subdomain_index);
+         break;
+      }
+      case (UNIVERSAL):
+      {
+         int c_type = topol_handler->GetMeshType(subdomain_index);
+         return topol_handler->GetComponentName(c_type);
+         break;
+      }
+      default:
+      {
+         mfem_error("ROMHandler::GetBasisTag - Unknown training mode!\n");
+         break;
+      }
+   }
+   return "";
+}
+
+void ROMHandler::GetBasisTags(std::vector<std::string> &basis_tags)
+{
+   // TODO: support variable-separate basis case.
+   basis_tags.resize(numSub);
+   for (int m = 0; m < numSub; m++)
+      basis_tags[m] = GetBasisTag(m);
 }
 
 const std::string ROMHandler::GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)

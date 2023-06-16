@@ -114,7 +114,7 @@ public:
    const int GetNumSubdomains() { return numSub; }
    const ROMHandlerMode GetMode() { return mode; }
    const TrainMode GetTrainMode() { return train_mode; }
-   // TODO: multi-component case
+   const int GetNumBasisSets() { return num_basis_sets; }
    const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
    const bool UseExistingBasis() { return basis_file_exists; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
@@ -126,9 +126,9 @@ public:
    // cannot do const GridFunction* due to librom function definitions.
    virtual void SaveSnapshot(BlockVector *sol, const int &sample_index);
 
-   virtual void FormReducedBasis(const int &total_samples);
-   virtual void FormReducedBasisUniversal(const int &total_samples);
-   virtual void FormReducedBasisIndividual(const int &total_samples);
+   virtual void FormReducedBasis();
+   virtual void FormReducedBasisUniversal();
+   virtual void FormReducedBasisIndividual();
 
    virtual void LoadReducedBasis();
    int GetBasisIndexForSubdomain(const int &subdomain_index);
@@ -151,6 +151,9 @@ public:
    virtual void LoadOperator(SparseMatrix *input_mat)
    { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
 
+   const std::string GetBasisTagForComponent(const int &comp_idx);
+   const std::string GetBasisTag(const int &subdomain_index);
+   void GetBasisTags(std::vector<std::string> &basis_tags);
    const std::string GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx);
    const std::string GetBasisPrefix(const TrainMode &mode, const int &index);
 

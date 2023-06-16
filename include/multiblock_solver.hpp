@@ -200,9 +200,8 @@ public:
    virtual void SaveVisualization();
 
    void InitROMHandler();
-   virtual void SaveSnapshot(const int &sample_index);
-   void FormReducedBasis(const int &total_samples)
-   { rom_handler->FormReducedBasis(total_samples); }
+   virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
+   void FormReducedBasis() { rom_handler->FormReducedBasis(); }
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
    virtual void ProjectRHSOnReducedBasis();
