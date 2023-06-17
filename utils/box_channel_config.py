@@ -149,7 +149,7 @@ if __name__ == "__main__":
     comp_list = {'empty': Empty(),
                  'circle': ObjectInSpace('square-circle'),
                  'square': ObjectInSpace('square-square'),
-                 'triange': ObjectInSpace('square-triangle'),
+                 'triangle': ObjectInSpace('square-triangle'),
                  'star': ObjectInSpace('square-star'),}
     
     # example.addComponent(Empty())
