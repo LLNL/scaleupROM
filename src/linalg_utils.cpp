@@ -239,15 +239,15 @@ SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename)
    success = hdfIO.open(filename, "r");
    assert(success);
 
+   int size[2];
+   hdfIO.getIntegerArray("size", &size[0], 2);
+
    const int n_entry = hdfIO.getDoubleArraySize("data");
    Array<int> i_read(n_entry), j_read(n_entry);
    Vector data_read(n_entry);
-   hdfIO.getIntegerArray("I", i_read.Write(), n_entry);
-   hdfIO.getIntegerArray("J", j_read.Write(), n_entry);
-   hdfIO.getDoubleArray("data", data_read.Write(), n_entry);
-
-   int size[2];
-   hdfIO.getIntegerArray("size", &size[0], 2);
+   hdfIO.getIntegerArray("I", i_read.Write(), size[0]+1);
+   hdfIO.getIntegerArray("J", j_read.Write(), i_read[size[0]]);
+   hdfIO.getDoubleArray("data", data_read.Write(), i_read[size[0]]);
 
    // Need to transfer the ownership to avoid segfault or double-free.
    int *ip, *jp;
@@ -273,13 +273,14 @@ void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename)
    assert(success);
 
    const int nnz = mat->NumNonZeroElems();
+   const int height = mat->Height();
    const int *i_idx = mat->ReadI();
    const int *j_idx = mat->ReadJ();
    const double *data = mat->ReadData();
 
-   hdfIO.putIntegerArray("I", i_idx, nnz);
-   hdfIO.putIntegerArray("J", j_idx, nnz);
-   hdfIO.putDoubleArray("data", data, nnz);
+   hdfIO.putIntegerArray("I", i_idx, height+1);
+   hdfIO.putIntegerArray("J", j_idx, i_idx[height]);
+   hdfIO.putDoubleArray("data", data, i_idx[height]);
 
    int size[2];
    size[0] = mat->NumRows();

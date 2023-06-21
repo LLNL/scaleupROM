@@ -15,6 +15,7 @@
 #include "input_parser.hpp"
 #include "rom_handler.hpp"
 #include "linalg_utils.hpp"
+#include "hdf5_utils.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -493,23 +494,17 @@ void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
 MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
    : ROMHandler(input_topol, input_vdim, input_num_vdofs)
 {
-   romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
+   romMat = new BlockMatrix(rom_block_offsets);
+   romMat->owns_blocks = true;
 
-   AllocROMMat();
+   carom_mats.SetSize(0, 0);
 }
 
 MFEMROMHandler::~MFEMROMHandler()
 {
    DeletePointers(spatialbasis);
-   delete romMat;
+   delete romMat, romMat_mono;
    delete reduced_rhs;
-}
-
-void MFEMROMHandler::AllocROMMat()
-{
-   carom_mats.SetSize(0, 0);
-   zero_blocks.SetSize(rom_block_offsets.Size() - 1, rom_block_offsets.Size() - 1);
-   zero_blocks = true;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -560,34 +555,33 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
       num_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
       basis_i = GetBasisIndexForSubdomain(i);
 
-      Array<int> vdof_i(num_basis_i);
-      for (int k = 0, vdof = rom_block_offsets[i]; vdof < rom_block_offsets[i+1]; k++, vdof++)
-         vdof_i[k] = vdof;
-
       for (int j = 0; j < numSub; j++)
       {
          num_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
          basis_j = GetBasisIndexForSubdomain(j);
-
-         Array<int> vdof_j(num_basis_j);
-         for (int k = 0, vdof = rom_block_offsets[j]; vdof < rom_block_offsets[j+1]; k++, vdof++)
-            vdof_j[k] = vdof;
          
-         DenseMatrix elemmat(num_basis_i, num_basis_j);
-         ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j), &elemmat);
-         romMat->SetSubMatrix(vdof_i, vdof_j, elemmat);
-
-         zero_blocks(i, j) = CheckZeroBlock(elemmat);
+         SparseMatrix *elemmat = ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j));
+         romMat->SetBlock(i, j, elemmat);
       }
    }  // for (int j = 0; j < numSub; j++)
 
    romMat->Finalize();
    operator_loaded = true;
 
+   romMat_mono = romMat->CreateMonolithic();
+
    if (save_operator == ROMBuildingLevel::GLOBAL)
    {
       std::string filename = operator_prefix + ".h5";
-      WriteSparseMatrixToHDF(romMat, filename);
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hdf5_utils::WriteBlockMatrix(file_id, "ROM_matrix", romMat);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
    }
 }
 
@@ -638,7 +632,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       // TODO: need to change when the actual parallelization is implemented.
       HYPRE_BigInt glob_size = rom_block_offsets.Last();
       HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat);
+      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
       K = parRomMat;
    }
    else
@@ -652,7 +646,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
    }
    else if (prec_str == "gs")
    {
-      M = new GSSmoother(*romMat);
+      M = new GSSmoother(*romMat_mono);
    }
    else if (prec_str != "none")
    {
@@ -693,9 +687,8 @@ void MFEMROMHandler::Solve(BlockVector* U)
    delete solver;
 }
 
-void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat)
+SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
 {
-   assert(proj_mat != NULL);
    assert((i >= 0) && (i < num_basis_sets));
    assert((j >= 0) && (j < num_basis_sets));
    // assert(mat->Finalized());
@@ -708,14 +701,13 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, c
    GetBasis(j, basis_j);
    num_basis_j = basis_j->NumCols();
 
-   proj_mat->SetSize(num_basis_i, num_basis_j);
-   mfem::RtAP(*basis_i, *mat, *basis_j, *proj_mat);
-   return;
+   return mfem::RtAP(*basis_i, *mat, *basis_j);
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 {
    assert(save_operator == ROMBuildingLevel::GLOBAL);
+   delete romMat, romMat_mono;
    
    std::string filename;
    if (input_prefix == "")
@@ -724,16 +716,25 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
       filename = input_prefix;
    filename += ".h5";
 
-   romMat = ReadSparseMatrixFromHDF(filename);
-   GetBlockSparsity(romMat, rom_block_offsets, zero_blocks);
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);   
+
+   romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
+   romMat_mono = romMat->CreateMonolithic();
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
    operator_loaded = true;
 }
 
-void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat, const Array2D<bool> &input_zero_blocks)
+void MFEMROMHandler::LoadOperator(BlockMatrix *input_mat)
 {
-   delete romMat;
+   delete romMat, romMat_mono;
    romMat = input_mat;
-   zero_blocks = input_zero_blocks;
+   romMat_mono = romMat->CreateMonolithic();
    operator_loaded = true;
 }
 
@@ -823,48 +824,48 @@ IterativeSolver* MFEMROMHandler::SetSolver(const std::string &solver_type, const
    return solver;
 }
 
-void MFEMROMHandler::GetBlockSparsity(
-   const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks)
-{
-   assert(mat);
-   assert(block_offsets.Size() > 0);
-   assert(mat->NumRows() == block_offsets.Last());
-   assert(mat->NumCols() == block_offsets.Last());
+// void MFEMROMHandler::GetBlockSparsity(
+//    const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks)
+// {
+//    assert(mat);
+//    assert(block_offsets.Size() > 0);
+//    assert(mat->NumRows() == block_offsets.Last());
+//    assert(mat->NumCols() == block_offsets.Last());
 
-   const int num_blocks = block_offsets.Size() - 1;
-   mat_zero_blocks.SetSize(num_blocks, num_blocks);
-   mat_zero_blocks = true;
+//    const int num_blocks = block_offsets.Size() - 1;
+//    mat_zero_blocks.SetSize(num_blocks, num_blocks);
+//    mat_zero_blocks = true;
 
-   DenseMatrix tmp;
-   Array<int> rows, cols;
-   for (int i = 0; i < num_blocks; i++)
-   {
-      rows.SetSize(block_offsets[i+1] - block_offsets[i]);
-      for (int ii = block_offsets[i], idx = 0; ii < block_offsets[i+1]; ii++, idx++)
-         rows[idx] = ii;
+//    DenseMatrix tmp;
+//    Array<int> rows, cols;
+//    for (int i = 0; i < num_blocks; i++)
+//    {
+//       rows.SetSize(block_offsets[i+1] - block_offsets[i]);
+//       for (int ii = block_offsets[i], idx = 0; ii < block_offsets[i+1]; ii++, idx++)
+//          rows[idx] = ii;
 
-      for (int j = 0; j < num_blocks; j++)
-      {
-         cols.SetSize(block_offsets[j+1] - block_offsets[j]);
-         for (int jj = block_offsets[j], idx = 0; jj < block_offsets[j+1]; jj++, idx++)
-            cols[idx] = jj;
+//       for (int j = 0; j < num_blocks; j++)
+//       {
+//          cols.SetSize(block_offsets[j+1] - block_offsets[j]);
+//          for (int jj = block_offsets[j], idx = 0; jj < block_offsets[j+1]; jj++, idx++)
+//             cols[idx] = jj;
 
-         tmp.SetSize(rows.Size(), cols.Size());
-         tmp = 0.0;
-         mat->GetSubMatrix(rows, cols, tmp);
-         mat_zero_blocks(i, j) = CheckZeroBlock(tmp);
-      }  // for (int j = 0; j < num_blocks; j++)
-   }  // for (int i = 0; i < num_blocks; i++)
-}
+//          tmp.SetSize(rows.Size(), cols.Size());
+//          tmp = 0.0;
+//          mat->GetSubMatrix(rows, cols, tmp);
+//          mat_zero_blocks(i, j) = CheckZeroBlock(tmp);
+//       }  // for (int j = 0; j < num_blocks; j++)
+//    }  // for (int i = 0; i < num_blocks; i++)
+// }
 
-bool MFEMROMHandler::CheckZeroBlock(const DenseMatrix &mat)
-{
-   for (int i = 0; i < mat.NumRows(); i++)
-      for (int j = 0; j < mat.NumCols(); j++)
-         if (mat(i, j) != 0.0)
-            return false;
+// bool MFEMROMHandler::CheckZeroBlock(const DenseMatrix &mat)
+// {
+//    for (int i = 0; i < mat.NumRows(); i++)
+//       for (int j = 0; j < mat.NumCols(); j++)
+//          if (mat(i, j) != 0.0)
+//             return false;
 
-   return true;
-}
+//    return true;
+// }
 
 }  // namespace mfem

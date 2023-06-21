@@ -88,10 +88,10 @@ protected:
 
    // Used for bottom-up building, only with ComponentTopologyHandler.
    // For now, assumes ROM basis represents the entire vector solution.
-   Array<DenseMatrix *> comp_mats;     // Size(num_components);
+   Array<SparseMatrix *> comp_mats;     // Size(num_components);
    // boundary condition is enforced via forcing term.
-   Array<Array<DenseMatrix *> *> bdr_mats;
-   Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
+   Array<Array<SparseMatrix *> *> bdr_mats;
+   Array<Array2D<SparseMatrix *> *> port_mats;   // reference ports.
 
 public:
    MultiBlockSolver();

@@ -121,7 +121,7 @@ public:
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
-   const Array<int> GetBlockOffsets() { return rom_block_offsets; }
+   const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
 
    virtual void FormReducedBasis();
    virtual void LoadReducedBasis();
@@ -138,11 +138,11 @@ public:
 
    // P_i^T * mat * P_j
    virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat);
-   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat)
-   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(...)\n"); }
+   virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
+   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(...)\n"); return NULL; }
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(SparseMatrix *input_mat, const Array2D<bool> &input_zero_blocks)
+   virtual void LoadOperator(BlockMatrix *input_mat)
    { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
 
    const std::string GetBasisTagForComponent(const int &comp_idx);
@@ -161,8 +161,8 @@ protected:
    // rom variables.
    Array<DenseMatrix*> spatialbasis;
 
-   SparseMatrix *romMat = NULL;
-   Array2D<bool> zero_blocks;    // sparsity of romMat blocks.
+   BlockMatrix *romMat = NULL;
+   SparseMatrix *romMat_mono = NULL;
    
    mfem::BlockVector *reduced_rhs = NULL;
 
@@ -176,24 +176,24 @@ public:
    virtual void LoadReducedBasis();
    void GetBasis(const int &basis_index, DenseMatrix* &basis);
    void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
-   virtual void AllocROMMat();  // allocate matrixes for rom.
+   // virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
    virtual void Solve(BlockVector* U);
    
    // P_i^T * mat * P_j
-   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat);
+   virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(SparseMatrix *input_mat, const Array2D<bool> &input_zero_blocks);
+   virtual void LoadOperator(BlockMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
 
 private:
    IterativeSolver* SetSolver(const std::string &solver_type, const std::string &prec_type);
-   void GetBlockSparsity(const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks);
-   bool CheckZeroBlock(const DenseMatrix &mat);
+   // void GetBlockSparsity(const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks);
+   // bool CheckZeroBlock(const DenseMatrix &mat);
 };
 
 
