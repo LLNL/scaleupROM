@@ -142,7 +142,7 @@ public:
    { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(...)\n"); }
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(SparseMatrix *input_mat)
+   virtual void LoadOperator(SparseMatrix *input_mat, const Array2D<bool> &input_zero_blocks)
    { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
 
    const std::string GetBasisTagForComponent(const int &comp_idx);
@@ -162,6 +162,7 @@ protected:
    Array<DenseMatrix*> spatialbasis;
 
    SparseMatrix *romMat = NULL;
+   Array2D<bool> zero_blocks;    // sparsity of romMat blocks.
    
    mfem::BlockVector *reduced_rhs = NULL;
 
@@ -175,7 +176,7 @@ public:
    virtual void LoadReducedBasis();
    void GetBasis(const int &basis_index, DenseMatrix* &basis);
    void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
-   // virtual void AllocROMMat() override;  // allocate matrixes for rom.
+   virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
@@ -185,12 +186,14 @@ public:
    virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(SparseMatrix *input_mat);
+   virtual void LoadOperator(SparseMatrix *input_mat, const Array2D<bool> &input_zero_blocks);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
 
 private:
    IterativeSolver* SetSolver(const std::string &solver_type, const std::string &prec_type);
+   void GetBlockSparsity(const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks);
+   bool CheckZeroBlock(const DenseMatrix &mat);
 };
 
 

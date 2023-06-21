@@ -168,6 +168,32 @@ void RtAP(DenseMatrix& R,
       }
 }
 
+SparseMatrix* RtAP(DenseMatrix& R,
+   const Operator& A, DenseMatrix& P)
+{
+   assert(R.NumRows() == A.NumRows());
+   assert(A.NumCols() == P.NumRows());
+
+   const int num_row = R.NumCols();
+   const int num_col = P.NumCols();
+   SparseMatrix *RAP = new SparseMatrix(num_row, num_col);
+   for (int i = 0; i < num_row; i++)
+      for (int j = 0; j < num_col; j++)
+      {
+         Vector vec_i, vec_j;
+         R.GetColumnReference(i, vec_i);
+         P.GetColumnReference(j, vec_j);
+         // NOTE: mfem::SparseMatrix.InnerProduct(x, y) computes y^t A x
+         Vector tmp(vec_i.Size());
+         tmp = 0.0;
+         A.Mult(vec_j, tmp);
+         RAP->Set(i, j, vec_i * tmp);
+      }
+   RAP->Finalize();
+
+   return RAP;
+}
+
 void PrintMatrix(const SparseMatrix &mat,
                 const std::string &filename)
 {

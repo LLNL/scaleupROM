@@ -37,6 +37,8 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdi
 
    ParseInputs();
 
+   SetBlockSizes();
+
    AllocROMMat();
 }
 
@@ -313,7 +315,7 @@ void ROMHandler::SetBlockSizes()
 
 void ROMHandler::AllocROMMat()
 {
-   SetBlockSizes();
+   assert(rom_block_offsets.Size() == (numSub+1));
 
    carom_mats.SetSize(numSub, numSub);
    carom_mats = NULL;
@@ -492,6 +494,8 @@ MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &i
    : ROMHandler(input_topol, input_vdim, input_num_vdofs)
 {
    romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
+
+   AllocROMMat();
 }
 
 MFEMROMHandler::~MFEMROMHandler()
@@ -499,6 +503,13 @@ MFEMROMHandler::~MFEMROMHandler()
    DeletePointers(spatialbasis);
    delete romMat;
    delete reduced_rhs;
+}
+
+void MFEMROMHandler::AllocROMMat()
+{
+   carom_mats.SetSize(0, 0);
+   zero_blocks.SetSize(rom_block_offsets.Size() - 1, rom_block_offsets.Size() - 1);
+   zero_blocks = true;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -565,6 +576,8 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
          DenseMatrix elemmat(num_basis_i, num_basis_j);
          ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j), &elemmat);
          romMat->SetSubMatrix(vdof_i, vdof_j, elemmat);
+
+         zero_blocks(i, j) = CheckZeroBlock(elemmat);
       }
    }  // for (int j = 0; j < numSub; j++)
 
@@ -695,7 +708,6 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, c
    GetBasis(j, basis_j);
    num_basis_j = basis_j->NumCols();
 
-   // TODO: multi-component case.
    proj_mat->SetSize(num_basis_i, num_basis_j);
    mfem::RtAP(*basis_i, *mat, *basis_j, *proj_mat);
    return;
@@ -713,13 +725,15 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    filename += ".h5";
 
    romMat = ReadSparseMatrixFromHDF(filename);
+   GetBlockSparsity(romMat, rom_block_offsets, zero_blocks);
    operator_loaded = true;
 }
 
-void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
+void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat, const Array2D<bool> &input_zero_blocks)
 {
    delete romMat;
    romMat = input_mat;
+   zero_blocks = input_zero_blocks;
    operator_loaded = true;
 }
 
@@ -807,6 +821,50 @@ IterativeSolver* MFEMROMHandler::SetSolver(const std::string &solver_type, const
    }
 
    return solver;
+}
+
+void MFEMROMHandler::GetBlockSparsity(
+   const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks)
+{
+   assert(mat);
+   assert(block_offsets.Size() > 0);
+   assert(mat->NumRows() == block_offsets.Last());
+   assert(mat->NumCols() == block_offsets.Last());
+
+   const int num_blocks = block_offsets.Size() - 1;
+   mat_zero_blocks.SetSize(num_blocks, num_blocks);
+   mat_zero_blocks = true;
+
+   DenseMatrix tmp;
+   Array<int> rows, cols;
+   for (int i = 0; i < num_blocks; i++)
+   {
+      rows.SetSize(block_offsets[i+1] - block_offsets[i]);
+      for (int ii = block_offsets[i], idx = 0; ii < block_offsets[i+1]; ii++, idx++)
+         rows[idx] = ii;
+
+      for (int j = 0; j < num_blocks; j++)
+      {
+         cols.SetSize(block_offsets[j+1] - block_offsets[j]);
+         for (int jj = block_offsets[j], idx = 0; jj < block_offsets[j+1]; jj++, idx++)
+            cols[idx] = jj;
+
+         tmp.SetSize(rows.Size(), cols.Size());
+         tmp = 0.0;
+         mat->GetSubMatrix(rows, cols, tmp);
+         mat_zero_blocks(i, j) = CheckZeroBlock(tmp);
+      }  // for (int j = 0; j < num_blocks; j++)
+   }  // for (int i = 0; i < num_blocks; i++)
+}
+
+bool MFEMROMHandler::CheckZeroBlock(const DenseMatrix &mat)
+{
+   for (int i = 0; i < mat.NumRows(); i++)
+      for (int j = 0; j < mat.NumCols(); j++)
+         if (mat(i, j) != 0.0)
+            return false;
+
+   return true;
 }
 
 }  // namespace mfem

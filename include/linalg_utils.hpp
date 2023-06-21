@@ -56,6 +56,9 @@ void RtAP(DenseMatrix& R,
         const Operator& A,
         DenseMatrix& P,
         DenseMatrix& RAP);
+SparseMatrix* RtAP(DenseMatrix& R,
+                   const Operator& A,
+                   DenseMatrix& P);
 
 void PrintMatrix(const SparseMatrix &mat,
                 const std::string &filename);

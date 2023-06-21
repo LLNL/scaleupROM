@@ -583,6 +583,8 @@ void MultiBlockSolver::AssembleROM()
 
    const Array<int> rom_block_offsets = rom_handler->GetBlockOffsets();
    SparseMatrix *romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
+   Array2D<bool> zero_blocks(rom_block_offsets.Size() - 1, rom_block_offsets.Size() - 1);
+   zero_blocks = true;
 
    // component domain matrix.
    for (int m = 0; m < numSub; m++)
@@ -608,6 +610,9 @@ void MultiBlockSolver::AssembleROM()
 
          romMat->AddSubMatrix(vdofs, vdofs, *(*bdr_mat)[b]);
       }
+
+      // update sparsity of romMat
+      zero_blocks(m, m) = false;
    }
 
    // interface matrixes.
@@ -636,10 +641,13 @@ void MultiBlockSolver::AssembleROM()
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
             romMat->AddSubMatrix(*vdofs[i], *vdofs[j], *((*port_mat)(i, j)));
+
+      // update sparsity of romMat
+      zero_blocks(m1, m2) = false;
    }
 
    romMat->Finalize();
-   rom_handler->LoadOperator(romMat);
+   rom_handler->LoadOperator(romMat, zero_blocks);
 }
 
 void MultiBlockSolver::InitVisualization(const std::string& output_path)
