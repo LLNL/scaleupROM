@@ -129,6 +129,8 @@ void GenerateSamples(MPI_Comm comm)
       test->PrepareSnapshots(U_snapshots, basis_tags);
       sample_generator->SaveSnapshot(U_snapshots, basis_tags);
 
+      sample_generator->ReportStatus(s);
+
       delete U_snapshots;
       delete test;
    }

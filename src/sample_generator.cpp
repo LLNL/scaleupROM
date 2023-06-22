@@ -50,6 +50,9 @@ SampleGenerator::SampleGenerator(MPI_Comm comm)
    // the number of snapshots can exceed total_samples.
    max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
 
+   // Report frequency
+   report_freq = config.GetOption<int>("sample_generation/report_frequency", 1);
+
    // Initially no snapshot generator.
    snapshot_generators.SetSize(0);
    snapshot_options.SetSize(0);
@@ -204,4 +207,17 @@ void SampleGenerator::WriteSnapshots()
       assert(snapshot_generators[s]);
       snapshot_generators[s]->writeSnapshot();
    }
+}
+
+void SampleGenerator::ReportStatus(const int &sample_idx)
+{
+   if (sample_idx % report_freq != 0) return;
+
+   printf("==========  SampleGenerator Status  ==========\n");
+   printf("%d-th sample is collected.\n", sample_idx);
+   printf("Basis tags: %ld\n", basis_tags.size());
+   printf("Basis tag\t# of snapshots\n");
+   for (int k = 0; k < basis_tags.size(); k++)
+      printf("%s\t%d\n", basis_tags[k].c_str(), snapshot_generators[k]->getNumSamples());
+   printf("==============================================\n");
 }

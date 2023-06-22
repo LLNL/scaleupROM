@@ -33,6 +33,7 @@ protected:
 
    Array<int> sampling_sizes;
    int total_samples;
+   int report_freq = -1;
 
    Array<Parameter *> params;
 
@@ -84,6 +85,8 @@ public:
    void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags);
    void AddSnapshotGenerator(const int &fom_vdofs, const std::string &basis_tag);
    void WriteSnapshots();
+
+   void ReportStatus(const int &sample_idx);
 };
 
 #endif
