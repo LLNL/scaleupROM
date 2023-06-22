@@ -133,6 +133,9 @@ set(scaleupROMObj_SOURCES
   include/hdf5_utils.hpp
   src/hdf5_utils.cpp
 
+  include/block_smoother.hpp
+  src/block_smoother.cpp
+
   include/navier_solver.hpp
   src/navier_solver.cpp
 
