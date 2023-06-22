@@ -653,6 +653,10 @@ void MFEMROMHandler::Solve(BlockVector* U)
    {
       M = new BlockGSSmoother(*romMat);
    }
+   else if (prec_str == "block_jacobi")
+   {
+      M = new BlockDSmoother(*romMat);
+   }
    else if (prec_str != "none")
    {
       mfem_error("Unknown preconditioner for ROM!\n");

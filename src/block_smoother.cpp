@@ -19,6 +19,10 @@ using namespace mfem;
 namespace mfem
 {
 
+/*
+   BlockSmoother
+*/
+
 BlockSmoother::BlockSmoother(const BlockMatrix &a)
    : MatrixInverse(a),
      oper(&a),
@@ -53,6 +57,10 @@ void BlockSmoother::SetOperator(const Operator &a)
    height = oper->Height();
    width = oper->Width();
 }
+
+/*
+   BlockGSSmoother
+*/
 
 /// Matrix vector multiplication with Block GS Smoother.
 void BlockGSSmoother::Mult(const Vector &x, Vector &y) const
@@ -142,6 +150,77 @@ void BlockGSSmoother::BlockGaussSeidelBack(const Vector &x, Vector &y) const
                                 row_offsets[i+1] - row_offsets[i]);
       diag_inv[i]->Mult(tmp, yblockview);
    }
+}
+
+/*
+   BlockDSmoother
+*/
+
+/// Create the Jacobi smoother.
+BlockDSmoother::BlockDSmoother(const BlockMatrix &a, int t, int it)
+   : BlockSmoother(a)
+{
+   type = t;
+   // scale = s;
+   iterations = it;
+}
+
+/// Matrix vector multiplication with Jacobi smoother.
+void BlockDSmoother::Mult(const Vector &x, Vector &y) const
+{
+   if (!iterative_mode && type == 0 && iterations == 1)
+   {
+      Vector xblockview, yblockview;
+      for (int i = 0; i < num_row_blocks; i++)
+      {
+         xblockview.SetDataAndSize(x.GetData() + row_offsets[i],
+                                 row_offsets[i+1] - row_offsets[i]);
+         yblockview.SetDataAndSize(y.GetData() + row_offsets[i],
+                                 row_offsets[i+1] - row_offsets[i]);
+         diag_inv[i]->Mult(xblockview, yblockview);
+      }
+      return;
+   }
+
+   mfem_error("BlockDSmoother::Mult is implemented only for standard preconditioner!\n");
+
+   // z.SetSize(width);
+
+   // Vector *r = &y, *p = &z;
+
+   // if (iterations % 2 == 0)
+   // {
+   //    Swap<Vector*>(r, p);
+   // }
+
+   // if (!iterative_mode)
+   // {
+   //    *p = 0.0;
+   // }
+   // else if (iterations % 2)
+   // {
+   //    *p = y;
+   // }
+   // for (int i = 0; i < iterations; i++)
+   // {
+   //    if (type == 0)
+   //    {
+   //       oper->Jacobi(x, *p, *r, scale, use_abs_diag);
+   //    }
+   //    else if (type == 1)
+   //    {
+   //       oper->Jacobi2(x, *p, *r, scale);
+   //    }
+   //    else if (type == 2)
+   //    {
+   //       oper->Jacobi3(x, *p, *r, scale);
+   //    }
+   //    else
+   //    {
+   //       mfem_error("DSmoother::Mult wrong type");
+   //    }
+   //    Swap<Vector*>(r, p);
+   // }
 }
 
 }

@@ -61,32 +61,27 @@ public:
    void BlockGaussSeidelBack(const Vector &x, Vector &y) const;
 };
 
-// /// Data type for scaled Jacobi-type smoother of sparse matrix
-// class BlockDSmoother : public BlockSmoother
-// {
-// protected:
-//    int type; // 0, 1, 2 - scaled Jacobi, scaled l1-Jacobi, scaled lumped-Jacobi
+/// Data type for scaled Jacobi-type smoother of sparse matrix
+class BlockDSmoother : public BlockSmoother
+{
+protected:
+   int type; // 0, 1, 2 - scaled Jacobi, scaled l1-Jacobi, scaled lumped-Jacobi
 //    double scale;
-//    int iterations;
-//    /// Uses abs values of the diagonal entries. Relevant only when type = 0.
-//    bool use_abs_diag = false;
+   int iterations;
 
 //    mutable Vector z;
 
-// public:
-//    /// Create Jacobi smoother.
-//    BlockDSmoother(int t = 0, double s = 1., int it = 1)
-//    { type = t; scale = s; iterations = it; }
+public:
+   /// Create Jacobi smoother.
+   BlockDSmoother(int t = 0, int it = 1)
+   { type = t; iterations = it; }
 
-//    /// Create Jacobi smoother.
-//    BlockDSmoother(const BlockMatrix &a, int t = 0, double s = 1., int it = 1);
+   /// Create Jacobi smoother.
+   BlockDSmoother(const BlockMatrix &a, int t = 0, int it = 1);
 
-//    /// Replace diag entries with their abs values. Relevant only when type = 0.
-//    void SetPositiveDiagonal(bool pos_diag = true) { use_abs_diag = pos_diag; }
-
-//    /// Matrix vector multiplication with Jacobi smoother.
-//    virtual void Mult(const Vector &x, Vector &y) const;
-// };
+   /// Matrix vector multiplication with Jacobi smoother.
+   virtual void Mult(const Vector &x, Vector &y) const;
+};
 
 }
 
