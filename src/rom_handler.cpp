@@ -16,6 +16,7 @@
 #include "rom_handler.hpp"
 #include "linalg_utils.hpp"
 #include "hdf5_utils.hpp"
+#include "block_smoother.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -647,6 +648,10 @@ void MFEMROMHandler::Solve(BlockVector* U)
    else if (prec_str == "gs")
    {
       M = new GSSmoother(*romMat_mono);
+   }
+   else if (prec_str == "block_gs")
+   {
+      M = new BlockGSSmoother(*romMat);
    }
    else if (prec_str != "none")
    {
