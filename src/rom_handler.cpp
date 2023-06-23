@@ -194,7 +194,7 @@ void ROMHandler::FormReducedBasis()
       assert(basis_dim > 0);
 
       rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
       std::string filename = sample_dir + "/" + sample_prefix + "_sample";
       filename += "_" + basis_tag + "_snapshot";
@@ -636,6 +636,8 @@ void MFEMROMHandler::Solve(BlockVector* U)
       parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
       K = parRomMat;
    }
+   else if (prec_str == "gs")
+      K = romMat_mono;
    else
       K = romMat;
 
