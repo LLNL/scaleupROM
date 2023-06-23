@@ -216,8 +216,8 @@ void SampleGenerator::ReportStatus(const int &sample_idx)
    printf("==========  SampleGenerator Status  ==========\n");
    printf("%d-th sample is collected.\n", sample_idx);
    printf("Basis tags: %ld\n", basis_tags.size());
-   printf("Basis tag\t# of snapshots\n");
+   printf("%20.20s\t# of snapshots\n", "Basis tags");
    for (int k = 0; k < basis_tags.size(); k++)
-      printf("%s\t%d\n", basis_tags[k].c_str(), snapshot_generators[k]->getNumSamples());
+      printf("%20.20s\t%d\n", basis_tags[k].c_str(), snapshot_generators[k]->getNumSamples());
    printf("==============================================\n");
 }
