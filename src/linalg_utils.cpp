@@ -194,12 +194,16 @@ SparseMatrix* RtAP(DenseMatrix& R,
    return RAP;
 }
 
-void PrintMatrix(const SparseMatrix &mat,
+template<typename T>
+void PrintMatrix(const T &mat,
                 const std::string &filename)
 {
    std::ofstream file(filename.c_str());
    mat.PrintMatlab(file);
 }
+
+template void PrintMatrix<SparseMatrix>(const SparseMatrix &mat, const std::string &filename);
+template void PrintMatrix<BlockMatrix>(const BlockMatrix &mat, const std::string &filename);
 
 // Does not support parallelization. for debugging.
 void PrintMatrix(const DenseMatrix &mat,

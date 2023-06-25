@@ -60,7 +60,8 @@ SparseMatrix* RtAP(DenseMatrix& R,
                    const Operator& A,
                    DenseMatrix& P);
 
-void PrintMatrix(const SparseMatrix &mat,
+template<typename T>
+void PrintMatrix(const T &mat,
                 const std::string &filename);
 
 void PrintMatrix(const DenseMatrix &mat,
