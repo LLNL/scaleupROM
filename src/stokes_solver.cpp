@@ -17,6 +17,7 @@
 #include "linalg_utils.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -75,36 +76,16 @@ StokesSolver::~StokesSolver()
    delete nu_coeff;
    delete vec_diff, norm_flux;
 
-   for (int k = 0; k < fs.Size(); k++) delete fs[k];
-   for (int k = 0; k < gs.Size(); k++) delete gs[k];
-   for (int k = 0; k < ms.Size(); k++) delete ms[k];
-   for (int k = 0; k < bs.Size(); k++) delete bs[k];
+   DeletePointers(fs);
+   DeletePointers(gs);
+   DeletePointers(ms);
+   DeletePointers(bs);
 
-   for (int k = 0; k < ud_coeffs.Size(); k++)
-      delete ud_coeffs[k];
-      
-   for (int k = 0; k < sn_coeffs.Size(); k++)
-      delete sn_coeffs[k];
+   DeletePointers(ud_coeffs);
+   DeletePointers(sn_coeffs);
 
-   // for (int c = 0; c < comp_mats.Size(); c++)
-   //    delete comp_mats[c];
-
-   // for (int c = 0; c < bdr_mats.Size(); c++)
-   // {
-   //    for (int b = 0; b < bdr_mats[c]->Size(); b++)
-   //       delete (*bdr_mats[c])[b];
-
-   //    delete bdr_mats[c];
-   // }
-
-   // for (int p = 0; p < port_mats.Size(); p++)
-   // {
-   //    for (int i = 0; i < port_mats[p]->NumRows(); i++)
-   //       for (int j = 0; j < port_mats[p]->NumCols(); j++)
-   //          delete (*port_mats[p])(i,j);
-
-   //    delete port_mats[p];
-   // }
+   delete mMat, bMat;
+   delete M, B;
 }
 
 void StokesSolver::SetupBCVariables()

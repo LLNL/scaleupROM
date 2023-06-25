@@ -14,6 +14,7 @@
 #include "poisson_solver.hpp"
 #include "input_parser.hpp"
 #include "linalg_utils.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -54,14 +55,12 @@ PoissonSolver::~PoissonSolver()
 {
    delete interface_integ;
 
-   for (int k = 0; k < bs.Size(); k++) delete bs[k];
-   for (int k = 0; k < as.Size(); k++) delete as[k];
+   DeletePointers(bs);
+   DeletePointers(as);
+   DeletePointers(bdr_coeffs);
+   DeletePointers(rhs_coeffs);
 
-   for (int k = 0; k < bdr_coeffs.Size(); k++)
-      delete bdr_coeffs[k];
-      
-   for (int k = 0; k < rhs_coeffs.Size(); k++)
-      delete rhs_coeffs[k];
+   delete globalMat_mono, globalMat;
 }
 
 void PoissonSolver::SetupBCVariables()
