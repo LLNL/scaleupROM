@@ -128,12 +128,12 @@ void MultiBlockSolver::ParseInputs()
    use_rom = config.GetOption<bool>("main/use_rom", false);
 
    // save solution if single run.
-   save_sol = config.GetOption<bool>("main/single_run/save_solution/enabled", false);
+   save_sol = config.GetOption<bool>("save_solution/enabled", false);
    if (save_sol)
    {
       // Default file path if no input file name is provided.
-      sol_dir = config.GetOption<std::string>("main/single_run/save_solution/file_path/directory", ".");
-      sol_prefix = config.GetOption<std::string>("main/single_run/save_solution/file_path/prefix", "solution");
+      sol_dir = config.GetOption<std::string>("save_solution/file_path/directory", ".");
+      sol_prefix = config.GetOption<std::string>("save_solution/file_path/prefix", "solution");
    }
 }
 
