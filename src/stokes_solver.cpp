@@ -713,9 +713,9 @@ void StokesSolver::Solve()
 
    SchurOperator *schur;
    if (use_amg)
-      schur = new SchurOperator(Mop, B);
+      schur = new SchurOperator(Mop, B, use_amg);
    else
-      schur = new SchurOperator(M, B);
+      schur = new SchurOperator(M, B, use_amg);
    MINRESSolver solver2;
    solver2.SetOperator(*schur);
    solver2.SetPrintLevel(print_level);

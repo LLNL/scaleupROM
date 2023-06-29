@@ -25,6 +25,8 @@ class SchurOperator : public Operator
 protected:
    Operator *A, *B;//, *Bt;
    CGSolver *solver = NULL;
+
+   bool use_amg = false;
    HypreBoomerAMG *amg_prec = NULL;
 
    int maxIter = -1;
@@ -32,7 +34,7 @@ protected:
    double atol = -1.0;
 
 public:
-   SchurOperator(Operator* const A_, Operator* const B_,
+   SchurOperator(Operator* const A_, Operator* const B_, bool use_amg = false,
                   const int &max_iter_ = 10000, const double rtol_ = 1.0e-15, const double atol_ = 1.0e-15)
       : Operator(B_->Height()), A(A_), B(B_),
         maxIter(max_iter_), rtol(rtol_), atol(atol_)
@@ -41,25 +43,18 @@ public:
       solver->SetRelTol(rtol);
       solver->SetAbsTol(atol);
       solver->SetMaxIter(maxIter);
-      solver->SetOperator(*A);
       solver->SetPrintLevel(0);
-   }
 
-   SchurOperator(HypreParMatrix* const A_, Operator* const B_,
-                  const int &max_iter_ = 10000, const double rtol_ = 1.0e-15, const double atol_ = 1.0e-15)
-      : Operator(B_->Height()), A(A_), B(B_),
-        maxIter(max_iter_), rtol(rtol_), atol(atol_)
-   {
-      solver = new CGSolver();
-      solver->SetRelTol(rtol);
-      solver->SetAbsTol(atol);
-      solver->SetMaxIter(maxIter);
+      if (use_amg)
+      {
+         HypreParMatrix *A_amg = dynamic_cast<HypreParMatrix *>(A_);
+         A = A_amg;
+         amg_prec = new HypreBoomerAMG(*A_amg);
+         amg_prec->SetPrintLevel(0);
+         solver->SetPreconditioner(*amg_prec);
+      }
+
       solver->SetOperator(*A);
-      solver->SetPrintLevel(0);
-      
-      amg_prec = new HypreBoomerAMG(*A_);
-      amg_prec->SetPrintLevel(0);
-      solver->SetPreconditioner(*amg_prec);
    }
 
    virtual ~SchurOperator()
