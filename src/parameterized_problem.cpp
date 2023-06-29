@@ -249,6 +249,10 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new StokesComponent();
    }
+   else if (problem_name == "stokes_flow_past_array")
+   {
+      problem = new StokesFlowPastArray();
+   }
    else
    {
       mfem_error("Unknown parameterized problem name!\n");
@@ -480,5 +484,50 @@ StokesComponent::StokesComponent()
       param_ptr[7+i] = &(function_factory::stokes_problem::stokes_component::offsets[i]);
       for (int j = 0; j < 3; j++)
          param_ptr[10 + 3*i + j] = &(function_factory::stokes_problem::stokes_component::k(j,i));
+   }
+}
+
+/*
+   StokesFlowPastArray
+*/
+
+StokesFlowPastArray::StokesFlowPastArray()
+   : StokesComponent(), u0(&function_factory::stokes_problem::stokes_component::u0)
+{}
+
+void StokesFlowPastArray::SetParams(const std::string &key, const double &value)
+{
+   ParameterizedProblem::SetParams(key, value);
+   SetBattr();
+}
+
+void StokesFlowPastArray::SetParams(const Array<int> &indexes, const Vector &values)
+{
+   ParameterizedProblem::SetParams(indexes, values);
+   SetBattr();
+}
+
+void StokesFlowPastArray::SetBattr()
+{
+   if ((*u0)[0] > 0.0)
+   {
+      bdr_type[3] = StokesProblem::DIRICHLET;
+      bdr_type[1] = StokesProblem::NEUMANN;
+   }
+   else
+   {
+      bdr_type[1] = StokesProblem::DIRICHLET;
+      bdr_type[3] = StokesProblem::NEUMANN;
+   }
+
+   if ((*u0)[1] > 0.0)
+   {
+      bdr_type[0] = StokesProblem::DIRICHLET;
+      bdr_type[2] = StokesProblem::NEUMANN;
+   }
+   else
+   {
+      bdr_type[2] = StokesProblem::DIRICHLET;
+      bdr_type[0] = StokesProblem::NEUMANN;
    }
 }

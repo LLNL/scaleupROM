@@ -11,7 +11,7 @@
 
 #include <fstream>
 #include <iostream>
-#include "random.hpp"
+#include "etc.hpp"
 #include "librom.h"
 #include "mfem.hpp"
 #include "linalg/svd/StaticSVD.h"

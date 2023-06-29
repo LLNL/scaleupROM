@@ -12,7 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include "librom.h"
-#include "random.hpp"
+#include "etc.hpp"
 
 int main(int argc, char *argv[])
 {

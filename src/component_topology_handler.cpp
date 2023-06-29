@@ -12,19 +12,13 @@
 // Implementation of Bilinear Form Integrators
 
 #include "component_topology_handler.hpp"
+#include "etc.hpp"
 #include "hdf5.h"
 #include "hdf5_utils.hpp"
 #include <fstream>
 
 using namespace std;
 using namespace mfem;
-
-inline bool FileExists(const std::string& name)
-{
-   std::ifstream f(name.c_str());
-   return f.good();
-   // ifstream f will be closed upon the end of the function.
-}
 
 ComponentTopologyHandler::ComponentTopologyHandler()
    : TopologyHandler(COMPONENT)
@@ -79,6 +73,18 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    SetupBdrAttributes();
 }
 
+ComponentTopologyHandler::~ComponentTopologyHandler()
+{
+   DeletePointers(components);
+   DeletePointers(meshes);
+   DeletePointers(ref_ports);
+   DeletePointers(port_dicts);
+   DeletePointers(bdr_c2g);
+   // NOTE: We do not need ~TopologyHandler,
+   // since all entries in interface_infos point toward ref_interfaces.
+   DeletePointers(ref_interfaces);
+}
+
 void ComponentTopologyHandler::GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)
 {
    assert(num_ref_ports > 0);
@@ -112,9 +118,9 @@ void ComponentTopologyHandler::SetupComponents()
    {
       std::string comp_name = config.GetRequiredOptionFromDict<std::string>("name", comp_list[c]);
       // do not read if this component is not used in the global config.
-      if (!comp_names.count(comp_name)) continue;
+      if (!comp_name2idx.count(comp_name)) continue;
 
-      int idx = comp_names[comp_name];
+      int idx = comp_name2idx[comp_name];
       std::string filename = config.GetRequiredOptionFromDict<std::string>("file", comp_list[c]);
       components[idx] = new BlockMesh(filename.c_str());
 
@@ -138,14 +144,21 @@ void ComponentTopologyHandler::SetupComponents()
 void ComponentTopologyHandler::SetupReferencePorts()
 {
    assert(num_ref_ports > 0);
+   assert(port_dicts.Size() == num_ref_ports);
 
    ref_ports.SetSize(num_ref_ports);
    ref_ports = NULL;
 
+   // Build it from hdf5 config file first.
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      if (port_dicts[p] != NULL)
+         BuildPortDataFromInput(*port_dicts[p]);
+   }
+
+   // Fill out the rest from yaml input file.
    YAML::Node port_list = config.FindNode("mesh/component-wise/ports");
-   if (!port_list)
-      mfem_error("ComponentTopologyHandler: port list does not exist!\n");
-   else
+   if (port_list)
    {
       for (int p = 0; p < port_list.size(); p++)
       {
@@ -159,7 +172,12 @@ void ComponentTopologyHandler::SetupReferencePorts()
       }
    }
    
-   for (int p = 0; p < ref_ports.Size(); p++) assert(ref_ports[p] != NULL);
+   for (int p = 0; p < ref_ports.Size(); p++)
+      if (ref_ports[p] == NULL)
+      {
+         std::string msg = "ComponentTopologyHandler: cannot set up port " + port_names[p] + "!\n";
+         mfem_error(msg.c_str());
+      }
 }
 
 void ComponentTopologyHandler::ReadComponentsFromFile(const std::string filename)
@@ -172,16 +190,18 @@ void ComponentTopologyHandler::ReadComponentsFromFile(const std::string filename
    
    {  // Component list.
       // This line below currently does not work.
-      // hdf5_utils::ReadDataset(file_id, "components", comp_names);
+      // hdf5_utils::ReadDataset(file_id, "components", comp_name2idx);
       grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
       assert(grp_id >= 0);
 
       hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
+      comp_names.resize(num_comp);
       for (int c = 0; c < num_comp; c++)
       {
          std::string tmp;
          hdf5_utils::ReadAttribute(grp_id, std::to_string(c).c_str(), tmp);
-         comp_names[tmp] = c;
+         comp_name2idx[tmp] = c;
+         comp_names[c] = tmp;
       }
 
       // Mesh list.
@@ -235,18 +255,30 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
       assert(grp_id >= 0);
 
       hdf5_utils::ReadAttribute(grp_id, "number_of_references", num_ref_ports);
+      port_names.resize(num_ref_ports);
+      port_dicts.SetSize(num_ref_ports);
+      port_dicts = NULL;
       // // hdf5_utils::ReadDataset(file_id, "ports", ports);
       for (int p = 0; p < num_ref_ports; p++)
       {
          std::string tmp;
          hdf5_utils::ReadAttribute(grp_id, std::to_string(p).c_str(), tmp);
-         port_names[tmp] = p;
+         port_names[p] = tmp;
+         port_name2idx[tmp] = p;
+         if (hdf5_utils::pathExists(grp_id, tmp))
+            port_dicts[p] = ReadPortDict(grp_id, tmp);
       }
 
       // Global interface port data.
       Array2D<int> tmp;
-      hdf5_utils::ReadDataset(grp_id, "interface", tmp);
-      num_ports = tmp.NumRows();
+      if (num_ref_ports == 0) // no ports needed or used.
+         num_ports = 0;
+      else
+      {
+         hdf5_utils::ReadDataset(grp_id, "interface", tmp);
+         num_ports = tmp.NumRows();
+      }
+      
       port_infos.SetSize(num_ports);
       port_types.SetSize(num_ports);
 
@@ -295,6 +327,42 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
 
       attr_offset += 1;
    }
+}
+
+YAML::Node* ComponentTopologyHandler::ReadPortDict(hid_t grp_id, const std::string& port_name)
+{
+   assert(grp_id >= 0);
+   hid_t port_id;
+   herr_t errf = 0;
+
+   port_id = H5Gopen2(grp_id, port_name.c_str(), H5P_DEFAULT);
+   assert(port_id >= 0);
+
+   std::string comp1, comp2;
+   hdf5_utils::ReadAttribute(port_id, "comp1", comp1);
+   hdf5_utils::ReadAttribute(port_id, "comp2", comp2);
+
+   int attr1, attr2;
+   hdf5_utils::ReadAttribute(port_id, "attr1", attr1);
+   hdf5_utils::ReadAttribute(port_id, "attr2", attr2);
+
+   Array<double> trnsf2;
+   hdf5_utils::ReadDataset(port_id, "comp2_configuration", trnsf2);
+
+   errf = H5Gclose(port_id);
+   assert(errf >= 0);
+
+
+   YAML::Node *port_dict = new YAML::Node;
+
+   (*port_dict)["name"] = port_name;
+   (*port_dict)["comp1"]["name"] = comp1;
+   (*port_dict)["comp2"]["name"] = comp2;
+   (*port_dict)["comp1"]["attr"] = attr1;
+   (*port_dict)["comp2"]["attr"] = attr2;
+   (*port_dict)["comp2_configuration"] = trnsf2;
+
+   return port_dict;
 }
 
 void ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename)
@@ -349,12 +417,16 @@ void ComponentTopologyHandler::ReadPortDatasFromFile(const std::string filename)
       std::string port_name;
       hdf5_utils::ReadAttribute(grp_id, "name", port_name);
       // Read only the ports that are specified in the global configuration.
-      if (!port_names.count(port_name))
+      if (!port_name2idx.count(port_name))
       {
          errf = H5Gclose(grp_id);
          assert(errf >= 0);
          continue;
       }
+
+      int port_idx = port_name2idx[port_name];
+      // Skip if the port is already set up.
+      if (ref_ports[port_idx] != NULL) continue;
 
       int battr1, battr2;
       hdf5_utils::ReadAttribute(grp_id, "bdr_attr1", battr1);
@@ -365,8 +437,8 @@ void ComponentTopologyHandler::ReadPortDatasFromFile(const std::string filename)
       hdf5_utils::ReadAttribute(grp_id, "component1", name1);
       hdf5_utils::ReadAttribute(grp_id, "component2", name2);
 
-      int comp1 = comp_names[name1];
-      int comp2 = comp_names[name2];
+      int comp1 = comp_name2idx[name1];
+      int comp2 = comp_name2idx[name2];
       assert((comp1 >= 0) && (comp2 >= 0));
 
       Array<int> vtx1, vtx2;
@@ -396,7 +468,6 @@ void ComponentTopologyHandler::ReadPortDatasFromFile(const std::string filename)
       errf = H5Gclose(grp_id);
       assert(errf >= 0);
 
-      int port_idx = port_names[port_name];
       ref_ports[port_idx] = new PortData;
       PortData *port = ref_ports[port_idx];
       port->Component1 = comp1;
@@ -441,19 +512,9 @@ void ComponentTopologyHandler::WritePortDataToFile(const PortData &port,
       hdf5_utils::WriteAttribute(grp_id, "bdr_attr1", port.Attr1);
       hdf5_utils::WriteAttribute(grp_id, "bdr_attr2", port.Attr2);
 
-      std::string comp1_name, comp2_name;
-      for (auto& it : comp_names)
-         if (it.second == port.Component1)
-         {
-            comp1_name = it.first;
-            break;
-         }
-      for (auto& it : comp_names)
-         if (it.second == port.Component2)
-         {
-            comp2_name = it.first;
-            break;
-         }
+      std::string comp1_name = comp_names[port.Component1];
+      std::string comp2_name = comp_names[port.Component2];
+
       hdf5_utils::WriteAttribute(grp_id, "component1", comp1_name);
       hdf5_utils::WriteAttribute(grp_id, "component2", comp2_name);
 
@@ -651,10 +712,12 @@ void ComponentTopologyHandler::SetupPorts()
 void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict)
 {
    std::string port_name = config.GetRequiredOptionFromDict<std::string>("name", port_dict);
-   if (!port_names.count(port_name))
+   if (!port_name2idx.count(port_name))
       return;
 
-   int port_idx = port_names[port_name];
+   int port_idx = port_name2idx[port_name];
+   if (ref_ports[port_idx] != NULL) return;
+
    ref_ports[port_idx] = new PortData;
    PortData *port = ref_ports[port_idx];
 
@@ -662,13 +725,13 @@ void ComponentTopologyHandler::BuildPortDataFromInput(const YAML::Node port_dict
    assert(components.Size() == num_comp);
    std::string name1 = config.GetRequiredOptionFromDict<std::string>("comp1/name", port_dict);
    std::string name2 = config.GetRequiredOptionFromDict<std::string>("comp2/name", port_dict);
-   if (!comp_names.count(name1))
+   if (!comp_name2idx.count(name1))
       mfem_error("component 1 for the port building does not exist!\n");
-   if (!comp_names.count(name2))
+   if (!comp_name2idx.count(name2))
       mfem_error("component 2 for the port building does not exist!\n");
    
-   int idx1 = comp_names[name1];
-   int idx2 = comp_names[name2];
+   int idx1 = comp_name2idx[name1];
+   int idx2 = comp_name2idx[name2];
    Mesh *comp1 = components[idx1];
    Mesh *comp2 = components[idx2];
    assert(comp1 != NULL);

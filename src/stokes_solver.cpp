@@ -17,6 +17,7 @@
 #include "linalg_utils.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -75,36 +76,16 @@ StokesSolver::~StokesSolver()
    delete nu_coeff;
    delete vec_diff, norm_flux;
 
-   for (int k = 0; k < fs.Size(); k++) delete fs[k];
-   for (int k = 0; k < gs.Size(); k++) delete gs[k];
-   for (int k = 0; k < ms.Size(); k++) delete ms[k];
-   for (int k = 0; k < bs.Size(); k++) delete bs[k];
+   DeletePointers(fs);
+   DeletePointers(gs);
+   DeletePointers(ms);
+   DeletePointers(bs);
 
-   for (int k = 0; k < ud_coeffs.Size(); k++)
-      delete ud_coeffs[k];
-      
-   for (int k = 0; k < sn_coeffs.Size(); k++)
-      delete sn_coeffs[k];
+   DeletePointers(ud_coeffs);
+   DeletePointers(sn_coeffs);
 
-   // for (int c = 0; c < comp_mats.Size(); c++)
-   //    delete comp_mats[c];
-
-   // for (int c = 0; c < bdr_mats.Size(); c++)
-   // {
-   //    for (int b = 0; b < bdr_mats[c]->Size(); b++)
-   //       delete (*bdr_mats[c])[b];
-
-   //    delete bdr_mats[c];
-   // }
-
-   // for (int p = 0; p < port_mats.Size(); p++)
-   // {
-   //    for (int i = 0; i < port_mats[p]->NumRows(); i++)
-   //       for (int j = 0; j < port_mats[p]->NumCols(); j++)
-   //          delete (*port_mats[p])(i,j);
-
-   //    delete port_mats[p];
-   // }
+   delete mMat, bMat;
+   delete M, B;
 }
 
 void StokesSolver::SetupBCVariables()
@@ -530,7 +511,7 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       Array<int> dummy1, dummy2;
       BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
 
-      rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp, comp_mats[c]);
+      comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
 
       delete bt_mat, sys_comp;
    }
@@ -554,7 +535,7 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
       const int fidx = c * num_var;
       Mesh *comp = topol_handler->GetComponentMesh(c);
       assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-      Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
+      Array<SparseMatrix *> *bdr_mats_c = bdr_mats[c];
 
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
       {
@@ -580,7 +561,7 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          Array<int> dummy1, dummy2;
          BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
 
-         rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp, (*bdr_mats_c)[b]);
+         (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
 
          delete bt_mat, sys_comp;
       }
@@ -652,7 +633,7 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
             Array<int> dummy1, dummy2;
             BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
                                                    dummy1, dummy2);
-            rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat, (*port_mats[p])(i, j));
+            (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat);
             delete tmp_mat;
          }
 
@@ -878,6 +859,7 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
    // Ensure incompressibility.
    function_factory::stokes_problem::del_u = 0.0;
+   function_factory::stokes_problem::x0.SetSize(dim);
    if (!pres_dbc)
    {
       Array<bool> nz_dbcs(numBdr);

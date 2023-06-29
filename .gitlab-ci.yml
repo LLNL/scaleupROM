@@ -98,6 +98,17 @@ comp-topol:
     - cd ci-build/test
     - ./test_topol
 
+block-smoother:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - ./test_block_smoother
+
 multi_comp_dd_mms:
   stage: test
   dependencies:

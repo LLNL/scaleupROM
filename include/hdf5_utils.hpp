@@ -25,11 +25,11 @@ inline hid_t GetType(double) { return (H5T_NATIVE_DOUBLE); }
 
 hid_t GetNativeType(hid_t type);
 
-void ReadAttribute(hid_t source, std::string attribute, std::string &value);
-void WriteAttribute(hid_t source, std::string attribute, const std::string &value);
+void ReadAttribute(hid_t &source, std::string attribute, std::string &value);
+void WriteAttribute(hid_t &source, std::string attribute, const std::string &value);
 
 template <typename T>
-void ReadAttribute(hid_t source, std::string attribute, T &value) {
+void ReadAttribute(hid_t &source, std::string attribute, T &value) {
    herr_t status;
    hid_t attr;
    hid_t attrType = hdf5_utils::GetType(value);
@@ -41,7 +41,7 @@ void ReadAttribute(hid_t source, std::string attribute, T &value) {
 }
 
 template <typename T>
-void WriteAttribute(hid_t dest, std::string attribute, const T &value) {
+void WriteAttribute(hid_t &dest, std::string attribute, const T &value) {
    hid_t attr, status;
    hid_t attrType = hdf5_utils::GetType(value);
    hid_t dataspaceId = H5Screate(H5S_SCALAR);
@@ -55,7 +55,7 @@ void WriteAttribute(hid_t dest, std::string attribute, const T &value) {
 }
 
 template <typename T>
-void ReadDataset(hid_t source, std::string dataset, Array<T> &value)
+void ReadDataset(hid_t &source, std::string dataset, Array<T> &value)
 {
    herr_t errf = 0;
    
@@ -79,7 +79,7 @@ void ReadDataset(hid_t source, std::string dataset, Array<T> &value)
 }
 
 template <typename T>
-void ReadDataset(hid_t source, std::string dataset, Array2D<T> &value)
+void ReadDataset(hid_t &source, std::string dataset, Array2D<T> &value)
 {
    herr_t errf = 0;
    
@@ -111,10 +111,10 @@ void ReadDataset(hid_t source, std::string dataset, Array2D<T> &value)
 }
 
 // This currently only reads the first item. Do not use it.
-void ReadDataset(hid_t source, std::string dataset, std::vector<std::string> &value);
+void ReadDataset(hid_t &source, std::string dataset, std::vector<std::string> &value);
 
 template <typename T>
-void WriteDataset(hid_t source, std::string dataset, const Array<T> &value)
+void WriteDataset(hid_t &source, std::string dataset, const Array<T> &value)
 {
    herr_t errf = 0;
 
@@ -136,7 +136,7 @@ void WriteDataset(hid_t source, std::string dataset, const Array<T> &value)
 }
 
 template <typename T>
-void WriteDataset(hid_t source, std::string dataset, const Array2D<T> &value)
+void WriteDataset(hid_t &source, std::string dataset, const Array2D<T> &value)
 {
    herr_t errf = 0;
 
@@ -158,8 +158,20 @@ void WriteDataset(hid_t source, std::string dataset, const Array2D<T> &value)
    assert(errf >= 0);
 }
 
-void ReadDataset(hid_t source, std::string dataset, DenseMatrix &value);
-void WriteDataset(hid_t source, std::string dataset, const DenseMatrix &value);
+SparseMatrix* ReadSparseMatrix(hid_t &source, std::string matrix_name);
+void WriteSparseMatrix(hid_t &source, std::string matrix_name, SparseMatrix* mat);
+
+BlockMatrix* ReadBlockMatrix(hid_t &source, std::string matrix_name,
+                             const Array<int> &block_offsets);
+void WriteBlockMatrix(hid_t &source, std::string matrix_name, BlockMatrix* mat);
+
+void ReadDataset(hid_t &source, std::string dataset, DenseMatrix &value);
+void WriteDataset(hid_t &source, std::string dataset, const DenseMatrix &value);
+
+inline bool pathExists(hid_t id, const std::string& path)
+{
+  return H5Lexists(id, path.c_str(), H5P_DEFAULT) > 0;
+}
 
 }
 

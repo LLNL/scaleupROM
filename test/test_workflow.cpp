@@ -124,8 +124,6 @@ TEST(Poisson_Workflow, ComponentWiseTest)
    config = InputParser("inputs/test.component.yml");
 
    printf("\nSample Generation \n\n");
-
-   config.dict_["mesh"]["type"] = "submesh";
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);

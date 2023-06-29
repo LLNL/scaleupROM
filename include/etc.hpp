@@ -9,9 +9,28 @@
 // terms of the BSD-3 license. We welcome feedback and contributions, see file
 // CONTRIBUTING.md for details.
 
-#ifndef RANDOM_HPP
-#define RANDOM_HPP
+#ifndef ETC_HPP
+#define ETC_HPP
+
+#include "mfem.hpp"
+
+using namespace mfem;
+using namespace std;
 
 double UniformRandom();
+
+template <typename T>
+inline void DeletePointers(Array<T*> &ptr_array)
+{ for (int k = 0; k < ptr_array.Size(); k++) delete ptr_array[k]; }
+
+template <typename T>
+inline void DeletePointers(Array2D<T*> &ptr_array)
+{
+    for (int i = 0; i < ptr_array.NumRows(); i++)
+        for (int j = 0; j < ptr_array.NumCols(); j++)
+            delete ptr_array(i,j);
+}
+
+bool FileExists(const std::string& name);
 
 #endif

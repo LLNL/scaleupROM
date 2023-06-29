@@ -295,23 +295,20 @@ void MultiBlockSolver::AllocateROMElements()
    const int num_ref_ports = topol_handler->GetNumRefPorts();
 
    comp_mats.SetSize(num_comp);
+   comp_mats = NULL;
+
    bdr_mats.SetSize(num_comp);
    for (int c = 0; c < num_comp; c++)
    {
-      comp_mats[c] = new DenseMatrix();
-
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      bdr_mats[c] = new Array<DenseMatrix *>(comp->bdr_attributes.Size());
-      for (int b = 0; b < bdr_mats[c]->Size(); b++)
-         (*bdr_mats[c])[b] = new DenseMatrix();
+      bdr_mats[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats[c]) = NULL;
    }
    port_mats.SetSize(num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
    {
-      port_mats[p] = new Array2D<DenseMatrix *>(2,2);
-
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++) (*port_mats[p])(i,j) = new DenseMatrix();
+      port_mats[p] = new Array2D<SparseMatrix *>(2,2);
+      (*port_mats[p]) = NULL;
    }
 }
 
@@ -381,7 +378,7 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
       comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
-      hdf5_utils::WriteDataset(comp_grp_id, "domain", *(comp_mats[c]));
+      hdf5_utils::WriteSparseMatrix(comp_grp_id, "domain", comp_mats[c]);
 
       // boundaries are saved for each component group.
       SaveBdrROMElement(comp_grp_id, c);
@@ -409,9 +406,9 @@ void MultiBlockSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
 
    hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
    
-   Array<DenseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
+   Array<SparseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
    for (int b = 0; b < num_bdr; b++)
-      hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
+      hdf5_utils::WriteSparseMatrix(bdr_grp_id, std::to_string(b), (*bdr_mat_c)[b]);
 
    errf = H5Gclose(bdr_grp_id);
    assert(errf >= 0);
@@ -440,12 +437,12 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
       port_grp_id = H5Gcreate(grp_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(port_grp_id >= 0);
 
-      Array2D<DenseMatrix *> *port_mat = port_mats[p];
+      Array2D<SparseMatrix *> *port_mat = port_mats[p];
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
          {
             std::string dset_name = std::to_string(i) + std::to_string(j);
-            hdf5_utils::WriteDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
+            hdf5_utils::WriteSparseMatrix(port_grp_id, dset_name, (*port_mat)(i,j));
          }
       
       errf = H5Gclose(port_grp_id);
@@ -500,7 +497,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
       comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
-      hdf5_utils::ReadDataset(comp_grp_id, "domain", *(comp_mats[c]));
+      comp_mats[c] = hdf5_utils::ReadSparseMatrix(comp_grp_id, "domain");
 
       // boundary
       LoadBdrROMElement(comp_grp_id, c);
@@ -528,9 +525,9 @@ void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
    assert(num_bdr == comp->bdr_attributes.Size());
    assert(num_bdr = bdr_mats[comp_idx]->Size());
 
-   Array<DenseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
+   Array<SparseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
    for (int b = 0; b < num_bdr; b++)
-      hdf5_utils::ReadDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
+      (*bdr_mat_c)[b] = hdf5_utils::ReadSparseMatrix(bdr_grp_id, std::to_string(b));
 
    errf = H5Gclose(bdr_grp_id);
    assert(errf >= 0);
@@ -559,12 +556,12 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
       port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
       assert(port_grp_id >= 0);
 
-      Array2D<DenseMatrix *> *port_mat = port_mats[p];
+      Array2D<SparseMatrix *> *port_mat = port_mats[p];
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
          {
             std::string dset_name = std::to_string(i) + std::to_string(j);
-            hdf5_utils::ReadDataset(port_grp_id, dset_name, *((*port_mat)(i,j)));
+            (*port_mat)(i,j) = hdf5_utils::ReadSparseMatrix(port_grp_id, dset_name);
          }
       
       errf = H5Gclose(port_grp_id);
@@ -581,8 +578,8 @@ void MultiBlockSolver::AssembleROM()
    const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
-   const Array<int> rom_block_offsets = rom_handler->GetBlockOffsets();
-   SparseMatrix *romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
+   const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
+   BlockMatrix *romMat = new BlockMatrix(*rom_block_offsets);
 
    // component domain matrix.
    for (int m = 0; m < numSub; m++)
@@ -590,15 +587,14 @@ void MultiBlockSolver::AssembleROM()
       int c_type = topol_handler->GetMeshType(m);
       int num_basis = rom_handler->GetNumBasis(c_type);
 
-      Array<int> vdofs(num_basis);
-      for (int k = rom_block_offsets[m]; k < rom_block_offsets[m+1]; k++)
-         vdofs[k - rom_block_offsets[m]] = k;
+      if (romMat->IsZeroBlock(m, m))
+         romMat->SetBlock(m, m, new SparseMatrix(num_basis));
 
-      romMat->AddSubMatrix(vdofs, vdofs, *(comp_mats[c_type]));
+      romMat->GetBlock(m,m) += *(comp_mats[c_type]);
 
       // boundary matrixes of each component.
       Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
-      Array<DenseMatrix *> *bdr_mat = bdr_mats[c_type];
+      Array<SparseMatrix *> *bdr_mat = bdr_mats[c_type];
 
       for (int b = 0; b < bdr_c2g->Size(); b++)
       {
@@ -606,7 +602,7 @@ void MultiBlockSolver::AssembleROM()
          if (global_idx < 0) continue;
          if (!BCExistsOnBdr(global_idx)) continue;
 
-         romMat->AddSubMatrix(vdofs, vdofs, *(*bdr_mat)[b]);
+         romMat->GetBlock(m,m) += *(*bdr_mat)[b];
       }
    }
 
@@ -615,7 +611,7 @@ void MultiBlockSolver::AssembleROM()
    {
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
       const int p_type = topol_handler->GetPortType(p);
-      Array2D<DenseMatrix *> *port_mat = port_mats[p_type];
+      Array2D<SparseMatrix *> *port_mat = port_mats[p_type];
 
       const int m1 = pInfo->Mesh1;
       const int m2 = pInfo->Mesh2;
@@ -624,18 +620,20 @@ void MultiBlockSolver::AssembleROM()
       const int num_basis1 = rom_handler->GetNumBasis(c1);
       const int num_basis2 = rom_handler->GetNumBasis(c2);
 
-      Array<int> vdofs1(num_basis1), vdofs2(num_basis2);
-      for (int k = rom_block_offsets[m1]; k < rom_block_offsets[m1+1]; k++)
-         vdofs1[k - rom_block_offsets[m1]] = k;
-      for (int k = rom_block_offsets[m2]; k < rom_block_offsets[m2+1]; k++)
-         vdofs2[k - rom_block_offsets[m2]] = k;
-      Array<Array<int> *> vdofs(2);
-      vdofs[0] = &vdofs1;
-      vdofs[1] = &vdofs2;
+      Array<int> midx(2), num_basis(2);
+      midx[0] = m1;
+      midx[1] = m2;
+      num_basis[0] = num_basis1;
+      num_basis[1] = num_basis2;
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-            romMat->AddSubMatrix(*vdofs[i], *vdofs[j], *((*port_mat)(i, j)));
+         {
+            if (romMat->IsZeroBlock(midx[i], midx[j]))
+               romMat->SetBlock(midx[i], midx[j],
+                                 new SparseMatrix(num_basis[i], num_basis[j]));
+            romMat->GetBlock(midx[i], midx[j]) += *((*port_mat)(i, j));
+         }
    }
 
    romMat->Finalize();
@@ -753,10 +751,12 @@ void MultiBlockSolver::InitROMHandler()
    }
 }
 
-void MultiBlockSolver::SaveSnapshot(const int &sample_index)
-{  
-   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
-   rom_handler->SaveSnapshot(&U_domain, sample_index);
+void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags)
+{
+   // TODO: get offsets set by rom_handler.
+   U_snapshots = new BlockVector(U->GetData(), domain_offsets); // View vector for U.
+   rom_handler->GetBasisTags(basis_tags);
+   assert(U_snapshots->NumBlocks() == basis_tags.size());
 }
 
 void MultiBlockSolver::ProjectRHSOnReducedBasis()
