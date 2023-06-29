@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "topology_handler.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -207,6 +208,8 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
    sub_composition = numSub;
    mesh_comp_idx.SetSize(numSub);
    for (int m = 0; m < numSub; m++) mesh_comp_idx[m] = m;
+   comp_names.resize(num_comp);
+   for (int c = 0; c < num_comp; c++) comp_names[c] = "comp" + std::to_string(c);
 
    // Set up element mapping between submeshes and parent mesh.
    parent_elem_map.SetSize(numSub);
@@ -253,6 +256,8 @@ void SubMeshTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs,
 
 SubMeshTopologyHandler::~SubMeshTopologyHandler()
 {
+   DeletePointers(interface_infos);
+   
    for (int k = 0; k < parent_elem_map.Size(); k++) delete parent_elem_map[k];
    for (int k = 0; k < parent_face_map.Size(); k++) delete parent_face_map[k];
    if (own_pmesh)

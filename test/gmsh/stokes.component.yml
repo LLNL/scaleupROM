@@ -55,6 +55,7 @@ single_run:
     U: 2.5
 
 sample_generation:
+  maximum_number_of_snapshots: 400
   component_sampling: false
   file_path:
     prefix: "stokes"
@@ -78,7 +79,6 @@ model_reduction:
   compare_solution: true
   svd:
     save_spectrum: true
-    maximum_number_of_snapshots: 400
     update_right_sv: false
   visualization:
     enabled: false

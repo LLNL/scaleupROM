@@ -26,15 +26,15 @@ friend class ParameterizedProblem;
 
 protected:
    // interface integrator
-   InterfaceNonlinearFormIntegrator *interface_integ;
+   InterfaceNonlinearFormIntegrator *interface_integ = NULL;
    // int skip_zeros = 1;
 
    // System matrix for Bilinear case.
    Array2D<SparseMatrix *> mats;
    // For nonlinear problem
    // BlockOperator *globalMat;
-   BlockMatrix *globalMat;
-   SparseMatrix *globalMat_mono;
+   BlockMatrix *globalMat = NULL;
+   SparseMatrix *globalMat_mono = NULL;
 
    // operators
    Array<LinearForm *> bs;

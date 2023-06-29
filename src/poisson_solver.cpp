@@ -14,6 +14,7 @@
 #include "poisson_solver.hpp"
 #include "input_parser.hpp"
 #include "linalg_utils.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -54,14 +55,12 @@ PoissonSolver::~PoissonSolver()
 {
    delete interface_integ;
 
-   for (int k = 0; k < bs.Size(); k++) delete bs[k];
-   for (int k = 0; k < as.Size(); k++) delete as[k];
+   DeletePointers(bs);
+   DeletePointers(as);
+   DeletePointers(bdr_coeffs);
+   DeletePointers(rhs_coeffs);
 
-   for (int k = 0; k < bdr_coeffs.Size(); k++)
-      delete bdr_coeffs[k];
-      
-   for (int k = 0; k < rhs_coeffs.Size(); k++)
-      delete rhs_coeffs[k];
+   delete globalMat_mono, globalMat;
 }
 
 void PoissonSolver::SetupBCVariables()
@@ -376,7 +375,7 @@ void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       a_comp.Assemble();
       a_comp.Finalize();
 
-      rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), comp_mats[c]);
+      comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
    }
 }
 
@@ -393,7 +392,7 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
    {
       Mesh *comp = topol_handler->GetComponentMesh(c);
       assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-      Array<DenseMatrix *> *bdr_mats_c = bdr_mats[c];
+      Array<SparseMatrix *> *bdr_mats_c = bdr_mats[c];
 
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
       {
@@ -406,7 +405,7 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          a_comp.Assemble();
          a_comp.Finalize();
 
-         rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()), (*bdr_mats_c)[b]);
+         (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
       }
    }
 }
@@ -454,7 +453,7 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-            rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j), (*port_mats[p])(i, j));
+            (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j));
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++) delete spmats(i, j);

@@ -12,7 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "random_sample_generator.hpp"
-#include "random.hpp"
+#include "etc.hpp"
 #include "time.h"
 
 using namespace mfem;

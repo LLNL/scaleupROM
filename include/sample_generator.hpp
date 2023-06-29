@@ -14,6 +14,8 @@
 
 #include "mfem.hpp"
 #include "parameter.hpp"
+#include "linalg/BasisGenerator.h"
+#include "multiblock_solver.hpp"
 
 using namespace mfem;
 
@@ -31,6 +33,7 @@ protected:
 
    Array<int> sampling_sizes;
    int total_samples;
+   int report_freq = -1;
 
    Array<Parameter *> params;
 
@@ -38,6 +41,16 @@ protected:
    std::string sample_dir = ".";
    std::string sample_prefix;
    int file_offset = 0;
+
+   // snapshot generators: purely for saving snapshots. will not execute svd.
+   int max_num_snapshots = 100;
+   const bool update_right_SV = false;
+   const bool incremental = false;
+   Array<CAROM::Options*> snapshot_options;
+   Array<CAROM::BasisGenerator*> snapshot_generators;
+   // each snapshot will be sorted out by its basis tag.
+   std::vector<std::string> basis_tags;
+   std::map<std::string, int> basis_tag2idx;
 
 public:
    SampleGenerator(MPI_Comm comm);
@@ -68,6 +81,12 @@ public:
    { return ((index >= sample_offsets[proc_rank]) && (index < sample_offsets[proc_rank+1])); }
 
    const std::string GetSamplePath(const int& idx, const std::string &prefix = "");
+
+   void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags);
+   void AddSnapshotGenerator(const int &fom_vdofs, const std::string &basis_tag);
+   void WriteSnapshots();
+
+   void ReportStatus(const int &sample_idx);
 };
 
 #endif

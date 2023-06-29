@@ -64,6 +64,7 @@ protected:
    int numSub = -1;   // number of subdomains.
    int num_comp = -1;  // number of components. Submesh - only one component / Component - multiple compoenents allowed, not yet implemented.
    Array<int> sub_composition;  // number of subdomains per each component index.
+   std::vector<std::string> comp_names;
 
    // Spatial dimension.
    int dim = -1;
@@ -84,7 +85,9 @@ protected:
 public:
    TopologyHandler(const TopologyHandlerMode &input_type);
 
-   virtual ~TopologyHandler() {};
+   // ownership of interface_infos changes depending on derived classes.
+   // not deleting here.
+   virtual ~TopologyHandler() {}
 
    // access
    const TopologyHandlerMode GetType() { return type; }
@@ -94,6 +97,7 @@ public:
    const int GetNumPorts() { return num_ports; }
    const int GetMeshType(const int &m) { return mesh_types[m]; }
    const int GetComponentIndexOfMesh(const int &m) { return mesh_comp_idx[m]; }
+   const std::string GetComponentName(const int &c) const { return comp_names[c]; }
    const PortInfo* GetPortInfo(const int &k) { return &(port_infos[k]); }
    Array<InterfaceInfo>* const GetInterfaceInfos(const int &k) { return interface_infos[k]; }
    virtual Mesh* GetMesh(const int k) = 0;

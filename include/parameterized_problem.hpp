@@ -185,6 +185,19 @@ public:
    StokesComponent();
 };
 
+class StokesFlowPastArray : public StokesComponent
+{
+public:
+   StokesFlowPastArray();
+
+   virtual void SetParams(const std::string &key, const double &value);
+   virtual void SetParams(const Array<int> &indexes, const Vector &values);
+
+private:
+   Vector *u0;
+   void SetBattr();
+};
+
 ParameterizedProblem* InitParameterizedProblem();
 
 #endif

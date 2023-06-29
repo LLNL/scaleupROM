@@ -11,7 +11,7 @@
 
 // Implementation of Bilinear Form Integrators
 
-#include "random.hpp"
+#include "etc.hpp"
 // #include <stdlib.h>
 #include <random>
 
@@ -24,4 +24,11 @@ static std::uniform_real_distribution<> dis(0.0, 1.0);
 double UniformRandom()
 {
    return dis(gen);
+}
+
+bool FileExists(const std::string& name)
+{
+   std::ifstream f(name.c_str());
+   return f.good();
+   // ifstream f will be closed upon the end of the function.
 }

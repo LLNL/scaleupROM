@@ -11,9 +11,12 @@
 
 // Implementation of Bilinear Form Integrators
 
+#include "etc.hpp"
 #include "input_parser.hpp"
 #include "rom_handler.hpp"
 #include "linalg_utils.hpp"
+#include "hdf5_utils.hpp"
+#include "block_smoother.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -36,7 +39,16 @@ ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdi
 
    ParseInputs();
 
+   SetBlockSizes();
+
    AllocROMMat();
+}
+
+ROMHandler::~ROMHandler()
+{
+   DeletePointers(carom_mats);
+   delete reduced_rhs;
+   delete romMat_inv;
 }
 
 void ROMHandler::ParseInputs()
@@ -146,7 +158,7 @@ void ROMHandler::ParseInputs()
    // if (proj_mode == ProjectionMode::LSPG)
    //    save_lspg_basis = config.GetOption<bool>("model_reduction/lspg/save_lspg_basis", true);
 
-   max_num_snapshots = config.GetOption<int>("model_reduction/svd/maximum_number_of_snapshots", 100);
+   max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
 
    save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
@@ -154,87 +166,39 @@ void ROMHandler::ParseInputs()
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
 }
 
-void ROMHandler::SaveSnapshot(BlockVector *sol, const int &sample_index)
+void ROMHandler::FormReducedBasis()
 {
-   assert(sol->NumBlocks() == (num_var * numSub));
-
-   for (int m = 0, idx = 0; m < numSub; m++)
-   {
-      // for (int v = 0; v < num_var; v++, idx++)
-      // {
-      //    const std::string filename = GetSnapshotPrefix(sample_index, m, v);
-      //    rom_options = new CAROM::Options(fom_num_vdofs[idx], max_num_snapshots, 1, update_right_SV);
-      //    basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
-
-      //    bool addSample = basis_generator->takeSample(sol->GetBlock(idx).GetData(), 0.0, 0.01);
-      //    assert(addSample);
-      //    basis_generator->writeSnapshot();
-
-      //    delete basis_generator;
-      //    delete rom_options;
-      // }
-      const std::string filename = GetSnapshotPrefix(sample_index, m);
-      rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
-
-      bool addSample = basis_generator->takeSample(sol->GetBlock(m).GetData(), 0.0, 0.01);
-      assert(addSample);
-      basis_generator->writeSnapshot();
-
-      delete basis_generator;
-      delete rom_options;
-   }
-}
-
-void ROMHandler::FormReducedBasis(const int &total_samples)
-{
-   switch (train_mode)
-   {
-      case (TrainMode::UNIVERSAL):
-      {
-         FormReducedBasisUniversal(total_samples);
-         break;
-      }
-      case (TrainMode::INDIVIDUAL):
-      {
-         FormReducedBasisIndividual(total_samples);
-         break;
-      }
-      default:
-      {
-         mfem_error("ROMHandler: unknown train mode!\n");
-      }
-   }
-}
-
-void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
-{
-   assert(train_mode == TrainMode::UNIVERSAL);
-
+   std::string basis_name, basis_tag;
+   
    for (int c = 0; c < num_basis_sets; c++)
    {
-      std::string basis_name = basis_prefix + "_universal_comp" + std::to_string(c);
-      // Determine dimension of the basis vectors.
       int basis_dim = -1;
-      for (int m = 0; m < numSub; m++)
-         if (topol_handler->GetMeshType(m) == c)
-         { basis_dim = fom_num_vdofs[m]; break; }
+      switch (train_mode)
+      {
+         case (INDIVIDUAL):
+         {
+            basis_tag = GetBasisTag(c);
+            basis_dim = fom_num_vdofs[c];
+            break;
+         }
+         case (UNIVERSAL):
+         {
+            basis_tag = GetBasisTagForComponent(c);
+            for (int m = 0; m < numSub; m++)
+               if (topol_handler->GetMeshType(m) == c)
+               { basis_dim = fom_num_vdofs[m]; break; }
+            break;
+         }
+      }
+      basis_name = basis_prefix + "_" + basis_tag;
       assert(basis_dim > 0);
 
       rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);   
+      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
-      for (int m = 0; m < numSub; m++)
-      {
-         // Take the snapshots of the same mesh type only.
-         if (topol_handler->GetMeshType(m) != c) continue;
-
-         for (int s = 0; s < total_samples; s++)
-         {
-            const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
-            basis_generator->loadSamples(filename,"snapshot");
-         }
-      }  // for (int m = 0; m < numSub; m++)
+      std::string filename = sample_dir + "/" + sample_prefix + "_sample";
+      filename += "_" + basis_tag + "_snapshot";
+      basis_generator->loadSamples(filename,"snapshot");
 
       basis_generator->endSamples(); // save the merged basis file
       SaveSV(basis_name, c);
@@ -244,31 +208,6 @@ void ROMHandler::FormReducedBasisUniversal(const int &total_samples)
    }  // for (int c = 0; c < num_basis_sets; c++)
 }
 
-void ROMHandler::FormReducedBasisIndividual(const int &total_samples)
-{
-   assert(train_mode == TrainMode::INDIVIDUAL);
-   std::string basis_name;
-
-   for (int m = 0; m < numSub; m++)
-   {
-      basis_name = basis_prefix + "_dom" + std::to_string(m);
-      rom_options = new CAROM::Options(fom_num_vdofs[m], max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
-
-      for (int s = 0; s < total_samples; s++)
-      {
-         const std::string filename = GetSnapshotPrefix(s, m) + "_snapshot";
-         basis_generator->loadSamples(filename,"snapshot");
-      }
-
-      basis_generator->endSamples(); // save the merged basis file
-      SaveSV(basis_name, m);
-
-      delete basis_generator;
-      delete rom_options;
-   }
-}
-
 void ROMHandler::LoadReducedBasis()
 {
    if (basis_loaded) return;
@@ -276,48 +215,19 @@ void ROMHandler::LoadReducedBasis()
    std::string basis_name;
    int numRowRB, numColumnRB;
 
-   switch (train_mode)
+   carom_spatialbasis.SetSize(num_basis_sets);
+   for (int k = 0; k < num_basis_sets; k++)
    {
-      case TrainMode::UNIVERSAL:
-      {
-         carom_spatialbasis.SetSize(num_basis_sets);
-         for (int k = 0; k < num_basis_sets; k++)
-         {
-            basis_name = basis_prefix + "_universal_comp" + std::to_string(k);
-            basis_reader = new CAROM::BasisReader(basis_name);
+      basis_name = basis_prefix + "_" + GetBasisTagForComponent(k);
+      basis_reader = new CAROM::BasisReader(basis_name);
 
-            carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
-            numRowRB = carom_spatialbasis[k]->numRows();
-            numColumnRB = carom_spatialbasis[k]->numColumns();
-            printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
+      carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
+      numRowRB = carom_spatialbasis[k]->numRows();
+      numColumnRB = carom_spatialbasis[k]->numColumns();
+      printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
 
-            delete basis_reader;
-         }
-         break;
-      }
-      case TrainMode::INDIVIDUAL:
-      {
-         carom_spatialbasis.SetSize(numSub);
-         for (int j = 0; j < numSub; j++)
-         {
-            basis_name = basis_prefix + "_dom" + std::to_string(j);
-            basis_reader = new CAROM::BasisReader(basis_name);
-
-            carom_spatialbasis[j] = basis_reader->getSpatialBasis(0.0, num_basis[j]);
-            numRowRB = carom_spatialbasis[j]->numRows();
-            numColumnRB = carom_spatialbasis[j]->numColumns();
-            printf("%d domain spatial basis dimension is %d x %d\n", j, numRowRB, numColumnRB);
-
-            delete basis_reader;
-         }
-         break;
-      }
-      default:
-      {
-         mfem_error("LoadBasis: unknown TrainMode!\n");
-         break;
-      }
-   }  // switch (train_mode)
+      delete basis_reader;
+   }
 
    basis_loaded = true;
 }
@@ -407,9 +317,10 @@ void ROMHandler::SetBlockSizes()
 
 void ROMHandler::AllocROMMat()
 {
-   SetBlockSizes();
+   assert(rom_block_offsets.Size() == (numSub+1));
 
    carom_mats.SetSize(numSub, numSub);
+   carom_mats = NULL;
    // TODO: parallelization.
    romMat_inv = new CAROM::Matrix(rom_block_offsets.Last(), rom_block_offsets.Last(), false);
 }
@@ -502,32 +413,51 @@ void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    operator_loaded = true;
 }
 
-const std::string ROMHandler::GetSnapshotPrefix(const int &sample_idx, const int &subdomain_idx)
+const std::string ROMHandler::GetBasisTagForComponent(const int &comp_idx)
 {
-   std::string prefix = sample_dir + "/" + sample_prefix + "_sample";
+   switch (train_mode)
+   {
+      case (INDIVIDUAL):   { return "dom" + std::to_string(comp_idx); break; }
+      case (UNIVERSAL):    { return topol_handler->GetComponentName(comp_idx); break; }
+      default:
+      {
+         mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
+         break;
+      }
+   }
+   return "";
+}
+
+const std::string ROMHandler::GetBasisTag(const int &subdomain_index)
+{
    switch (train_mode)
    {
       case (INDIVIDUAL):
       {
-         prefix += std::to_string(sample_idx) + "_dom" + std::to_string(subdomain_idx);
+         return "dom" + std::to_string(subdomain_index);
          break;
       }
       case (UNIVERSAL):
       {
-         int c_type = topol_handler->GetMeshType(subdomain_idx);
-         int c_idx = topol_handler->GetComponentIndexOfMesh(subdomain_idx);
-         int comp_sample = sample_idx * topol_handler->GetNumSubdomains(c_type) + c_idx;
-
-         prefix += std::to_string(comp_sample) + "_comp" + std::to_string(c_type);
+         int c_type = topol_handler->GetMeshType(subdomain_index);
+         return topol_handler->GetComponentName(c_type);
          break;
       }
       default:
       {
-         mfem_error("ROMHandler::GetSnapshotPrefix - Unknown training mode!\n");
+         mfem_error("ROMHandler::GetBasisTag - Unknown training mode!\n");
          break;
       }
    }
-   return prefix;
+   return "";
+}
+
+void ROMHandler::GetBasisTags(std::vector<std::string> &basis_tags)
+{
+   // TODO: support variable-separate basis case.
+   basis_tags.resize(numSub);
+   for (int m = 0; m < numSub; m++)
+      basis_tags[m] = GetBasisTag(m);
 }
 
 void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
@@ -565,7 +495,17 @@ void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
 MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
    : ROMHandler(input_topol, input_vdim, input_num_vdofs)
 {
-   romMat = new SparseMatrix(rom_block_offsets.Last(), rom_block_offsets.Last());
+   romMat = new BlockMatrix(rom_block_offsets);
+   romMat->owns_blocks = true;
+
+   carom_mats.SetSize(0, 0);
+}
+
+MFEMROMHandler::~MFEMROMHandler()
+{
+   DeletePointers(spatialbasis);
+   delete romMat, romMat_mono;
+   delete reduced_rhs;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -573,6 +513,7 @@ void MFEMROMHandler::LoadReducedBasis()
    ROMHandler::LoadReducedBasis();
 
    spatialbasis.SetSize(carom_spatialbasis.Size());
+   spatialbasis = NULL;
    for (int k = 0; k < spatialbasis.Size(); k++)
    {
       assert(carom_spatialbasis[k] != NULL);
@@ -615,32 +556,33 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
       num_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
       basis_i = GetBasisIndexForSubdomain(i);
 
-      Array<int> vdof_i(num_basis_i);
-      for (int k = 0, vdof = rom_block_offsets[i]; vdof < rom_block_offsets[i+1]; k++, vdof++)
-         vdof_i[k] = vdof;
-
       for (int j = 0; j < numSub; j++)
       {
          num_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
          basis_j = GetBasisIndexForSubdomain(j);
-
-         Array<int> vdof_j(num_basis_j);
-         for (int k = 0, vdof = rom_block_offsets[j]; vdof < rom_block_offsets[j+1]; k++, vdof++)
-            vdof_j[k] = vdof;
          
-         DenseMatrix elemmat(num_basis_i, num_basis_j);
-         ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j), &elemmat);
-         romMat->SetSubMatrix(vdof_i, vdof_j, elemmat);
+         SparseMatrix *elemmat = ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j));
+         romMat->SetBlock(i, j, elemmat);
       }
    }  // for (int j = 0; j < numSub; j++)
 
    romMat->Finalize();
    operator_loaded = true;
 
+   romMat_mono = romMat->CreateMonolithic();
+
    if (save_operator == ROMBuildingLevel::GLOBAL)
    {
       std::string filename = operator_prefix + ".h5";
-      WriteSparseMatrixToHDF(romMat, filename);
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hdf5_utils::WriteBlockMatrix(file_id, "ROM_matrix", romMat);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
    }
 }
 
@@ -691,9 +633,11 @@ void MFEMROMHandler::Solve(BlockVector* U)
       // TODO: need to change when the actual parallelization is implemented.
       HYPRE_BigInt glob_size = rom_block_offsets.Last();
       HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat);
+      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
       K = parRomMat;
    }
+   else if (prec_str == "gs")
+      K = romMat_mono;
    else
       K = romMat;
 
@@ -705,7 +649,15 @@ void MFEMROMHandler::Solve(BlockVector* U)
    }
    else if (prec_str == "gs")
    {
-      M = new GSSmoother(*romMat);
+      M = new GSSmoother(*romMat_mono);
+   }
+   else if (prec_str == "block_gs")
+   {
+      M = new BlockGSSmoother(*romMat);
+   }
+   else if (prec_str == "block_jacobi")
+   {
+      M = new BlockDSmoother(*romMat);
    }
    else if (prec_str != "none")
    {
@@ -746,9 +698,8 @@ void MFEMROMHandler::Solve(BlockVector* U)
    delete solver;
 }
 
-void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, DenseMatrix *proj_mat)
+SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
 {
-   assert(proj_mat != NULL);
    assert((i >= 0) && (i < num_basis_sets));
    assert((j >= 0) && (j < num_basis_sets));
    // assert(mat->Finalized());
@@ -761,15 +712,13 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, c
    GetBasis(j, basis_j);
    num_basis_j = basis_j->NumCols();
 
-   // TODO: multi-component case.
-   proj_mat->SetSize(num_basis_i, num_basis_j);
-   mfem::RtAP(*basis_i, *mat, *basis_j, *proj_mat);
-   return;
+   return mfem::RtAP(*basis_i, *mat, *basis_j);
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 {
    assert(save_operator == ROMBuildingLevel::GLOBAL);
+   delete romMat, romMat_mono;
    
    std::string filename;
    if (input_prefix == "")
@@ -778,14 +727,25 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
       filename = input_prefix;
    filename += ".h5";
 
-   romMat = ReadSparseMatrixFromHDF(filename);
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);   
+
+   romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
+   romMat_mono = romMat->CreateMonolithic();
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
    operator_loaded = true;
 }
 
-void MFEMROMHandler::LoadOperator(SparseMatrix *input_mat)
+void MFEMROMHandler::LoadOperator(BlockMatrix *input_mat)
 {
-   delete romMat;
+   delete romMat, romMat_mono;
    romMat = input_mat;
+   romMat_mono = romMat->CreateMonolithic();
    operator_loaded = true;
 }
 
@@ -874,5 +834,49 @@ IterativeSolver* MFEMROMHandler::SetSolver(const std::string &solver_type, const
 
    return solver;
 }
+
+// void MFEMROMHandler::GetBlockSparsity(
+//    const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks)
+// {
+//    assert(mat);
+//    assert(block_offsets.Size() > 0);
+//    assert(mat->NumRows() == block_offsets.Last());
+//    assert(mat->NumCols() == block_offsets.Last());
+
+//    const int num_blocks = block_offsets.Size() - 1;
+//    mat_zero_blocks.SetSize(num_blocks, num_blocks);
+//    mat_zero_blocks = true;
+
+//    DenseMatrix tmp;
+//    Array<int> rows, cols;
+//    for (int i = 0; i < num_blocks; i++)
+//    {
+//       rows.SetSize(block_offsets[i+1] - block_offsets[i]);
+//       for (int ii = block_offsets[i], idx = 0; ii < block_offsets[i+1]; ii++, idx++)
+//          rows[idx] = ii;
+
+//       for (int j = 0; j < num_blocks; j++)
+//       {
+//          cols.SetSize(block_offsets[j+1] - block_offsets[j]);
+//          for (int jj = block_offsets[j], idx = 0; jj < block_offsets[j+1]; jj++, idx++)
+//             cols[idx] = jj;
+
+//          tmp.SetSize(rows.Size(), cols.Size());
+//          tmp = 0.0;
+//          mat->GetSubMatrix(rows, cols, tmp);
+//          mat_zero_blocks(i, j) = CheckZeroBlock(tmp);
+//       }  // for (int j = 0; j < num_blocks; j++)
+//    }  // for (int i = 0; i < num_blocks; i++)
+// }
+
+// bool MFEMROMHandler::CheckZeroBlock(const DenseMatrix &mat)
+// {
+//    for (int i = 0; i < mat.NumRows(); i++)
+//       for (int j = 0; j < mat.NumCols(); j++)
+//          if (mat(i, j) != 0.0)
+//             return false;
+
+//    return true;
+// }
 
 }  // namespace mfem

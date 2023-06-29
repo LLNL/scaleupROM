@@ -90,7 +90,7 @@ friend class ParameterizedProblem;
 
 protected:
    double nu;
-   Coefficient *nu_coeff;
+   Coefficient *nu_coeff = NULL;
    ConstantCoefficient minus_one;
 
    int porder, uorder;
@@ -103,13 +103,13 @@ protected:
    Array<GridFunction *> vels, ps;
 
    // interface integrator
-   InterfaceNonlinearFormIntegrator *vec_diff, *norm_flux;
+   InterfaceNonlinearFormIntegrator *vec_diff = NULL, *norm_flux = NULL;
 
    // System matrix for Bilinear case.
    Array<int> u_offsets, p_offsets;
    Array2D<SparseMatrix *> m_mats, b_mats;
-   BlockMatrix *mMat, *bMat;
-   SparseMatrix *M, *B;
+   BlockMatrix *mMat = NULL, *bMat = NULL;
+   SparseMatrix *M = NULL, *B = NULL;
 
    // operators
    Array<LinearForm *> fs, gs;

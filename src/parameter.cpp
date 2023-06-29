@@ -12,7 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "parameter.hpp"
-#include "random.hpp"
+#include "etc.hpp"
 #include <memory>
 #include <string>
 #include <stdexcept>
