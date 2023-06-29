@@ -73,7 +73,8 @@ model_reduction:
   save_operator:
     level: component
     prefix: "test.rom_elem"
-  compare_solution: true
+  compare_solution:
+    enabled: true
   svd:
     save_spectrum: true
     update_right_sv: false

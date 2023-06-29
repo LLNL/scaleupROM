@@ -25,6 +25,8 @@ inline hid_t GetType(double) { return (H5T_NATIVE_DOUBLE); }
 
 hid_t GetNativeType(hid_t type);
 
+int GetDatasetSize(hid_t &source, std::string dataset, hsize_t* &dims);
+
 void ReadAttribute(hid_t &source, std::string attribute, std::string &value);
 void WriteAttribute(hid_t &source, std::string attribute, const std::string &value);
 
@@ -164,6 +166,9 @@ void WriteSparseMatrix(hid_t &source, std::string matrix_name, SparseMatrix* mat
 BlockMatrix* ReadBlockMatrix(hid_t &source, std::string matrix_name,
                              const Array<int> &block_offsets);
 void WriteBlockMatrix(hid_t &source, std::string matrix_name, BlockMatrix* mat);
+
+void ReadDataset(hid_t &source, std::string dataset, Vector &value);
+void WriteDataset(hid_t &source, std::string dataset, const Vector &value);
 
 void ReadDataset(hid_t &source, std::string dataset, DenseMatrix &value);
 void WriteDataset(hid_t &source, std::string dataset, const DenseMatrix &value);
