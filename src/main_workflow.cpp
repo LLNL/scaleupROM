@@ -114,11 +114,14 @@ void GenerateSamples(MPI_Comm comm)
 
       int file_idx = s + sample_generator->GetFileOffset();
       const std::string visual_path = sample_generator->GetSamplePath(file_idx, test->GetVisualizationPrefix());
+      std::string sol_file = sample_generator->GetSamplePath(file_idx, test->GetSolutionFilePrefix());
+      sol_file += ".h5";
       test->InitVisualization(visual_path);
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
       test->Solve();
+      test->SaveSolution(sol_file);
       test->SaveVisualization();
 
       // test->SaveSnapshot(file_idx);
@@ -334,22 +337,47 @@ double SingleRun()
    solveTimer.Stop();
    printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
-   test->SaveVisualization();
-
    double error = -1.0;
-   bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution", false);
+   bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
+   bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
    if (test->UseRom() && compare_sol)
    {
-      solveTimer.Clear();
-      solveTimer.Start();
-      test->BuildDomainOperators();
-      test->SetupDomainBCOperators();
-      test->AssembleOperator();
-      solveTimer.Stop();
-      printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+      BlockVector *romU = test->GetSolutionCopy();
 
-      error = test->CompareSolution();
+      if (load_sol)
+      {
+         printf("Comparing with the existing FOM solution.\n");
+         std::string fom_file = config.GetRequiredOption<std::string>("model_reduction/compare_solution/fom_solution_file");
+         test->LoadSolution(fom_file);
+      }
+      else
+      {
+         solveTimer.Clear();
+         solveTimer.Start();
+         test->BuildDomainOperators();
+         test->SetupDomainBCOperators();
+         test->AssembleOperator();
+         solveTimer.Stop();
+         printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+
+         solveTimer.Clear();
+         solveTimer.Start();
+         test->Solve();
+         solveTimer.Stop();
+         printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+      }
+
+      error = test->CompareSolution(*romU);
+
+      // Recover the original ROM solution.
+      test->CopySolution(romU);
+
+      delete romU;
    }
+
+   // Save solution and visualization.
+   test->SaveSolution();
+   test->SaveVisualization();
    
    delete test;
    delete problem;

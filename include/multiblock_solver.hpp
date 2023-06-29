@@ -72,6 +72,11 @@ protected:
    // MFEM solver options
    bool use_amg;
 
+   // Saving solution in single run
+   bool save_sol = false;
+   std::string sol_dir = ".";
+   std::string sol_prefix;
+
    // visualization variables
    bool save_visual = false;
    bool unified_paraview = false;
@@ -111,9 +116,11 @@ public:
    const bool UseRom() const { return use_rom; }
    ROMHandler* GetROMHandler() const { return rom_handler; }
    const bool IsVisualizationSaved() const { return save_visual; }
+   const std::string GetSolutionFilePrefix() const { return sol_prefix; }
    const std::string GetVisualizationPrefix() const { return visual_prefix; }
    const TopologyHandlerMode GetTopologyMode() const { return topol_mode; }
    ParaViewDataCollection* GetParaViewColl(const int &k) { return paraviewColls[k]; }
+   BlockVector* GetSolutionCopy() { return new BlockVector(*U); }
 
    void GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var);
    void SetVariableVector(const int &var_idx, BlockVector &var, BlockVector &global);
@@ -199,6 +206,10 @@ public:
    virtual void InitIndividualParaview(const std::string &file_prefix);
    virtual void SaveVisualization();
 
+   void SaveSolution(std::string filename = "");
+   void LoadSolution(const std::string &filename);
+   void CopySolution(BlockVector *input_sol);
+
    void InitROMHandler();
    virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
    void FormReducedBasis() { rom_handler->FormReducedBasis(); }
@@ -213,7 +224,7 @@ public:
 
    void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
    double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols);
-   double CompareSolution();
+   double CompareSolution(BlockVector &test_U);
 };
 
 #endif
