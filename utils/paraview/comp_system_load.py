@@ -9,10 +9,11 @@ from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 
 # create a new 'PVD Reader'
-ncomp = 64
-rootDir = 'C:\\Users\\chung28\\Desktop\\slides\\figures\\stokes_array\\visual'
+ncomp = 128
+offset = 128
+rootDir = 'C:\\Users\\chung28\\Desktop\\slides\\stokes_array\\stokes_array_32x32_rom'
 prefix = 'stokes_channel_output'
-filenames = ['%s_%d' % (prefix, n) for n in range(ncomp)]
+filenames = ['%s_%d' % (prefix, n + offset) for n in range(ncomp)]
 paths = ['%s/%s/%s.pvd' % (rootDir, filename, filename) for filename in filenames]
 
 paraview_output_pvd = []
@@ -80,6 +81,7 @@ for n in range(ncomp):
 
     # set scalar coloring
     ColorBy(paraview_output_pvdDisplay[n], ('POINTS', 'vel', 'Magnitude'))
+    # ColorBy(paraview_output_pvdDisplay[n], ('POINTS', 'pres'))
 
     # rescale color and/or opacity maps used to include current data range
     paraview_output_pvdDisplay[n].RescaleTransferFunctionToDataRange(True, False)
@@ -113,16 +115,25 @@ layout1 = GetLayout()
 # saving layout sizes for layouts
 
 # layout/tab size in pixels
-layout1.SetSize(1475, 790)
+layout1.SetSize(1187, 1154)
 
 #-----------------------------------
 # saving camera placements for views
 
+# # current camera placement for renderView1
+# renderView1.InteractionMode = '2D'
+# renderView1.CameraPosition = [1.0728459999485958, 1.0649950687890346, 10000.0]
+# renderView1.CameraFocalPoint = [1.0728459999485958, 1.0649950687890346, 0.0]
+# renderView1.CameraParallelScale = 1.2526827963856217
+
 # current camera placement for renderView1
 renderView1.InteractionMode = '2D'
-renderView1.CameraPosition = [1.0728459999485958, 1.0649950687890346, 10000.0]
-renderView1.CameraFocalPoint = [1.0728459999485958, 1.0649950687890346, 0.0]
-renderView1.CameraParallelScale = 1.2526827963856217
+renderView1.CameraPosition = [16.359130599262404, 16.042753498411386, 10000.0]
+renderView1.CameraFocalPoint = [16.359130599262404, 16.042753498411386, 0.0]
+renderView1.CameraParallelScale = 16.36196422443889
+
+# save screenshot
+SaveScreenshot('C:/Users/chung28/Desktop/test.png', renderView1, ImageResolution=[1187, 1154])
 
 #--------------------------------------------
 # uncomment the following to render all views
