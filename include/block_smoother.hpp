@@ -37,6 +37,8 @@ public:
    virtual ~BlockSmoother();
 
    virtual void SetOperator(const Operator &a);
+
+   void PrintOperator();
 };
 
 /// Data type for Gauss-Seidel smoother of sparse matrix

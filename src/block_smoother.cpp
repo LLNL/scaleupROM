@@ -13,6 +13,7 @@
 
 #include "block_smoother.hpp"
 #include "etc.hpp"
+#include "linalg_utils.hpp"
 
 using namespace mfem;
 
@@ -56,6 +57,18 @@ void BlockSmoother::SetOperator(const Operator &a)
    }
    height = oper->Height();
    width = oper->Width();
+}
+
+void BlockSmoother::PrintOperator()
+{
+   std::string filename = "BlockSmoother.op.txt";
+   PrintMatrix(*oper, filename);
+
+   for (int k = 0; k < num_row_blocks; k++)
+   {
+      filename = "BlockSmoother.diag_inv" + std::to_string(k) + ".txt";
+      PrintMatrix(*diag_inv[k], filename);
+   }
 }
 
 /*
@@ -106,14 +119,20 @@ void BlockGSSmoother::BlockGaussSeidelForw(const Vector &x, Vector &y) const
             oper->GetBlock(i, j).AddMult(yblockview, tmp, -1.0);
          }
       }
+      for (int k = 0; k < tmp.Size(); k++)
+         assert(!std::isnan(tmp(k)));
 
       xblockview.SetDataAndSize(x.GetData() + row_offsets[i],
                                 row_offsets[i+1] - row_offsets[i]);
       tmp += xblockview;
+      for (int k = 0; k < tmp.Size(); k++)
+         assert(!std::isnan(tmp(k)));
 
       yblockview.SetDataAndSize(y.GetData() + row_offsets[i],
                                 row_offsets[i+1] - row_offsets[i]);
       diag_inv[i]->Mult(tmp, yblockview);
+      for (int k = 0; k < yblockview.Size(); k++)
+         assert(!std::isnan(yblockview(k)));
    }
 }
 
@@ -141,14 +160,20 @@ void BlockGSSmoother::BlockGaussSeidelBack(const Vector &x, Vector &y) const
             oper->GetBlock(i, j).AddMult(yblockview, tmp, -1.0);
          }
       }
+      for (int k = 0; k < tmp.Size(); k++)
+         assert(!std::isnan(tmp(k)));
 
       xblockview.SetDataAndSize(x.GetData() + row_offsets[i],
                                 row_offsets[i+1] - row_offsets[i]);
       tmp += xblockview;
+      for (int k = 0; k < tmp.Size(); k++)
+         assert(!std::isnan(tmp(k)));
 
       yblockview.SetDataAndSize(y.GetData() + row_offsets[i],
                                 row_offsets[i+1] - row_offsets[i]);
       diag_inv[i]->Mult(tmp, yblockview);
+      for (int k = 0; k < yblockview.Size(); k++)
+         assert(!std::isnan(yblockview(k)));
    }
 }
 
