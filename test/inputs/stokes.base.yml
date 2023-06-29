@@ -50,7 +50,8 @@ model_reduction:
   save_operator:
     level: global
     prefix: "proj_inv"
-  compare_solution: true
+  compare_solution:
+    enabled: true
   svd:
     save_spectrum: true
     update_right_sv: false

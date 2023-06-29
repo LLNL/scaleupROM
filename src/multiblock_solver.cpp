@@ -14,6 +14,7 @@
 #include "multiblock_solver.hpp"
 #include "linalg_utils.hpp"
 #include "component_topology_handler.hpp"
+#include "etc.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -125,6 +126,15 @@ void MultiBlockSolver::ParseInputs()
 
    // rom inputs.
    use_rom = config.GetOption<bool>("main/use_rom", false);
+
+   // save solution if single run.
+   save_sol = config.GetOption<bool>("main/single_run/save_solution/enabled", false);
+   if (save_sol)
+   {
+      // Default file path if no input file name is provided.
+      sol_dir = config.GetOption<std::string>("main/single_run/save_solution/file_path/directory", ".");
+      sol_prefix = config.GetOption<std::string>("main/single_run/save_solution/file_path/prefix", "solution");
+   }
 }
 
 void MultiBlockSolver::GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var)
@@ -723,6 +733,69 @@ void MultiBlockSolver::SaveVisualization()
       paraviewColls[m]->Save();
 };
 
+void MultiBlockSolver::SaveSolution(std::string filename)
+{
+   if (!save_sol) return;
+
+   if (filename == "")
+   {
+      filename = sol_dir + "/" + sol_prefix + ".h5";
+   }
+   printf("Saving the solution file %s ...", filename.c_str());
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // TODO: currently we only need solution vector. But we can add more data as we need.
+   hdf5_utils::WriteDataset(file_id, "solution", *U);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   printf("Done!\n");
+}
+
+void MultiBlockSolver::LoadSolution(const std::string &filename)
+{
+   // solution vector U must be instantiated beforehand.
+   assert(U);
+   printf("Loading the solution file %s ...", filename.c_str());
+   if (!FileExists(filename))
+      mfem_error("file does not exist!\n");
+   
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // Check the size of the solution in the file.
+   hsize_t *dims = NULL;
+   int ndims = hdf5_utils::GetDatasetSize(file_id, "solution", dims);
+   bool size_match = (ndims == 1) && (dims[0] == U->Size());
+
+   // Read the solution.
+   if (size_match)
+      hdf5_utils::ReadDataset(file_id, "solution", *U);
+
+   // TODO: currently we only need solution vector. But we can add more data as we need.
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   if (size_match)
+      printf("Done!\n");
+   else
+      mfem_error("solution size does not match!\n");
+}
+
+void MultiBlockSolver::CopySolution(BlockVector *input_sol)
+{
+   assert(input_sol->NumBlocks() == U->NumBlocks());
+   for (int b = 0; b < U->NumBlocks(); b++)
+      assert(input_sol->BlockSize(b) == U->BlockSize(b));
+   *U = *input_sol;
+}
+
 void MultiBlockSolver::InitROMHandler()
 {
    std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
@@ -826,40 +899,29 @@ double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Ar
    return error.Max();
 }
 
-double MultiBlockSolver::CompareSolution()
+double MultiBlockSolver::CompareSolution(BlockVector &test_U)
 {
-   // Copy the rom solution.
-   BlockVector romU(var_offsets);
-   romU = *U;
+   assert(test_U.NumBlocks() == U->NumBlocks());
+   for (int b = 0; b < U->NumBlocks(); b++)
+      assert(test_U.BlockSize(b) == U->BlockSize(b));
 
-   Array<GridFunction *> rom_us;
-   rom_us.SetSize(num_var * numSub);
-   for (int k = 0; k < rom_us.Size(); k++)
+   Array<GridFunction *> test_us;
+   test_us.SetSize(num_var * numSub);
+   for (int k = 0; k < test_us.Size(); k++)
    {
-      rom_us[k] = new GridFunction(fes[k], romU.GetBlock(k), 0);
+      test_us[k] = new GridFunction(fes[k], test_U.GetBlock(k), 0);
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
-      rom_us[k]->SetTrueVector();
+      test_us[k]->SetTrueVector();
    }
-
-   // TODO: right now we solve the full-order system to compare the solution.
-   // Need to implement loading the fom solution file?
-   StopWatch solveTimer;
-   solveTimer.Start();
-   Solve();
-   solveTimer.Stop();
-   printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
 
    // Compare the solution.
    // Maximum L2-error / L2-norm over all variables.
-   double error = ComputeRelativeError(us, rom_us);
+   double error = ComputeRelativeError(us, test_us);
    printf("Relative error: %.5E\n", error);
 
-   for (int m = 0; m < numSub; m++)
-   {
-      delete rom_us[m];
-   }
+   DeletePointers(test_us);
 
    return error;
 }

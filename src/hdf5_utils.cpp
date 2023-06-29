@@ -33,6 +33,27 @@ hid_t GetNativeType(hid_t type)
    return p_type;
 }
 
+int GetDatasetSize(hid_t &source, std::string dataset, hsize_t* &dims)
+{
+   herr_t errf = 0;
+   
+   hid_t dset_id = H5Dopen(source, dataset.c_str(), H5P_DEFAULT);
+   assert(dset_id >= 0);
+
+   hid_t dspace_id = H5Dget_space(dset_id);
+   int ndims = H5Sget_simple_extent_ndims(dspace_id);
+   assert(ndims > 0);
+
+   dims = new hsize_t[ndims];
+   errf = H5Sget_simple_extent_dims(dspace_id, dims, NULL);
+   assert(errf >= 0);
+
+   errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+
+   return ndims;
+}
+
 void ReadAttribute(hid_t &source, std::string attribute, std::string &value)
 {
    herr_t status;
@@ -310,6 +331,51 @@ void WriteBlockMatrix(hid_t &source, std::string matrix_name, BlockMatrix* mat)
       }
 
    errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+}
+
+void ReadDataset(hid_t &source, std::string dataset, Vector &value)
+{
+   herr_t errf = 0;
+   
+   hid_t dset_id = H5Dopen(source, dataset.c_str(), H5P_DEFAULT);
+   assert(dset_id >= 0);
+
+   hid_t dspace_id = H5Dget_space(dset_id);
+   int ndims = H5Sget_simple_extent_ndims(dspace_id);
+   assert(ndims == 1);
+
+   hsize_t dims[ndims];
+   errf = H5Sget_simple_extent_dims(dspace_id, dims, NULL);
+   assert(errf >= 0);
+
+   value.SetSize(dims[0]);
+   hid_t dataType = hdf5_utils::GetType(value[0]);
+   H5Dread(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Write());
+
+   errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+}
+
+void WriteDataset(hid_t &source, std::string dataset, const Vector &value)
+{
+   herr_t errf = 0;
+   assert(value.Size() > 0);
+
+   hid_t dataType = hdf5_utils::GetType(value[0]);
+   hsize_t dims[1];
+   dims[0] = value.Size();
+
+   hid_t dspace_id = H5Screate_simple(1, dims, NULL);
+   assert(dspace_id >= 0);
+
+   hid_t dset_id = H5Dcreate2(source, dataset.c_str(), dataType, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(dset_id >= 0);
+
+   errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
+   assert(errf >= 0);
+
+   errf = H5Dclose(dset_id);
    assert(errf >= 0);
 }
 
