@@ -122,6 +122,18 @@ void MultiBlockSolver::ParseInputs()
       // Default file path if no input file name is provided.
       visual_dir = config.GetOption<std::string>("visualization/file_path/directory", ".");
       visual_prefix = config.GetOption<std::string>("visualization/file_path/prefix", "paraview_output");
+
+      unified_paraview = config.GetOption<bool>("visualization/unified_paraview", false);
+      if (unified_paraview)
+      {
+         if (topol_mode == TopologyHandlerMode::COMPONENT)
+            mfem_error("ComponentTopologyHandler does not yet support unified paraview!\n");
+      }
+      else
+      {
+         visual_offset = config.GetOption<int>("visualization/domain_offset", 0);
+         visual_freq = config.GetOption<int>("visualization/domain_frequency", 1);
+      } 
    }
 
    // rom inputs.
@@ -664,8 +676,6 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
       file_prefix = visual_dir + "/" + visual_prefix;
    }
 
-   unified_paraview = config.GetOption<bool>("visualization/unified_paraview", true);
-
    if (unified_paraview)
       InitUnifiedParaview(file_prefix);
    else
@@ -675,9 +685,14 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
 void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
 {
    assert(var_names.size() == num_var);
+   assert((visual_offset >= 0) && (visual_offset < numSub));
+   assert((visual_freq > 0) && (visual_freq < numSub));
    paraviewColls.SetSize(numSub);
+   paraviewColls = NULL;
 
    for (int m = 0; m < numSub; m++) {
+      if ((m < visual_offset) || (m % visual_freq != 0)) continue;
+
       ostringstream oss;
       // Each subdomain needs to be save separately.
       oss << file_prefix << "_" << std::to_string(m);
@@ -728,9 +743,18 @@ void MultiBlockSolver::SaveVisualization()
       mfem_warning("Paraview is unified. Any overlapped interface dof data will not be shown.\n");
       topol_handler->TransferToGlobal(us, global_us_visual, num_var);
    }
+   else
+   {
+      assert((visual_offset >= 0) && (visual_offset < numSub));
+      assert((visual_freq > 0) && (visual_freq < numSub));
+   }
 
    for (int m = 0; m < paraviewColls.Size(); m++)
+   {
+      if ((!unified_paraview) && ((m < visual_offset) || (m % visual_freq != 0))) continue;
+      assert(paraviewColls[m]);
       paraviewColls[m]->Save();
+   }
 };
 
 void MultiBlockSolver::SaveSolution(std::string filename)

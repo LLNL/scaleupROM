@@ -80,6 +80,7 @@ protected:
    // visualization variables
    bool save_visual = false;
    bool unified_paraview = false;
+   int visual_offset = -1, visual_freq = -1;    // for individual_paraview, support partial visualization.
    std::string visual_dir = ".";
    std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
