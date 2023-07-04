@@ -82,10 +82,6 @@ void ROMHandler::ParseInputs()
          sample_prefix = config.GetRequiredOption<std::string>("parameterized_problem/name");
    }
 
-   num_basis = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
-   assert(num_basis.Size() > 0);
-   for (int k = 0; k < num_basis.Size(); k++) assert(num_basis[k] > 0);
-
    basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
    basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
 
@@ -112,30 +108,14 @@ void ROMHandler::ParseInputs()
    }
 
    std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
-   if (train_mode_str == "individual")
-   {
-      train_mode = TrainMode::INDIVIDUAL;
-      num_basis_sets = numSub;
-   }
-   else if (train_mode_str == "universal")
-   {
-      train_mode = TrainMode::UNIVERSAL;
-      num_basis_sets = topol_handler->GetNumComponents();
-   }
+   if (train_mode_str == "individual")       train_mode = TrainMode::INDIVIDUAL;
+   else if (train_mode_str == "universal")   train_mode = TrainMode::UNIVERSAL;
    else
    {
       mfem_error("Unknown subdomain training mode!\n");
    }
    
-   // Adjust num_basis according to num_basis_sets.
-   if (num_basis.Size() != num_basis_sets)
-   {
-      // Only take uniform number of basis for all components.
-      assert(num_basis.Size() == 1);
-      const int tmp = num_basis[0];
-      num_basis.SetSize(num_basis_sets);
-      num_basis = tmp;
-   }
+   ParseNumBasis();
 
    // component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
    // if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
@@ -164,6 +144,33 @@ void ROMHandler::ParseInputs()
    save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
 
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
+}
+
+void ROMHandler::ParseNumBasis()
+{
+   switch (train_mode)
+   {
+      case TrainMode::INDIVIDUAL:
+      { num_basis_sets = numSub; break; }
+      case TrainMode::UNIVERSAL:
+      { num_basis_sets = topol_handler->GetNumComponents(); break; }
+      default:
+      { mfem_error("ROMHandler::ParseNumBasis - unknown TrainMode!\n"); break; }
+   }
+
+   num_basis = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
+   assert(num_basis.Size() > 0);
+   for (int k = 0; k < num_basis.Size(); k++) assert(num_basis[k] > 0);
+
+   // Adjust num_basis according to num_basis_sets.
+   if (num_basis.Size() != num_basis_sets)
+   {
+      // Only take uniform number of basis for all components.
+      assert(num_basis.Size() == 1);
+      const int tmp = num_basis[0];
+      num_basis.SetSize(num_basis_sets);
+      num_basis = tmp;
+   }
 }
 
 void ROMHandler::FormReducedBasis()
@@ -303,7 +310,6 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 
 void ROMHandler::SetBlockSizes()
 {
-   // TODO: non-uniform subdomain cases.
    rom_block_offsets.SetSize(numSub+1);
    rom_block_offsets = 0;
 

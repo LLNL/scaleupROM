@@ -105,6 +105,7 @@ protected:
    bool incremental = false;
 
    void ParseInputs();
+   void ParseNumBasis();
 public:
    ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
