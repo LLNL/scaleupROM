@@ -57,7 +57,6 @@ protected:
    Array<int> block_offsets;  // Size(numSub * udim + 1). each block corresponds to a component of vector solution.
    Array<int> var_offsets; // Size(num_var * numSub + 1). each block corresponds to the variable of the solution in each domain.
    Array<int> domain_offsets; // Size(numSub + 1). each block corresponds to the vector solution in each domain.
-   Array<int> num_vdofs;       // Size(numSub). number of vdofs of the vector solution in each subdomain.
    BlockVector *U, *RHS;
 
    // Each Variable is separated by distinct FiniteElementSpace.

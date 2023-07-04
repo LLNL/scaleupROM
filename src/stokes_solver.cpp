@@ -147,7 +147,6 @@ void StokesSolver::InitVariables()
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
    var_offsets.SetSize(num_var * numSub + 1);
-   num_vdofs.SetSize(numSub);
    u_offsets.SetSize(numSub + 1);
    p_offsets.SetSize(numSub + 1);
 
@@ -175,7 +174,7 @@ void StokesSolver::InitVariables()
       p_offsets[m + 1] = pfes[m]->GetVSize();
    }
    block_offsets.PartialSum();
-   domain_offsets.GetSubArray(1, numSub, num_vdofs);
+   // domain_offsets.GetSubArray(1, numSub, num_vdofs);
    var_offsets.PartialSum();
    domain_offsets.PartialSum();
    u_offsets.PartialSum();

@@ -60,6 +60,7 @@ protected:
    int num_var = -1;         // number of variables for which linear subspace method is applied.
    int num_basis_sets = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
    Array<int> vdim;          // dimension of each variable.
+   Array<int> fom_var_offsets;
    Array<int> fom_num_vdofs;
 
    // rom options.
@@ -72,6 +73,10 @@ protected:
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
    // ProjectionMode proj_mode = NUM_PROJMODE;
+
+   // basis options.
+   bool var_basis = false;    // train basis separately for each variable.
+   bool bdr_basis = false;    // train basis separately for interior/boundary.
 
    // file names.
    std::string sample_dir;

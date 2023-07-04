@@ -25,19 +25,36 @@ using namespace std;
 namespace mfem
 {
 
-ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_var_offsets)
    : topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
      vdim(input_vdim),
-     fom_num_vdofs(input_num_vdofs),
+     fom_var_offsets(input_var_offsets),
      basis_loaded(false),
      operator_loaded(false)
 {
    num_var = vdim.Size();
    udim = vdim.Sum();
-   assert(fom_num_vdofs.Size() == (num_var * numSub));
+   assert(fom_var_offsets.Size() == (num_var * numSub + 1));
 
    ParseInputs();
+
+   if (var_basis)
+   {
+      fom_num_vdofs.SetSize(fom_var_offsets.Size() - 1);
+      for (int k = 0; k < fom_num_vdofs.Size(); k++)
+         fom_num_vdofs[k] = fom_var_offsets[k+1] - fom_var_offsets[k];
+   }
+   else
+   {
+      fom_num_vdofs.SetSize(numSub);
+      for (int m = 0, vidx = 0; m < numSub; m++)
+      {
+         fom_num_vdofs[m] = 0;
+         for (int v = 0; v < num_var; v++, vidx++)
+            fom_num_vdofs[m] += fom_var_offsets[vidx+1] - fom_var_offsets[vidx];
+      }
+   }
 
    SetBlockSizes();
 
@@ -84,6 +101,8 @@ void ROMHandler::ParseInputs()
 
    basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
    basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
+   var_basis = config.GetOption<bool>("model_reduction/basis/separate_variable", false);
+   bdr_basis = config.GetOption<bool>("model_reduction/basis/separate_boundary", false);
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
    if (save_op_str == "none")
@@ -148,6 +167,7 @@ void ROMHandler::ParseInputs()
 
 void ROMHandler::ParseNumBasis()
 {
+   // TODO: bdr_basis case.
    switch (train_mode)
    {
       case TrainMode::INDIVIDUAL:
@@ -157,6 +177,8 @@ void ROMHandler::ParseNumBasis()
       default:
       { mfem_error("ROMHandler::ParseNumBasis - unknown TrainMode!\n"); break; }
    }
+   if (var_basis)
+      num_basis_sets *= num_var;
 
    num_basis = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
    assert(num_basis.Size() > 0);
@@ -761,7 +783,7 @@ void MFEMROMHandler::SaveBasisVisualization(
    if (!save_basis_visual) return;
    assert(basis_loaded);
 
-   const int num_var = var_names.size();
+   assert(num_var == var_names.size());
    assert(fes.Size() == num_var * numSub);
 
    std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");

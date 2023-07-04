@@ -116,13 +116,11 @@ void PoissonSolver::InitVariables()
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
    var_offsets.SetSize(numSub + 1);
-   num_vdofs.SetSize(numSub);
    block_offsets[0] = 0;
    var_offsets[0] = 0;
    for (int i = 0; i < numSub; i++)
    {
       var_offsets[i + 1] = fes[i]->GetTrueVSize();
-      num_vdofs[i] = fes[i]->GetTrueVSize();
       for (int d = 0; d < udim; d++)
       {
          block_offsets[d + i * udim + 1] = fes[i]->GetNDofs();
