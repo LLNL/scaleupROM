@@ -121,6 +121,7 @@ public:
    const std::string GetVisualizationPrefix() const { return visual_prefix; }
    const TopologyHandlerMode GetTopologyMode() const { return topol_mode; }
    ParaViewDataCollection* GetParaViewColl(const int &k) { return paraviewColls[k]; }
+   BlockVector* GetSolution() { return U; }
    BlockVector* GetSolutionCopy() { return new BlockVector(*U); }
 
    void GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var);

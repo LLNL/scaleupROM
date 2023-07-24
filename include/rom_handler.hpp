@@ -17,6 +17,7 @@
 #include "linalg/BasisReader.h"
 #include "mfem/Utilities.hpp"
 #include "topology_handler.hpp"
+#include "linalg_utils.hpp"
 
 namespace mfem
 {
@@ -134,7 +135,12 @@ public:
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
-   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
+   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec);
+   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS)
+   {
+      printf("Project RHS on reduced basis.\n");
+      ProjectVectorOnReducedBasis(RHS, reduced_rhs);
+   }
    virtual void Solve(BlockVector* U);
 
    // P_i^T * mat * P_j
@@ -154,6 +160,10 @@ public:
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
    virtual void SaveSV(const std::string& prefix, const int& basis_idx);
+   virtual void SaveReducedSolution(const std::string &filename)
+   { CAROM::PrintVector(*reduced_sol, filename); }
+   virtual void SaveReducedRHS(const std::string &filename)
+   { CAROM::PrintVector(*reduced_rhs, filename); }
 };
 
 class MFEMROMHandler : public ROMHandler
@@ -181,7 +191,11 @@ public:
    // virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
-   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS);
+   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec) override
+   { mfem_error("MFEMROMHandler::ProjectVectorOnReducedBasis - base class method is called!\n"); }
+   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
+   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) override
+   { ProjectVectorOnReducedBasis(RHS, reduced_rhs); }
    virtual void Solve(BlockVector* U);
    
    // P_i^T * mat * P_j
@@ -191,6 +205,11 @@ public:
    virtual void LoadOperator(BlockMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
+
+   virtual void SaveReducedSolution(const std::string &filename) override
+   { PrintVector(*reduced_sol, filename); }
+   virtual void SaveReducedRHS(const std::string &filename) override
+   { PrintVector(*reduced_rhs, filename); }
 
 private:
    IterativeSolver* SetSolver(const std::string &solver_type, const std::string &prec_type);

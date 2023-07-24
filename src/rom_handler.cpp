@@ -14,7 +14,6 @@
 #include "etc.hpp"
 #include "input_parser.hpp"
 #include "rom_handler.hpp"
-#include "linalg_utils.hpp"
 #include "hdf5_utils.hpp"
 #include "block_smoother.hpp"
 // #include <cmath>
@@ -326,27 +325,28 @@ void ROMHandler::AllocROMMat()
    romMat_inv = new CAROM::Matrix(rom_block_offsets.Last(), rom_block_offsets.Last(), false);
 }
 
-void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
+void ROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec)
 {
-   assert(RHS->NumBlocks() == numSub);
+   assert(vec->NumBlocks() == numSub);
+   // reset the rom_vec if initiated a priori.
+   if (rom_vec) delete rom_vec;
 
-   printf("Project RHS on reduced basis.\n");
-   reduced_rhs = new CAROM::Vector(rom_block_offsets.Last(), false);
+   rom_vec = new CAROM::Vector(rom_block_offsets.Last(), false);
 
    if (!basis_loaded) LoadReducedBasis();
 
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
+      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       const CAROM::Matrix* basis_i;
       GetBasisOnSubdomain(i, basis_i);
 
-      CAROM::Vector block_rhs_carom(RHS->GetBlock(i).GetData(), RHS->GetBlock(i).Size(), true, false);
-      CAROM::Vector *block_reduced_rhs = basis_i->transposeMult(&block_rhs_carom);
+      CAROM::Vector block_vec_carom(vec->GetBlock(i).GetData(), vec->GetBlock(i).Size(), true, false);
+      CAROM::Vector *block_reduced_vec = basis_i->transposeMult(&block_vec_carom);
 
-      CAROM::SetBlock(*block_reduced_rhs, rom_block_offsets[i], rom_block_offsets[i+1], *reduced_rhs);
+      CAROM::SetBlock(*block_reduced_vec, rom_block_offsets[i], rom_block_offsets[i+1], *rom_vec);
    }
 }
 
@@ -588,23 +588,24 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
    }
 }
 
-void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
+void MFEMROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, BlockVector*& rom_vec)
 {
-   assert(RHS->NumBlocks() == numSub);
+   assert(vec->NumBlocks() == numSub);
+   // reset rom_vec if initiated a priori.
+   if (rom_vec) delete rom_vec;
 
-   printf("Project RHS on reduced basis.\n");
-   reduced_rhs = new BlockVector(rom_block_offsets);
+   rom_vec = new BlockVector(rom_block_offsets);
 
    if (!basis_loaded) LoadReducedBasis();
 
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
+      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       DenseMatrix* basis_i;
       GetBasisOnSubdomain(i, basis_i);
-      basis_i->MultTranspose(RHS->GetBlock(i).GetData(), reduced_rhs->GetBlock(i).GetData());
+      basis_i->MultTranspose(vec->GetBlock(i).GetData(), rom_vec->GetBlock(i).GetData());
    }
 }
 
