@@ -92,6 +92,7 @@ protected:
    Array<int> rom_block_offsets;
    
    CAROM::Vector *reduced_rhs = NULL;
+   CAROM::Vector *reduced_sol = NULL;
 
    Array2D<CAROM::Matrix *> carom_mats;
    CAROM::Matrix *romMat_inv = NULL;
@@ -165,6 +166,7 @@ protected:
    SparseMatrix *romMat_mono = NULL;
    
    mfem::BlockVector *reduced_rhs = NULL;
+   mfem::BlockVector *reduced_sol = NULL;
 
 public:
    MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);

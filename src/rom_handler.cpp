@@ -48,6 +48,7 @@ ROMHandler::~ROMHandler()
 {
    DeletePointers(carom_mats);
    delete reduced_rhs;
+   delete reduced_sol;
    delete romMat_inv;
 }
 
@@ -356,8 +357,8 @@ void ROMHandler::Solve(BlockVector* U)
 
    printf("Solve ROM.\n");
 
-   CAROM::Vector reduced_sol(rom_block_offsets.Last(), false);
-   romMat_inv->mult(*reduced_rhs, reduced_sol);
+   reduced_sol = new CAROM::Vector(rom_block_offsets.Last(), false);
+   romMat_inv->mult(*reduced_rhs, *reduced_sol);
 
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
@@ -370,7 +371,7 @@ void ROMHandler::Solve(BlockVector* U)
       CAROM::Vector block_reduced_sol(num_basis[c], false);
       const int offset = rom_block_offsets[i];
       for (int k = 0; k < num_basis[c]; k++)
-         block_reduced_sol(k) = reduced_sol(k + offset);
+         block_reduced_sol(k) = reduced_sol->item(k + offset);
 
       // This saves the data automatically to U.
       CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
@@ -506,6 +507,7 @@ MFEMROMHandler::~MFEMROMHandler()
    DeletePointers(spatialbasis);
    delete romMat, romMat_mono;
    delete reduced_rhs;
+   delete reduced_sol;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -612,7 +614,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
    assert(operator_loaded);
 
    printf("Solve ROM.\n");
-   BlockVector reduced_sol(rom_block_offsets);
+   reduced_sol = new BlockVector(rom_block_offsets);
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
@@ -673,10 +675,10 @@ void MFEMROMHandler::Solve(BlockVector* U)
    solver->SetMaxIter(maxIter);
    solver->SetPrintLevel(print_level);
 
-   reduced_sol = 0.0;
+   (*reduced_sol) = 0.0;
    // StopWatch solveTimer;
    // solveTimer.Start();
-   solver->Mult(*reduced_rhs, reduced_sol);
+   solver->Mult(*reduced_rhs, *reduced_sol);
    // solveTimer.Stop();
    // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
 
@@ -688,7 +690,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       GetBasisOnSubdomain(i, basis_i);
 
       // 23. reconstruct FOM state
-      basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
+      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
    }
 
    // delete the created objects.
