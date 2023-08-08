@@ -22,6 +22,9 @@ TEST(Poisson_Workflow, BaseIndividualTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
@@ -49,6 +52,9 @@ TEST(Poisson_Workflow, BaseUniversalTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
@@ -72,6 +78,9 @@ TEST(Poisson_Workflow, MFEMIndividualTest)
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -111,6 +120,9 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
@@ -134,6 +146,9 @@ TEST(Poisson_Workflow, ComponentWiseTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    printf("\nBuild ROM \n\n");
 
    config.dict_["mesh"]["type"] = "component-wise";
@@ -156,6 +171,9 @@ TEST(Stokes_Workflow, BaseIndividualTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -189,6 +207,9 @@ TEST(Stokes_Workflow, BaseUniversalTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
@@ -213,6 +234,9 @@ TEST(Stokes_Workflow, MFEMIndividualTest)
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -252,6 +276,9 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
@@ -274,6 +301,9 @@ TEST(Stokes_Workflow, ComponentWiseTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    printf("\nBuild ROM \n\n");
 

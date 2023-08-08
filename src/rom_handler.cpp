@@ -65,6 +65,10 @@ void ROMHandler::ParseInputs()
    {
       mode = ROMHandlerMode::SAMPLE_GENERATION;
    }
+   else if (mode_str == "train_rom")
+   {
+      mode = ROMHandlerMode::TRAIN_ROM;
+   }
    else if (mode_str == "build_rom")
    {
       mode = ROMHandlerMode::BUILD_ROM;
@@ -74,7 +78,7 @@ void ROMHandler::ParseInputs()
       mfem_error("Unknown main mode!\n");
    }
 
-   if ((mode == ROMHandlerMode::SAMPLE_GENERATION) || (mode == ROMHandlerMode::BUILD_ROM))
+   if ((mode == ROMHandlerMode::SAMPLE_GENERATION) || (mode == ROMHandlerMode::TRAIN_ROM) || (mode == ROMHandlerMode::BUILD_ROM))
    {
       sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
       sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", "");

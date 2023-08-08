@@ -145,6 +145,19 @@ void GenerateSamples(MPI_Comm comm)
    config.dict_ = dict0;
 }
 
+void TrainROM(MPI_Comm comm)
+{
+   MultiBlockSolver *test = NULL;
+
+   test = InitSolver();
+   if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
+   test->InitVariables();
+   
+   test->FormReducedBasis();
+
+   delete test;
+}
+
 void BuildROM(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
@@ -165,8 +178,6 @@ void BuildROM(MPI_Comm comm)
    test->Assemble();
    
    ROMHandler *rom = test->GetROMHandler();
-   if (!rom->UseExistingBasis())
-      test->FormReducedBasis();
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();

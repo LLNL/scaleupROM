@@ -24,6 +24,9 @@ TEST(ComponentWiseTest, PoissonTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    printf("\nBuild ROM \n\n");
 
    config.dict_["mesh"]["type"] = "component-wise";
@@ -50,6 +53,9 @@ TEST(ComponentWiseTest, StokesTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    printf("\nBuild ROM \n\n");
 
    config.dict_["mesh"]["type"] = "component-wise";
@@ -75,6 +81,9 @@ TEST(MultiComponentGlobalROM, StokesTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    printf("\nBuild ROM \n\n");
 

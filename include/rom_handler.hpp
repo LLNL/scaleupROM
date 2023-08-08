@@ -25,6 +25,7 @@ namespace mfem
 enum ROMHandlerMode
 {
    SAMPLE_GENERATION,
+   TRAIN_ROM,
    BUILD_ROM,
    SINGLE_RUN,
    NUM_HANDLERMODE
