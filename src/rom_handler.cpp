@@ -14,7 +14,6 @@
 #include "etc.hpp"
 #include "input_parser.hpp"
 #include "rom_handler.hpp"
-#include "linalg_utils.hpp"
 #include "hdf5_utils.hpp"
 #include "block_smoother.hpp"
 // #include <cmath>
@@ -48,6 +47,7 @@ ROMHandler::~ROMHandler()
 {
    DeletePointers(carom_mats);
    delete reduced_rhs;
+   delete reduced_sol;
    delete romMat_inv;
 }
 
@@ -325,27 +325,28 @@ void ROMHandler::AllocROMMat()
    romMat_inv = new CAROM::Matrix(rom_block_offsets.Last(), rom_block_offsets.Last(), false);
 }
 
-void ROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
+void ROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec)
 {
-   assert(RHS->NumBlocks() == numSub);
+   assert(vec->NumBlocks() == numSub);
+   // reset the rom_vec if initiated a priori.
+   if (rom_vec) delete rom_vec;
 
-   printf("Project RHS on reduced basis.\n");
-   reduced_rhs = new CAROM::Vector(rom_block_offsets.Last(), false);
+   rom_vec = new CAROM::Vector(rom_block_offsets.Last(), false);
 
    if (!basis_loaded) LoadReducedBasis();
 
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
+      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       const CAROM::Matrix* basis_i;
       GetBasisOnSubdomain(i, basis_i);
 
-      CAROM::Vector block_rhs_carom(RHS->GetBlock(i).GetData(), RHS->GetBlock(i).Size(), true, false);
-      CAROM::Vector *block_reduced_rhs = basis_i->transposeMult(&block_rhs_carom);
+      CAROM::Vector block_vec_carom(vec->GetBlock(i).GetData(), vec->GetBlock(i).Size(), true, false);
+      CAROM::Vector *block_reduced_vec = basis_i->transposeMult(&block_vec_carom);
 
-      CAROM::SetBlock(*block_reduced_rhs, rom_block_offsets[i], rom_block_offsets[i+1], *reduced_rhs);
+      CAROM::SetBlock(*block_reduced_vec, rom_block_offsets[i], rom_block_offsets[i+1], *rom_vec);
    }
 }
 
@@ -356,8 +357,8 @@ void ROMHandler::Solve(BlockVector* U)
 
    printf("Solve ROM.\n");
 
-   CAROM::Vector reduced_sol(rom_block_offsets.Last(), false);
-   romMat_inv->mult(*reduced_rhs, reduced_sol);
+   reduced_sol = new CAROM::Vector(rom_block_offsets.Last(), false);
+   romMat_inv->mult(*reduced_rhs, *reduced_sol);
 
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
@@ -370,7 +371,7 @@ void ROMHandler::Solve(BlockVector* U)
       CAROM::Vector block_reduced_sol(num_basis[c], false);
       const int offset = rom_block_offsets[i];
       for (int k = 0; k < num_basis[c]; k++)
-         block_reduced_sol(k) = reduced_sol(k + offset);
+         block_reduced_sol(k) = reduced_sol->item(k + offset);
 
       // This saves the data automatically to U.
       CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
@@ -506,6 +507,7 @@ MFEMROMHandler::~MFEMROMHandler()
    DeletePointers(spatialbasis);
    delete romMat, romMat_mono;
    delete reduced_rhs;
+   delete reduced_sol;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -586,23 +588,24 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
    }
 }
 
-void MFEMROMHandler::ProjectRHSOnReducedBasis(const BlockVector* RHS)
+void MFEMROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, BlockVector*& rom_vec)
 {
-   assert(RHS->NumBlocks() == numSub);
+   assert(vec->NumBlocks() == numSub);
+   // reset rom_vec if initiated a priori.
+   if (rom_vec) delete rom_vec;
 
-   printf("Project RHS on reduced basis.\n");
-   reduced_rhs = new BlockVector(rom_block_offsets);
+   rom_vec = new BlockVector(rom_block_offsets);
 
    if (!basis_loaded) LoadReducedBasis();
 
    // Each basis is applied to the same column blocks.
    for (int i = 0; i < numSub; i++)
    {
-      assert(RHS->GetBlock(i).Size() == fom_num_vdofs[i]);
+      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
 
       DenseMatrix* basis_i;
       GetBasisOnSubdomain(i, basis_i);
-      basis_i->MultTranspose(RHS->GetBlock(i).GetData(), reduced_rhs->GetBlock(i).GetData());
+      basis_i->MultTranspose(vec->GetBlock(i).GetData(), rom_vec->GetBlock(i).GetData());
    }
 }
 
@@ -612,7 +615,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
    assert(operator_loaded);
 
    printf("Solve ROM.\n");
-   BlockVector reduced_sol(rom_block_offsets);
+   reduced_sol = new BlockVector(rom_block_offsets);
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
@@ -673,10 +676,10 @@ void MFEMROMHandler::Solve(BlockVector* U)
    solver->SetMaxIter(maxIter);
    solver->SetPrintLevel(print_level);
 
-   reduced_sol = 0.0;
+   (*reduced_sol) = 0.0;
    // StopWatch solveTimer;
    // solveTimer.Start();
-   solver->Mult(*reduced_rhs, reduced_sol);
+   solver->Mult(*reduced_rhs, *reduced_sol);
    // solveTimer.Stop();
    // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
 
@@ -688,7 +691,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       GetBasisOnSubdomain(i, basis_i);
 
       // 23. reconstruct FOM state
-      basis_i->Mult(reduced_sol.GetBlock(i).GetData(), U->GetBlock(i).GetData());
+      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
    }
 
    // delete the created objects.

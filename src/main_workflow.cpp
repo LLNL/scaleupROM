@@ -369,6 +369,17 @@ double SingleRun()
 
       error = test->CompareSolution(*romU);
 
+      bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
+      if (save_reduced_sol)
+      {
+         ROMHandler *rom = test->GetROMHandler();
+         rom->SaveReducedSolution("rom_reduced_sol.txt");
+
+         // use ROMHandler::reduced_rhs as a temporary variable.
+         rom->ProjectRHSOnReducedBasis(test->GetSolution());
+         rom->SaveReducedRHS("fom_reduced_sol.txt");
+      }
+
       // Recover the original ROM solution.
       test->CopySolution(romU);
 
