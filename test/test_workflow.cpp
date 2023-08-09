@@ -18,6 +18,8 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 TEST(Poisson_Workflow, BaseIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -75,6 +77,8 @@ TEST(Poisson_Workflow, MFEMIndividualTest)
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -168,6 +172,8 @@ TEST(Poisson_Workflow, ComponentWiseTest)
 TEST(Stokes_Workflow, BaseIndividualTest)
 {
    config = InputParser("inputs/stokes.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -227,6 +233,8 @@ TEST(Stokes_Workflow, BaseUniversalTest)
 TEST(Stokes_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/stokes.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;

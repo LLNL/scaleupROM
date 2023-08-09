@@ -63,6 +63,10 @@ sample_generation:
       minimum: 2.0
       maximum: 2.0
 
+basis:
+  tags:
+    - name: square
+
 model_reduction:
   rom_handler_type: mfem
   basis:

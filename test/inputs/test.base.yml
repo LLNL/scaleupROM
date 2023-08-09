@@ -39,6 +39,13 @@ sample_generation:
       minimum: 2.0
       maximum: 3.0
 
+basis:
+  # prefix: "poisson0"
+  # number_of_basis: 3
+  tags:
+    - name: comp0
+
+
 model_reduction:
   rom_handler_type: base
   basis:

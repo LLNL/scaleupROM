@@ -147,15 +147,43 @@ void GenerateSamples(MPI_Comm comm)
 
 void TrainROM(MPI_Comm comm)
 {
-   MultiBlockSolver *test = NULL;
+   SampleGenerator *sample_generator = InitSampleGenerator(comm);
 
-   test = InitSolver();
-   if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
-   test->InitVariables();
+   YAML::Node basis_list = config.FindNode("basis/tags");
+   if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
+
+   std::string basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
+   Array<int> num_basis_default = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
+
+   for (int p = 0; p < basis_list.size(); p++)
+   {
+      std::string basis_tag = config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]);
+      const int num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default[0], basis_list[p]);
+
+      std::vector<std::string> file_list =
+         config.GetOptionFromDict<std::vector<std::string>>(
+            "snapshot_files", std::vector<std::string>(0), basis_list[p]);
+      if (file_list.size() == 0)
+      {
+         std::string filename = sample_generator->GetBaseFilename(sample_generator->GetSamplePrefix(), basis_tag);
+         filename += "_snapshot";
+         file_list.push_back(filename);
+      }
+
+      sample_generator->FormReducedBasis(basis_prefix, basis_tag, file_list, num_basis);
+   }  // for (int p = 0; p < num_sampling_params; p++)
+
+   delete sample_generator;
+
+   // MultiBlockSolver *test = NULL;
+
+   // test = InitSolver();
+   // if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
+   // test->InitVariables();
    
-   test->FormReducedBasis();
+   // test->FormReducedBasis();
 
-   delete test;
+   // delete test;
 }
 
 void BuildROM(MPI_Comm comm)
