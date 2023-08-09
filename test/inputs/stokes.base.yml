@@ -43,6 +43,9 @@ sample_generation:
 basis:
   tags:
     - name: comp0
+  svd:
+    save_spectrum: true
+    update_right_sv: false
 
 model_reduction:
   rom_handler_type: base
@@ -56,9 +59,6 @@ model_reduction:
     prefix: "proj_inv"
   compare_solution:
     enabled: true
-  svd:
-    save_spectrum: true
-    update_right_sv: false
   visualization:
     enabled: false
   solver_type: minres

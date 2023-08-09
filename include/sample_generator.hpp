@@ -44,7 +44,8 @@ protected:
 
    // snapshot generators: purely for saving snapshots. will not execute svd.
    int max_num_snapshots = 100;
-   const bool update_right_SV = false;
+   bool save_sv = false;
+   bool update_right_SV = false;
    const bool incremental = false;
    Array<CAROM::Options*> snapshot_options;
    Array<CAROM::BasisGenerator*> snapshot_generators;

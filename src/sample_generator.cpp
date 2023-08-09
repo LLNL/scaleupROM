@@ -56,6 +56,10 @@ SampleGenerator::SampleGenerator(MPI_Comm comm)
    // Initially no snapshot generator.
    snapshot_generators.SetSize(0);
    snapshot_options.SetSize(0);
+
+   // BasisGenerator options.
+   update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
+   save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
 }
 
 SampleGenerator::~SampleGenerator()
@@ -251,7 +255,7 @@ const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
 
 void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int& num_basis)
 {
-   // if (!save_sv) return;
+   if (!save_sv) return;
    assert(basis_generator != NULL);
 
    const CAROM::Vector *rom_sv = basis_generator->getSingularValues();

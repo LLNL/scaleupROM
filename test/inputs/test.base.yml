@@ -44,6 +44,9 @@ basis:
   # number_of_basis: 3
   tags:
     - name: comp0
+  svd:
+    save_spectrum: true
+    update_right_sv: false
 
 
 model_reduction:
@@ -58,8 +61,5 @@ model_reduction:
     prefix: "proj_inv"
   compare_solution:
     enabled: true
-  svd:
-    save_spectrum: true
-    update_right_sv: false
   visualization:
     enabled: false

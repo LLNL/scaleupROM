@@ -70,6 +70,9 @@ basis:
   tags:
     - name: "empty"
     - name: "circle"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
 
 model_reduction:
   rom_handler_type: mfem
@@ -83,9 +86,6 @@ model_reduction:
     prefix: "test.rom_elem"
   compare_solution:
     enabled: true
-  svd:
-    save_spectrum: true
-    update_right_sv: false
   visualization:
     enabled: false
   solver_type: minres

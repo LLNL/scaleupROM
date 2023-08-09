@@ -163,9 +163,9 @@ void ROMHandler::ParseInputs()
    //    save_lspg_basis = config.GetOption<bool>("model_reduction/lspg/save_lspg_basis", true);
 
    max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
-   update_right_SV = config.GetOption<bool>("model_reduction/svd/update_right_sv", false);
+   update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
 
-   save_sv = config.GetOption<bool>("model_reduction/svd/save_spectrum", false);
+   save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
 
    save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
 }
