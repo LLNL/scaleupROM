@@ -91,7 +91,7 @@ void ROMHandler::ParseInputs()
    for (int k = 0; k < num_basis.Size(); k++) assert(num_basis[k] > 0);
 
    basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
-   basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
+   basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
    if (save_op_str == "none")
@@ -167,7 +167,7 @@ void ROMHandler::ParseInputs()
 
    save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
 
-   save_basis_visual = config.GetOption<bool>("model_reduction/visualization/enabled", false);
+   save_basis_visual = config.GetOption<bool>("basis/visualization/enabled", false);
 }
 
 void ROMHandler::FormReducedBasis()

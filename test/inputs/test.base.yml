@@ -40,19 +40,18 @@ sample_generation:
       maximum: 3.0
 
 basis:
-  # prefix: "poisson0"
+  prefix: "poisson0"
   # number_of_basis: 3
   tags:
     - name: comp0
   svd:
     save_spectrum: true
     update_right_sv: false
-
+  visualization:
+      enabled: false
 
 model_reduction:
   rom_handler_type: base
-  basis:
-    prefix: "poisson0"
   # individual/universal
   subdomain_training: individual
   number_of_basis: [3]
@@ -61,5 +60,3 @@ model_reduction:
     prefix: "proj_inv"
   compare_solution:
     enabled: true
-  visualization:
-    enabled: false

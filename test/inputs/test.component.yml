@@ -64,16 +64,17 @@ sample_generation:
       maximum: 2.5
 
 basis:
+  prefix: "poisson0"
   tags:
     - name: "square"
   svd:
     save_spectrum: true
     update_right_sv: false
+  visualization:
+    enabled: false
 
 model_reduction:
   rom_handler_type: mfem
-  basis:
-    prefix: "poisson0"
   # individual/universal
   subdomain_training: universal
   number_of_basis: [4]
@@ -82,5 +83,3 @@ model_reduction:
     prefix: "test.rom_elem"
   compare_solution:
     enabled: true
-  visualization:
-    enabled: false

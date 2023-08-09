@@ -152,7 +152,7 @@ void TrainROM(MPI_Comm comm)
    YAML::Node basis_list = config.FindNode("basis/tags");
    if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
 
-   std::string basis_prefix = config.GetOption<std::string>("model_reduction/basis/prefix", "basis");
+   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
    Array<int> num_basis_default = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
 
    for (int p = 0; p < basis_list.size(); p++)
