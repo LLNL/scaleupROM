@@ -69,7 +69,6 @@ protected:
    bool save_basis_visual = false;
    bool component_sampling = false;
    bool save_lspg_basis = false;
-   bool basis_file_exists = false;
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
@@ -119,7 +118,6 @@ public:
    const TrainMode GetTrainMode() { return train_mode; }
    const int GetNumBasisSets() { return num_basis_sets; }
    const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
-   const bool UseExistingBasis() { return basis_file_exists; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }

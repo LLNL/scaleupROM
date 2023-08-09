@@ -90,7 +90,6 @@ void ROMHandler::ParseInputs()
    assert(num_basis.Size() > 0);
    for (int k = 0; k < num_basis.Size(); k++) assert(num_basis[k] > 0);
 
-   basis_file_exists = config.GetOption<bool>("model_reduction/basis/file_exists", false);
    basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
