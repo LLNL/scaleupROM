@@ -63,6 +63,10 @@ sample_generation:
       minimum: 2.0
       maximum: 2.5
 
+basis:
+  tags:
+    - name: "empty"
+    - name: "circle"
 
 model_reduction:
   rom_handler_type: mfem
