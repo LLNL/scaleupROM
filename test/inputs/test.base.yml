@@ -41,7 +41,7 @@ sample_generation:
 
 basis:
   prefix: "poisson0"
-  # number_of_basis: 3
+  number_of_basis: 3
   tags:
     - name: comp0
   svd:
@@ -54,7 +54,6 @@ model_reduction:
   rom_handler_type: base
   # individual/universal
   subdomain_training: individual
-  number_of_basis: [3]
   save_operator:
     level: global
     prefix: "proj_inv"

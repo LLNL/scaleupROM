@@ -153,12 +153,13 @@ void TrainROM(MPI_Comm comm)
    if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
 
    std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
-   Array<int> num_basis_default = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
+   const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
 
    for (int p = 0; p < basis_list.size(); p++)
    {
       std::string basis_tag = config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]);
-      const int num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default[0], basis_list[p]);
+      const int num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[p]);
+      assert(num_basis > 0);
 
       std::vector<std::string> file_list =
          config.GetOptionFromDict<std::vector<std::string>>(
@@ -171,7 +172,7 @@ void TrainROM(MPI_Comm comm)
       }
 
       sample_generator->FormReducedBasis(basis_prefix, basis_tag, file_list, num_basis);
-   }  // for (int p = 0; p < num_sampling_params; p++)
+   }  // for (int p = 0; p < basis_list.size(); p++)
 
    delete sample_generator;
 

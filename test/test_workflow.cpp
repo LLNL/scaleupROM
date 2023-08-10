@@ -47,9 +47,7 @@ TEST(Poisson_Workflow, BaseUniversalTest)
    config.dict_["single_run"]["poisson0"]["k"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -112,9 +110,7 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    config.dict_["single_run"]["poisson0"]["k"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -201,9 +197,7 @@ TEST(Stokes_Workflow, BaseUniversalTest)
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -272,9 +266,7 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;

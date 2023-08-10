@@ -86,10 +86,6 @@ void ROMHandler::ParseInputs()
          sample_prefix = config.GetRequiredOption<std::string>("parameterized_problem/name");
    }
 
-   num_basis = config.GetRequiredOption<Array<int>>("model_reduction/number_of_basis");
-   assert(num_basis.Size() > 0);
-   for (int k = 0; k < num_basis.Size(); k++) assert(num_basis[k] > 0);
-
    basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
@@ -130,15 +126,36 @@ void ROMHandler::ParseInputs()
       mfem_error("Unknown subdomain training mode!\n");
    }
    
-   // Adjust num_basis according to num_basis_sets.
-   if (num_basis.Size() != num_basis_sets)
+   const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
+   num_basis.SetSize(num_basis_sets);
+   num_basis = -1;
+   assert(num_basis.Size() > 0);
+
+   YAML::Node basis_list = config.FindNode("basis/tags");
+   if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
+
+   for (int p = 0; p < basis_list.size(); p++)
    {
-      // Only take uniform number of basis for all components.
-      assert(num_basis.Size() == 1);
-      const int tmp = num_basis[0];
-      num_basis.SetSize(num_basis_sets);
-      num_basis = tmp;
-   }
+      std::string basis_tag = config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]);
+      const int nb = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[p]);
+      assert(nb > 0);
+
+      int idx = -1;
+      for (int c = 0; c < num_basis_sets; c++)
+      {
+         if (basis_tag == GetBasisTagForComponent(c))
+         {
+            idx = c;
+            break;
+         }
+      }
+      assert((idx >= 0) && (idx < num_basis_sets));
+
+      num_basis[idx] = nb;
+   }  // for (int p = 0; p < basis_list.size(); p++)
+   
+   for (int k = 0; k < num_basis.Size(); k++)
+      assert(num_basis[k] > 0);
 
    // component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
    // if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
