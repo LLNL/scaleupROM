@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
    {
       if (mode == "sample_generation") GenerateSamples(MPI_COMM_WORLD);
       else if (mode == "build_rom")    BuildROM(MPI_COMM_WORLD);
+      else if (mode == "train_rom")    TrainROM(MPI_COMM_WORLD);
       else if (mode == "single_run")   double dump = SingleRun();
       else
       {

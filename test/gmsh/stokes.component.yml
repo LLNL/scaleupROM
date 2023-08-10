@@ -66,23 +66,28 @@ sample_generation:
       minimum: 2.0
       maximum: 2.5
 
-model_reduction:
-  rom_handler_type: mfem
-  basis:
-    prefix: "stokes"
-  # individual/universal
-  subdomain_training: universal
-  number_of_basis: [2,4]
-  save_operator:
-    level: component
-    prefix: "test.rom_elem"
-  compare_solution:
-    enabled: true
+basis:
+  prefix: "stokes"
+  tags:
+    - name: "empty"
+      number_of_basis: 2
+    - name: "circle"
+      number_of_basis: 4
   svd:
     save_spectrum: true
     update_right_sv: false
   visualization:
     enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  # individual/universal
+  subdomain_training: universal
+  save_operator:
+    level: component
+    prefix: "test.rom_elem"
+  compare_solution:
+    enabled: true
   solver_type: minres
 
 manufactured_solution:

@@ -92,15 +92,7 @@ FilenameParam::FilenameParam(const std::string &input_key, YAML::Node option)
 
 void FilenameParam::SetParam(const int &param_index, InputParser &parser)
 {
-   assert(size > 0);
-   assert((param_index >= 0) && (param_index < size));
-   int val = -1;
-
-   int Np = (size == 1) ? 1 : (size - 1);
-   int dp = (maxval - minval) / Np;
-   val = minval + param_index * dp;
-
-   std::string filename = string_format(format, val);
+   std::string filename = GetFilename(param_index);
 
    parser.SetOption<std::string>(key, filename);
 }
@@ -115,4 +107,17 @@ void FilenameParam::SetRandomParam(InputParser &parser)
    std::string filename = string_format(format, val);
 
    parser.SetOption<std::string>(key, filename);
+}
+
+const std::string FilenameParam::GetFilename(const int &param_index)
+{
+   assert(size > 0);
+   assert((param_index >= 0) && (param_index < size));
+   int val = -1;
+
+   int Np = (size == 1) ? 1 : (size - 1);
+   int dp = (maxval - minval) / Np;
+   val = minval + param_index * dp;
+
+   return string_format(format, val);
 }

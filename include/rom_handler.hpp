@@ -25,6 +25,7 @@ namespace mfem
 enum ROMHandlerMode
 {
    SAMPLE_GENERATION,
+   TRAIN_ROM,
    BUILD_ROM,
    SINGLE_RUN,
    NUM_HANDLERMODE
@@ -68,7 +69,6 @@ protected:
    bool save_basis_visual = false;
    bool component_sampling = false;
    bool save_lspg_basis = false;
-   bool basis_file_exists = false;
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
    ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
@@ -118,14 +118,13 @@ public:
    const TrainMode GetTrainMode() { return train_mode; }
    const int GetNumBasisSets() { return num_basis_sets; }
    const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
-   const bool UseExistingBasis() { return basis_file_exists; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
 
-   virtual void FormReducedBasis();
+   // virtual void FormReducedBasis();
    virtual void LoadReducedBasis();
 
    int GetBasisIndexForSubdomain(const int &subdomain_index);
@@ -159,7 +158,7 @@ public:
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
-   virtual void SaveSV(const std::string& prefix, const int& basis_idx);
+   // virtual void SaveSV(const std::string& prefix, const int& basis_idx);
    virtual void SaveReducedSolution(const std::string &filename)
    { CAROM::PrintVector(*reduced_sol, filename); }
    virtual void SaveReducedRHS(const std::string &filename)
