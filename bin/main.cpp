@@ -12,8 +12,10 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
    const char *input_file = "test.input";
+   const char *output_file = "";
    OptionsParser args(argc, argv);
    args.AddOption(&input_file, "-i", "--input", "Input file to use.");
+   args.AddOption(&output_file, "-o", "--output", "For single run, save comparison result to output file.");
    args.ParseCheck();
    config = InputParser(input_file);
 
@@ -26,7 +28,7 @@ int main(int argc, char *argv[])
       if (mode == "sample_generation") GenerateSamples(MPI_COMM_WORLD);
       else if (mode == "build_rom")    BuildROM(MPI_COMM_WORLD);
       else if (mode == "train_rom")    TrainROM(MPI_COMM_WORLD);
-      else if (mode == "single_run")   double dump = SingleRun();
+      else if (mode == "single_run")   double dump = SingleRun(output_file);
       else
       {
          if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());
