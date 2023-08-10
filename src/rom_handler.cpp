@@ -186,47 +186,47 @@ void ROMHandler::ParseInputs()
    save_basis_visual = config.GetOption<bool>("basis/visualization/enabled", false);
 }
 
-void ROMHandler::FormReducedBasis()
-{
-   std::string basis_name, basis_tag;
+// void ROMHandler::FormReducedBasis()
+// {
+//    std::string basis_name, basis_tag;
    
-   for (int c = 0; c < num_basis_sets; c++)
-   {
-      int basis_dim = -1;
-      switch (train_mode)
-      {
-         case (INDIVIDUAL):
-         {
-            basis_tag = GetBasisTag(c);
-            basis_dim = fom_num_vdofs[c];
-            break;
-         }
-         case (UNIVERSAL):
-         {
-            basis_tag = GetBasisTagForComponent(c);
-            for (int m = 0; m < numSub; m++)
-               if (topol_handler->GetMeshType(m) == c)
-               { basis_dim = fom_num_vdofs[m]; break; }
-            break;
-         }
-      }
-      basis_name = basis_prefix + "_" + basis_tag;
-      assert(basis_dim > 0);
+//    for (int c = 0; c < num_basis_sets; c++)
+//    {
+//       int basis_dim = -1;
+//       switch (train_mode)
+//       {
+//          case (INDIVIDUAL):
+//          {
+//             basis_tag = GetBasisTag(c);
+//             basis_dim = fom_num_vdofs[c];
+//             break;
+//          }
+//          case (UNIVERSAL):
+//          {
+//             basis_tag = GetBasisTagForComponent(c);
+//             for (int m = 0; m < numSub; m++)
+//                if (topol_handler->GetMeshType(m) == c)
+//                { basis_dim = fom_num_vdofs[m]; break; }
+//             break;
+//          }
+//       }
+//       basis_name = basis_prefix + "_" + basis_tag;
+//       assert(basis_dim > 0);
 
-      rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
-      basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
+//       rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
+//       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
 
-      std::string filename = sample_dir + "/" + sample_prefix + "_sample";
-      filename += "_" + basis_tag + "_snapshot";
-      basis_generator->loadSamples(filename,"snapshot");
+//       std::string filename = sample_dir + "/" + sample_prefix + "_sample";
+//       filename += "_" + basis_tag + "_snapshot";
+//       basis_generator->loadSamples(filename,"snapshot");
 
-      basis_generator->endSamples(); // save the merged basis file
-      SaveSV(basis_name, c);
+//       basis_generator->endSamples(); // save the merged basis file
+//       SaveSV(basis_name, c);
 
-      delete basis_generator;
-      delete rom_options;
-   }  // for (int c = 0; c < num_basis_sets; c++)
-}
+//       delete basis_generator;
+//       delete rom_options;
+//    }  // for (int c = 0; c < num_basis_sets; c++)
+// }
 
 void ROMHandler::LoadReducedBasis()
 {
@@ -481,33 +481,33 @@ void ROMHandler::GetBasisTags(std::vector<std::string> &basis_tags)
       basis_tags[m] = GetBasisTag(m);
 }
 
-void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
-{
-   if (!save_sv) return;
-   assert(basis_generator != NULL);
+// void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
+// {
+//    if (!save_sv) return;
+//    assert(basis_generator != NULL);
 
-   const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
-   printf("Singular values: ");
-   for (int d = 0; d < rom_sv->dim(); d++)
-      printf("%.3E\t", rom_sv->item(d));
-   printf("\n");
+//    const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+//    printf("Singular values: ");
+//    for (int d = 0; d < rom_sv->dim(); d++)
+//       printf("%.3E\t", rom_sv->item(d));
+//    printf("\n");
 
-   double coverage = 0.0;
-   double total = 0.0;
+//    double coverage = 0.0;
+//    double total = 0.0;
 
-   for (int d = 0; d < rom_sv->dim(); d++)
-   {
-      if (d == num_basis[basis_idx]) coverage = total;
-      total += rom_sv->item(d);
-   }
-   if (rom_sv->dim() == num_basis[basis_idx]) coverage = total;
-   coverage /= total;
-   printf("Coverage: %.7f%%\n", coverage * 100.0);
+//    for (int d = 0; d < rom_sv->dim(); d++)
+//    {
+//       if (d == num_basis[basis_idx]) coverage = total;
+//       total += rom_sv->item(d);
+//    }
+//    if (rom_sv->dim() == num_basis[basis_idx]) coverage = total;
+//    coverage /= total;
+//    printf("Coverage: %.7f%%\n", coverage * 100.0);
 
-   // TODO: hdf5 format + parallel case.
-   std::string filename = prefix + "_sv.txt";
-   CAROM::PrintVector(*rom_sv, filename);
-}
+//    // TODO: hdf5 format + parallel case.
+//    std::string filename = prefix + "_sv.txt";
+//    CAROM::PrintVector(*rom_sv, filename);
+// }
 
 /*
    MFEMROMHandler

@@ -124,7 +124,7 @@ public:
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
 
-   virtual void FormReducedBasis();
+   // virtual void FormReducedBasis();
    virtual void LoadReducedBasis();
 
    int GetBasisIndexForSubdomain(const int &subdomain_index);
@@ -158,7 +158,7 @@ public:
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
-   virtual void SaveSV(const std::string& prefix, const int& basis_idx);
+   // virtual void SaveSV(const std::string& prefix, const int& basis_idx);
    virtual void SaveReducedSolution(const std::string &filename)
    { CAROM::PrintVector(*reduced_sol, filename); }
    virtual void SaveReducedRHS(const std::string &filename)
