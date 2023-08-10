@@ -25,6 +25,7 @@ MultiBlockSolver* InitSolver();
 SampleGenerator* InitSampleGenerator(MPI_Comm comm);
 void GenerateSamples(MPI_Comm comm);
 void BuildROM(MPI_Comm comm);
+void TrainROM(MPI_Comm comm);
 // return relative error if comparing solution.
 double SingleRun();
 

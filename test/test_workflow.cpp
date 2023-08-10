@@ -18,9 +18,14 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
 TEST(Poisson_Workflow, BaseIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -42,12 +47,13 @@ TEST(Poisson_Workflow, BaseUniversalTest)
    config.dict_["single_run"]["poisson0"]["k"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -69,9 +75,14 @@ TEST(Poisson_Workflow, MFEMIndividualTest)
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -99,9 +110,7 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    config.dict_["single_run"]["poisson0"]["k"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -110,6 +119,9 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -134,6 +146,9 @@ TEST(Poisson_Workflow, ComponentWiseTest)
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
 
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
    printf("\nBuild ROM \n\n");
 
    config.dict_["mesh"]["type"] = "component-wise";
@@ -153,9 +168,14 @@ TEST(Poisson_Workflow, ComponentWiseTest)
 TEST(Stokes_Workflow, BaseIndividualTest)
 {
    config = InputParser("inputs/stokes.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -177,9 +197,7 @@ TEST(Stokes_Workflow, BaseUniversalTest)
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -188,6 +206,9 @@ TEST(Stokes_Workflow, BaseUniversalTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -206,6 +227,8 @@ TEST(Stokes_Workflow, BaseUniversalTest)
 TEST(Stokes_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/stokes.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
@@ -213,6 +236,9 @@ TEST(Stokes_Workflow, MFEMIndividualTest)
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -240,9 +266,7 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   Array<int> num_basis(1);
-   num_basis = 4;
-   config.dict_["model_reduction"]["number_of_basis"] = num_basis;
+   config.dict_["basis"]["number_of_basis"] = 4;
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -251,6 +275,9 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
@@ -274,6 +301,9 @@ TEST(Stokes_Workflow, ComponentWiseTest)
    
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
 
    printf("\nBuild ROM \n\n");
 

@@ -63,6 +63,28 @@ struct convert<Vector> {
    }
 }; // struct convert<Vector>
 
+template<>
+struct convert<std::vector<std::string>> {
+   static Node encode(const std::vector<std::string>& rhs) {
+      Node node;
+      for (int k = 0; k < rhs.size(); k++)
+         node.push_back(rhs[k]);
+      return node;
+   }
+
+   static bool decode(const Node& node, std::vector<std::string>& rhs) {
+      if(!node.IsSequence()) {
+         return false;
+      }
+
+      rhs.resize(node.size());
+      for (int k = 0; k < node.size(); k++)
+         rhs[k] = node[k].as<std::string>();
+
+      return true;
+   }
+}; // struct convert<std::vector<std::string>>
+
 }
 
 class InputParser

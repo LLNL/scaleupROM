@@ -56,6 +56,10 @@ SampleGenerator::SampleGenerator(MPI_Comm comm)
    // Initially no snapshot generator.
    snapshot_generators.SetSize(0);
    snapshot_options.SetSize(0);
+
+   // BasisGenerator options.
+   update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
+   save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
 }
 
 SampleGenerator::~SampleGenerator()
@@ -173,7 +177,7 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::st
       if (!basis_tag2idx.count(snapshot_basis_tags[s]))
       {
          const int fom_vdofs = U_snapshots->BlockSize(s);
-         AddSnapshotGenerator(fom_vdofs, snapshot_basis_tags[s]);
+         AddSnapshotGenerator(fom_vdofs, GetSamplePrefix(), snapshot_basis_tags[s]);
       }
 
       int index = basis_tag2idx[snapshot_basis_tags[s]];
@@ -182,10 +186,9 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::st
    }
 }
 
-void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &basis_tag)
+void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag)
 {
-   const std::string prefix = sample_dir + "/" + sample_prefix + "_sample";
-   const std::string filename = prefix + "_" + basis_tag;
+   const std::string filename = GetBaseFilename(prefix, basis_tag);
 
    snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
    snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename));
@@ -220,4 +223,60 @@ void SampleGenerator::ReportStatus(const int &sample_idx)
    for (int k = 0; k < basis_tags.size(); k++)
       printf("%20.20s\t%d\n", basis_tags[k].c_str(), snapshot_generators[k]->getNumSamples());
    printf("==============================================\n");
+}
+
+void SampleGenerator::FormReducedBasis(const std::string &basis_prefix,
+                                       const std::string &basis_tag,
+                                       const std::vector<std::string> &file_list,
+                                       const int &num_basis)
+{
+   // Get dimension from the first snapshot file.
+   const int fom_num_vdof = GetDimFromSnapshots(file_list[0]);
+
+   std::string basis_name = GetBaseFilename(basis_prefix, basis_tag);
+
+   // Append snapshot generator.
+   AddSnapshotGenerator(fom_num_vdof, basis_prefix, basis_tag);
+   CAROM::BasisGenerator *basis_generator = snapshot_generators.Last();
+
+   for (int s = 0; s < file_list.size(); s++)
+      basis_generator->loadSamples(file_list[s], "snapshot");
+
+   basis_generator->endSamples(); // save the merged basis file
+   SaveSV(basis_generator, basis_name, num_basis);
+}
+
+const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
+{
+   CAROM::BasisReader d_basis_reader(filename);
+   // time is currently always 0.0
+   return d_basis_reader.getDim("snapshot", 0.0);
+}
+
+void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int& num_basis)
+{
+   if (!save_sv) return;
+   assert(basis_generator != NULL);
+
+   const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+   printf("Singular values: ");
+   for (int d = 0; d < rom_sv->dim(); d++)
+      printf("%.3E\t", rom_sv->item(d));
+   printf("\n");
+
+   double coverage = 0.0;
+   double total = 0.0;
+
+   for (int d = 0; d < rom_sv->dim(); d++)
+   {
+      if (d == num_basis) coverage = total;
+      total += rom_sv->item(d);
+   }
+   if (rom_sv->dim() == num_basis) coverage = total;
+   coverage /= total;
+   printf("Coverage: %.7f%%\n", coverage * 100.0);
+
+   // TODO: hdf5 format + parallel case.
+   std::string filename = prefix + "_sv.txt";
+   CAROM::PrintVector(*rom_sv, filename);
 }

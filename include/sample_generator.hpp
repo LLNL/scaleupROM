@@ -44,7 +44,8 @@ protected:
 
    // snapshot generators: purely for saving snapshots. will not execute svd.
    int max_num_snapshots = 100;
-   const bool update_right_SV = false;
+   bool save_sv = false;
+   bool update_right_SV = false;
    const bool incremental = false;
    Array<CAROM::Options*> snapshot_options;
    Array<CAROM::BasisGenerator*> snapshot_generators;
@@ -63,6 +64,10 @@ public:
    const int GetProcRank() { return proc_rank; }
    const int GetFileOffset() { return file_offset; }
    Parameter* GetParam(const int &k) { return params[k]; }
+   const std::string GetSamplePrefix()
+   { return sample_dir + "/" + sample_prefix + "_sample"; }
+   const std::string GetBaseFilename(const std::string &prefix, const std::string &basis_tag)
+   { return prefix + "_" + basis_tag; }
 
    // Generate parameter space as listed in sample_generation/problem_name.
    virtual void SetParamSpaceSizes();
@@ -83,10 +88,20 @@ public:
    const std::string GetSamplePath(const int& idx, const std::string &prefix = "");
 
    void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags);
-   void AddSnapshotGenerator(const int &fom_vdofs, const std::string &basis_tag);
+   void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag);
    void WriteSnapshots();
 
    void ReportStatus(const int &sample_idx);
+
+   void FormReducedBasis(const std::string &basis_prefix,
+                         const std::string &basis_tag,
+                         const std::vector<std::string> &file_list,
+                         const int &num_basis);
+
+private:
+   const int GetDimFromSnapshots(const std::string &filename);
+   void SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int &num_basis);
+
 };
 
 #endif

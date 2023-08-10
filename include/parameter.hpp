@@ -57,8 +57,8 @@ public:
 class FilenameParam : public Parameter
 {
 protected:
-   int minval = -1.;
-   int maxval = -1.;
+   int minval = -1;
+   int maxval = -1;
    std::string format = "";
 
 public:
@@ -67,6 +67,9 @@ public:
 
    virtual void SetParam(const int &param_index, InputParser &parser);
    virtual void SetRandomParam(InputParser &parser);
+
+   virtual const std::string GetFilename(const int &param_index);
+   virtual void SetMaximumSize() { SetSize(maxval - minval); }
 };
 
 #endif
