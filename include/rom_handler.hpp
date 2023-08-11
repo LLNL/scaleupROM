@@ -22,15 +22,6 @@
 namespace mfem
 {
 
-enum ROMHandlerMode
-{
-   SAMPLE_GENERATION,
-   TRAIN_ROM,
-   BUILD_ROM,
-   SINGLE_RUN,
-   NUM_HANDLERMODE
-};
-
 enum TrainMode
 {
    INDIVIDUAL,
@@ -70,7 +61,6 @@ protected:
    bool component_sampling = false;
    bool save_lspg_basis = false;
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
-   ROMHandlerMode mode = NUM_HANDLERMODE;
    TrainMode train_mode = NUM_TRAINMODE;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
@@ -114,7 +104,6 @@ public:
 
    // access
    const int GetNumSubdomains() { return numSub; }
-   const ROMHandlerMode GetMode() { return mode; }
    const TrainMode GetTrainMode() { return train_mode; }
    const int GetNumBasisSets() { return num_basis_sets; }
    const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }

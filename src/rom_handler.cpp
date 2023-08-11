@@ -56,36 +56,6 @@ void ROMHandler::ParseInputs()
    assert(numSub > 0);
    assert(topol_handler != NULL);
 
-   std::string mode_str = config.GetOption<std::string>("main/mode", "");
-   if (mode_str == "single_run")
-   {
-      mode = ROMHandlerMode::SINGLE_RUN;
-   }
-   else if (mode_str == "sample_generation")
-   {
-      mode = ROMHandlerMode::SAMPLE_GENERATION;
-   }
-   else if (mode_str == "train_rom")
-   {
-      mode = ROMHandlerMode::TRAIN_ROM;
-   }
-   else if (mode_str == "build_rom")
-   {
-      mode = ROMHandlerMode::BUILD_ROM;
-   }
-   else
-   {
-      mfem_error("Unknown main mode!\n");
-   }
-
-   if ((mode == ROMHandlerMode::SAMPLE_GENERATION) || (mode == ROMHandlerMode::TRAIN_ROM) || (mode == ROMHandlerMode::BUILD_ROM))
-   {
-      sample_dir = config.GetOption<std::string>("sample_generation/file_path/directory", ".");
-      sample_prefix = config.GetOption<std::string>("sample_generation/file_path/prefix", "");
-      if (sample_prefix == "")
-         sample_prefix = config.GetRequiredOption<std::string>("parameterized_problem/name");
-   }
-
    basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
@@ -128,31 +98,31 @@ void ROMHandler::ParseInputs()
    
    const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
    num_basis.SetSize(num_basis_sets);
-   num_basis = -1;
+   num_basis = num_basis_default;
    assert(num_basis.Size() > 0);
 
    YAML::Node basis_list = config.FindNode("basis/tags");
    if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
 
-   for (int p = 0; p < basis_list.size(); p++)
+   for (int c = 0; c < num_basis_sets; c++)
    {
-      std::string basis_tag = config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]);
-      const int nb = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[p]);
-      assert(nb > 0);
+      std::string basis_tag = GetBasisTagForComponent(c);
 
-      int idx = -1;
-      for (int c = 0; c < num_basis_sets; c++)
-      {
-         if (basis_tag == GetBasisTagForComponent(c))
+      // Not so sure we need to explicitly list out all the needed basis tags here.
+      for (int p = 0; p < basis_list.size(); p++)
+         if (basis_tag == config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]))
          {
-            idx = c;
+            const int nb = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[p]);
+            num_basis[c] = nb;
             break;
          }
+      
+      if (num_basis[c] < 0)
+      {
+         printf("Cannot find the number of basis for %s!\n", basis_tag.c_str());
+         mfem_error("Or specify the default number of basis!\n");
       }
-      assert((idx >= 0) && (idx < num_basis_sets));
-
-      num_basis[idx] = nb;
-   }  // for (int p = 0; p < basis_list.size(); p++)
+   }
    
    for (int k = 0; k < num_basis.Size(); k++)
       assert(num_basis[k] > 0);
