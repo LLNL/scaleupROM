@@ -100,7 +100,7 @@ public:
 public:
    InputParser() {};
 
-   InputParser(const std::string &input_file);
+   InputParser(const std::string &input_file, const std::string forced_input="");
 
    template<class T>
    const T GetRequiredOptionFromDict(const std::string &keys, YAML::Node input_dict)
@@ -149,6 +149,9 @@ public:
    template<class T>
    void SetOption(const std::string &keys, const T &value)
    { SetOptionInDict<T>(keys, value, dict_); }
+
+private:
+   void OverwriteOption(const std::string &forced_input);
 
 };
 

@@ -12,43 +12,45 @@
 // Implementation of Bilinear Form Integrators
 
 #include "input_parser.hpp"
+#include <stdlib.h>
 
-InputParser::InputParser(const std::string &input_file)
+InputParser::InputParser(const std::string &input_file, const std::string forced_input)
 {
    file_ = input_file;
 
    int flag = 0;
    MPI_Initialized(&flag);
-   if (flag)
+   if (flag)   // parallel case
    {
       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+      std::stringstream buffer;
+      std::string ss;
+      if (rank == 0)
+      {
+         std::ifstream file(input_file);
+         buffer << file.rdbuf();
+      }
+
+      int bufferSize = buffer.str().size();
+      MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+      if (rank == 0)
+         ss = buffer.str();
+      else
+         ss.resize(bufferSize);
+
+      MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, MPI_COMM_WORLD);
+
+      dict_ = YAML::Load(ss);
    }
-   else
+   else   // serial case
    {
       rank = 0;
       dict_ = YAML::LoadFile(input_file.c_str());
-      return;
    }
 
-   std::stringstream buffer;
-   std::string ss;
-   if (rank == 0)
-   {
-      std::ifstream file(input_file);
-      buffer << file.rdbuf();
-   }
-
-   int bufferSize = buffer.str().size();
-   MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-   if (rank == 0)
-      ss = buffer.str();
-   else
-      ss.resize(bufferSize);
-
-   MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, MPI_COMM_WORLD);
-
-   dict_ = YAML::Load(ss);
+   OverwriteOption(forced_input);
 
    return;
 }
@@ -76,6 +78,32 @@ YAML::Node InputParser::FindNodeFromDict(const std::string &keys, YAML::Node inp
       nodes.push_back(nodes.back()[s]);
    }
    return nodes.back();
+}
+
+void InputParser::OverwriteOption(const std::string &forced_input)
+{
+   std::stringstream ss(forced_input);
+   std::string kv, key, val, dummy;
+   bool success = false;
+
+   while (std::getline(ss, kv, ':'))
+   {
+      std::stringstream kvss(kv);
+      success = true;
+      success = success && (std::getline(kvss, key, '='));
+      success = success && (std::getline(kvss, val, '='));
+      success = success && (!std::getline(kvss, dummy, '='));
+      if (!success)
+      {
+         if (rank == 0)
+         {
+            std::string msg = kv + " is not a valid key=value pair!\n";
+            printf("%s", msg.c_str());
+         }
+         exit(-1);
+      }
+      SetOption(key, YAML::Load(val));
+   }
 }
 
 // template int InputParser::GetRequiredOption<int>(const std::string&);
