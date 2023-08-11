@@ -31,7 +31,7 @@ TEST(Poisson_Workflow, BaseIndividualTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -59,7 +59,7 @@ TEST(Poisson_Workflow, BaseUniversalTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -88,7 +88,7 @@ TEST(Poisson_Workflow, MFEMIndividualTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -128,7 +128,7 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
 
    config.dict_["save_solution"]["enabled"] = false;
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -156,7 +156,7 @@ TEST(Poisson_Workflow, ComponentWiseTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -181,7 +181,7 @@ TEST(Stokes_Workflow, BaseIndividualTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -215,7 +215,7 @@ TEST(Stokes_Workflow, BaseUniversalTest)
 
    config.dict_["save_solution"]["enabled"] = false;
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -244,7 +244,7 @@ TEST(Stokes_Workflow, MFEMIndividualTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -284,7 +284,7 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
 
    config.dict_["save_solution"]["enabled"] = false;
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -311,7 +311,7 @@ TEST(Stokes_Workflow, ComponentWiseTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);

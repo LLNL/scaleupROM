@@ -18,6 +18,7 @@ using namespace mfem;
 using namespace std;
 
 double UniformRandom();
+int UniformRandom(const int &min, const int &max);
 
 template <typename T>
 inline void DeletePointers(Array<T*> &ptr_array)

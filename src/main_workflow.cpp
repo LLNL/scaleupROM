@@ -15,6 +15,7 @@
 #include "multiblock_solver.hpp"
 #include "poisson_solver.hpp"
 #include "stokes_solver.hpp"
+#include "etc.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -254,8 +255,18 @@ void BuildROM(MPI_Comm comm)
    delete problem;
 }
 
-double SingleRun(const std::string output_file)
+double SingleRun(MPI_Comm comm, const std::string output_file)
 {
+   if (config.GetOption<bool>("single_run/choose_from_random_sample", false))
+   {
+      RandomSampleGenerator *generator = new RandomSampleGenerator(comm);
+      generator->SetParamSpaceSizes();
+      int idx = UniformRandom(0, generator->GetTotalSampleSize()-1);
+      // NOTE: this will change config.dict_
+      generator->SetSampleParams(idx);
+      delete generator;
+   }
+
    ParameterizedProblem *problem = InitParameterizedProblem();
    MultiBlockSolver *test = InitSolver();
    test->InitVariables();

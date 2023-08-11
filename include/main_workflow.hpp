@@ -27,6 +27,6 @@ void GenerateSamples(MPI_Comm comm);
 void BuildROM(MPI_Comm comm);
 void TrainROM(MPI_Comm comm);
 // return relative error if comparing solution.
-double SingleRun(const std::string output_file = "");
+double SingleRun(MPI_Comm comm, const std::string output_file = "");
 
 #endif

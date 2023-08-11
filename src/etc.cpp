@@ -26,6 +26,12 @@ double UniformRandom()
    return dis(gen);
 }
 
+int UniformRandom(const int &min, const int &max)
+{
+   std::uniform_int_distribution<int> dis_int(min, max);
+   return dis_int(gen);
+}
+
 bool FileExists(const std::string& name)
 {
    std::ifstream f(name.c_str());

@@ -35,7 +35,7 @@ TEST(ComponentWiseTest, PoissonTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -63,7 +63,7 @@ TEST(ComponentWiseTest, StokesTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
@@ -92,7 +92,7 @@ TEST(MultiComponentGlobalROM, StokesTest)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun();
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
