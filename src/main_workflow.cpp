@@ -254,7 +254,7 @@ void BuildROM(MPI_Comm comm)
    delete problem;
 }
 
-double SingleRun()
+double SingleRun(const std::string output_file)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
    MultiBlockSolver *test = InitSolver();
@@ -271,6 +271,9 @@ double SingleRun()
    test->BuildRHSOperators();
    test->SetupRHSBCOperators();
    test->AssembleRHS();
+
+   double rom_assemble = -1.0, rom_solve = -1.0;
+   double fom_assemble = -1.0, fom_solve = -1.0;
 
    solveTimer.Start();
    if (test->UseRom())
@@ -363,6 +366,8 @@ double SingleRun()
    solveTimer.Stop();
    printf("%s-assemble time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
+   if (test->UseRom()) rom_assemble = solveTimer.RealTime();
+
    solveTimer.Clear();
    solveTimer.Start();
    if (test->UseRom())
@@ -376,6 +381,8 @@ double SingleRun()
    }
    solveTimer.Stop();
    printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
+
+   if (test->UseRom()) rom_solve = solveTimer.RealTime();
 
    double error = -1.0;
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
@@ -399,15 +406,34 @@ double SingleRun()
          test->AssembleOperator();
          solveTimer.Stop();
          printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+         fom_assemble = solveTimer.RealTime();
 
          solveTimer.Clear();
          solveTimer.Start();
          test->Solve();
          solveTimer.Stop();
          printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+         fom_solve = solveTimer.RealTime();
       }
 
       error = test->CompareSolution(*romU);
+
+      if (output_file.length() > 0)
+      {
+         hid_t file_id;
+         herr_t errf = 0;
+         file_id = H5Fcreate(output_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+         assert(file_id >= 0);
+
+         hdf5_utils::WriteAttribute(file_id, "rom_assemble", rom_assemble);
+         hdf5_utils::WriteAttribute(file_id, "rom_solve", rom_solve);
+         hdf5_utils::WriteAttribute(file_id, "fom_assemble", fom_assemble);
+         hdf5_utils::WriteAttribute(file_id, "fom_solve", fom_solve);
+         hdf5_utils::WriteAttribute(file_id, "rel_error", error);
+
+         errf = H5Fclose(file_id);
+         assert(errf >= 0);
+      }
 
       bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
       if (save_reduced_sol)

@@ -101,6 +101,40 @@ TEST(YAML_test, LoopingOverKeys)
    return;
 }
 
+TEST(YAML_test, OverwriteOption)
+{
+   config = InputParser("inputs/test.parser.yml");
+
+   int int_input = config.GetRequiredOption<int>("overwrite/integer");
+   double double_input = config.GetRequiredOption<double>("overwrite/double");
+   Array<int> array_input = config.GetRequiredOption<Array<int>>("overwrite/array");
+   Array<int> array_orig({1, 3, 5});
+
+   EXPECT_EQ(int_input, -4);
+   EXPECT_EQ(double_input, 13.48);
+   EXPECT_EQ(array_input.Size(), array_orig.Size());
+   for (int k = 0; k < array_input.Size(); k++)
+      EXPECT_EQ(array_input[k], array_orig[k]);
+
+   std::string forced_input = "overwrite/integer=7:overwrite/double=3.14:overwrite/array=[2,4,6,8]:overwrite/string=successful";
+   config = InputParser("inputs/test.parser.yml", forced_input);
+
+   int int_changed = config.GetRequiredOption<int>("overwrite/integer");
+   double double_changed = config.GetRequiredOption<double>("overwrite/double");
+   Array<int> array_changed = config.GetRequiredOption<Array<int>>("overwrite/array");
+   std::string new_string = config.GetRequiredOption<std::string>("overwrite/string");
+
+   Array<int> array_forced({2, 4, 6, 8});
+   EXPECT_EQ(int_changed, 7);
+   EXPECT_EQ(double_changed, 3.14);
+   EXPECT_EQ(array_changed.Size(), array_forced.Size());
+   for (int k = 0; k < array_changed.Size(); k++)
+      EXPECT_EQ(array_changed[k], array_forced[k]);
+   EXPECT_EQ(new_string, "successful");
+
+   return;
+}
+
 // TODO: add more tests from sketches/yaml_example.cpp.
 
 int main(int argc, char* argv[])

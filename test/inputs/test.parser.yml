@@ -1,1 +1,6 @@
 codename: scaleupROM
+
+overwrite:
+  integer: -4
+  double: 13.48
+  array: [1,3,5]
