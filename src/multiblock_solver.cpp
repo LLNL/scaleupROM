@@ -905,7 +905,7 @@ double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Ar
       for (int v = 0; v < num_var; v++, idx++)
       {
          assert(fom_sols[idx] && rom_sols[idx]);
-         double var_norm, var_error;
+         double var_norm = 0.0, var_error = 0.0;
          ComputeSubdomainErrorAndNorm(fom_sols[idx], rom_sols[idx], var_error, var_norm);
          norm[v] += var_norm * var_norm;
          error[v] += var_error * var_error;

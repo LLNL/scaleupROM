@@ -275,11 +275,17 @@ double SingleRun(const std::string output_file)
    double rom_assemble = -1.0, rom_solve = -1.0;
    double fom_assemble = -1.0, fom_solve = -1.0;
 
+   ROMHandler *rom = NULL;
+   if (test->UseRom())
+   {
+      rom = test->GetROMHandler();
+      rom->LoadReducedBasis();
+   }
+
    solveTimer.Start();
    if (test->UseRom())
    {
       printf("ROM with ");
-      ROMHandler *rom = test->GetROMHandler();
       ROMBuildingLevel save_operator = rom->SaveOperator();
       TopologyHandlerMode topol_mode = test->GetTopologyMode();
       switch (topol_mode)
