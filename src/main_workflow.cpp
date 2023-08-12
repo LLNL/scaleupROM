@@ -285,6 +285,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
    double rom_assemble = -1.0, rom_solve = -1.0;
    double fom_assemble = -1.0, fom_solve = -1.0;
+   double error = -1.0;
 
    ROMHandler *rom = NULL;
    if (test->UseRom())
@@ -383,7 +384,10 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    solveTimer.Stop();
    printf("%s-assemble time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
-   if (test->UseRom()) rom_assemble = solveTimer.RealTime();
+   if (test->UseRom())
+      rom_assemble = solveTimer.RealTime();
+   else
+      fom_assemble = solveTimer.RealTime();
 
    solveTimer.Clear();
    solveTimer.Start();
@@ -399,9 +403,11 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    solveTimer.Stop();
    printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
-   if (test->UseRom()) rom_solve = solveTimer.RealTime();
+   if (test->UseRom())
+      rom_solve = solveTimer.RealTime();
+   else
+      fom_solve = solveTimer.RealTime();
 
-   double error = -1.0;
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
    bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
    if (test->UseRom() && compare_sol)
@@ -435,23 +441,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
       error = test->CompareSolution(*romU);
 
-      if (output_file.length() > 0)
-      {
-         hid_t file_id;
-         herr_t errf = 0;
-         file_id = H5Fcreate(output_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-         assert(file_id >= 0);
-
-         hdf5_utils::WriteAttribute(file_id, "rom_assemble", rom_assemble);
-         hdf5_utils::WriteAttribute(file_id, "rom_solve", rom_solve);
-         hdf5_utils::WriteAttribute(file_id, "fom_assemble", fom_assemble);
-         hdf5_utils::WriteAttribute(file_id, "fom_solve", fom_solve);
-         hdf5_utils::WriteAttribute(file_id, "rel_error", error);
-
-         errf = H5Fclose(file_id);
-         assert(errf >= 0);
-      }
-
       bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
       if (save_reduced_sol)
       {
@@ -467,6 +456,24 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       test->CopySolution(romU);
 
       delete romU;
+   }
+
+   // save results to output file.
+   if (output_file.length() > 0)
+   {
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(output_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hdf5_utils::WriteAttribute(file_id, "rom_assemble", rom_assemble);
+      hdf5_utils::WriteAttribute(file_id, "rom_solve", rom_solve);
+      hdf5_utils::WriteAttribute(file_id, "fom_assemble", fom_assemble);
+      hdf5_utils::WriteAttribute(file_id, "fom_solve", fom_solve);
+      hdf5_utils::WriteAttribute(file_id, "rel_error", error);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
    }
 
    // Save solution and visualization.
