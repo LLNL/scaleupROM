@@ -70,7 +70,7 @@ double rhs(const Vector &x)
 namespace poisson_spiral
 {
 
-double L, Lw, k;
+double L, Lw, k, s;
 
 double rhs(const Vector &x)
 {
@@ -82,7 +82,7 @@ double rhs(const Vector &x)
    if (theta < 0.0) theta += 2.0 * pi; // in [0, 2*pi]
 
    // r = theta * 0.6 * L / (2.0 * pi * N);
-   const double slope = 0.6 * L / (2.0 * pi * N);
+   const double slope = s * L / (2.0 * pi * N);
    double tmp = r - slope * (theta - 2.0 * pi);
    double dist = abs(tmp);
    for (int n = 0; n < N; n++)
@@ -365,7 +365,7 @@ void PoissonComponent::SetParams(const Array<int> &indexes, const Vector &values
 PoissonSpiral::PoissonSpiral()
    : PoissonProblem()
 {
-   param_num = 3;
+   param_num = 4;
    battr = -1;
    bdr_type = PoissonProblem::ZERO;
 
@@ -377,15 +377,18 @@ PoissonSpiral::PoissonSpiral()
    function_factory::poisson_spiral::L = 1.0;
    function_factory::poisson_spiral::Lw = 0.2;
    function_factory::poisson_spiral::k = 1.0;
+   function_factory::poisson_spiral::s = 0.6;
 
    param_map["L"] = 0;
    param_map["Lw"] = 1;
    param_map["k"] = 2;
+   param_map["s"] = 3;
 
    param_ptr.SetSize(param_num);
    param_ptr[0] = &(function_factory::poisson_spiral::L);
    param_ptr[1] = &(function_factory::poisson_spiral::Lw);
    param_ptr[2] = &(function_factory::poisson_spiral::k);
+   param_ptr[3] = &(function_factory::poisson_spiral::s);
 }
 
 /*
