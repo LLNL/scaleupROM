@@ -629,7 +629,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
       parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
       K = parRomMat;
    }
-   else if (prec_str == "gs")
+   else if ((prec_str == "gs") || (prec_str == "none"))
       K = romMat_mono;
    else
       K = romMat;
