@@ -175,9 +175,11 @@ StokesSolver *SolveWithRefinement(const int num_refinement)
 
    test->AddBCFunction(uFun_ex);
    test->AddRHSFunction(fFun);
-   Array<bool> nz_dbcs(test->GetNumBdr());
-   nz_dbcs = true;
-   test->SetComplementaryFlux(nz_dbcs);
+   // NOTE(kevin): uFun_ex already satisfies zero divergence.
+   //              no need to set complementary flux.
+   // Array<bool> nz_dbcs(test->GetNumBdr());
+   // nz_dbcs = true;
+   // test->SetComplementaryFlux(nz_dbcs);
 
    test->BuildOperators();
 
