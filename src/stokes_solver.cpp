@@ -47,7 +47,6 @@ StokesSolver::StokesSolver()
    {
       fec[0] = new DG_FECollection(uorder, dim);
       fec[1] = new DG_FECollection(porder, dim);
-      mfem_error("StokesSolver currently cannot support full DG scheme!\n");
    }
    else
    {
@@ -317,10 +316,10 @@ void StokesSolver::SetupRHSBCOperators()
          // TODO: Non-homogeneous Neumann stress bc
          // fs[m]->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(*sn_coeffs[b]), p_ess_attr);
 
-         // TODO: develop full-dg compatiable integrator.
-         // Currently full-dg is not possible due to this operator.
-         // gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
-         gs[m]->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
+         if (full_dg)
+            gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
+         else
+            gs[m]->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(*ud_coeffs[b]), *bdr_markers[b]);
       }
    }
 }

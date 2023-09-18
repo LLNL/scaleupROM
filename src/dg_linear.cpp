@@ -217,7 +217,7 @@ void DGBoundaryNormalLFIntegrator::AssembleRHSElementVect(
    if (ir == NULL)
    {
       int intorder = 2 * el.GetOrder();  // <----------
-      ir = &IntRules.Get(el.GetGeomType(), intorder);
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
    }
 
    for (int i = 0; i < ir->GetNPoints(); i++)
