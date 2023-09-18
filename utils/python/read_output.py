@@ -11,6 +11,8 @@ parser.add_argument('file_format', metavar='string', type=str,
 parser.add_argument('nsample', metavar='integer', type=int,
                     help='number of samples\n')
 parser.add_argument('--dir-indexes', nargs='+', type=int)
+parser.add_argument('--append', action='store_true',
+                    help='append the existing files if specified.')
 
 def collectResults(format_, nSample, attrs):
     filenames = [format_ % k for k in range(nSample)]
@@ -26,9 +28,10 @@ def collectResults(format_, nSample, attrs):
 
     stats = []
 
+    cfd_level = 0.95
     med = int(nSample * 0.5)
-    stdp = int(nSample * (0.5 + 0.34))
-    stdm = int(nSample * (0.5 - 0.34))
+    stdp = int(nSample * (0.5 + 0.5 * cfd_level))
+    stdm = int(nSample * (0.5 - 0.5 * cfd_level))
     for a, attr in enumerate(attrs):
         stats += [[results[a, med],
                    results[a, 0],
@@ -40,8 +43,8 @@ def collectResults(format_, nSample, attrs):
         print("median: %.5E" % stats[-1][0])
         print("minimum: %.5E" % stats[-1][1])
         print("maxinum: %.5E" % stats[-1][2])
-        print("-1std: %.5E" % stats[-1][3])
-        print("+1std: %.5E" % stats[-1][4])
+        print("-2std: %.5E" % stats[-1][3])
+        print("+2std: %.5E" % stats[-1][4])
         print("================================")
     
     return stats
@@ -63,5 +66,7 @@ if __name__ == "__main__":
         for a, attr in enumerate(attrs):
             attr_stats[a] += [[size] + stats[a]]
 
+    mode = 'a' if (args.append) else 'w'
     for a, attr in enumerate(attrs):
-        np.savetxt('%s.txt' % attr, np.array(attr_stats[a]), fmt='%.5E')
+        with open('%s.txt' % attr, mode) as f:
+            np.savetxt(f, np.array(attr_stats[a]), fmt='%.5E')
