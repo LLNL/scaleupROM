@@ -326,15 +326,23 @@ int main(int argc, char *argv[])
    pMass.Finalize();
    pMass.FormSystemMatrix(p_ess_tdof, Ph);
    SparseMatrix &pM(pMass.SpMat());
-   HYPRE_BigInt glob_size_p = pM.NumRows();
-   HYPRE_BigInt row_starts_p[2] = {0, pM.NumRows()};
-   HypreParMatrix pMop(MPI_COMM_WORLD, glob_size_p, row_starts_p, &pM);
-   HypreBoomerAMG p_prec(pMop);
-   p_prec.SetPrintLevel(0);
+   // HYPRE_BigInt glob_size_p = pM.NumRows();
+   // HYPRE_BigInt row_starts_p[2] = {0, pM.NumRows()};
+   // HypreParMatrix pMop(MPI_COMM_WORLD, glob_size_p, row_starts_p, &pM);
+   // HypreBoomerAMG p_prec(pMop);
+   // p_prec.SetPrintLevel(0);
+   GSSmoother p_prec(pM);
+
+   OrthoSolver *ortho_p_prec = new OrthoSolver;
+   ortho_p_prec->SetSolver(p_prec);
+   ortho_p_prec->SetOperator(pM);
 
    BlockDiagonalPreconditioner systemPrec(vblock_offsets);
    systemPrec.SetDiagonalBlock(0, &A_prec);
-   systemPrec.SetDiagonalBlock(1, &p_prec);
+   if (pres_dbc)
+      systemPrec.SetDiagonalBlock(1, &p_prec);
+   else
+      systemPrec.SetDiagonalBlock(1, ortho_p_prec);
 
 {
    // SparseMatrix *spMat = systemOp.CreateMonolithic();
@@ -349,7 +357,7 @@ int main(int argc, char *argv[])
    //    umax = max(umax, abs(u[k]));
    // printf("umax before solve: %.5E\n", umax);
 
-   assert(pres_dbc);
+   // assert(pres_dbc);
    int maxIter(10000);
    double rtol(1.e-15);
    double atol(1.e-15);
