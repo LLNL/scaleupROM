@@ -111,6 +111,11 @@ protected:
    Array<BilinearForm *> ms;
    Array<MixedBilinearFormDGExtension *> bs;
 
+   // for pressure mass matrix preconditioner.
+   Array<BilinearForm *> pms;
+   BlockMatrix *pmMat = NULL;
+   SparseMatrix *pM = NULL;
+
    // rhs coefficients
    // The solution dimension is 1 by default, for which using VectorCoefficient is not allowed. (in LinearForm Assemble.)
    // For a derived class for vector solution, this is the first one needs to be changed to Array<VectorCoefficient*>.
@@ -175,6 +180,7 @@ public:
    virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
    virtual void Solve();
+   virtual void Solve_obsolete();
 
    virtual void ProjectOperatorOnReducedBasis();
 

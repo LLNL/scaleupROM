@@ -50,6 +50,35 @@ double pFun_ex(const Vector & x);
 void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 double f_natural(const Vector & x);
+void dudx_ex(const Vector & x, Vector & y);
+
+double error(Operator &M, Vector &x, Vector &b)
+{
+   assert(x.Size() == b.Size());
+
+   Vector res(x.Size());
+   M.Mult(x, res);
+   res -= b;
+
+   double tmp = 0.0;
+   for (int k = 0; k < x.Size(); k++)
+      tmp = max(tmp, abs(res(k)));
+   return tmp;
+}
+
+double diff(Vector &a, Vector &b)
+{
+   assert(a.Size() == b.Size());
+
+   Vector res(a.Size());
+   res = a;
+   res -= b;
+
+   double tmp = 0.0;
+   for (int k = 0; k < a.Size(); k++)
+      tmp = max(tmp, abs(res(k)));
+   return tmp;
+}
 
 class SchurOperator : public Operator
 {
@@ -91,6 +120,11 @@ public:
 
 int main(int argc, char *argv[])
 {
+   int num_procs, rank;
+   MPI_Init(&argc, &argv);
+   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
    StopWatch chrono;
 
    // 1. Parse command-line options.
@@ -98,6 +132,7 @@ int main(int argc, char *argv[])
    int order = 1;
    int refine = 0;
    bool pa = false;
+   bool pres_dbc = false;
    const char *device_config = "cpu";
    bool visualization = 1;
 
@@ -108,6 +143,9 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
                   "Number of refinements.");
+   args.AddOption(&pres_dbc, "-pd", "--pressure-dirichlet",
+                  "-no-pd", "--no-pressure-dirichlet",
+                  "Use pressure Dirichlet condition.");
    args.Parse();
    if (!args.Good())
    {
@@ -171,8 +209,12 @@ int main(int argc, char *argv[])
    // If value is 1, then it is Dirichlet.
    u_ess_attr = 1;
    p_ess_attr = 0;
-   // u_ess_attr[1] = 0;
-   // p_ess_attr[1] = 1;
+   if (pres_dbc)
+   {
+      u_ess_attr[1] = 0;
+      p_ess_attr[1] = 1;
+   }
+
    Array<int> u_ess_tdof, p_ess_tdof, empty;
    ufes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
    pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
@@ -182,6 +224,7 @@ int main(int argc, char *argv[])
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
+   VectorFunctionCoefficient dudxcoeff(dim, dudx_ex);
    FunctionCoefficient gcoeff(gFun);
 
    VectorFunctionCoefficient ucoeff(dim, uFun_ex);
@@ -193,12 +236,12 @@ int main(int argc, char *argv[])
    //    allocated by x and rhs are passed as a reference to the grid functions
    //    (u,p) and the linear forms (fform, gform).
 //    MemoryType mt = device.GetMemoryType();
-   BlockVector x(block_offsets), rhs(block_offsets);
+   BlockVector x(vblock_offsets), rhs(vblock_offsets);
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
    GridFunction u, p;
    u.MakeRef(ufes, x.GetBlock(0), 0);
-   p.MakeRef(pfes, x.GetBlock(dim), 0);
+   p.MakeRef(pfes, x.GetBlock(1), 0);
 
    u = 0.0;
    u.ProjectBdrCoefficient(ucoeff, u_ess_attr);
@@ -211,12 +254,16 @@ int main(int argc, char *argv[])
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
-   // fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff));
+
+   // Currently, mfem does not have a way to impose general tensor bc.
+   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
+   fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
+
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
 
    LinearForm *gform(new LinearForm);
-   gform->Update(pfes, rhs.GetBlock(dim), 0);
+   gform->Update(pfes, rhs.GetBlock(1), 0);
    gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
@@ -248,17 +295,14 @@ int main(int argc, char *argv[])
 
    // A \ F2.
    SparseMatrix A;
-   OperatorHandle Bh;
+   OperatorHandle Bh, Ph;
    Vector U1, F1;
    Vector P1, G1;
    mVarf->FormLinearSystem(u_ess_tdof, u, *fform, A, U1, F1);
-   bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
 
-   BlockVector RHS1(vblock_offsets);
-   RHS1.GetBlock(0).MakeRef(F1, 0);
-   RHS1.GetBlock(1).MakeRef(G1, 1);
-
-   // Operator &B(*Bh);
+   // It turns out that we do not remove pressure dirichlet bc dofs from this matrix.
+   // bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
+   bVarf->FormRectangularLinearSystem(u_ess_tdof, empty, u, *gform, Bh, U1, G1);
    SparseMatrix &B(bVarf->SpMat());
    SparseMatrix *Bt = Transpose(B);
 
@@ -268,58 +312,55 @@ int main(int argc, char *argv[])
    systemOp.SetBlock(0,1, Bt);
    systemOp.SetBlock(1,0, &B);
 
-   SparseMatrix *sysMat = systemOp.CreateMonolithic();
-   PrintMatrix(*sysMat, "stokes.mat.txt");
-   PrintVector(RHS1, "stokes.rhs.txt");
+   // SparseMatrix &M(mVarf->SpMat());
+   HYPRE_BigInt glob_size = A.NumRows();
+   HYPRE_BigInt row_starts[2] = {0, A.NumRows()};
+   HypreParMatrix Aop(MPI_COMM_WORLD, glob_size, row_starts, &A);
+   HypreBoomerAMG A_prec(Aop);
+   A_prec.SetPrintLevel(0);
+   A_prec.SetSystemsOptions(dim, true);
 
-   exit(-1);
+   BilinearForm pMass(pfes);
+   pMass.AddDomainIntegrator(new MassIntegrator);
+   pMass.Assemble();
+   pMass.Finalize();
+   pMass.FormSystemMatrix(p_ess_tdof, Ph);
+   SparseMatrix &pM(pMass.SpMat());
+   // HYPRE_BigInt glob_size_p = pM.NumRows();
+   // HYPRE_BigInt row_starts_p[2] = {0, pM.NumRows()};
+   // HypreParMatrix pMop(MPI_COMM_WORLD, glob_size_p, row_starts_p, &pM);
+   // HypreBoomerAMG p_prec(pMop);
+   // p_prec.SetPrintLevel(0);
+   GSSmoother p_prec(pM);
 
-   // 10. Construct the operators for preconditioner
-   //
-   //                 P = [ diag(M)         0         ]
-   //                     [  0       B diag(M)^-1 B^T ]
-   //
-   //     Here we use Symmetric Gauss-Seidel to approximate the inverse of the
-   //     pressure Schur Complement
-   SparseMatrix *MinvBt = NULL;
-   Vector Md(mVarf->Height());
+   OrthoSolver *ortho_p_prec = new OrthoSolver;
+   ortho_p_prec->SetSolver(p_prec);
+   ortho_p_prec->SetOperator(pM);
 
    BlockDiagonalPreconditioner systemPrec(vblock_offsets);
-   Solver *invM, *invS;
-   OrthoSolver *orthoInvS;
-   SparseMatrix *S = NULL;
+   systemPrec.SetDiagonalBlock(0, &A_prec);
+   if (pres_dbc)
+      systemPrec.SetDiagonalBlock(1, &p_prec);
+   else
+      systemPrec.SetDiagonalBlock(1, ortho_p_prec);
 
-   SparseMatrix &M(mVarf->SpMat());
-   M.GetDiag(Md);
-   Md.HostReadWrite();
+{
+   // SparseMatrix *spMat = systemOp.CreateMonolithic();
+   // DenseMatrix *matInv = spMat->ToDenseMatrix();
+   // matInv->Invert();
+   // matInv->Mult(rhs, x);
 
-   MinvBt = Transpose(B);
+   // delete spMat, matInv;
 
-   for (int i = 0; i < Md.Size(); i++)
-   {
-      MinvBt->ScaleRow(i, 1./Md(i));
-   }
+   // double umax = 0.0;
+   // for (int k = 0; k < u.Size(); k++)
+   //    umax = max(umax, abs(u[k]));
+   // printf("umax before solve: %.5E\n", umax);
 
-   S = Mult(B, *MinvBt);
-
-   invM = new DSmoother(M);
-   invS = new GSSmoother(*S);
-
-   invM->iterative_mode = false;
-   invS->iterative_mode = false;
-
-   orthoInvS = new OrthoSolver;
-   orthoInvS->SetSolver(*invS);
-   orthoInvS->SetOperator(*S);
-
-   systemPrec.SetDiagonalBlock(0, invM);
-   systemPrec.SetDiagonalBlock(1, invS);
-
+   // assert(pres_dbc);
    int maxIter(10000);
-   double rtol(1.e-12);
-   double atol(1.e-12);
-   chrono.Clear();
-   chrono.Start();
+   double rtol(1.e-15);
+   double atol(1.e-15);
    MINRESSolver solver;
    solver.SetAbsTol(atol);
    solver.SetRelTol(rtol);
@@ -327,11 +368,30 @@ int main(int argc, char *argv[])
    solver.SetOperator(systemOp);
    solver.SetPreconditioner(systemPrec);
    solver.SetPrintLevel(1);
-   // x = 0.0;
-   solver.Mult(RHS1, x);
-   chrono.Stop();
+   solver.Mult(rhs, x);
 
-   // exit(-1);
+   // umax = 0.0;
+   // for (int k = 0; k < u.Size(); k++)
+   //    umax = max(umax, abs(u[k]));
+   // printf("umax after solve: %.5E\n", umax);
+}
+   // int maxIter(10000);
+   // double rtol(1.e-15);
+   // double atol(1.e-15);
+   // chrono.Clear();
+   // chrono.Start();
+   // // MINRESSolver solver;
+   // CGSolver solver;
+   // solver.SetAbsTol(atol);
+   // // solver.SetRelTol(rtol);
+   // solver.SetMaxIter(maxIter);
+   // solver.SetOperator(A);
+   // // solver.SetPreconditioner(darcyPrec);
+   // solver.SetPrintLevel(0);
+   // // x = 0.0;
+   // solver.Mult(F1, U1);
+   // // if (device.IsEnabled()) { x.HostRead(); }
+   // chrono.Stop();
 
    // // B * A^{-1} * F1 - G1
    // Vector R2(pfes->GetVSize());
@@ -346,13 +406,21 @@ int main(int argc, char *argv[])
    // solver2.SetAbsTol(rtol);
    // solver2.SetMaxIter(maxIter);
    // OrthoSolver ortho;
-   // ortho.SetSolver(solver2);
-   // ortho.SetOperator(schur);
+   // if (!pres_dbc)
+   // {
+   //    printf("Setting up OrthoSolver\n");
+   //    ortho.SetSolver(solver2);
+   //    ortho.SetOperator(schur);
+   // }
+   
    // printf("Solving for pressure\n");
    // // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
-   // // solver2.Mult(R2, p);
-   // ortho.Mult(R2, p);
+   // if (pres_dbc)
+   //    solver2.Mult(R2, p);
+   // else
+   //    ortho.Mult(R2, p);
    // printf("Pressure is solved.\n");
+   // printf("error: %.5E\n", error(schur, p, R2));
 
    // // AU = F - B^T * P;
    // Vector F3(F1.Size());
@@ -363,8 +431,30 @@ int main(int argc, char *argv[])
    // printf("Solving for velocity\n");
    // solver.Mult(F3, u);
    // printf("Velocity is solved.\n");
+   // printf("error: %.5E\n", error(A, u, F3));
 
-   // p += p_const;
+   // printf("u-x(0) diff: %.5E\n", diff(u, x.GetBlock(0)));
+   // printf("p-x(1) diff: %.5E\n", diff(p, x.GetBlock(1)));
+   // printf("system error: %.5E\n", error(systemOp, x, rhs));
+   // Vector zerou(u.Size()), zerop(p.Size());
+   // zerou = 0.0; zerop = 0.0;
+   // Vector Au(u.Size());
+   // A.Mult(u, Au);
+   // Vector Btp(u.Size());
+   // B.MultTranspose(p, Btp);
+   // Au += Btp;
+   // Au -= F1;
+   // printf("block 0 diff: %.5E\n", diff(Au, zerou));
+   // Vector Bu(p.Size());
+   // B.Mult(u, Bu);
+   // Bu -= G1;
+   // printf("block 1 diff: %.5E\n", diff(Bu, zerop));
+
+   // printf("rhs 0 diff: %.5E\n", diff(rhs.GetBlock(0), F1));
+   // printf("rhs 1 diff: %.5E\n", diff(rhs.GetBlock(1), G1));
+
+   if (!pres_dbc)
+      p += p_const;
 
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
@@ -396,11 +486,11 @@ int main(int argc, char *argv[])
    // 17. Free the used memory.
    delete fform;
    delete gform;
-   delete invM;
-   delete invS;
-   delete S;
+   // delete invM;
+   // delete invS;
+   // delete S;
    // delete Bt;
-   delete MinvBt;
+   // delete MinvBt;
    delete mVarf;
    delete bVarf;
    delete fes;
@@ -425,8 +515,10 @@ void uFun_ex(const Vector & x, Vector & u)
    double yi(x(1));
    assert(x.Size() == 2);
 
-   u(0) = - exp(xi)*sin(yi);
-   u(1) = - exp(xi)*cos(yi);
+   // u(0) = - exp(xi)*sin(yi);
+   // u(1) = - exp(xi)*cos(yi);
+   u(0) = cos(xi)*sin(yi);
+   u(1) = - sin(xi)*cos(yi);
 }
 
 // Change if needed
@@ -437,7 +529,7 @@ double pFun_ex(const Vector & x)
 
    assert(x.Size() == 2);
 
-   return exp(xi)*sin(yi);
+   return 2.0 * sin(xi)*sin(yi);
 }
 
 void fFun(const Vector & x, Vector & f)
@@ -448,8 +540,10 @@ void fFun(const Vector & x, Vector & f)
    double xi(x(0));
    double yi(x(1));
 
-   f(0) = exp(xi)*sin(yi);
-   f(1) = exp(xi)*cos(yi);
+   // f(0) = exp(xi)*sin(yi);
+   // f(1) = exp(xi)*cos(yi);
+   f(0) = 4.0 * cos(xi) * sin(yi);
+   f(1) = 0.0;
 }
 
 double gFun(const Vector & x)
@@ -461,4 +555,16 @@ double gFun(const Vector & x)
 double f_natural(const Vector & x)
 {
    return (-pFun_ex(x));
+}
+
+void dudx_ex(const Vector & x, Vector & y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(x.Size());
+
+   double xi(x(0));
+   double yi(x(1));
+
+   y(0) = - sin(xi)*sin(yi);
+   y(1) = - cos(xi)*cos(yi);
 }

@@ -183,6 +183,42 @@ void MultiBlockSolver::SetVariableVector(const int &var_idx, BlockVector &var, B
    }
 }
 
+void MultiBlockSolver::SortBySubdomains(BlockVector &by_var, BlockVector &by_sub)
+{
+   assert(by_var.NumBlocks() == (num_var * numSub));
+   assert(by_sub.NumBlocks() == (num_var * numSub));
+
+   for (int m = 0; m < numSub; m++)
+      for (int v = 0; v < num_var; v++)
+      {
+         int by_var_idx = numSub * v + m;
+         int by_sub_idx = num_var * m + v;
+         assert(by_var.BlockSize(by_var_idx) == by_sub.BlockSize(by_sub_idx));
+
+         Vector tmp;
+         by_sub.GetBlockView(by_sub_idx, tmp);
+         tmp = by_var.GetBlock(by_var_idx);
+      }
+}
+
+void MultiBlockSolver::SortByVariables(BlockVector &by_sub, BlockVector &by_var)
+{
+   assert(by_var.NumBlocks() == (num_var * numSub));
+   assert(by_sub.NumBlocks() == (num_var * numSub));
+
+   for (int m = 0; m < numSub; m++)
+      for (int v = 0; v < num_var; v++)
+      {
+         int by_var_idx = numSub * v + m;
+         int by_sub_idx = num_var * m + v;
+         assert(by_var.BlockSize(by_var_idx) == by_sub.BlockSize(by_sub_idx));
+
+         Vector tmp;
+         by_var.GetBlockView(by_var_idx, tmp);
+         tmp = by_sub.GetBlock(by_sub_idx);
+      }
+}
+
 void MultiBlockSolver::SetupBCVariables()
 {
    // Set up boundary markers.

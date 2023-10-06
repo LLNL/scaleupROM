@@ -127,6 +127,9 @@ public:
    void GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var);
    void SetVariableVector(const int &var_idx, BlockVector &var, BlockVector &global);
 
+   void SortBySubdomains(BlockVector &by_var, BlockVector &by_sub);
+   void SortByVariables(BlockVector &by_sub, BlockVector &by_var);
+
    virtual void SetupBCVariables();
    virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }

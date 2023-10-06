@@ -79,12 +79,13 @@ StokesSolver::~StokesSolver()
    DeletePointers(gs);
    DeletePointers(ms);
    DeletePointers(bs);
+   DeletePointers(pms);
 
    DeletePointers(ud_coeffs);
    DeletePointers(sn_coeffs);
 
-   delete mMat, bMat;
-   delete M, B;
+   delete mMat, bMat, pmMat;
+   delete M, B, pM;
 }
 
 void StokesSolver::SetupBCVariables()
@@ -278,6 +279,14 @@ void StokesSolver::BuildDomainOperators()
 
    vec_diff = new InterfaceDGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa);
    norm_flux = new InterfaceDGNormalFluxIntegrator;
+
+   // pressure mass matrix for preconditioner.
+   pms.SetSize(numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      pms[m] = new BilinearForm(pfes[m]);
+      pms[m]->AddDomainIntegrator(new MassIntegrator);
+   }
 }
 
 bool StokesSolver::BCExistsOnBdr(const int &global_battr_idx)
@@ -434,6 +443,17 @@ void StokesSolver::AssembleOperator()
 
    M = mMat->CreateMonolithic();
    B = bMat->CreateMonolithic();
+
+   // pressure mass matrix for preconditioner.
+   pmMat = new BlockMatrix(p_offsets);
+   for (int m = 0; m < numSub; m++)
+   {
+      pms[m]->Assemble();
+      pms[m]->Finalize();
+
+      pmMat->SetBlock(m, m, &(pms[m]->SpMat()));
+   }
+   pM = pmMat->CreateMonolithic();
 }
 
 void StokesSolver::AssembleInterfaceMatrixes()
@@ -643,6 +663,107 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
 }
 
 void StokesSolver::Solve()
+{
+   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
+   int print_level = config.GetOption<int>("solver/print_level", 0);
+
+   // offsets for global block system.
+   Array<int> vblock_offsets(3); // number of variables + 1
+   vblock_offsets[0] = 0;
+   vblock_offsets[1] = u_offsets.Last();
+   vblock_offsets[2] = u_offsets.Last() + p_offsets.Last();
+
+   // same size as var_offsets, but sorted by variables first (then by subdomain).
+   Array<int> offsets_byvar(num_var * numSub + 1);
+   offsets_byvar = 0;
+   for (int k = 0; k < numSub; k++)
+   {
+      offsets_byvar[k+1] = u_offsets[k+1];
+      offsets_byvar[k+1 + numSub] = p_offsets[k+1] + u_offsets.Last();
+   }
+
+   // sort out solution/rhs by variables.
+   BlockVector rhs_byvar(offsets_byvar);
+   BlockVector sol_byvar(offsets_byvar);
+   SortByVariables(*RHS, rhs_byvar);
+   sol_byvar = 0.0;
+
+   // global block matrix.
+   SparseMatrix *Bt = Transpose(*B);
+   BlockMatrix systemOp(vblock_offsets);
+   systemOp.SetBlock(0,0, M);
+   systemOp.SetBlock(0,1, Bt);
+   systemOp.SetBlock(1,0, B);
+
+   HypreParMatrix *Mop = NULL;
+   HypreBoomerAMG *amg_prec = NULL;
+   GSSmoother *p_prec = NULL;
+   OrthoSolver *ortho_p_prec = NULL;
+   BlockDiagonalPreconditioner *systemPrec = NULL;
+
+   // TODO: need to change when the actual parallelization is implemented.
+   HYPRE_BigInt glob_size = M->NumRows();
+   HYPRE_BigInt row_starts[2] = {0, M->NumRows()};
+
+   if (use_amg)
+   {
+      // velocity amg preconditioner
+      Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
+      amg_prec = new HypreBoomerAMG(*Mop);
+      amg_prec->SetPrintLevel(0);
+      amg_prec->SetSystemsOptions(vdim[0], true);
+
+      // pressure mass preconditioner
+      p_prec = new GSSmoother(*pM);
+      if (!pres_dbc)
+      {
+         ortho_p_prec = new OrthoSolver;
+         ortho_p_prec->SetSolver(*p_prec);
+         ortho_p_prec->SetOperator(*pM);
+      }
+
+      systemPrec = new BlockDiagonalPreconditioner(vblock_offsets);
+      systemPrec->SetDiagonalBlock(0, amg_prec);
+      if (pres_dbc)
+         systemPrec->SetDiagonalBlock(1, p_prec);
+      else
+         systemPrec->SetDiagonalBlock(1, ortho_p_prec);
+   }
+
+   MINRESSolver solver;
+   solver.SetAbsTol(atol);
+   solver.SetRelTol(rtol);
+   solver.SetMaxIter(maxIter);
+   solver.SetOperator(systemOp);
+   if (use_amg)
+      solver.SetPreconditioner(*systemPrec);
+   solver.SetPrintLevel(print_level);
+   solver.Mult(rhs_byvar, sol_byvar);
+
+   // orthogonalize the pressure.
+   if (!pres_dbc)
+   {
+      Vector pres_view(sol_byvar, vblock_offsets[1], vblock_offsets[2] - vblock_offsets[1]);
+
+      // TODO(kevin): parallelization.
+      double tmp = pres_view.Sum() / pres_view.Size();
+      pres_view -= tmp;
+   }
+
+   SortBySubdomains(sol_byvar, *U);
+
+   if (use_amg)
+   {
+      delete Mop, amg_prec, p_prec;
+      if (pres_dbc) delete ortho_p_prec;
+      delete systemPrec;
+   }
+   delete Bt;
+}
+
+void StokesSolver::Solve_obsolete()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
