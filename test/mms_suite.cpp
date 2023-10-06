@@ -199,7 +199,9 @@ void CheckConvergence(const double &threshold)
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
    int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
 
-   printf("Num. Elem.\tRel. vel. Error\tConv Rate\tNorm\tRel. pres. Error\tConv Rate\tNorm\n");
+   //printf("Num. Elem.\tRel. v err.\tConv Rate\tNorm\tRel. p err.\tConv Rate\tNorm\n");
+   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
+          "Num. Elem.", "Rel v err", "Conv Rate", "Norm", "Rel p err", "Conv Rate", "Norm");
 
    Vector uconv_rate(num_refine), pconv_rate(num_refine);
    uconv_rate = 0.0;
@@ -276,7 +278,7 @@ void CheckConvergence(const double &threshold)
          uconv_rate(r) = uerror1 / uerror;
          pconv_rate(r) = perror1 / perror;
       }
-      printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\t%.5E\t%.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
+      printf("%10d\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
 
       // reported convergence rate
       if (r > base_refine)
