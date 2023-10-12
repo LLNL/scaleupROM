@@ -80,6 +80,71 @@ double diff(Vector &a, Vector &b)
    return tmp;
 }
 
+/** Nonlinear operator of the form:
+    k --> (M + dt*S)*k + H(x + dt*v + dt^2*k) + S*v,
+    where M and S are given BilinearForms, H is a given NonlinearForm, v and x
+    are given vectors, and dt is a scalar. */
+class SteadyNavierStokes : public Operator
+{
+private:
+   BilinearForm *M;
+   MixedBilinearForm *S;
+   NonlinearForm *H;
+   Array<int> block_offsets;
+
+   mutable BlockMatrix *system_jac;
+   mutable SparseMatrix *mono_jac, *uu, *up, *pu;
+
+public:
+   SteadyNavierStokes(BilinearForm *M_, MixedBilinearForm *S_, NonlinearForm *H_)
+      : Operator(M_->Height() + S_->Height()), M(M_), S(S_), H(H_),
+        system_jac(NULL), mono_jac(NULL), uu(NULL)
+   { 
+      block_offsets.SetSize(3);
+      block_offsets = 0;
+      block_offsets[1] = M_->Height();
+      block_offsets[2] = S_->Height();
+      block_offsets.PartialSum();
+
+      pu = &(S->SpMat());
+      up = Transpose(*pu);
+   }
+
+   /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
+   virtual void Mult(const Vector &x, Vector &y) const
+   {
+      Vector x_u(x.GetData()+block_offsets[0], M->Height()), x_p(x.GetData()+block_offsets[1], S->Height());
+      Vector y_u(y.GetData()+block_offsets[0], M->Height()), y_p(y.GetData()+block_offsets[1], S->Height());
+      H->Mult(x_u, y_u);
+      M->AddMult(x_u, y_u);
+      S->AddMultTranspose(x_p, y_u);
+      S->Mult(x_u, y_p);
+   }
+
+   /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
+   virtual Operator &GetGradient(const Vector &x) const
+   {
+      delete system_jac, mono_jac, uu;
+      const Vector x_u(x.GetData()+block_offsets[0], M->Height()), x_p(x.GetData()+block_offsets[1], S->Height());
+
+      SparseMatrix *grad_H = dynamic_cast<SparseMatrix *>(&H->GetGradient(x_u));
+      uu = Add(1.0, M->SpMat(), 1.0, *grad_H);
+
+      system_jac = new BlockMatrix(block_offsets);
+      system_jac->SetBlock(0,0, uu);
+      system_jac->SetBlock(0,1, up);
+      system_jac->SetBlock(1,0, pu);
+
+      mono_jac = system_jac->CreateMonolithic();
+      return *mono_jac;
+   }
+
+   virtual ~SteadyNavierStokes()
+   {
+      delete system_jac, mono_jac, uu, up;
+   }
+};
+
 int main(int argc, char *argv[])
 {
    int num_procs, rank;
@@ -240,7 +305,7 @@ int main(int argc, char *argv[])
    //     B   = -\int_\Omega \div u_h q_h d\Omega   u_h \in R_h, q_h \in W_h
    BilinearForm *mVarf(new BilinearForm(ufes));
    MixedBilinearForm *bVarf(new MixedBilinearForm(ufes, pfes));
-   // MixedBilinearForm *btVarf(new MixedBilinearForm(fes, ufes));
+   NonlinearForm *nVarf(new NonlinearForm(ufes));
 
 //    // mVarf->AddDomainIntegrator(new VectorFEMassIntegrator(k));
    mVarf->AddDomainIntegrator(new VectorDiffusionIntegrator(k));
@@ -250,6 +315,15 @@ int main(int argc, char *argv[])
    bVarf->AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
    bVarf->Assemble();
    bVarf->Finalize();
+
+   ConstantCoefficient nlcoeff;
+   nlcoeff.constant = 1.0;
+   IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
+                                             (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
+   auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
+   nlc_nlfi->SetIntRule(&gll_ir_nl);
+   nVarf->AddDomainIntegrator(nlc_nlfi);
+   nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
    // btVarf->AddDomainIntegrator(new MixedScalarWeakGradientIntegrator);
    // btVarf->Assemble();
@@ -307,19 +381,6 @@ int main(int argc, char *argv[])
       systemPrec.SetDiagonalBlock(1, ortho_p_prec);
 
 {
-   // SparseMatrix *spMat = systemOp.CreateMonolithic();
-   // DenseMatrix *matInv = spMat->ToDenseMatrix();
-   // matInv->Invert();
-   // matInv->Mult(rhs, x);
-
-   // delete spMat, matInv;
-
-   // double umax = 0.0;
-   // for (int k = 0; k < u.Size(); k++)
-   //    umax = max(umax, abs(u[k]));
-   // printf("umax before solve: %.5E\n", umax);
-
-   // assert(pres_dbc);
    int maxIter(10000);
    double rtol(1.e-15);
    double atol(1.e-15);
@@ -328,14 +389,9 @@ int main(int argc, char *argv[])
    solver.SetRelTol(rtol);
    solver.SetMaxIter(maxIter);
    solver.SetOperator(systemOp);
-   solver.SetPreconditioner(systemPrec);
+   // solver.SetPreconditioner(systemPrec);
    solver.SetPrintLevel(1);
    solver.Mult(rhs, x);
-
-   // umax = 0.0;
-   // for (int k = 0; k < u.Size(); k++)
-   //    umax = max(umax, abs(u[k]));
-   // printf("umax after solve: %.5E\n", umax);
 }
 
    if (!pres_dbc)
@@ -355,6 +411,39 @@ int main(int argc, char *argv[])
 
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+
+   SteadyNavierStokes oper(mVarf, bVarf, nVarf);
+{
+   int maxIter(10000);
+   double rtol(1.e-10);
+   double atol(1.e-10);
+
+   MINRESSolver J_solver;
+   J_solver.SetAbsTol(atol);
+   J_solver.SetRelTol(rtol);
+   J_solver.SetMaxIter(maxIter);
+   // J_solver.SetOperator(systemOp);
+   // solver.SetPreconditioner(systemPrec);
+   J_solver.SetPrintLevel(-1);
+
+   NewtonSolver newton_solver;
+   newton_solver.iterative_mode = false;
+   newton_solver.SetSolver(J_solver);
+   newton_solver.SetOperator(oper);
+   newton_solver.SetPrintLevel(1); // print Newton iterations
+   newton_solver.SetRelTol(rtol);
+   newton_solver.SetAbsTol(atol);
+   newton_solver.SetMaxIter(100);
+   newton_solver.Mult(rhs, x);
+   
+}
+
+   // GridFunction tmp(u);
+   // nVarf->Mult(u, tmp);
+
+   // printf("u\ttmp\n");
+   // for (int k = 0; k < u.Size(); k++)
+   //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
 
    // 15. Save data in the ParaView format
    ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
@@ -378,6 +467,7 @@ int main(int argc, char *argv[])
    // delete MinvBt;
    delete mVarf;
    delete bVarf;
+   delete nVarf;
    delete fes;
    delete ufes;
    delete pfes;
@@ -402,8 +492,8 @@ void uFun_ex(const Vector & x, Vector & u)
 
    // u(0) = - exp(xi)*sin(yi);
    // u(1) = - exp(xi)*cos(yi);
-   u(0) = cos(xi)*sin(yi);
-   u(1) = - sin(xi)*cos(yi);
+   u(0) = 1.0 + cos(xi)*sin(yi);
+   u(1) = -1.0 - sin(xi)*cos(yi);
 }
 
 // Change if needed
