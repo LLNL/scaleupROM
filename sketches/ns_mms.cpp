@@ -44,6 +44,8 @@
 using namespace std;
 using namespace mfem;
 
+static double nu = 1.1;
+
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
 double pFun_ex(const Vector & x);
@@ -95,10 +97,14 @@ private:
    mutable BlockMatrix *system_jac;
    mutable SparseMatrix *mono_jac, *uu, *up, *pu;
 
+   // double atol=1.0e-10, rtol=1.0e-10;
+   // int maxIter=10000;
+   // MINRESSolver *J_solver;
+
 public:
    SteadyNavierStokes(BilinearForm *M_, MixedBilinearForm *S_, NonlinearForm *H_)
       : Operator(M_->Height() + S_->Height()), M(M_), S(S_), H(H_),
-        system_jac(NULL), mono_jac(NULL), uu(NULL)
+        system_jac(NULL), mono_jac(NULL), uu(NULL)//, J_solver(new MINRESSolver())
    { 
       block_offsets.SetSize(3);
       block_offsets = 0;
@@ -108,6 +114,13 @@ public:
 
       pu = &(S->SpMat());
       up = Transpose(*pu);
+
+      // J_solver.SetAbsTol(atol);
+      // J_solver.SetRelTol(rtol);
+      // J_solver.SetMaxIter(maxIter);
+      // // J_solver.SetOperator(systemOp);
+      // // solver.SetPreconditioner(systemPrec);
+      // J_solver.SetPrintLevel(-1);
    }
 
    /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
@@ -247,7 +260,7 @@ int main(int argc, char *argv[])
    pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(1.0), minus_one(-1.0);
+   ConstantCoefficient k(nu), minus_one(-1.0), one(1.0);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
@@ -316,11 +329,9 @@ int main(int argc, char *argv[])
    bVarf->Assemble();
    bVarf->Finalize();
 
-   ConstantCoefficient nlcoeff;
-   nlcoeff.constant = 1.0;
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
+   auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
    nlc_nlfi->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi);
    nVarf->SetEssentialTrueDofs(u_ess_tdof);
@@ -380,37 +391,19 @@ int main(int argc, char *argv[])
    else
       systemPrec.SetDiagonalBlock(1, ortho_p_prec);
 
-{
-   int maxIter(10000);
-   double rtol(1.e-15);
-   double atol(1.e-15);
-   MINRESSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(systemOp);
-   // solver.SetPreconditioner(systemPrec);
-   solver.SetPrintLevel(1);
-   solver.Mult(rhs, x);
-}
-
-   if (!pres_dbc)
-      p += p_const;
-
-   int order_quad = max(2, 2*(order+1)+1);
-   const IntegrationRule *irs[Geometry::NumGeom];
-   for (int i=0; i < Geometry::NumGeom; ++i)
-   {
-      irs[i] = &(IntRules.Get(i, order_quad));
-   }
-
-   double err_u  = u.ComputeL2Error(ucoeff, irs);
-   double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
-   double err_p  = p.ComputeL2Error(pcoeff, irs);
-   double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
-
-   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-   printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+// {
+//    int maxIter(10000);
+//    double rtol(1.e-15);
+//    double atol(1.e-15);
+//    MINRESSolver solver;
+//    solver.SetAbsTol(atol);
+//    solver.SetRelTol(rtol);
+//    solver.SetMaxIter(maxIter);
+//    solver.SetOperator(systemOp);
+//    // solver.SetPreconditioner(systemPrec);
+//    solver.SetPrintLevel(1);
+//    solver.Mult(rhs, x);
+// }
 
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
 {
@@ -437,6 +430,27 @@ int main(int argc, char *argv[])
    newton_solver.Mult(rhs, x);
    
 }
+
+   if (!pres_dbc)
+   {
+      p -= p.Sum() / p.Size();
+      p += p_const;
+   }
+
+   int order_quad = max(2, 2*(order+1)+1);
+   const IntegrationRule *irs[Geometry::NumGeom];
+   for (int i=0; i < Geometry::NumGeom; ++i)
+   {
+      irs[i] = &(IntRules.Get(i, order_quad));
+   }
+
+   double err_u  = u.ComputeL2Error(ucoeff, irs);
+   double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+   double err_p  = p.ComputeL2Error(pcoeff, irs);
+   double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
+
+   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+   printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
    // GridFunction tmp(u);
    // nVarf->Mult(u, tmp);
@@ -490,10 +504,8 @@ void uFun_ex(const Vector & x, Vector & u)
    double yi(x(1));
    assert(x.Size() == 2);
 
-   // u(0) = - exp(xi)*sin(yi);
-   // u(1) = - exp(xi)*cos(yi);
-   u(0) = 1.0 + cos(xi)*sin(yi);
-   u(1) = -1.0 - sin(xi)*cos(yi);
+   u(0) = cos(xi)*sin(yi);
+   u(1) = - sin(xi)*cos(yi);
 }
 
 // Change if needed
@@ -504,7 +516,7 @@ double pFun_ex(const Vector & x)
 
    assert(x.Size() == 2);
 
-   return 2.0 * sin(xi)*sin(yi);
+   return 2.0 * nu * sin(xi)*sin(yi);
 }
 
 void fFun(const Vector & x, Vector & f)
@@ -517,8 +529,11 @@ void fFun(const Vector & x, Vector & f)
 
    // f(0) = exp(xi)*sin(yi);
    // f(1) = exp(xi)*cos(yi);
-   f(0) = 4.0 * cos(xi) * sin(yi);
+   f(0) = 4.0 * nu * cos(xi) * sin(yi);
    f(1) = 0.0;
+
+   f(0) += - sin(xi) * cos(xi);
+   f(1) += - sin(yi) * cos(yi);
 }
 
 double gFun(const Vector & x)
@@ -540,6 +555,6 @@ void dudx_ex(const Vector & x, Vector & y)
    double xi(x(0));
    double yi(x(1));
 
-   y(0) = - sin(xi)*sin(yi);
-   y(1) = - cos(xi)*cos(yi);
+   y(0) = - nu * sin(xi)*sin(yi);
+   y(1) = - nu * cos(xi)*cos(yi);
 }
