@@ -161,6 +161,9 @@ set(scaleupROMObj_SOURCES
   include/dg_linear.hpp
   src/dg_linear.cpp
 
+  include/nonlinear_integ.hpp
+  src/nonlinear_integ.cpp
+
   # include/multiblock_nonlinearform.hpp
   # src/multiblock_nonlinearform.cpp
 

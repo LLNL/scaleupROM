@@ -48,6 +48,8 @@ file(COPY meshes/test_topol.3d.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 
 add_executable(test_block_smoother test_block_smoother.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
+add_executable(nonlinear_integ_grad nonlinear_integ_grad.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
 if(GMSH)
     add_subdirectory(gmsh)
 endif(GMSH)
