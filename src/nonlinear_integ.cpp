@@ -127,6 +127,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
    elvect.SetSize(nvdofs);
 
    nor.SetSize(dim);
+   nh.SetSize(dim);
    un.SetSize(dim);
    uu.SetSize(dim);
 
@@ -134,9 +135,6 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
    elv1.UseExternalData(elvect.GetData(), ndofs1, dim);
    shape1.SetSize(ndofs1);
    u1.SetSize(dim);
-
-if (ndofs2)
-   printf("ndofs2 is not zero!!\n");
    
    if (ndofs2)
    {
@@ -189,15 +187,16 @@ if (ndofs2)
       if (Q) { w *= Q->Eval(Tr, ip); }
 
       nor *= w;
+      if (ndofs2)
+         nh.Set(0.5, nor);
+      else
+         nh = nor;
 
       MultVVt(u1, uu);
       if (ndofs2)
-      {
-         uu *= 0.5;
-         AddMult_a_VVt(0.5, u2, uu);
-      }
+         AddMultVVt(u2, uu);
 
-      uu.Mult(nor, un);
+      uu.Mult(nh, un);
       AddMultVWt(shape1, un, elv1);
       if (ndofs2)
          AddMult_a_VWt(-1.0, shape2, un, elv2);
@@ -229,6 +228,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
    elmat_comp11.SetSize(ndofs1);
 
    nor.SetSize(dim);
+   nh.SetSize(dim);
    un.SetSize(dim);
    uu.SetSize(dim);
 
@@ -290,14 +290,13 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
       if (Q) { w *= Q->Eval(Tr, ip); }
 
       nor *= w;
-
-      un1 = nor * u1;
-      un2 = (ndofs2) ? nor * u2 : 0.0;
       if (ndofs2)
-      {
-         un1 *= 0.5;
-         un2 *= 0.5;
-      }
+         nh.Set(0.5, nor);
+      else
+         nh = nor;
+
+      un1 = nh * u1;
+      un2 = (ndofs2) ? nh * u2 : 0.0;
 
       MultVVt(shape1, elmat_comp11);
       if (ndofs2)
@@ -320,12 +319,12 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
 
          for (int dj = 0; dj < dim; dj++)
          {
-            elmat.AddMatrix(u1(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
+            elmat.AddMatrix(u1(di) * nh(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
             if (ndofs2)
             {
-               elmat.AddMatrix(-u1(di) * nor(dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
-               elmat.AddMatrix(u2(di) * nor(dj), elmat_comp12, di * ndofs1, dj * ndofs2 + dim * ndofs1);
-               elmat.AddMatrix(-u2(di) * nor(dj), elmat_comp22, di * ndofs2 + dim * ndofs1, dj * ndofs2 + dim * ndofs1);
+               elmat.AddMatrix(-u1(di) * nh(dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
+               elmat.AddMatrix(u2(di) * nh(dj), elmat_comp12, di * ndofs1, dj * ndofs2 + dim * ndofs1);
+               elmat.AddMatrix(-u2(di) * nh(dj), elmat_comp22, di * ndofs2 + dim * ndofs1, dj * ndofs2 + dim * ndofs1);
             }
          }
       }
@@ -351,16 +350,16 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
 
       for (int di = 0; di < dim; di++)
       {
+         elmat.AddMatrix(un1, elmat_comp11, di * ndofs1, di * ndofs1);
+         if (ndofs2)
+         {
+            elmat.AddMatrix(-un1, elmat_comp21, di * ndofs2 + dim * ndofs1, di * ndofs1);
+            elmat.AddMatrix(-un1, elmat_comp12, di * ndofs1, di * ndofs2 + dim * ndofs1);
+            elmat.AddMatrix(un1, elmat_comp22, di * ndofs2 + dim * ndofs1, di * ndofs2 + dim * ndofs1);
+         }
+
          for (int dj = 0; dj < dim; dj++)
          {
-            elmat.AddMatrix(un1, elmat_comp11, di * ndofs1, dj * ndofs1);
-            if (ndofs2)
-            {
-               elmat.AddMatrix(-un1, elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
-               elmat.AddMatrix(-un1, elmat_comp12, di * ndofs1, dj * ndofs2 + dim * ndofs1);
-               elmat.AddMatrix(un1, elmat_comp22, di * ndofs2 + dim * ndofs1, dj * ndofs2 + dim * ndofs1);
-            }
-
             if (u1_lg_u2)
             {
                elmat.AddMatrix(un2 * u1(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);

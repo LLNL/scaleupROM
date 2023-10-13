@@ -49,7 +49,7 @@ private:
    double w, un1, un2;
    Coefficient *Q{};
 
-   Vector nor, shape1, shape2, u1, u2, un;
+   Vector nor, nh, shape1, shape2, u1, u2, un;
    DenseMatrix udof1, udof2, elv1, elv2, uu;
    DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
 public:

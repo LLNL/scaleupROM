@@ -89,22 +89,22 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
    double gg = grad * grad;
    printf("gg: %.5E\n", gg);
 
-   printf("N[u]\n");
-   for (int k = 0 ; k < Nu.Size(); k++)
-      printf("%.4E\t", Nu(k));
-   printf("\n");
+   // printf("N[u]\n");
+   // for (int k = 0 ; k < Nu.Size(); k++)
+   //    printf("%.1E\t", Nu(k));
+   // printf("\n");
 
-   printf("jac_mat\n");
-   DenseMatrix jac_mat;
-   jac->ToDenseMatrix(jac_mat);
-   for (int i = 0; i < jac_mat.NumRows(); i++)
-   {
-      for (int j = 0; j < jac_mat.NumCols(); j++)
-      {
-         printf("%.3E\t", jac_mat(i, j));
-      }
-      printf("\n");
-   }
+   // printf("jac_mat\n");
+   // DenseMatrix jac_mat;
+   // jac->ToDenseMatrix(jac_mat);
+   // for (int i = 0; i < jac_mat.NumRows(); i++)
+   // {
+   //    for (int j = 0; j < jac_mat.NumCols(); j++)
+   //    {
+   //       printf("%.1E\t", jac_mat(i, j));
+   //    }
+   //    printf("\n");
+   // }
 
    GridFunction u0(fes);
    u0 = u;
@@ -174,13 +174,11 @@ TEST(DGLaxFriedrichsFlux, Test_grad)
 {
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["discretization"]["order"] = 1;
-   config.dict_["mesh"]["uniform_refinement"] = 0;
-   config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
 
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new DGLaxFriedrichsFluxIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+   CheckGradient(nlc_nlfi, IntegratorType::INTERIOR, true);
 
    return;
 }
