@@ -40,6 +40,7 @@
 #include <iostream>
 #include <algorithm>
 #include "linalg_utils.hpp"
+#include "nonlinear_integ.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -53,6 +54,7 @@ void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 double f_natural(const Vector & x);
 void dudx_ex(const Vector & x, Vector & y);
+void uux_ex(const Vector & x, Vector & y);
 
 double error(Operator &M, Vector &x, Vector &b)
 {
@@ -89,6 +91,8 @@ double diff(Vector &a, Vector &b)
 class SteadyNavierStokes : public Operator
 {
 private:
+   int dim = -1;
+
    BilinearForm *M;
    MixedBilinearForm *S;
    NonlinearForm *H;
@@ -100,10 +104,21 @@ private:
    // double atol=1.0e-10, rtol=1.0e-10;
    // int maxIter=10000;
    // MINRESSolver *J_solver;
+   bool pres_dbc = false;
+   mutable BlockDiagonalPreconditioner *jac_prec;
+   BilinearForm *pMass = NULL;
+   SparseMatrix *pM = NULL;
+   GSSmoother *p_prec = NULL;
+   OrthoSolver *ortho_p_prec = NULL;
+
+   HYPRE_BigInt glob_size;
+   mutable HYPRE_BigInt row_starts[2];
+   mutable HypreParMatrix *uu_hypre = NULL;
+   mutable HypreBoomerAMG *u_prec = NULL;
 
 public:
-   SteadyNavierStokes(BilinearForm *M_, MixedBilinearForm *S_, NonlinearForm *H_)
-      : Operator(M_->Height() + S_->Height()), M(M_), S(S_), H(H_),
+   SteadyNavierStokes(BilinearForm *M_, MixedBilinearForm *S_, NonlinearForm *H_, bool pres_dbc_=false)
+      : Operator(M_->Height() + S_->Height()), dim(M_->FESpace()->GetVDim()), M(M_), S(S_), H(H_), pres_dbc(pres_dbc_),
         system_jac(NULL), mono_jac(NULL), uu(NULL)//, J_solver(new MINRESSolver())
    { 
       block_offsets.SetSize(3);
@@ -115,12 +130,30 @@ public:
       pu = &(S->SpMat());
       up = Transpose(*pu);
 
-      // J_solver.SetAbsTol(atol);
-      // J_solver.SetRelTol(rtol);
-      // J_solver.SetMaxIter(maxIter);
-      // // J_solver.SetOperator(systemOp);
-      // // solver.SetPreconditioner(systemPrec);
-      // J_solver.SetPrintLevel(-1);
+      jac_prec = new BlockDiagonalPreconditioner(block_offsets);
+      pMass = new BilinearForm(S_->TestFESpace());
+      pMass->AddDomainIntegrator(new MassIntegrator);
+      pMass->Assemble();
+      pMass->Finalize();
+      // pMass->FormSystemMatrix(p_ess_tdof, Ph);
+      pM = &(pMass->SpMat());
+      p_prec = new GSSmoother(*pM);
+
+      if (!pres_dbc)
+      {
+         ortho_p_prec = new OrthoSolver;
+         ortho_p_prec->SetSolver(*p_prec);
+         ortho_p_prec->SetOperator(*pM);
+      }
+
+      if (pres_dbc)
+         jac_prec->SetDiagonalBlock(1, p_prec);
+      else
+         jac_prec->SetDiagonalBlock(1, ortho_p_prec);
+      
+      glob_size = M_->NumRows();
+      row_starts[0] = 0;
+      row_starts[1] = M_->NumRows();
    }
 
    /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
@@ -148,6 +181,14 @@ public:
       system_jac->SetBlock(0,1, up);
       system_jac->SetBlock(1,0, pu);
 
+      // update preconditioner.
+      delete u_prec, uu_hypre;
+      uu_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, uu);
+      u_prec = new HypreBoomerAMG(*uu_hypre);
+      u_prec->SetPrintLevel(0);
+      u_prec->SetSystemsOptions(dim, true);
+      jac_prec->SetDiagonalBlock(0, u_prec);
+
       mono_jac = system_jac->CreateMonolithic();
       return *mono_jac;
    }
@@ -155,7 +196,11 @@ public:
    virtual ~SteadyNavierStokes()
    {
       delete system_jac, mono_jac, uu, up;
+      delete jac_prec;
+      delete pMass, p_prec, ortho_p_prec;
    }
+
+   BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }
 };
 
 int main(int argc, char *argv[])
@@ -265,6 +310,7 @@ int main(int argc, char *argv[])
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
    VectorFunctionCoefficient dudxcoeff(dim, dudx_ex);
+   VectorFunctionCoefficient uuxcoeff(dim, uux_ex);
    FunctionCoefficient gcoeff(gFun);
 
    VectorFunctionCoefficient ucoeff(dim, uFun_ex);
@@ -298,6 +344,7 @@ int main(int argc, char *argv[])
    // Currently, mfem does not have a way to impose general tensor bc.
    fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
    fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
+   fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(uuxcoeff), p_ess_attr);
 
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
@@ -331,7 +378,8 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
+   // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
+   auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(minus_one);
    nlc_nlfi->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi);
    nVarf->SetEssentialTrueDofs(u_ess_tdof);
@@ -406,6 +454,7 @@ int main(int argc, char *argv[])
 // }
 
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
+   BlockDiagonalPreconditioner *jac_prec = oper.GetGradientPreconditioner();
 {
    int maxIter(10000);
    double rtol(1.e-10);
@@ -416,7 +465,7 @@ int main(int argc, char *argv[])
    J_solver.SetRelTol(rtol);
    J_solver.SetMaxIter(maxIter);
    // J_solver.SetOperator(systemOp);
-   // solver.SetPreconditioner(systemPrec);
+   // J_solver.SetPreconditioner(*jac_prec);
    J_solver.SetPrintLevel(-1);
 
    NewtonSolver newton_solver;
@@ -557,4 +606,17 @@ void dudx_ex(const Vector & x, Vector & y)
 
    y(0) = - nu * sin(xi)*sin(yi);
    y(1) = - nu * cos(xi)*cos(yi);
+}
+
+void uux_ex(const Vector & x, Vector & y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(x.Size());
+
+   double xi(x(0));
+   double yi(x(1));
+
+   uFun_ex(x, y);
+   y(1) *= - y(0);
+   y(0) *= - y(0);
 }

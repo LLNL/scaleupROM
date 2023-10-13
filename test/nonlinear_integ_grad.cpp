@@ -17,7 +17,6 @@ TEST(IncompressibleInviscidFlux, Test_grad)
 {
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["discretization"]["order"] = 1;
-   config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
    // config.dict_["mesh"]["uniform_refinement"] = 2;
     
    // 1. Parse command-line options.
@@ -61,11 +60,11 @@ TEST(IncompressibleInviscidFlux, Test_grad)
    }
 
    NonlinearForm *nform(new NonlinearForm(fes));
-   ConstantCoefficient one(1.0);
+   ConstantCoefficient one(1.0), pi(3.141592);
 
    IntegrationRule gll_ir_nl = IntRules.Get(fes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
-   auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(one);
+   auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(pi);
    // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
    nlc_nlfi->SetIntRule(&gll_ir_nl);
    nform->AddDomainIntegrator(nlc_nlfi);
@@ -97,6 +96,7 @@ TEST(IncompressibleInviscidFlux, Test_grad)
    GridFunction u0(fes);
    u0 = u;
 
+   double error1 = 1.0e10;
    printf("%10s\t%10s\t%10s\t%10s\t%10s\n", "amp", "J0", "J1", "dJdx", "error");
    for (int k = 0; k < 40; k++)
    {
@@ -112,7 +112,16 @@ TEST(IncompressibleInviscidFlux, Test_grad)
       double error = abs((dJdx - gg) / gg);
 
       printf("%.5E\t%.5E\t%.5E\t%.5E\t%.5E\n", amp, J0, J1, dJdx, error);
+
+      if (k > 4)
+      {
+         if (error > error1)
+            break;
+         else
+            error1 = error;
+      }
    }
+   EXPECT_TRUE(error1 < 1.0e-7);
 
    // 17. Free the used memory.
    delete nform;
