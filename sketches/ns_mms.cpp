@@ -460,7 +460,8 @@ int main(int argc, char *argv[])
    double rtol(1.e-10);
    double atol(1.e-10);
 
-   MINRESSolver J_solver;
+   // MINRESSolver J_solver;
+   GMRESSolver J_solver;
    J_solver.SetAbsTol(atol);
    J_solver.SetRelTol(rtol);
    J_solver.SetMaxIter(maxIter);
