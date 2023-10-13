@@ -460,6 +460,8 @@ void StokesSolver::AssembleOperator()
             mMat->SetBlock(i + v * numSub, j + v * numSub, m2_mats(v, v));
             bMat->SetBlock(i, j + v * numSub, b2_mats(0, v));
          }
+         mMat->SetBlock(i + 0 * numSub, j + 1 * numSub, NULL);
+         mMat->SetBlock(i + 1 * numSub, j + 0 * numSub, NULL);
 
          // mMat->SetBlock(i, j, m_mats(i, j));
          // bMat->SetBlock(i, j, b_mats(i, j));
