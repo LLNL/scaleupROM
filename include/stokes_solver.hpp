@@ -101,7 +101,7 @@ protected:
    InterfaceNonlinearFormIntegrator *vec_diff = NULL, *norm_flux = NULL;
 
    // System matrix for Bilinear case.
-   Array<int> u_offsets, p_offsets;
+   Array<int> u_offsets, p_offsets, u1_offsets;
    Array2D<SparseMatrix *> m_mats, b_mats;
    BlockMatrix *mMat = NULL, *bMat = NULL;
    SparseMatrix *M = NULL, *B = NULL;

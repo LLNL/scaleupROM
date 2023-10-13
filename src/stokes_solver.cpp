@@ -181,6 +181,18 @@ void StokesSolver::InitVariables()
    u_offsets.PartialSum();
    p_offsets.PartialSum();
 
+   u1_offsets.SetSize(vdim[0] * numSub + 1);
+   u1_offsets[0] = 0;
+   for (int m = 0, block_idx = 1; m < numSub; m++)
+   {
+      FiniteElementSpace *fes = ufes[m];
+      for (int d = 0; d < vdim[0]; d++, block_idx++)
+      {
+         u1_offsets[block_idx] = fes->GetNDofs();
+      }
+   }
+   u1_offsets.PartialSum();
+
    SetupBCVariables();
 
    // Set up solution/rhs variables/
@@ -424,8 +436,12 @@ void StokesSolver::AssembleOperator()
    // This is especially true for vector solution, where ordering of component is changed.
    // This is quite inevitable, but is it desirable?
    // globalMat = new BlockMatrix(domain_offsets);
-   mMat = new BlockMatrix(u_offsets);
-   bMat = new BlockMatrix(p_offsets, u_offsets);
+   // mMat = new BlockMatrix(u_offsets);
+   // bMat = new BlockMatrix(p_offsets, u_offsets);
+   mMat = new BlockMatrix(u1_offsets);
+   bMat = new BlockMatrix(p_offsets, u1_offsets);
+   mMat->owns_blocks = true;
+   bMat->owns_blocks = true;
    for (int i = 0; i < numSub; i++)
    {
       for (int j = 0; j < numSub; j++)
@@ -436,8 +452,17 @@ void StokesSolver::AssembleOperator()
             b_mats(i, j)->Finalize();
          }
 
-         mMat->SetBlock(i, j, m_mats(i, j));
-         bMat->SetBlock(i, j, b_mats(i, j));
+         Array2D<SparseMatrix*> m2_mats(vdim[0], vdim[0]), b2_mats(vdim[1], vdim[0]);
+         m_mats(i, j)->GetBlocks(m2_mats);
+         b_mats(i, j)->GetBlocks(b2_mats);
+         for (int v = 0; v < vdim[0]; v++)
+         {
+            mMat->SetBlock(i + v * numSub, j + v * numSub, m2_mats(v, v));
+            bMat->SetBlock(i, j + v * numSub, b2_mats(0, v));
+         }
+
+         // mMat->SetBlock(i, j, m_mats(i, j));
+         // bMat->SetBlock(i, j, b_mats(i, j));
       }
    }
 
@@ -676,18 +701,30 @@ void StokesSolver::Solve()
    vblock_offsets[2] = u_offsets.Last() + p_offsets.Last();
 
    // same size as var_offsets, but sorted by variables first (then by subdomain).
-   Array<int> offsets_byvar(num_var * numSub + 1);
+   // Array<int> offsets_byvar(num_var * numSub + 1);
+   // offsets_byvar = 0;
+   // for (int k = 0; k < numSub; k++)
+   // {
+   //    offsets_byvar[k+1] = u_offsets[k+1];
+   //    offsets_byvar[k+1 + numSub] = p_offsets[k+1] + u_offsets.Last();
+   // }
+   Array<int> offsets_byvar(udim * numSub + 1);
    offsets_byvar = 0;
    for (int k = 0; k < numSub; k++)
    {
-      offsets_byvar[k+1] = u_offsets[k+1];
-      offsets_byvar[k+1 + numSub] = p_offsets[k+1] + u_offsets.Last();
+      offsets_byvar[k+1] = ufes[k]->GetNDofs();
+      offsets_byvar[k+1 + numSub] = ufes[k]->GetNDofs();
+      offsets_byvar[k+1 + 2 * numSub] = pfes[k]->GetNDofs();
    }
+   offsets_byvar.PartialSum();
 
    // sort out solution/rhs by variables.
    BlockVector rhs_byvar(offsets_byvar);
    BlockVector sol_byvar(offsets_byvar);
-   SortByVariables(*RHS, rhs_byvar);
+   // SortByVariables(*RHS, rhs_byvar);
+   BlockVector rhs_view(*RHS, block_offsets);
+   BlockVector sol_view(*U, block_offsets);
+   SortByVariables(rhs_view, rhs_byvar);
    sol_byvar = 0.0;
 
    // global block matrix.
@@ -696,6 +733,10 @@ void StokesSolver::Solve()
    systemOp.SetBlock(0,0, M);
    systemOp.SetBlock(0,1, Bt);
    systemOp.SetBlock(1,0, B);
+
+{
+   PrintMatrix(*M, "vel_mat_fom.txt");
+}
 
    HypreParMatrix *Mop = NULL;
    HypreBoomerAMG *amg_prec = NULL;
@@ -752,7 +793,8 @@ void StokesSolver::Solve()
       pres_view -= tmp;
    }
 
-   SortBySubdomains(sol_byvar, *U);
+   // SortBySubdomains(sol_byvar, *U);
+   SortBySubdomains(sol_byvar, sol_view);
 
    if (use_amg)
    {
