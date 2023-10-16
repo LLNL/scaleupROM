@@ -186,11 +186,11 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
       w = ip.weight;
       if (Q) { w *= Q->Eval(Tr, ip); }
 
-      nor *= w;
-      if (ndofs2)
-         nh.Set(0.5, nor);
-      else
-         nh = nor;
+      nor *= 0.5 * w;
+      // if (ndofs2)
+      // nh.Set(0.5, nor);
+      // else
+      nh = nor;
 
       MultVVt(u1, uu);
       if (ndofs2)
@@ -289,11 +289,11 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
       w = ip.weight;
       if (Q) { w *= Q->Eval(Tr, ip); }
 
-      nor *= w;
-      if (ndofs2)
-         nh.Set(0.5, nor);
-      else
-         nh = nor;
+      nor *= 0.5 * w;
+      // if (ndofs2)
+      // nh.Set(0.5, nor);
+      // else
+      nh = nor;
 
       un1 = nh * u1;
       un2 = (ndofs2) ? nh * u2 : 0.0;

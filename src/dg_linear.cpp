@@ -156,12 +156,6 @@ void DGVectorDirichletLFIntegrator::AssembleRHSElementVect(
     DGBoundaryNormalLFIntegrator
 */
 
-// void DGBoundaryNormalLFIntegrator::AssembleRHSElementVect(
-//    const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
-// {
-//    mfem_error("DGBoundaryNormalLFIntegrator::AssembleRHSElementVect");
-// }
-
 void DGBoundaryNormalLFIntegrator::AssembleRHSElementVect(
    const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
 {
@@ -342,6 +336,104 @@ void BoundaryNormalStressLFIntegrator::AssembleRHSElementVect(
       for (int k = 0, j = 0; k < dim; k++)
          for (int jdof = 0; jdof < dof; jdof++, j++)
             elvect(j) += Fn(k) * shape(jdof);
+   }
+}
+
+void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, FaceElementTransformations &Tr, Vector &elvect)
+{
+   int dim = el.GetDim();
+   int dof = el.GetDof();
+   Vector nor(dim), Qvec, gn(dim);
+   double un;
+
+   shape.SetSize(dof);
+   elvect.SetSize(dim * dof);
+   elvect = 0.0;
+
+   ELV.UseExternalData(elvect.GetData(), dof, dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = (int) (ceil(1.5 * (2 * el.GetOrder() - 1)));  // <----------
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   }
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Tr.SetAllIntPoints(&ip);
+
+      // Access the neighboring element's integration point
+      const IntegrationPoint &eip = Tr.GetElement1IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+      Q.Eval(Qvec, *(Tr.Elem1), eip);
+
+      el.CalcShape(eip, shape);
+
+      un = 0.5 * (Qvec * nor);
+      gn.Set(un, Qvec);
+
+      // Need to check the signs.
+      AddMult_a_VWt(-ip.weight, shape, gn, ELV);
+      AddMult_a_VWt(ip.weight * abs(un), shape, Qvec, ELV);
+   }
+}
+
+void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
+{
+   int dim = el.GetDim();
+   int dof = el.GetDof();
+   Vector nor(dim), Qvec, gn(dim);
+   double un;
+
+   shape.SetSize(dof);
+   elvect.SetSize(dim * dof);
+   elvect = 0.0;
+
+   ELV.UseExternalData(elvect.GetData(), dof, dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = (int) (ceil(1.5 * (2 * el.GetOrder() - 1)));  // <----------
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   }
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      Tr.SetIntPoint(&ip);
+
+      if (dim == 1)
+      {
+         nor[0] = 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+      Q.Eval(Qvec, Tr, ip);
+
+      el.CalcShape(ip, shape);
+
+      un = 0.5 * (Qvec * nor);
+      gn.Set(un, Qvec);
+
+      // Need to check the signs.
+      AddMult_a_VWt(-ip.weight, shape, gn, ELV);
+      AddMult_a_VWt(ip.weight * abs(un), shape, Qvec, ELV);
    }
 }
 
