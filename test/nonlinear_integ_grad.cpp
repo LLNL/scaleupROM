@@ -40,7 +40,7 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
 
    Array<int> ess_attr(mesh->bdr_attributes.Max()), ess_tdof(0);
    ess_attr = 0;
-   ess_attr[1] = 1;
+   ess_attr[3] = 1;
 
    // if (!use_dg)
    //    fes->GetEssentialTrueDofs(ess_attr, ess_tdof);
@@ -177,6 +177,19 @@ TEST(DGLaxFriedrichsFlux, Test_grad)
 
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new DGLaxFriedrichsFluxIntegrator(pi);
+    
+   CheckGradient(nlc_nlfi, IntegratorType::INTERIOR, true);
+
+   return;
+}
+
+TEST(DGTemamFlux, Test_grad)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+
+   ConstantCoefficient pi(3.141592);
+   auto *nlc_nlfi = new DGTemamFluxIntegrator(pi);
     
    CheckGradient(nlc_nlfi, IntegratorType::INTERIOR, true);
 

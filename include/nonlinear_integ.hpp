@@ -69,6 +69,33 @@ public:
 
 };
 
+class DGTemamFluxIntegrator : public NonlinearFormIntegrator
+{
+private:
+   int dim, ndofs1, ndofs2, nvdofs;
+   double w, un;
+   Coefficient *Q{};
+
+   Vector nor, shape1, shape2, u1, u2, flux;
+   DenseMatrix udof1, udof2, elv1, elv2;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21;
+public:
+   DGTemamFluxIntegrator(Coefficient &q) : Q(&q) {}
+
+   virtual void AssembleFaceVector(const FiniteElement &el1,
+                                   const FiniteElement &el2,
+                                   FaceElementTransformations &Tr,
+                                   const Vector &elfun, Vector &elvect);
+
+   /// @brief Assemble the local action of the gradient of the
+   /// NonlinearFormIntegrator resulting from a face integral term.
+   virtual void AssembleFaceGrad(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr,
+                                 const Vector &elfun, DenseMatrix &elmat);
+
+};
+
 } // namespace mfem
 
 #endif
