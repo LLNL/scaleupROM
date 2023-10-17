@@ -377,7 +377,7 @@ void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
       {
          CalcOrtho(Tr.Jacobian(), nor);
       }
-      Q.Eval(Qvec, *(Tr.Elem1), eip);
+      Q.Eval(Qvec, *(Tr.Face), ip);
 
       el.CalcShape(eip, shape);
 
@@ -434,6 +434,110 @@ void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
       // Need to check the signs.
       AddMult_a_VWt(-ip.weight, shape, gn, ELV);
       AddMult_a_VWt(ip.weight * abs(un), shape, Qvec, ELV);
+   }
+}
+
+void DGBdrTemamLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, FaceElementTransformations &Tr, Vector &elvect)
+{
+   int dim = el.GetDim();
+   int dof = el.GetDof();
+   Vector nor(dim), Qvec, gn(dim);
+   double un;
+
+   shape.SetSize(dof);
+   elvect.SetSize(dim * dof);
+   elvect = 0.0;
+
+   ELV.UseExternalData(elvect.GetData(), dof, dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = (int) (ceil(1.5 * (2 * el.GetOrder() - 1)));  // <----------
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   }
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      Tr.SetAllIntPoints(&ip);
+
+      // Access the neighboring element's integration point
+      const IntegrationPoint &eip = Tr.GetElement1IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+
+      w = ip.weight;
+      if (Z) w *= Z->Eval(*(Tr.Face), eip);
+
+      Q.Eval(Qvec, *(Tr.Face), eip);
+
+      el.CalcShape(eip, shape);
+
+      un = (Qvec * nor);
+      gn.Set(un, Qvec);
+
+      // Need to check the signs.
+      AddMult_a_VWt(w, shape, gn, ELV);
+   }
+}
+
+void DGBdrTemamLFIntegrator::AssembleRHSElementVect(
+   const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
+{
+   int dim = el.GetDim();
+   int dof = el.GetDof();
+   Vector nor(dim), Qvec, gn(dim);
+   double un;
+
+   shape.SetSize(dof);
+   elvect.SetSize(dim * dof);
+   elvect = 0.0;
+
+   ELV.UseExternalData(elvect.GetData(), dof, dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = (int) (ceil(1.5 * (2 * el.GetOrder() - 1)));  // <----------
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   }
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      Tr.SetIntPoint(&ip);
+
+      if (dim == 1)
+      {
+         nor[0] = 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+
+      w = ip.weight;
+      if (Z) w *= Z->Eval(Tr, ip);
+
+      Q.Eval(Qvec, Tr, ip);
+
+      el.CalcShape(ip, shape);
+
+      un = (Qvec * nor);
+      gn.Set(un, Qvec);
+
+      // Need to check the signs.
+      AddMult_a_VWt(w, shape, gn, ELV);
    }
 }
 

@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
    // pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(nu), minus_one(-1.0), one(1.0);
+   ConstantCoefficient k(nu), minus_one(-1.0), one(1.0), half(0.5), minus_half(-0.5);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
@@ -374,9 +374,9 @@ int main(int argc, char *argv[])
    //    fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
    
    if (use_dg)
-      fform->AddBdrFaceIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
+      fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half), u_ess_attr);
    else
-      fform->AddBoundaryIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
+      fform->AddBoundaryIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half), u_ess_attr);
 
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
@@ -417,13 +417,16 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
-   auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(minus_one);
-   nlc_nlfi->SetIntRule(&gll_ir_nl);
-   nVarf->AddDomainIntegrator(nlc_nlfi);
+   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half);
+   auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
+   nlc_nlfi1->SetIntRule(&gll_ir_nl);
+   nlc_nlfi2->SetIntRule(&gll_ir_nl);
+   nVarf->AddDomainIntegrator(nlc_nlfi1);
+   nVarf->AddDomainIntegrator(nlc_nlfi2);
    if (use_dg)
-      nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-   nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
+      // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
+      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half));
+   // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
 {
@@ -545,8 +548,10 @@ int main(int argc, char *argv[])
    newton_solver.SetRelTol(rtol);
    newton_solver.SetAbsTol(atol);
    newton_solver.SetMaxIter(100);
-   for (int k = 0; k < x.Size(); k++)
-      x(k) = UniformRandom();
+   // for (int k = 0; k < x.Size(); k++)
+   //    x(k) = UniformRandom();
+   u.ProjectCoefficient(ucoeff);
+   p.ProjectCoefficient(pcoeff);
    newton_solver.Mult(rhs, x);
    
 }
