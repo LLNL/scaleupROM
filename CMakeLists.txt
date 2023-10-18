@@ -83,9 +83,11 @@ find_library(MFEM mfem "$ENV{MFEM_DIR}/lib")
 find_library(HYPRE HYPRE "$ENV{HYPRE_DIR}/lib")
 find_library(PARMETIS parmetis "$ENV{PARMETIS_DIR}/lib")
 find_library(METIS metis "$ENV{METIS_DIR}/lib")
+find_library(MUMPS dmumps "$ENV{MUMPS_DIR}/lib")
 find_path(MFEM_INCLUDES mfem.hpp "$ENV{MFEM_DIR}/include")
 find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
 find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
+find_path(MUMPS_INCLUDES dmumps_c.h "$ENV{MUMPS_DIR}/include")
 
 # yaml-cpp library
 find_library(YAML yaml-cpp HINTS "$ENV{YAML_DIR}/lib")
@@ -100,6 +102,7 @@ include_directories(
   ${MFEM_INCLUDES}
   ${HYPRE_INCLUDES}
   ${PARMETIS_INCLUDES}
+  ${MUMPS_INCLUDES}
   ${HDF5_C_INCLUDE_DIRS}
   ${MPI_C_INCLUDE_DIRS}
   ${MFEM_C_INCLUDE_DIRS}
@@ -120,6 +123,7 @@ link_libraries(
   ${HYPRE}
   ${PARMETIS}
   ${METIS}
+  ${MUMPS}
   ${YAML}
   GTest::GTest
   ${LIBROM}
@@ -136,8 +140,8 @@ set(scaleupROMObj_SOURCES
   include/block_smoother.hpp
   src/block_smoother.cpp
 
-  include/navier_solver.hpp
-  src/navier_solver.cpp
+  # include/navier_solver.hpp
+  # src/navier_solver.cpp
 
   include/topology_handler.hpp
   src/topology_handler.cpp
