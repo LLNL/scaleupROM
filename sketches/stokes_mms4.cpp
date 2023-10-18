@@ -135,6 +135,7 @@ int main(int argc, char *argv[])
    bool pres_dbc = false;
    const char *device_config = "cpu";
    bool visualization = 1;
+   bool direct_solve = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -146,6 +147,9 @@ int main(int argc, char *argv[])
    args.AddOption(&pres_dbc, "-pd", "--pressure-dirichlet",
                   "-no-pd", "--no-pressure-dirichlet",
                   "Use pressure Dirichlet condition.");
+   args.AddOption(&direct_solve, "-ds", "--direct-solve",
+                  "-no-ds", "--no-direct-solve",
+                  "Use direct MUMPS LU solver.");
    args.Parse();
    if (!args.Good())
    {
@@ -344,114 +348,56 @@ int main(int argc, char *argv[])
    else
       systemPrec.SetDiagonalBlock(1, ortho_p_prec);
 
-{
-   // SparseMatrix *spMat = systemOp.CreateMonolithic();
-   // DenseMatrix *matInv = spMat->ToDenseMatrix();
-   // matInv->Invert();
-   // matInv->Mult(rhs, x);
+   if (direct_solve)
+   {
+      SparseMatrix *sys_mat = systemOp.CreateMonolithic();
+      HYPRE_BigInt sys_glob_size = sys_mat->NumRows();
+      HYPRE_BigInt sys_row_starts[2] = {0, sys_mat->NumRows()};
+      HypreParMatrix Aop(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, sys_mat);
 
-   // delete spMat, matInv;
+      MUMPSSolver mumps;
+      mumps.SetPrintLevel(0);
+      mumps.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      // mumps.SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+      // mumps.SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE); // this one for some reason doesn't work
+      mumps.SetOperator(Aop);
+      mumps.Mult(rhs, x);
 
-   // double umax = 0.0;
-   // for (int k = 0; k < u.Size(); k++)
-   //    umax = max(umax, abs(u[k]));
-   // printf("umax before solve: %.5E\n", umax);
+      if (!pres_dbc)
+         p -= p.Sum() / static_cast<double>(p.Size());
+   }
+   else
+   {
+      // SparseMatrix *spMat = systemOp.CreateMonolithic();
+      // DenseMatrix *matInv = spMat->ToDenseMatrix();
+      // matInv->Invert();
+      // matInv->Mult(rhs, x);
 
-   // assert(pres_dbc);
-   int maxIter(10000);
-   double rtol(1.e-15);
-   double atol(1.e-15);
-   MINRESSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(systemOp);
-   solver.SetPreconditioner(systemPrec);
-   solver.SetPrintLevel(1);
-   solver.Mult(rhs, x);
+      // delete spMat, matInv;
 
-   // umax = 0.0;
-   // for (int k = 0; k < u.Size(); k++)
-   //    umax = max(umax, abs(u[k]));
-   // printf("umax after solve: %.5E\n", umax);
-}
-   // int maxIter(10000);
-   // double rtol(1.e-15);
-   // double atol(1.e-15);
-   // chrono.Clear();
-   // chrono.Start();
-   // // MINRESSolver solver;
-   // CGSolver solver;
-   // solver.SetAbsTol(atol);
-   // // solver.SetRelTol(rtol);
-   // solver.SetMaxIter(maxIter);
-   // solver.SetOperator(A);
-   // // solver.SetPreconditioner(darcyPrec);
-   // solver.SetPrintLevel(0);
-   // // x = 0.0;
-   // solver.Mult(F1, U1);
-   // // if (device.IsEnabled()) { x.HostRead(); }
-   // chrono.Stop();
+      // double umax = 0.0;
+      // for (int k = 0; k < u.Size(); k++)
+      //    umax = max(umax, abs(u[k]));
+      // printf("umax before solve: %.5E\n", umax);
 
-   // // B * A^{-1} * F1 - G1
-   // Vector R2(pfes->GetVSize());
-   // bVarf->Mult(U1, R2);
-   // R2 -= G1;
+      // assert(pres_dbc);
+      int maxIter(10000);
+      double rtol(1.e-15);
+      double atol(1.e-15);
+      MINRESSolver solver;
+      solver.SetAbsTol(atol);
+      solver.SetRelTol(rtol);
+      solver.SetMaxIter(maxIter);
+      solver.SetOperator(systemOp);
+      solver.SetPreconditioner(systemPrec);
+      solver.SetPrintLevel(1);
+      solver.Mult(rhs, x);
 
-   // // B.BuildTranspose();
-   // SchurOperator schur(&A, &B);
-   // CGSolver solver2;
-   // solver2.SetOperator(schur);
-   // solver2.SetPrintLevel(0);
-   // solver2.SetAbsTol(rtol);
-   // solver2.SetMaxIter(maxIter);
-   // OrthoSolver ortho;
-   // if (!pres_dbc)
-   // {
-   //    printf("Setting up OrthoSolver\n");
-   //    ortho.SetSolver(solver2);
-   //    ortho.SetOperator(schur);
-   // }
-   
-   // printf("Solving for pressure\n");
-   // // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
-   // if (pres_dbc)
-   //    solver2.Mult(R2, p);
-   // else
-   //    ortho.Mult(R2, p);
-   // printf("Pressure is solved.\n");
-   // printf("error: %.5E\n", error(schur, p, R2));
-
-   // // AU = F - B^T * P;
-   // Vector F3(F1.Size());
-   // B.MultTranspose(p, F3);
-   // F3 *= -1.0;
-   // F3 += F1;
-
-   // printf("Solving for velocity\n");
-   // solver.Mult(F3, u);
-   // printf("Velocity is solved.\n");
-   // printf("error: %.5E\n", error(A, u, F3));
-
-   // printf("u-x(0) diff: %.5E\n", diff(u, x.GetBlock(0)));
-   // printf("p-x(1) diff: %.5E\n", diff(p, x.GetBlock(1)));
-   // printf("system error: %.5E\n", error(systemOp, x, rhs));
-   // Vector zerou(u.Size()), zerop(p.Size());
-   // zerou = 0.0; zerop = 0.0;
-   // Vector Au(u.Size());
-   // A.Mult(u, Au);
-   // Vector Btp(u.Size());
-   // B.MultTranspose(p, Btp);
-   // Au += Btp;
-   // Au -= F1;
-   // printf("block 0 diff: %.5E\n", diff(Au, zerou));
-   // Vector Bu(p.Size());
-   // B.Mult(u, Bu);
-   // Bu -= G1;
-   // printf("block 1 diff: %.5E\n", diff(Bu, zerop));
-
-   // printf("rhs 0 diff: %.5E\n", diff(rhs.GetBlock(0), F1));
-   // printf("rhs 1 diff: %.5E\n", diff(rhs.GetBlock(1), G1));
+      // umax = 0.0;
+      // for (int k = 0; k < u.Size(); k++)
+      //    umax = max(umax, abs(u[k]));
+      // printf("umax after solve: %.5E\n", umax);
+   }
 
    if (!pres_dbc)
       p += p_const;
