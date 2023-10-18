@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
       HypreParMatrix Aop(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, sys_mat);
 
       MUMPSSolver mumps;
-      mumps.SetPrintLevel(0);
+      mumps.SetPrintLevel(1);
       mumps.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       // mumps.SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
       // mumps.SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE); // this one for some reason doesn't work
