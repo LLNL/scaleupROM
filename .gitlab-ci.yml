@@ -18,8 +18,8 @@ compile:
   script:
     - mkdir ci-build
     - cd ci-build
-    - singularity exec --cleanenv $IMAGE_FILE cmake .. -DBUILD_SKETCHES=ON
-    - singularity exec --cleanenv $IMAGE_FILE make -j 4
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE cmake .. -DBUILD_SKETCHES=ON
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE make -j 4
 
 parser:
   stage: test
