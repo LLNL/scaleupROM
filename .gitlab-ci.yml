@@ -30,7 +30,7 @@ parser:
     - quartz
   script:
     - cd ci-build/test
-    - ./test_parser
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_parser
     # - mpirun -n 4 ./test_parser
 
 poisson_dd_mms:
@@ -42,7 +42,7 @@ poisson_dd_mms:
     - quartz
   script:
     - cd ci-build/test
-    - ./poisson_dd_mms
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./poisson_dd_mms
 
 stokes_dd_mms:
   stage: test
@@ -53,7 +53,7 @@ stokes_dd_mms:
     - quartz
   script:
     - cd ci-build/test
-    - ./stokes_dd_mms
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./stokes_dd_mms
 
 param_prob:
   stage: test
@@ -64,7 +64,7 @@ param_prob:
     - quartz
   script:
     - cd ci-build/test
-    - ./test_param_prob
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_param_prob
 
 workflow:
   stage: test
@@ -75,7 +75,7 @@ workflow:
     - quartz
   script:
     - cd ci-build/test
-    - ./test_workflow
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_workflow
 
 hdf5:
   stage: test
@@ -86,7 +86,7 @@ hdf5:
     - quartz
   script:
     - cd ci-build/test
-    - ./test_hdf5
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_hdf5
 
 comp-topol:
   stage: test
@@ -97,7 +97,7 @@ comp-topol:
     - quartz
   script:
     - cd ci-build/test
-    - ./test_topol
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_topol
 
 block-smoother:
   stage: test
@@ -108,7 +108,7 @@ block-smoother:
     - quartz
   script:
     - cd ci-build/test
-    - ./test_block_smoother
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_block_smoother
 
 multi_comp_dd_mms:
   stage: test
@@ -122,7 +122,8 @@ multi_comp_dd_mms:
   #       - ./ci-build/test/gmsh/multi_comp_dd_mms
   script:
     - cd ci-build/test/gmsh
-    - if [ -f "./multi_comp_dd_mms" ]; then ./multi_comp_dd_mms; else echo "multi_comp_dd_mms does not exist. Passing the test."; fi
+    - echo 'if [ -f "./multi_comp_dd_mms" ]; then ./multi_comp_dd_mms; else echo "multi_comp_dd_mms does not exist. Passing the test."; fi' >> command.sh
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE sh command.sh
 
 stokes_multi_comp_dd_mms:
   stage: test
@@ -133,7 +134,8 @@ stokes_multi_comp_dd_mms:
     - quartz
   script:
     - cd ci-build/test/gmsh
-    - if [ -f "./stokes_multi_comp_dd_mms" ]; then ./stokes_multi_comp_dd_mms; else echo "stokes_multi_comp_dd_mms does not exist. Passing the test."; fi
+    - echo 'if [ -f "./stokes_multi_comp_dd_mms" ]; then ./stokes_multi_comp_dd_mms; else echo "stokes_multi_comp_dd_mms does not exist. Passing the test."; fi' >> command.sh
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE sh command.sh
 
 multi_comp_workflow:
   stage: test
@@ -144,5 +146,6 @@ multi_comp_workflow:
     - quartz
   script:
     - cd ci-build/test/gmsh
-    - if [ -f "./test_multi_comp_workflow" ]; then ./test_multi_comp_workflow; else echo "test_multi_comp_workflow does not exist. Passing the test."; fi
+    - echo 'if [ -f "./test_multi_comp_workflow" ]; then ./test_multi_comp_workflow; else echo "test_multi_comp_workflow does not exist. Passing the test."; fi' >> command.sh
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE sh command.sh
 
