@@ -1,6 +1,7 @@
 variables:
   CUSTOM_CI_BUILDS_DIR: "/usr/workspace/chung28/gitlab-runner"
   GIT_SUBMODULE_STRATEGY: recursive
+  IMAGE_FILE: "/g/g92/chung28/scaleuprom_env/scaleuprom_env.sif"
 
 stages:
   - build
@@ -17,8 +18,8 @@ compile:
   script:
     - mkdir ci-build
     - cd ci-build
-    - cmake .. -DBUILD_SKETCHES=ON
-    - make -j 4
+    - singularity exec --cleanenv $IMAGE_FILE cmake .. -DBUILD_SKETCHES=ON
+    - singularity exec --cleanenv $IMAGE_FILE make -j 4
 
 parser:
   stage: test
