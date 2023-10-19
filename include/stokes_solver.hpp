@@ -101,10 +101,19 @@ protected:
    InterfaceNonlinearFormIntegrator *vec_diff = NULL, *norm_flux = NULL;
 
    // System matrix for Bilinear case.
-   Array<int> u_offsets, p_offsets;
+   Array<int> u_offsets, p_offsets, vblock_offsets;
    Array2D<SparseMatrix *> m_mats, b_mats;
    BlockMatrix *mMat = NULL, *bMat = NULL;
    SparseMatrix *M = NULL, *B = NULL;
+   BlockMatrix *systemOp = NULL;
+   SparseMatrix *Bt = NULL;
+
+   // variables needed for direct solve
+   HYPRE_BigInt sys_glob_size;
+   HYPRE_BigInt sys_row_starts[2];
+   SparseMatrix *systemOp_mono = NULL;
+   HypreParMatrix *systemOp_hypre = NULL;
+   MUMPSSolver *mumps = NULL;
 
    // operators
    Array<LinearForm *> fs, gs;
