@@ -115,6 +115,7 @@ void MultiBlockSolver::ParseInputs()
 
    // solver option;
    use_amg = config.GetOption<bool>("solver/use_amg", true);
+   direct_solve = config.GetOption<bool>("solver/direct_solve", false);
 
    save_visual = config.GetOption<bool>("visualization/enabled", false);
    if (save_visual)

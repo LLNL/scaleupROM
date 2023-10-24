@@ -36,6 +36,12 @@ protected:
    BlockMatrix *globalMat = NULL;
    SparseMatrix *globalMat_mono = NULL;
 
+   // variables needed for direct solve
+   HYPRE_BigInt sys_glob_size;
+   HYPRE_BigInt sys_row_starts[2];
+   HypreParMatrix *globalMat_hypre = NULL;
+   MUMPSSolver *mumps = NULL;
+
    // operators
    Array<LinearForm *> bs;
    Array<BilinearForm *> as;

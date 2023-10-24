@@ -490,6 +490,27 @@ MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &i
    romMat->owns_blocks = true;
 
    carom_mats.SetSize(0, 0);
+
+   std::string solver_type_str = config.GetOption<std::string>("model_reduction/linear_solver_type", "cg");
+   if (solver_type_str == "direct")       linsol_type = MFEMROMHandler::SolverType::DIRECT;
+   else if (solver_type_str == "cg")      linsol_type = MFEMROMHandler::SolverType::CG;
+   else if (solver_type_str == "minres")      linsol_type = MFEMROMHandler::SolverType::MINRES;
+   else
+   {
+      mfem_error("Unknown ROM linear solver type!\n");
+   }
+   
+   if (linsol_type == MFEMROMHandler::SolverType::DIRECT)
+   {
+      std::string mat_type_str = config.GetOption<std::string>("model_reduction/linear_system_type", "spd");
+      if (mat_type_str == "spd")          mat_type = MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE;
+      else if (mat_type_str == "sid")     mat_type = MUMPSSolver::MatType::SYMMETRIC_INDEFINITE;
+      else if (mat_type_str == "us")      mat_type = MUMPSSolver::MatType::UNSYMMETRIC;
+      else
+      {
+         mfem_error("Unknown ROM linear system type!\n");
+      }
+   }
 }
 
 MFEMROMHandler::~MFEMROMHandler()
@@ -498,6 +519,7 @@ MFEMROMHandler::~MFEMROMHandler()
    delete romMat, romMat_mono;
    delete reduced_rhs;
    delete reduced_sol;
+   delete romMat_hypre, mumps;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -563,6 +585,8 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
 
    romMat_mono = romMat->CreateMonolithic();
 
+   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
+
    if (save_operator == ROMBuildingLevel::GLOBAL)
    {
       std::string filename = operator_prefix + ".h5";
@@ -606,72 +630,86 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
+   (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
-   int print_level = config.GetOption<int>("solver/print_level", 0);
-   std::string solver_type = config.GetOption<std::string>("model_reduction/solver_type", "cg");
+   int print_level = config.GetOption<int>("solver/print_level", 0);   
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
 
-   IterativeSolver *solver = SetSolver(solver_type, prec_str);
-   HypreParMatrix *parRomMat = NULL;
-   Solver *M = NULL;    // preconditioner.
-   Operator *K = NULL;  // operator.
-   HypreBoomerAMG *amgM = NULL;
-   // GSSmoother *gsM = NULL;
-
-   if (prec_str == "amg")
+   if (linsol_type == SolverType::DIRECT)
    {
-      // TODO: need to change when the actual parallelization is implemented.
-      HYPRE_BigInt glob_size = rom_block_offsets.Last();
-      HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-      parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
-      K = parRomMat;
+      assert(mumps);
+      mumps->SetPrintLevel(print_level);
+      mumps->Mult(*reduced_rhs, *reduced_sol);
    }
-   else if ((prec_str == "gs") || (prec_str == "none"))
-      K = romMat_mono;
    else
-      K = romMat;
+   {
+      IterativeSolver *solver = SetIterativeSolver(linsol_type, prec_str);
+      HypreParMatrix *parRomMat = NULL;
+      Solver *M = NULL;    // preconditioner.
+      Operator *K = NULL;  // operator.
+      HypreBoomerAMG *amgM = NULL;
+      // GSSmoother *gsM = NULL;
 
-   if (prec_str == "amg")
-   {
-      amgM = new HypreBoomerAMG(*parRomMat);
-      amgM->SetPrintLevel(print_level);
-      M = amgM;
-   }
-   else if (prec_str == "gs")
-   {
-      M = new GSSmoother(*romMat_mono);
-   }
-   else if (prec_str == "block_gs")
-   {
-      M = new BlockGSSmoother(*romMat);
-   }
-   else if (prec_str == "block_jacobi")
-   {
-      M = new BlockDSmoother(*romMat);
-   }
-   else if (prec_str != "none")
-   {
-      mfem_error("Unknown preconditioner for ROM!\n");
-   }
+      if (prec_str == "amg")
+      {
+         // TODO: need to change when the actual parallelization is implemented.
+         HYPRE_BigInt glob_size = rom_block_offsets.Last();
+         HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
+         parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
+         K = parRomMat;
+      }
+      else if ((prec_str == "gs") || (prec_str == "none"))
+         K = romMat_mono;
+      else
+         K = romMat;
 
-   if (prec_str != "none")
-      solver->SetPreconditioner(*M);
-   solver->SetOperator(*K);
-   
-   solver->SetAbsTol(atol);
-   solver->SetRelTol(rtol);
-   solver->SetMaxIter(maxIter);
-   solver->SetPrintLevel(print_level);
+      if (prec_str == "amg")
+      {
+         amgM = new HypreBoomerAMG(*parRomMat);
+         amgM->SetPrintLevel(print_level);
+         M = amgM;
+      }
+      else if (prec_str == "gs")
+      {
+         M = new GSSmoother(*romMat_mono);
+      }
+      else if (prec_str == "block_gs")
+      {
+         M = new BlockGSSmoother(*romMat);
+      }
+      else if (prec_str == "block_jacobi")
+      {
+         M = new BlockDSmoother(*romMat);
+      }
+      else if (prec_str != "none")
+      {
+         mfem_error("Unknown preconditioner for ROM!\n");
+      }
 
-   (*reduced_sol) = 0.0;
-   // StopWatch solveTimer;
-   // solveTimer.Start();
-   solver->Mult(*reduced_rhs, *reduced_sol);
-   // solveTimer.Stop();
-   // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
+      if (prec_str != "none")
+         solver->SetPreconditioner(*M);
+      solver->SetOperator(*K);
+      
+      solver->SetAbsTol(atol);
+      solver->SetRelTol(rtol);
+      solver->SetMaxIter(maxIter);
+      solver->SetPrintLevel(print_level);
+
+      // StopWatch solveTimer;
+      // solveTimer.Start();
+      solver->Mult(*reduced_rhs, *reduced_sol);
+      // solveTimer.Stop();
+      // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
+
+      // delete the created objects.
+      if (prec_str == "amg")
+         delete parRomMat;
+      delete M;
+      delete solver;
+   }
 
    for (int i = 0; i < numSub; i++)
    {
@@ -683,12 +721,6 @@ void MFEMROMHandler::Solve(BlockVector* U)
       // 23. reconstruct FOM state
       basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
    }
-
-   // delete the created objects.
-   if (prec_str == "amg")
-      delete parRomMat;
-   delete M;
-   delete solver;
 }
 
 SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
@@ -731,6 +763,8 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    errf = H5Fclose(file_id);
    assert(errf >= 0);
 
+   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
+
    operator_loaded = true;
 }
 
@@ -739,6 +773,7 @@ void MFEMROMHandler::LoadOperator(BlockMatrix *input_mat)
    delete romMat, romMat_mono;
    romMat = input_mat;
    romMat_mono = romMat->CreateMonolithic();
+   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
    operator_loaded = true;
 }
 
@@ -807,25 +842,48 @@ void MFEMROMHandler::SaveBasisVisualization(
    }
 }
 
-IterativeSolver* MFEMROMHandler::SetSolver(const std::string &solver_type, const std::string &prec_type)
+IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::SolverType &linsol_type_, const std::string &prec_type)
 {
    IterativeSolver *solver;
-   if (solver_type == "cg")
+   switch (linsol_type_)
    {
-      if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
-      else                    solver = new CGSolver();
-   }
-   else if (solver_type == "minres")
-   {
-      if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
-      else                    solver = new MINRESSolver();
-   }
-   else
-   {
-      mfem_error("Unknown ROM solver type!\n");
+      case (SolverType::CG):
+      {
+         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+         else                    solver = new CGSolver();
+         break;
+      }
+      case (SolverType::MINRES):
+      {
+         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
+         else                    solver = new MINRESSolver();
+         break;
+      }
+      default:
+      {
+         mfem_error("Unknown ROM iterative linear solver type!\n");
+         break;
+      }
    }
 
    return solver;
+}
+
+void MFEMROMHandler::SetupDirectSolver()
+{
+   if (linsol_type != MFEMROMHandler::SolverType::DIRECT) return;
+   assert(romMat_mono);
+   delete romMat_hypre, mumps;
+
+   // TODO: need to change when the actual parallelization is implemented.
+   sys_glob_size = romMat_mono->NumRows();
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = romMat_mono->NumRows();
+   romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, romMat_mono);
+
+   mumps = new MUMPSSolver();
+   mumps->SetMatrixSymType(mat_type);
+   mumps->SetOperator(*romMat_hypre);
 }
 
 // void MFEMROMHandler::GetBlockSparsity(

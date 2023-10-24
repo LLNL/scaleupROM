@@ -71,6 +71,7 @@ protected:
 
    // MFEM solver options
    bool use_amg;
+   bool direct_solve = false;
 
    // Saving solution in single run
    bool save_sol = false;

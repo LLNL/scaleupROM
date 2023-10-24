@@ -23,6 +23,18 @@ TEST(DDSerialTest, Test_convergence)
    return;
 }
 
+TEST(DDSerialTest, Test_direct_solve)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+   config.dict_["manufactured_solution"]["number_of_refinement"] = 3;
+   config.dict_["solver"]["max_iter"] = 20000;
+   config.dict_["solver"]["direct_solve"] = true;
+   CheckConvergence();
+
+   return;
+}
+
 TEST(DDSerialTest, Test_componentwise)
 {
    config = InputParser("inputs/dd_mms.component.yml");

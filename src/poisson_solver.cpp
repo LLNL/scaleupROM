@@ -61,6 +61,7 @@ PoissonSolver::~PoissonSolver()
    DeletePointers(rhs_coeffs);
 
    delete globalMat_mono, globalMat;
+   delete globalMat_hypre, mumps;
 }
 
 void PoissonSolver::SetupBCVariables()
@@ -324,8 +325,20 @@ void PoissonSolver::AssembleOperator()
       }
    }
 
-   if (use_amg)
+   if (use_amg || direct_solve)
+   {
       globalMat_mono = globalMat->CreateMonolithic();
+
+      // TODO: need to change when the actual parallelization is implemented.
+      sys_glob_size = globalMat_mono->NumRows();
+      sys_row_starts[0] = 0;
+      sys_row_starts[1] = globalMat_mono->NumRows();
+      globalMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, globalMat_mono);
+
+      mumps = new MUMPSSolver();
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+      mumps->SetOperator(*globalMat_hypre);
+   }
 }
 
 void PoissonSolver::AssembleInterfaceMatrixes()
@@ -468,65 +481,67 @@ void PoissonSolver::Solve()
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    // TODO: need to change when the actual parallelization is implemented.
-   CGSolver *solver = NULL;
-   HypreParMatrix *parGlobalMat = NULL;
-   HypreBoomerAMG *M = NULL;
-   BlockDiagonalPreconditioner *globalPrec = NULL;
-   
-   // HypreBoomerAMG makes a meaningful difference in computation time.
-   if (use_amg)
+   if (direct_solve)
    {
-      // Initializating HypreParMatrix needs the monolithic sparse matrix.
-      assert(globalMat_mono != NULL);
-
-      solver = new CGSolver(MPI_COMM_WORLD);
-      
-      // TODO: need to change when the actual parallelization is implemented.
-      HYPRE_BigInt glob_size = block_offsets.Last();
-      HYPRE_BigInt row_starts[2] = {0, block_offsets.Last()};
-      
-      parGlobalMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, globalMat_mono);
-      M = new HypreBoomerAMG(*parGlobalMat);
-      M->SetPrintLevel(print_level);
-      solver->SetPreconditioner(*M);
-
-      solver->SetOperator(*parGlobalMat);
+      assert(mumps);
+      mumps->SetPrintLevel(print_level);
+      mumps->Mult(*RHS, *U);
    }
    else
    {
-      solver = new CGSolver();
+      CGSolver *solver = NULL;
+      HypreBoomerAMG *M = NULL;
+      BlockDiagonalPreconditioner *globalPrec = NULL;
       
-      if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
+      // HypreBoomerAMG makes a meaningful difference in computation time.
+      if (use_amg)
       {
-         globalPrec = new BlockDiagonalPreconditioner(var_offsets);
-         solver->SetPreconditioner(*globalPrec);
+         // Initializating HypreParMatrix needs the monolithic sparse matrix.
+         assert(globalMat_mono != NULL);
+
+         solver = new CGSolver(MPI_COMM_WORLD);
+
+         M = new HypreBoomerAMG(*globalMat_hypre);
+         M->SetPrintLevel(print_level);
+
+         solver->SetPreconditioner(*M);
+         solver->SetOperator(*globalMat_hypre);
       }
-      solver->SetOperator(*globalMat);
-   }
-   solver->SetAbsTol(atol);
-   solver->SetRelTol(rtol);
-   solver->SetMaxIter(maxIter);
-   solver->SetPrintLevel(print_level);
+      else
+      {
+         solver = new CGSolver();
+         
+         if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
+         {
+            globalPrec = new BlockDiagonalPreconditioner(var_offsets);
+            solver->SetPreconditioner(*globalPrec);
+         }
+         solver->SetOperator(*globalMat);
+      }
+      solver->SetAbsTol(atol);
+      solver->SetRelTol(rtol);
+      solver->SetMaxIter(maxIter);
+      solver->SetPrintLevel(print_level);
 
-   *U = 0.0;
-   // The time for the setup above is much smaller than this Mult().
-   // StopWatch test;
-   // test.Start();
-   solver->Mult(*RHS, *U);
-   // test.Stop();
-   // printf("test: %f seconds.\n", test.RealTime());
+      *U = 0.0;
+      // The time for the setup above is much smaller than this Mult().
+      // StopWatch test;
+      // test.Start();
+      solver->Mult(*RHS, *U);
+      // test.Stop();
+      // printf("test: %f seconds.\n", test.RealTime());
 
-   // delete the created objects.
-   if (use_amg)
-   {
-      delete M;
-      delete parGlobalMat;
+      // delete the created objects.
+      if (use_amg)
+      {
+         delete M;
+      }
+      else
+      {
+         if (globalPrec != NULL) delete globalPrec;
+      }
+      delete solver;
    }
-   else
-   {
-      if (globalPrec != NULL) delete globalPrec;
-   }
-   delete solver;
 }
 
 void PoissonSolver::ProjectOperatorOnReducedBasis()
