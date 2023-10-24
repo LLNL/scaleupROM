@@ -75,7 +75,8 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
          break;
    }
    
-   nform->SetEssentialTrueDofs(ess_tdof);
+   // if (!use_dg)
+   //    nform->SetEssentialTrueDofs(ess_tdof);
 
    Vector Nu(u.Size());
    nform->Mult(u, Nu);
@@ -163,7 +164,7 @@ TEST(IncompressibleInviscidFlux, Test_grad)
 
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(pi);
-   // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
+   // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(pi);
     
    CheckGradient(nlc_nlfi, IntegratorType::DOMAIN, use_dg);
 
