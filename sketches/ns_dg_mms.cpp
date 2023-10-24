@@ -50,6 +50,7 @@ using namespace std;
 using namespace mfem;
 
 static double nu = 1.1;
+static double zeta = 1.0;
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -224,7 +225,7 @@ int main(int argc, char *argv[])
    bool pres_dbc = false;
    const char *device_config = "cpu";
    bool visualization = 1;
-   bool use_dg = true;
+   bool use_dg = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -328,7 +329,8 @@ int main(int argc, char *argv[])
    // pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(nu), minus_one(-1.0), one(1.0), half(0.5), minus_half(-0.5);
+   ConstantCoefficient k(nu), zeta_coeff(zeta);
+   ConstantCoefficient minus_one(-1.0), one(1.0), half(0.5), minus_half(-0.5);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
@@ -363,20 +365,7 @@ int main(int argc, char *argv[])
    LinearForm *fform(new LinearForm);
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
-
-   // Currently, mfem does not have a way to impose general tensor bc.
-   fform->AddBoundaryIntegrator(new VectorBoundaryFluxLFIntegrator(fnatcoeff), p_ess_attr);
-   // fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
-   // fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(uuxcoeff), p_ess_attr);
-   // if (use_dg)
-   //    fform->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
-   // else
-   //    fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
-   
-   if (use_dg)
-      fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half), u_ess_attr);
-   else
-      fform->AddBoundaryIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half), u_ess_attr);
+   fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
 
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
@@ -417,43 +406,47 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half);
-   auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
+   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half);
+   // auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
+   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(zeta_coeff);
    nlc_nlfi1->SetIntRule(&gll_ir_nl);
-   nlc_nlfi2->SetIntRule(&gll_ir_nl);
+   // nlc_nlfi2->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi1);
-   nVarf->AddDomainIntegrator(nlc_nlfi2);
-   if (use_dg)
+   // nVarf->AddDomainIntegrator(nlc_nlfi2);
+   // if (use_dg)
       // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half));
+      // nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half));
    // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
-{
-   NonlinearForm *ntemp(new NonlinearForm(ufes));
-   // ntemp->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
-   ntemp->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
+// {
+//    NonlinearForm *ntemp(new NonlinearForm(ufes));
+//    // ntemp->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
+//    // ntemp->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
+//    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
+//    nlc_nlfi->SetIntRule(&gll_ir_nl);
+//    ntemp->AddDomainIntegrator(nlc_nlfi);
 
-   LinearForm *ftemp(new LinearForm(ufes));
-   ftemp->AddBdrFaceIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
-   // ftemp->AddBoundaryIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
-   ftemp->Assemble();
+//    // LinearForm *ftemp(new LinearForm(ufes));
+//    // ftemp->AddBdrFaceIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
+//    // // ftemp->AddBoundaryIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
+//    // ftemp->Assemble();
 
-   // Vector rhs_temp(u_ex.Size());
-   // ntemp->Mult(u_ex, rhs_temp);
-   // for (int k = 0; k < rhs_temp.Size(); k++)
-   // {
-   //    printf("%.3E\n", rhs_temp(k));
-   // }
+//    Vector rhs_temp(u_ex.Size());
+//    ntemp->Mult(u_ex, rhs_temp);
+//    for (int k = 0; k < rhs_temp.Size(); k++)
+//    {
+//       printf("%.3E\t%.3E\n", u_ex(k), rhs_temp(k));
+//    }
    
-   // for (int k = 0; k < ftemp->Size(); k++)
-   // {
-   //    printf("%.3E\n", (*ftemp)[k]);
-   // }
+//    // for (int k = 0; k < ftemp->Size(); k++)
+//    // {
+//    //    printf("%.3E\n", (*ftemp)[k]);
+//    // }
    
 
-   delete ntemp, ftemp;
-}
+//    delete ntemp;
+// }
 
    // btVarf->AddDomainIntegrator(new MixedScalarWeakGradientIntegrator);
    // btVarf->Assemble();
@@ -548,10 +541,10 @@ int main(int argc, char *argv[])
    newton_solver.SetRelTol(rtol);
    newton_solver.SetAbsTol(atol);
    newton_solver.SetMaxIter(100);
-   // for (int k = 0; k < x.Size(); k++)
-   //    x(k) = UniformRandom();
-   u.ProjectCoefficient(ucoeff);
-   p.ProjectCoefficient(pcoeff);
+   for (int k = 0; k < x.Size(); k++)
+      x(k) = UniformRandom();
+   // u.ProjectCoefficient(ucoeff);
+   // p.ProjectCoefficient(pcoeff);
    newton_solver.Mult(rhs, x);
    
 }
@@ -657,8 +650,8 @@ void fFun(const Vector & x, Vector & f)
    f(0) = 4.0 * nu * cos(xi) * sin(yi);
    f(1) = 0.0;
 
-   f(0) += - sin(xi) * cos(xi);
-   f(1) += - sin(yi) * cos(yi);
+   f(0) += - zeta * sin(xi) * cos(xi);
+   f(1) += - zeta * sin(yi) * cos(yi);
 }
 
 double gFun(const Vector & x)
