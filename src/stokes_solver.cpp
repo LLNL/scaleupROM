@@ -86,6 +86,7 @@ StokesSolver::~StokesSolver()
 
    delete mMat, bMat, pmMat;
    delete M, B, pM;
+   delete systemOp, Bt, systemOp_mono, systemOp_hypre, mumps;
 }
 
 void StokesSolver::SetupBCVariables()
@@ -180,6 +181,12 @@ void StokesSolver::InitVariables()
    domain_offsets.PartialSum();
    u_offsets.PartialSum();
    p_offsets.PartialSum();
+
+   // offsets for global block system.
+   vblock_offsets.SetSize(3); // number of variables + 1
+   vblock_offsets[0] = 0;
+   vblock_offsets[1] = u_offsets.Last();
+   vblock_offsets[2] = u_offsets.Last() + p_offsets.Last();
 
    SetupBCVariables();
 
@@ -441,19 +448,43 @@ void StokesSolver::AssembleOperator()
       }
    }
 
+   // global block matrix.
    M = mMat->CreateMonolithic();
    B = bMat->CreateMonolithic();
+   Bt = Transpose(*B);
 
-   // pressure mass matrix for preconditioner.
-   pmMat = new BlockMatrix(p_offsets);
-   for (int m = 0; m < numSub; m++)
+   systemOp = new BlockMatrix(vblock_offsets);
+   systemOp->SetBlock(0,0, M);
+   systemOp->SetBlock(0,1, Bt);
+   systemOp->SetBlock(1,0, B);
+
+   if (direct_solve)
    {
-      pms[m]->Assemble();
-      pms[m]->Finalize();
+      systemOp_mono = systemOp->CreateMonolithic();
 
-      pmMat->SetBlock(m, m, &(pms[m]->SpMat()));
+      // TODO: need to change when the actual parallelization is implemented.
+      sys_glob_size = systemOp_mono->NumRows();
+      sys_row_starts[0] = 0;
+      sys_row_starts[1] = systemOp_mono->NumRows();
+      systemOp_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, systemOp_mono);
+
+      mumps = new MUMPSSolver();
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+      mumps->SetOperator(*systemOp_hypre);
    }
-   pM = pmMat->CreateMonolithic();
+   else
+   {
+      // pressure mass matrix for preconditioner.
+      pmMat = new BlockMatrix(p_offsets);
+      for (int m = 0; m < numSub; m++)
+      {
+         pms[m]->Assemble();
+         pms[m]->Finalize();
+
+         pmMat->SetBlock(m, m, &(pms[m]->SpMat()));
+      }
+      pM = pmMat->CreateMonolithic();
+   }
 }
 
 void StokesSolver::AssembleInterfaceMatrixes()
@@ -669,12 +700,6 @@ void StokesSolver::Solve()
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
-   // offsets for global block system.
-   Array<int> vblock_offsets(3); // number of variables + 1
-   vblock_offsets[0] = 0;
-   vblock_offsets[1] = u_offsets.Last();
-   vblock_offsets[2] = u_offsets.Last() + p_offsets.Last();
-
    // same size as var_offsets, but sorted by variables first (then by subdomain).
    Array<int> offsets_byvar(num_var * numSub + 1);
    offsets_byvar = 0;
@@ -690,57 +715,67 @@ void StokesSolver::Solve()
    SortByVariables(*RHS, rhs_byvar);
    sol_byvar = 0.0;
 
-   // global block matrix.
-   SparseMatrix *Bt = Transpose(*B);
-   BlockMatrix systemOp(vblock_offsets);
-   systemOp.SetBlock(0,0, M);
-   systemOp.SetBlock(0,1, Bt);
-   systemOp.SetBlock(1,0, B);
-
-   HypreParMatrix *Mop = NULL;
-   HypreBoomerAMG *amg_prec = NULL;
-   GSSmoother *p_prec = NULL;
-   OrthoSolver *ortho_p_prec = NULL;
-   BlockDiagonalPreconditioner *systemPrec = NULL;
-
-   // TODO: need to change when the actual parallelization is implemented.
-   HYPRE_BigInt glob_size = M->NumRows();
-   HYPRE_BigInt row_starts[2] = {0, M->NumRows()};
-
-   if (use_amg)
+   if (direct_solve)
    {
-      // velocity amg preconditioner
-      Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
-      amg_prec = new HypreBoomerAMG(*Mop);
-      amg_prec->SetPrintLevel(0);
-      amg_prec->SetSystemsOptions(vdim[0], true);
+      assert(mumps);
 
-      // pressure mass preconditioner
-      p_prec = new GSSmoother(*pM);
-      if (!pres_dbc)
+      mumps->SetPrintLevel(print_level);
+      mumps->Mult(rhs_byvar, sol_byvar);
+   }
+   else
+   {
+      HypreParMatrix *Mop = NULL;
+      HypreBoomerAMG *amg_prec = NULL;
+      GSSmoother *p_prec = NULL;
+      OrthoSolver *ortho_p_prec = NULL;
+      BlockDiagonalPreconditioner *systemPrec = NULL;
+
+      // TODO: need to change when the actual parallelization is implemented.
+      HYPRE_BigInt glob_size = M->NumRows();
+      HYPRE_BigInt row_starts[2] = {0, M->NumRows()};
+
+      if (use_amg)
       {
-         ortho_p_prec = new OrthoSolver;
-         ortho_p_prec->SetSolver(*p_prec);
-         ortho_p_prec->SetOperator(*pM);
+         // velocity amg preconditioner
+         Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
+         amg_prec = new HypreBoomerAMG(*Mop);
+         amg_prec->SetPrintLevel(0);
+         amg_prec->SetSystemsOptions(vdim[0], true);
+
+         // pressure mass preconditioner
+         p_prec = new GSSmoother(*pM);
+         if (!pres_dbc)
+         {
+            ortho_p_prec = new OrthoSolver;
+            ortho_p_prec->SetSolver(*p_prec);
+            ortho_p_prec->SetOperator(*pM);
+         }
+
+         systemPrec = new BlockDiagonalPreconditioner(vblock_offsets);
+         systemPrec->SetDiagonalBlock(0, amg_prec);
+         if (pres_dbc)
+            systemPrec->SetDiagonalBlock(1, p_prec);
+         else
+            systemPrec->SetDiagonalBlock(1, ortho_p_prec);
       }
 
-      systemPrec = new BlockDiagonalPreconditioner(vblock_offsets);
-      systemPrec->SetDiagonalBlock(0, amg_prec);
-      if (pres_dbc)
-         systemPrec->SetDiagonalBlock(1, p_prec);
-      else
-         systemPrec->SetDiagonalBlock(1, ortho_p_prec);
-   }
+      MINRESSolver solver;
+      solver.SetAbsTol(atol);
+      solver.SetRelTol(rtol);
+      solver.SetMaxIter(maxIter);
+      solver.SetOperator(*systemOp);
+      if (use_amg)
+         solver.SetPreconditioner(*systemPrec);
+      solver.SetPrintLevel(print_level);
+      solver.Mult(rhs_byvar, sol_byvar);
 
-   MINRESSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   solver.SetOperator(systemOp);
-   if (use_amg)
-      solver.SetPreconditioner(*systemPrec);
-   solver.SetPrintLevel(print_level);
-   solver.Mult(rhs_byvar, sol_byvar);
+      if (use_amg)
+      {
+         delete Mop, amg_prec, p_prec;
+         if (pres_dbc) delete ortho_p_prec;
+         delete systemPrec;
+      }
+   }
 
    // orthogonalize the pressure.
    if (!pres_dbc)
@@ -753,14 +788,6 @@ void StokesSolver::Solve()
    }
 
    SortBySubdomains(sol_byvar, *U);
-
-   if (use_amg)
-   {
-      delete Mop, amg_prec, p_prec;
-      if (pres_dbc) delete ortho_p_prec;
-      delete systemPrec;
-   }
-   delete Bt;
 }
 
 void StokesSolver::Solve_obsolete()

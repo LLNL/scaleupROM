@@ -157,11 +157,27 @@ public:
 class MFEMROMHandler : public ROMHandler
 {
 protected:
+   // type for linear system solver.
+   enum SolverType
+   {
+      DIRECT,
+      CG,
+      MINRES,
+      NUM_SOLVERTYPE
+   } linsol_type;
+   MUMPSSolver::MatType mat_type;
+
    // rom variables.
    Array<DenseMatrix*> spatialbasis;
 
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;
+
+   // variables needed for direct solve
+   HYPRE_BigInt sys_glob_size;
+   HYPRE_BigInt sys_row_starts[2];
+   HypreParMatrix *romMat_hypre = NULL;
+   MUMPSSolver *mumps = NULL;
    
    mfem::BlockVector *reduced_rhs = NULL;
    mfem::BlockVector *reduced_sol = NULL;
@@ -200,9 +216,10 @@ public:
    { PrintVector(*reduced_rhs, filename); }
 
 private:
-   IterativeSolver* SetSolver(const std::string &solver_type, const std::string &prec_type);
+   IterativeSolver* SetIterativeSolver(const MFEMROMHandler::SolverType &linsol_type_, const std::string &prec_type);
    // void GetBlockSparsity(const SparseMatrix *mat, const Array<int> &block_offsets, Array2D<bool> &mat_zero_blocks);
    // bool CheckZeroBlock(const DenseMatrix &mat);
+   void SetupDirectSolver();
 };
 
 

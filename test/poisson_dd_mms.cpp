@@ -20,6 +20,15 @@ TEST(DDSerialTest, Test_convergence)
    return;
 }
 
+TEST(DDSerialTest, Test_direct_solver)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["solver"]["direct_solve"] = true;
+   CheckConvergence();
+
+   return;
+}
+
 TEST(DDSerial_component_wise_test, Test_convergence)
 {
    config = InputParser("inputs/dd_mms.component.yml");
