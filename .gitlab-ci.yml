@@ -33,6 +33,28 @@ parser:
     - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_parser
     # - mpirun -n 4 ./test_parser
 
+dg_integ_mms:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./dg_integ_mms
+
+nonlinear_integ_grad:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./nonlinear_integ_grad
+
 poisson_dd_mms:
   stage: test
   dependencies:

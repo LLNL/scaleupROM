@@ -170,7 +170,7 @@ TEST(IncompressibleInviscidFlux, Test_grad)
    return;
 }
 
-TEST(DGLaxFriedrichsFlux, Test_grad)
+TEST(DGLaxFriedrichsFlux, Test_grad_interior)
 {
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["discretization"]["order"] = 1;
@@ -183,7 +183,20 @@ TEST(DGLaxFriedrichsFlux, Test_grad)
    return;
 }
 
-TEST(DGTemamFlux, Test_grad)
+TEST(DGLaxFriedrichsFlux, Test_grad_bdr)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+
+   ConstantCoefficient pi(3.141592);
+   auto *nlc_nlfi = new DGLaxFriedrichsFluxIntegrator(pi);
+    
+   CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+
+   return;
+}
+
+TEST(DGTemamFlux, Test_grad_interior)
 {
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["discretization"]["order"] = 1;
@@ -195,6 +208,19 @@ TEST(DGTemamFlux, Test_grad)
 
    return;
 }
+
+// TEST(DGTemamFlux, Test_grad_bdr)
+// {
+//    config = InputParser("inputs/dd_mms.yml");
+//    config.dict_["discretization"]["order"] = 1;
+
+//    ConstantCoefficient pi(3.141592);
+//    auto *nlc_nlfi = new DGTemamFluxIntegrator(pi);
+    
+//    CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+
+//    return;
+// }
 
 int main(int argc, char* argv[])
 {
