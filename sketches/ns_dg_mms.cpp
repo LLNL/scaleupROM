@@ -49,7 +49,7 @@
 using namespace std;
 using namespace mfem;
 
-static double nu = 1.1;
+static double nu = 0.1;
 static double zeta = 1.0;
 
 // Define the analytical solution and forcing terms / boundary conditions
@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
    // pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(nu), zeta_coeff(zeta);
+   ConstantCoefficient k(nu), zeta_coeff(zeta), half_zeta(0.5 * zeta), minus_half_zeta(-0.5 * zeta);
    ConstantCoefficient minus_one(-1.0), one(1.0), half(0.5), minus_half(-0.5);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
@@ -366,6 +366,8 @@ int main(int argc, char *argv[])
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
+
+   fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
 
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
@@ -406,16 +408,17 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half);
-   // auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
-   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(zeta_coeff);
+   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half_zeta);
+   auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
+   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(zeta_coeff);
    nlc_nlfi1->SetIntRule(&gll_ir_nl);
-   // nlc_nlfi2->SetIntRule(&gll_ir_nl);
+   nlc_nlfi2->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi1);
-   // nVarf->AddDomainIntegrator(nlc_nlfi2);
-   // if (use_dg)
+   nVarf->AddDomainIntegrator(nlc_nlfi2);
+   if (use_dg)
       // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-      // nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half));
+      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half_zeta));
+   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(minus_half_zeta), u_ess_attr);
    // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
 

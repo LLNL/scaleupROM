@@ -90,6 +90,8 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
    double gg = grad * grad;
    printf("gg: %.5E\n", gg);
 
+   // EXPECT_TRUE(gg > 1.0e-12);
+
    // printf("N[u]\n");
    // for (int k = 0 ; k < Nu.Size(); k++)
    //    printf("%.1E\t", Nu(k));
@@ -115,7 +117,8 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
    for (int k = 0; k < 40; k++)
    {
       double amp = pow(10.0, -0.25 * k);
-      double dx = amp / sqrt(gg);
+      double dx = amp;
+      if (gg > 1.0e-14) dx /= sqrt(gg);
 
       u.Set(1.0, u0);
       u.Add(dx, grad);
@@ -123,7 +126,8 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
       nform->Mult(u, Nu);
       double J1 = us * (Nu);
       double dJdx = (J1 - J0) / dx;
-      double error = abs((dJdx - gg) / gg);
+      double error = abs((dJdx - gg));
+      if (gg > 1.0e-14) error /= abs(gg);
 
       printf("%.5E\t%.5E\t%.5E\t%.5E\t%.5E\n", amp, J0, J1, dJdx, error);
 
@@ -210,18 +214,18 @@ TEST(DGTemamFlux, Test_grad_interior)
    return;
 }
 
-// TEST(DGTemamFlux, Test_grad_bdr)
-// {
-//    config = InputParser("inputs/dd_mms.yml");
-//    config.dict_["discretization"]["order"] = 1;
+TEST(DGTemamFlux, Test_grad_bdr)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
 
-//    ConstantCoefficient pi(3.141592);
-//    auto *nlc_nlfi = new DGTemamFluxIntegrator(pi);
+   ConstantCoefficient pi(3.141592);
+   auto *nlc_nlfi = new DGTemamFluxIntegrator(pi);
     
-//    CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+   CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
 
-//    return;
-// }
+   return;
+}
 
 int main(int argc, char* argv[])
 {

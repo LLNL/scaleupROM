@@ -41,6 +41,9 @@
 #include <algorithm>
 #include "linalg_utils.hpp"
 #include "nonlinear_integ.hpp"
+#include "dg_mixed_bilin.hpp"
+#include "dg_bilinear.hpp"
+#include "dg_linear.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -305,7 +308,7 @@ int main(int argc, char *argv[])
    pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(nu), minus_one(-1.0), one(1.0);
+   ConstantCoefficient k(nu), minus_one(-1.0), one(1.0), half(0.5), minus_half(0.5);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
@@ -346,6 +349,8 @@ int main(int argc, char *argv[])
    fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(dudxcoeff), p_ess_attr);
    fform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(uuxcoeff), p_ess_attr);
 
+   // fform->AddBoundaryIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half), u_ess_attr); 
+
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
 
@@ -378,10 +383,12 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
+   // auto *nlc_nlfi2 = new VectorConvectionNLFIntegrator(half);
    auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(minus_one);
    nlc_nlfi->SetIntRule(&gll_ir_nl);
+   // nlc_nlfi2->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi);
+   // nVarf->AddDomainIntegrator(nlc_nlfi2);
    nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
    // btVarf->AddDomainIntegrator(new MixedScalarWeakGradientIntegrator);
