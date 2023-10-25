@@ -75,6 +75,29 @@ double error(Operator &M, Vector &x, Vector &b)
    return tmp;
 }
 
+namespace problem
+{
+
+Vector u0, du, offsets;
+DenseMatrix k;
+
+void ubdr(const Vector &x, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   
+   for (int i = 0; i < dim; i++)
+   {
+      double kx = 0.0;
+      for (int j = 0; j < dim; j++) kx += k(j, i) * x(j);
+      kx -= offsets(i);
+      kx *= 2.0 * (4.0 * atan(1.0));
+      y(i) = u0(i) + du(i) * sin(kx);
+   }
+}
+
+}
+
 double diff(Vector &a, Vector &b)
 {
    assert(a.Size() == b.Size());
@@ -111,7 +134,8 @@ private:
    FiniteElementSpace *ufes, *pfes;
 
    ConstantCoefficient nu, zeta;
-   ConstantCoefficient one, minus_one, half, minus_half;
+   ConstantCoefficient zero, one, minus_one, half, minus_half;
+   VectorFunctionCoefficient *ubdr = NULL;
 
    BlockVector *x, *rhs;
    GridFunction *u, *p;
@@ -147,7 +171,7 @@ public:
                       const bool use_dg_ = false, const bool pres_dbc_ = false)
       : mesh(mesh_), dim(mesh_->Dimension()), order(order_), sigma(-1.0), kappa((order_+2)*(order_+2)),
         nu(nu_), zeta(zeta_), use_dg(use_dg_), pres_dbc(pres_dbc_),
-        one(1.0), minus_one(-1.0), half(0.), minus_half(-0.5)
+        zero(0.0), one(1.0), minus_one(-1.0), half(0.), minus_half(-0.5)
    {
       if (use_dg)
       {
@@ -268,6 +292,54 @@ public:
       up = Transpose(*pu);
    }
 
+   void SetupProblem()
+   {
+      //     3
+      //     __
+      //  4 |  |  2
+      //     --
+      //     1
+      // 5: cylinder
+
+      u_ess_attr = 0;
+      pres_dbc = true;
+      delete ubdr;
+      ubdr = new VectorFunctionCoefficient(dim, problem::ubdr);
+
+      if (problem::u0(0) >= 0.0)
+         u_ess_attr[3] = 1;
+      else
+         u_ess_attr[1] = 1;
+
+      if (problem::u0(1) >= 0.0)
+         u_ess_attr[0] = 1;
+      else
+         u_ess_attr[2] = 1;
+
+      F->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*ubdr, nu, sigma, kappa), u_ess_attr);
+      // F->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
+      F->Assemble();
+      F->SyncAliasMemory(*rhs);
+
+      G->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*ubdr), u_ess_attr);
+      G->Assemble();
+      G->SyncAliasMemory(*rhs);
+
+      // no-slip wall cylinder
+      u_ess_attr.Last() = 1;
+
+      M->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(nu, sigma, kappa), u_ess_attr);
+      M->Assemble();
+      M->Finalize();
+
+      S->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, u_ess_attr);
+      S->Assemble();
+      S->Finalize();
+
+      pu = &(S->SpMat());
+      up = Transpose(*pu);
+   }
+
    /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
    virtual void Mult(const Vector &x, Vector &y) const
    {
@@ -315,7 +387,7 @@ public:
       delete x, rhs;
       delete u, p;
       delete ufec, pfec, ufes, pfes;
-      // delete J_solver, newton_solver;
+      delete J_solver, newton_solver;
       // delete jac_prec;
       // delete pMass, p_prec, ortho_p_prec;
    }
@@ -354,6 +426,9 @@ int main(int argc, char *argv[])
    const char *device_config = "cpu";
    bool visualization = 1;
    bool use_dg = false;
+   bool mms = false;
+   bool sample = false;
+   int nsample = -1;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -367,6 +442,12 @@ int main(int argc, char *argv[])
                   "Use pressure Dirichlet condition.");
    args.AddOption(&use_dg, "-dg", "--use-dg", "-no-dg", "--no-use-dg",
                   "Use discontinuous Galerkin scheme.");
+   args.AddOption(&mms, "-mms", "--mms", "-no-mms", "--no-mms",
+                  "Solve for manufactured solution.");
+   args.AddOption(&sample, "-sample", "--sample", "-no-sample", "--no-sample",
+                  "Generate samples. specify -ns.");
+   args.AddOption(&nsample, "-ns", "--nsample",
+                  "Number of samples to be generated.");
    args.Parse();
    if (!args.Good())
    {
@@ -380,7 +461,7 @@ int main(int argc, char *argv[])
    // 3. Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
    //    the same code.
-   Mesh *mesh = new Mesh(mesh_file, 1, 1);
+   Mesh *mesh = new Mesh(mesh_file);
    int dim = mesh->Dimension();
 
    // 4. Refine the mesh to increase the resolution. In this example we do
@@ -394,65 +475,103 @@ int main(int argc, char *argv[])
 
    SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
 
-   VectorFunctionCoefficient fcoeff(dim, fFun);
-   FunctionCoefficient gcoeff(gFun);
-
-   VectorFunctionCoefficient ucoeff(dim, uFun_ex);
-   FunctionCoefficient pcoeff(pFun_ex);
-
-   FiniteElementSpace *ufes = oper.GetUfes();
-   FiniteElementSpace *pfes = oper.GetPfes();
-   GridFunction u_ex(ufes), p_ex(pfes);
-   u_ex.ProjectCoefficient(ucoeff);
-   p_ex.ProjectCoefficient(pcoeff);
-   const double p_const = p_ex.Sum() / static_cast<double>(p_ex.Size());
-
-   // 12. Create the grid functions u and p. Compute the L2 error norms.
-   GridFunction *u = oper.GetVelocityGridFunction();
-   GridFunction *p = oper.GetPressureGridFunction();
-
-   oper.SetupMMS(fcoeff, gcoeff, ucoeff);
-   oper.Solve();
-
-   if (!pres_dbc)
+   if (mms)
    {
-      (*p) += p_const;
-   }
+      VectorFunctionCoefficient fcoeff(dim, fFun);
+      FunctionCoefficient gcoeff(gFun);
 
-   int order_quad = max(2, 2*(order+1)+1);
-   const IntegrationRule *irs[Geometry::NumGeom];
-   for (int i=0; i < Geometry::NumGeom; ++i)
+      VectorFunctionCoefficient ucoeff(dim, uFun_ex);
+      FunctionCoefficient pcoeff(pFun_ex);
+
+      FiniteElementSpace *ufes = oper.GetUfes();
+      FiniteElementSpace *pfes = oper.GetPfes();
+      GridFunction u_ex(ufes), p_ex(pfes);
+      u_ex.ProjectCoefficient(ucoeff);
+      p_ex.ProjectCoefficient(pcoeff);
+      const double p_const = p_ex.Sum() / static_cast<double>(p_ex.Size());
+
+      // 12. Create the grid functions u and p. Compute the L2 error norms.
+      GridFunction *u = oper.GetVelocityGridFunction();
+      GridFunction *p = oper.GetPressureGridFunction();
+
+      oper.SetupMMS(fcoeff, gcoeff, ucoeff);
+      oper.Solve();
+
+      if (!pres_dbc)
+      {
+         (*p) += p_const;
+      }
+
+      int order_quad = max(2, 2*(order+1)+1);
+      const IntegrationRule *irs[Geometry::NumGeom];
+      for (int i=0; i < Geometry::NumGeom; ++i)
+      {
+         irs[i] = &(IntRules.Get(i, order_quad));
+      }
+
+      double err_u  = u->ComputeL2Error(ucoeff, irs);
+      double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+      double err_p  = p->ComputeL2Error(pcoeff, irs);
+      double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
+
+      printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+      printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+
+      // GridFunction tmp(u);
+      // nVarf->Mult(u, tmp);
+
+      // printf("u\ttmp\n");
+      // for (int k = 0; k < u.Size(); k++)
+      //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
+
+      // 15. Save data in the ParaView format
+      ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
+      // paraview_dc.SetPrefixPath("ParaView");
+      paraview_dc.SetLevelsOfDetail(order);
+      // paraview_dc.SetCycle(0);
+   //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
+   //    paraview_dc.SetHighOrderOutput(true);
+   //    paraview_dc.SetTime(0.0); // set the time
+      paraview_dc.RegisterField("velocity", u);
+      paraview_dc.RegisterField("pressure", p);
+      paraview_dc.Save();
+   }  // mms mode
+   else if (sample)
    {
-      irs[i] = &(IntRules.Get(i, order_quad));
+      assert(nsample > 0);
+
+      problem::u0.SetSize(mesh->Dimension());
+      problem::du.SetSize(mesh->Dimension());
+      problem::offsets.SetSize(mesh->Dimension());
+      problem::k.SetSize(mesh->Dimension(), mesh->Dimension());
+
+      for (int s = 0; s < nsample; s++)
+      {
+         for (int d = 0; d < problem::u0.Size(); d++)
+         {
+            problem::u0(d) = 2.0 * UniformRandom() - 1.0;
+            problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
+            problem::offsets(d) = UniformRandom();
+
+            for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+               problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+         }
+
+         oper.SetupProblem();
+         oper.Solve();
+
+         GridFunction *u = oper.GetVelocityGridFunction();
+         GridFunction *p = oper.GetPressureGridFunction();
+
+         // 15. Save data in the ParaView format
+         ParaViewDataCollection paraview_dc("ns_sample_paraview", mesh);
+         paraview_dc.SetLevelsOfDetail(max(3,order+1));
+         paraview_dc.RegisterField("velocity", u);
+         paraview_dc.RegisterField("pressure", p);
+         paraview_dc.Save();
+      }
    }
-
-   double err_u  = u->ComputeL2Error(ucoeff, irs);
-   double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
-   double err_p  = p->ComputeL2Error(pcoeff, irs);
-   double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
-
-   printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-   printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
-
-   // GridFunction tmp(u);
-   // nVarf->Mult(u, tmp);
-
-   // printf("u\ttmp\n");
-   // for (int k = 0; k < u.Size(); k++)
-   //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
-
-   // 15. Save data in the ParaView format
-   ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
-   // paraview_dc.SetPrefixPath("ParaView");
-   paraview_dc.SetLevelsOfDetail(order);
-   // paraview_dc.SetCycle(0);
-//    paraview_dc.SetDataFormat(VTKFormat::BINARY);
-//    paraview_dc.SetHighOrderOutput(true);
-//    paraview_dc.SetTime(0.0); // set the time
-   paraview_dc.RegisterField("velocity", u);
-   paraview_dc.RegisterField("pressure", p);
-   paraview_dc.Save();
-
+   
    // 17. Free the used memory.
    delete mesh;
 
