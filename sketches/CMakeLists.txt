@@ -25,6 +25,7 @@ add_executable(dg_bdr_norm_lf dg_bdr_norm_lf.cpp $<TARGET_OBJECTS:scaleupROMObj>
 add_executable(precond precond.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(ns_mms ns_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(ns_dg_mms ns_dg_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_executable(ns_rom ns_rom.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
 file(COPY inputs/gen_interface.yml DESTINATION ${CMAKE_BINARY_DIR}/sketches/inputs)
 file(COPY meshes/2x2.mesh DESTINATION ${CMAKE_BINARY_DIR}/sketches/meshes)
