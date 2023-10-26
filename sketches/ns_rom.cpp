@@ -52,6 +52,8 @@ using namespace mfem;
 static double nu = 0.1;
 static double zeta = 1.0;
 
+enum Mode { MMS, SAMPLE, COMPARE, NUM_MODE };
+
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
 double pFun_ex(const Vector & x);
@@ -428,8 +430,8 @@ int main(int argc, char *argv[])
    const char *device_config = "cpu";
    bool visualization = 1;
    bool use_dg = false;
-   bool mms = false;
-   bool sample = false;
+   const char *mode_str = "";
+   Mode mode = Mode::NUM_MODE;
    bool random_sample = true;
    int nsample = -1;
 
@@ -445,10 +447,8 @@ int main(int argc, char *argv[])
                   "Use pressure Dirichlet condition.");
    args.AddOption(&use_dg, "-dg", "--use-dg", "-no-dg", "--no-use-dg",
                   "Use discontinuous Galerkin scheme.");
-   args.AddOption(&mms, "-mms", "--mms", "-no-mms", "--no-mms",
-                  "Solve for manufactured solution.");
-   args.AddOption(&sample, "-sample", "--sample", "-no-sample", "--no-sample",
-                  "Generate samples. specify -ns.");
+   args.AddOption(&mode_str, "-mode", "--mode",
+                  "Mode: mms, sample, compare");
    args.AddOption(&random_sample, "-rs", "--random-sample", "-no-rs", "--no-random-sample",
                   "Sample will be generated randomly.");
    args.AddOption(&nsample, "-ns", "--nsample",
@@ -462,6 +462,13 @@ int main(int argc, char *argv[])
    args.PrintOptions(cout);
 
    assert(!pres_dbc);
+   if (!strcmp(mode_str, "mms"))             mode = Mode::MMS;
+   else if (!strcmp(mode_str, "sample"))     mode = Mode::SAMPLE;
+   else if (!strcmp(mode_str, "compare"))    mode = Mode::COMPARE;
+   else
+   {
+      mfem_error("Unknown mode!\n");
+   }
 
    // 3. Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
@@ -478,137 +485,146 @@ int main(int argc, char *argv[])
       mesh->UniformRefinement();
    }
 
-   if (mms)
+   switch (mode)
    {
-      SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-
-      VectorFunctionCoefficient fcoeff(dim, fFun);
-      FunctionCoefficient gcoeff(gFun);
-
-      VectorFunctionCoefficient ucoeff(dim, uFun_ex);
-      FunctionCoefficient pcoeff(pFun_ex);
-
-      FiniteElementSpace *ufes = oper.GetUfes();
-      FiniteElementSpace *pfes = oper.GetPfes();
-      GridFunction u_ex(ufes), p_ex(pfes);
-      u_ex.ProjectCoefficient(ucoeff);
-      p_ex.ProjectCoefficient(pcoeff);
-      const double p_const = p_ex.Sum() / static_cast<double>(p_ex.Size());
-
-      // 12. Create the grid functions u and p. Compute the L2 error norms.
-      GridFunction *u = oper.GetVelocityGridFunction();
-      GridFunction *p = oper.GetPressureGridFunction();
-
-      oper.SetupMMS(fcoeff, gcoeff, ucoeff);
-      oper.Solve();
-
-      if (!pres_dbc)
+      case (Mode::MMS):
       {
-         (*p) += p_const;
-      }
-
-      int order_quad = max(2, 2*(order+1)+1);
-      const IntegrationRule *irs[Geometry::NumGeom];
-      for (int i=0; i < Geometry::NumGeom; ++i)
-      {
-         irs[i] = &(IntRules.Get(i, order_quad));
-      }
-
-      double err_u  = u->ComputeL2Error(ucoeff, irs);
-      double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
-      double err_p  = p->ComputeL2Error(pcoeff, irs);
-      double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
-
-      printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-      printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
-
-      // GridFunction tmp(u);
-      // nVarf->Mult(u, tmp);
-
-      // printf("u\ttmp\n");
-      // for (int k = 0; k < u.Size(); k++)
-      //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
-
-      // 15. Save data in the ParaView format
-      ParaViewDataCollection paraview_dc("ns_mms_paraview", mesh);
-      // paraview_dc.SetPrefixPath("ParaView");
-      paraview_dc.SetLevelsOfDetail(order);
-      // paraview_dc.SetCycle(0);
-   //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
-   //    paraview_dc.SetHighOrderOutput(true);
-   //    paraview_dc.SetTime(0.0); // set the time
-      paraview_dc.RegisterField("velocity", u);
-      paraview_dc.RegisterField("pressure", p);
-      paraview_dc.Save();
-   }  // mms mode
-   else if (sample)
-   {
-      if (!random_sample) nsample = 4;
-      assert(nsample > 0);
-
-      problem::u0.SetSize(mesh->Dimension());
-      problem::du.SetSize(mesh->Dimension());
-      problem::offsets.SetSize(mesh->Dimension());
-      problem::k.SetSize(mesh->Dimension(), mesh->Dimension());
-
-      SteadyNavierStokes *temp = new SteadyNavierStokes(mesh, order, nu, zeta, use_dg, pres_dbc);
-      const int fom_vdofs = temp->Height();
-      delete temp;
-      std::string filename = "ns_rom";
-      CAROM::Options option(fom_vdofs, nsample, 1, false);
-      CAROM::BasisGenerator snapshot_generator(option, false, filename);
-
-      for (int s = 0; s < nsample; s++)
-      {
-         if (random_sample)
-         {
-            for (int d = 0; d < problem::u0.Size(); d++)
-            {
-               problem::u0(d) = 2.0 * UniformRandom() - 1.0;
-               problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
-               problem::offsets(d) = UniformRandom();
-
-               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
-                  problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
-            }
-         }
-         else
-         {
-            problem::du = 0.0;
-            problem::offsets = 0.0;
-            problem::k = 0.0;
-
-            problem::u0(0) = (s / 2 == 0) ? 1.0 : -1.0;
-            problem::u0(1) = (s % 2 == 0) ? 1.0 : -1.0;
-            printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
-         }
-
          SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-         oper.SetupProblem();
+
+         VectorFunctionCoefficient fcoeff(dim, fFun);
+         FunctionCoefficient gcoeff(gFun);
+
+         VectorFunctionCoefficient ucoeff(dim, uFun_ex);
+         FunctionCoefficient pcoeff(pFun_ex);
+
+         FiniteElementSpace *ufes = oper.GetUfes();
+         FiniteElementSpace *pfes = oper.GetPfes();
+         GridFunction u_ex(ufes), p_ex(pfes);
+         u_ex.ProjectCoefficient(ucoeff);
+         p_ex.ProjectCoefficient(pcoeff);
+         const double p_const = p_ex.Sum() / static_cast<double>(p_ex.Size());
+
+         // 12. Create the grid functions u and p. Compute the L2 error norms.
+         GridFunction *u = oper.GetVelocityGridFunction();
+         GridFunction *p = oper.GetPressureGridFunction();
+
+         oper.SetupMMS(fcoeff, gcoeff, ucoeff);
          oper.Solve();
 
-         snapshot_generator.takeSample(oper.GetSolution()->GetData(), 0.0, 0.01);
+         if (!pres_dbc)
+         {
+            (*p) += p_const;
+         }
 
-         // GridFunction *u = oper.GetVelocityGridFunction();
-         // GridFunction *p = oper.GetPressureGridFunction();
+         int order_quad = max(2, 2*(order+1)+1);
+         const IntegrationRule *irs[Geometry::NumGeom];
+         for (int i=0; i < Geometry::NumGeom; ++i)
+         {
+            irs[i] = &(IntRules.Get(i, order_quad));
+         }
 
-         // // 15. Save data in the ParaView format
-         // ParaViewDataCollection paraview_dc("ns_sample_paraview", mesh);
-         // paraview_dc.SetLevelsOfDetail(max(3,order+1));
-         // paraview_dc.RegisterField("velocity", u);
-         // paraview_dc.RegisterField("pressure", p);
-         // paraview_dc.Save();
+         double err_u  = u->ComputeL2Error(ucoeff, irs);
+         double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+         double err_p  = p->ComputeL2Error(pcoeff, irs);
+         double norm_p = ComputeLpNorm(2., pcoeff, *mesh, irs);
+
+         printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+         printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+
+         // GridFunction tmp(u);
+         // nVarf->Mult(u, tmp);
+
+         // printf("u\ttmp\n");
+         // for (int k = 0; k < u.Size(); k++)
+         //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
+
+         // 15. Save data in the ParaView format
+         ParaViewDataCollection paraview_dc("ns_mms_paraview", mesh);
+         // paraview_dc.SetPrefixPath("ParaView");
+         paraview_dc.SetLevelsOfDetail(order);
+         // paraview_dc.SetCycle(0);
+      //    paraview_dc.SetDataFormat(VTKFormat::BINARY);
+      //    paraview_dc.SetHighOrderOutput(true);
+      //    paraview_dc.SetTime(0.0); // set the time
+         paraview_dc.RegisterField("velocity", u);
+         paraview_dc.RegisterField("pressure", p);
+         paraview_dc.Save();
       }
+      break;
+      case (Mode::SAMPLE):
+      {
+         if (!random_sample) nsample = 4;
+         assert(nsample > 0);
 
-      snapshot_generator.writeSnapshot();
-      snapshot_generator.endSamples();
+         problem::u0.SetSize(mesh->Dimension());
+         problem::du.SetSize(mesh->Dimension());
+         problem::offsets.SetSize(mesh->Dimension());
+         problem::k.SetSize(mesh->Dimension(), mesh->Dimension());
 
-      const CAROM::Vector *rom_sv = snapshot_generator.getSingularValues();
-      printf("Singular values: ");
-      for (int d = 0; d < rom_sv->dim(); d++)
-         printf("%.3E\t", rom_sv->item(d));
-      printf("\n");
-   }
+         SteadyNavierStokes *temp = new SteadyNavierStokes(mesh, order, nu, zeta, use_dg, pres_dbc);
+         const int fom_vdofs = temp->Height();
+         delete temp;
+         std::string filename = "ns_rom";
+         CAROM::Options option(fom_vdofs, nsample, 1, false);
+         CAROM::BasisGenerator snapshot_generator(option, false, filename);
+
+         for (int s = 0; s < nsample; s++)
+         {
+            if (random_sample)
+            {
+               for (int d = 0; d < problem::u0.Size(); d++)
+               {
+                  problem::u0(d) = 2.0 * UniformRandom() - 1.0;
+                  problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
+                  problem::offsets(d) = UniformRandom();
+
+                  for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                     problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+               }
+            }
+            else
+            {
+               problem::du = 0.0;
+               problem::offsets = 0.0;
+               problem::k = 0.0;
+
+               problem::u0(0) = (s / 2 == 0) ? 1.0 : -1.0;
+               problem::u0(1) = (s % 2 == 0) ? 1.0 : -1.0;
+               printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
+            }
+
+            SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+            oper.SetupProblem();
+            oper.Solve();
+
+            snapshot_generator.takeSample(oper.GetSolution()->GetData(), 0.0, 0.01);
+
+            // GridFunction *u = oper.GetVelocityGridFunction();
+            // GridFunction *p = oper.GetPressureGridFunction();
+
+            // // 15. Save data in the ParaView format
+            // ParaViewDataCollection paraview_dc("ns_sample_paraview", mesh);
+            // paraview_dc.SetLevelsOfDetail(max(3,order+1));
+            // paraview_dc.RegisterField("velocity", u);
+            // paraview_dc.RegisterField("pressure", p);
+            // paraview_dc.Save();
+         }
+
+         snapshot_generator.writeSnapshot();
+         snapshot_generator.endSamples();
+
+         const CAROM::Vector *rom_sv = snapshot_generator.getSingularValues();
+         printf("Singular values: ");
+         for (int d = 0; d < rom_sv->dim(); d++)
+            printf("%.3E\t", rom_sv->item(d));
+         printf("\n");
+      }
+      break;
+      default:
+      {
+         mfem_error("Unknown main mode!\n");
+      }
+   }  // mms mode
    
    // 17. Free the used memory.
    delete mesh;
