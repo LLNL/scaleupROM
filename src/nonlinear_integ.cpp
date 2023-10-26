@@ -574,4 +574,44 @@ void DGTemamFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
    }
 }
 
+void VectorConvectionTrilinearFormIntegrator::AssembleElementVector(
+   const FiniteElement &el,
+   ElementTransformation &T,
+   const Vector &elfun,
+   Vector &elvect)
+{
+   const int nd = el.GetDof();
+   dim = el.GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+   elvect.SetSize(nd * dim);
+   gradEF.SetSize(dim);
+
+   EF.UseExternalData(elfun.GetData(), nd, dim);
+   ELV.UseExternalData(elvect.GetData(), nd, dim);
+
+   Vector vec1(dim), vec2(dim);
+   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(el, T);
+   ELV = 0.0;
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      T.SetIntPoint(&ip);
+      el.CalcShape(ip, shape);
+      el.CalcPhysDShape(T, dshape);
+      double w = ip.weight * T.Weight();
+      if (Q) { w *= Q->Eval(T, ip); }
+
+      MultAtB(EF, dshape, gradEF);
+      if (vQ)
+         vQ->Eval(vec1, T, ip);
+      else
+         EF.MultTranspose(shape, vec1);
+      gradEF.Mult(vec1, vec2);
+      vec2 *= w;
+      AddMultVWt(shape, vec2, ELV);
+   }
+}
+
 }

@@ -152,7 +152,7 @@ protected:
    mutable BlockMatrix *system_jac;
    mutable SparseMatrix *mono_jac, *uu, *up, *pu;
 
-   double atol=1.0e-10, rtol=1.0e-10;
+   double atol=1.0e-15, rtol=1.0e-15;
    int maxIter=10000;
    GMRESSolver *J_solver;
    NewtonSolver *newton_solver;
@@ -246,7 +246,7 @@ public:
       if (use_dg)
          S->AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
 
-      H->AddDomainIntegrator(new VectorConvectionNLFIntegrator(zeta));
+      H->AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(zeta));
       // if (use_dg)
       //    // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
       //    nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half_zeta));
@@ -405,11 +405,141 @@ public:
       }
    }
 
+   SparseMatrix* GetLinearTerm()
+   {
+      assert(up && pu);
+
+      BlockMatrix tmp(vblock_offsets);
+      tmp.SetBlock(0,0, &(M->SpMat()));
+      tmp.SetBlock(0,1, up);
+      tmp.SetBlock(1,0, pu);
+
+      return tmp.CreateMonolithic();
+   }
+
    BlockVector* GetSolution() { return x; }
+   BlockVector* GetRHS() { return rhs; }
    GridFunction* GetVelocityGridFunction() { return u; }
    GridFunction* GetPressureGridFunction() { return p; }
    FiniteElementSpace* GetUfes() { return ufes; }
    FiniteElementSpace* GetPfes() { return pfes; }
+   ConstantCoefficient* GetZeta() { return &zeta; }
+};
+
+class TensorROM : public Operator
+{
+protected:
+   DenseMatrix *lin_op = NULL;
+   DenseTensor *nlin_op = NULL;
+
+   mutable DenseMatrix *jac = NULL;
+public:
+   TensorROM(DenseMatrix &lin_op_, DenseTensor &nlin_op_)
+      : Operator(lin_op_.Height(), lin_op_.Width()), lin_op(&lin_op_),
+        nlin_op(&nlin_op_), jac(NULL) {}
+
+   ~TensorROM() { delete jac; }
+
+   void TensorContract(const Vector &xi, const Vector &xj, Vector &yk) const
+   {
+      assert(xi.Size() == nlin_op->SizeI());
+      assert(xj.Size() == nlin_op->SizeJ());
+      yk.SetSize(nlin_op->SizeK());
+
+      const double *tdata = nlin_op->Data();
+      const double *dxi, *dxj;
+      double *dyk = yk.HostWrite();
+      for (int k = 0; k < nlin_op->SizeK(); k++, dyk++)
+      {
+         (*dyk) = 0.0;
+
+         dxj = xj.HostRead();
+         for (int j = 0; j < nlin_op->SizeJ(); j++, dxj++)
+         {
+            dxi = xi.HostRead();
+            for (int i = 0; i < nlin_op->SizeI(); i++, dxi++, tdata++)
+            {
+               (*dyk) += (*tdata) * (*dxi) * (*dxj);
+            }
+         }
+      }
+
+      return;
+   }
+
+   void TensorAddMultTranspose(const Vector &x, const int axis, DenseMatrix &M) const 
+   {
+      int size_ax, size_nx;
+      int offset, stride;
+      switch (axis)
+      {
+         case 0:
+         {
+            assert(x.Size() == nlin_op->SizeI());
+            assert(M.NumRows() == nlin_op->SizeK());
+            assert(M.NumCols() == nlin_op->SizeJ());
+            size_ax = nlin_op->SizeI();
+            size_nx = nlin_op->SizeJ();
+            offset = nlin_op->SizeI();
+            stride = 1;
+         }
+         break;
+         case 1:
+         {
+            assert(x.Size() == nlin_op->SizeJ());
+            assert(M.NumRows() == nlin_op->SizeK());
+            assert(M.NumCols() == nlin_op->SizeI());
+            size_ax = nlin_op->SizeJ();
+            size_nx = nlin_op->SizeI();
+            offset = 1;
+            stride = nlin_op->SizeI();
+         }
+         break;
+         default:
+            mfem_error("TensorMult axis should be between 0 and 1!\n");
+            break;
+      }
+
+      const double *tdata, *dx;
+      double *dM = M.HostReadWrite();
+
+      for (int nx = 0; nx < size_nx; nx++)
+      {
+         for (int k = 0; k < nlin_op->SizeK(); k++, dM++)
+         {
+            // commented for AddMultTranspose.
+            // (*dM) = 0.0;
+
+            dx = x.HostRead();
+            tdata = nlin_op->GetData(k) + offset * nx;
+            for (int ax = 0; ax < size_ax; ax++, dx++)
+            {
+               (*dM) += (*tdata) * (*dx);
+               tdata += stride;
+            }
+         }
+      }
+
+      return;
+   }
+
+   virtual void Mult(const Vector &x, Vector &y) const
+   {
+      TensorContract(x, x, y);
+      lin_op->AddMult(x, y);
+   }
+
+   /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
+   virtual Operator &GetGradient(const Vector &x) const
+   {
+      delete jac;
+      jac = new DenseMatrix(*lin_op);
+      TensorAddMultTranspose(x, 0, *jac);
+      TensorAddMultTranspose(x, 1, *jac);
+
+      return *jac;
+   }
+
 };
 
 int main(int argc, char *argv[])
@@ -434,6 +564,7 @@ int main(int argc, char *argv[])
    Mode mode = Mode::NUM_MODE;
    bool random_sample = true;
    int nsample = -1;
+   int num_basis = -1;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -453,6 +584,8 @@ int main(int argc, char *argv[])
                   "Sample will be generated randomly.");
    args.AddOption(&nsample, "-ns", "--nsample",
                   "Number of samples to be generated.");
+   args.AddOption(&num_basis, "-nb", "--nbasis",
+                  "Number of basis for ROM.");
    args.Parse();
    if (!args.Good())
    {
@@ -470,11 +603,23 @@ int main(int argc, char *argv[])
       mfem_error("Unknown mode!\n");
    }
 
+   if (!random_sample)
+   {
+      nsample = 4;
+      num_basis = nsample;
+   }
+
+   std::string filename = "ns_rom";
+
    // 3. Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
    //    the same code.
    Mesh *mesh = new Mesh(mesh_file);
    int dim = mesh->Dimension();
+   problem::u0.SetSize(dim);
+   problem::du.SetSize(dim);
+   problem::offsets.SetSize(dim);
+   problem::k.SetSize(dim);
 
    // 4. Refine the mesh to increase the resolution. In this example we do
    //    'ref_levels' of uniform refinement. We choose 'ref_levels' to be the
@@ -553,18 +698,12 @@ int main(int argc, char *argv[])
       break;
       case (Mode::SAMPLE):
       {
-         if (!random_sample) nsample = 4;
          assert(nsample > 0);
-
-         problem::u0.SetSize(mesh->Dimension());
-         problem::du.SetSize(mesh->Dimension());
-         problem::offsets.SetSize(mesh->Dimension());
-         problem::k.SetSize(mesh->Dimension(), mesh->Dimension());
 
          SteadyNavierStokes *temp = new SteadyNavierStokes(mesh, order, nu, zeta, use_dg, pres_dbc);
          const int fom_vdofs = temp->Height();
          delete temp;
-         std::string filename = "ns_rom";
+
          CAROM::Options option(fom_vdofs, nsample, 1, false);
          CAROM::BasisGenerator snapshot_generator(option, false, filename);
 
@@ -618,6 +757,128 @@ int main(int argc, char *argv[])
          for (int d = 0; d < rom_sv->dim(); d++)
             printf("%.3E\t", rom_sv->item(d));
          printf("\n");
+      }
+      break;
+      case (Mode::COMPARE):
+      {
+         if (random_sample)
+         {
+            for (int d = 0; d < problem::u0.Size(); d++)
+            {
+               problem::u0(d) = 2.0 * UniformRandom() - 1.0;
+               problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
+               problem::offsets(d) = UniformRandom();
+
+               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                  problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+            }
+         }
+         else
+         {
+            problem::du = 0.0;
+            problem::offsets = 0.0;
+            problem::k = 0.0;
+
+            problem::u0(0) = 1.0;
+            problem::u0(1) = -1.0;
+            printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
+         }
+
+         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+         oper.SetupProblem();
+         oper.Solve();
+
+         CAROM::BasisReader basis_reader(filename);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         DenseMatrix basis;
+         CAROM::CopyMatrix(*carom_basis, basis);
+
+         SparseMatrix *linear_term = oper.GetLinearTerm();
+         DenseMatrix lin_rom;
+         mfem::RtAP(basis, *linear_term, basis, lin_rom);
+
+         DenseTensor nlin_rom(num_basis, num_basis, num_basis);
+         FiniteElementSpace *ufes = oper.GetUfes();
+         FiniteElementSpace *pfes = oper.GetPfes();
+         ConstantCoefficient *zeta_coeff = oper.GetZeta();
+         Vector tmp(ufes->GetVSize());
+         // DenseTensor is column major and i is the fastest index. 
+         // For fast iteration, we set k to be the test function index.
+         for (int i = 0; i < num_basis; i++)
+         {
+            // Vector basis_i(basis.GetColumn(i), basis.NumRows());
+            Vector u_i(basis.GetColumn(i), ufes->GetVSize());
+            GridFunction ui_gf(ufes, u_i.GetData());
+            VectorGridFunctionCoefficient ui_coeff(&ui_gf);
+            NonlinearForm Hi(ufes);
+            Hi.AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(*zeta_coeff, &ui_coeff));
+            for (int j = 0; j < num_basis; j++)
+            {
+               // Vector basis_j(basis.GetColumn(j), basis.NumRows());
+               Vector u_j(basis.GetColumn(j), ufes->GetVSize());
+               tmp = 0.0;
+               Hi.Mult(u_j, tmp);
+               
+               for (int k = 0; k < num_basis; k++)
+               {
+                  // Vector basis_k(basis.GetColumn(k), basis.NumRows());
+                  Vector u_k(basis.GetColumn(k), ufes->GetVSize());
+                  nlin_rom(i, j, k) = u_k * tmp;
+               }
+            }
+         }
+
+         TensorROM rom_oper(lin_rom, nlin_rom);
+         Vector rom_rhs(num_basis), rom_sol(num_basis);
+         basis.MultTranspose((*oper.GetRHS()), rom_rhs);
+
+         double atol=1.0e-15, rtol=1.0e-15;
+         int maxIter=10000;
+
+         GMRESSolver J_solver;
+         J_solver.SetAbsTol(atol);
+         J_solver.SetRelTol(rtol);
+         J_solver.SetMaxIter(maxIter);
+         J_solver.SetPrintLevel(-1);
+
+         NewtonSolver newton_solver;
+         newton_solver.SetSolver(J_solver);
+         newton_solver.SetOperator(rom_oper);
+         newton_solver.SetPrintLevel(1); // print Newton iterations
+         newton_solver.SetRelTol(rtol);
+         newton_solver.SetAbsTol(atol);
+         newton_solver.SetMaxIter(100);
+         newton_solver.Mult(rom_rhs, rom_sol);
+
+         Vector sol(basis.NumRows());
+         basis.Mult(rom_sol, sol);
+         GridFunction *u_rom = new GridFunction;
+         GridFunction *p_rom = new GridFunction;
+         u_rom->MakeRef(ufes, sol, 0);
+         p_rom->MakeRef(pfes, sol, ufes->GetVSize());
+
+         // 12. Create the grid functions u and p. Compute the L2 error norms.
+         GridFunction *u = oper.GetVelocityGridFunction();
+         GridFunction *p = oper.GetPressureGridFunction();
+         VectorGridFunctionCoefficient u_coeff(u), p_coeff(p);
+
+         int order_quad = max(2, 2*(order+1)+1);
+         const IntegrationRule *irs[Geometry::NumGeom];
+         for (int i=0; i < Geometry::NumGeom; ++i)
+         {
+            irs[i] = &(IntRules.Get(i, order_quad));
+         }
+
+         double err_u  = u_rom->ComputeL2Error(u_coeff, irs);
+         double norm_u = ComputeLpNorm(2., u_coeff, *mesh, irs);
+         double err_p  = p_rom->ComputeL2Error(p_coeff, irs);
+         double norm_p = ComputeLpNorm(2., p_coeff, *mesh, irs);
+
+         printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
+         printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+
+         delete linear_term;
+         delete u_rom, p_rom;
       }
       break;
       default:
