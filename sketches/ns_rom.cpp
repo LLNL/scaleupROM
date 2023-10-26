@@ -430,6 +430,7 @@ int main(int argc, char *argv[])
    bool use_dg = false;
    bool mms = false;
    bool sample = false;
+   bool random_sample = true;
    int nsample = -1;
 
    OptionsParser args(argc, argv);
@@ -448,6 +449,8 @@ int main(int argc, char *argv[])
                   "Solve for manufactured solution.");
    args.AddOption(&sample, "-sample", "--sample", "-no-sample", "--no-sample",
                   "Generate samples. specify -ns.");
+   args.AddOption(&random_sample, "-rs", "--random-sample", "-no-rs", "--no-random-sample",
+                  "Sample will be generated randomly.");
    args.AddOption(&nsample, "-ns", "--nsample",
                   "Number of samples to be generated.");
    args.Parse();
@@ -527,7 +530,7 @@ int main(int argc, char *argv[])
       //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
 
       // 15. Save data in the ParaView format
-      ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
+      ParaViewDataCollection paraview_dc("ns_mms_paraview", mesh);
       // paraview_dc.SetPrefixPath("ParaView");
       paraview_dc.SetLevelsOfDetail(order);
       // paraview_dc.SetCycle(0);
@@ -540,6 +543,7 @@ int main(int argc, char *argv[])
    }  // mms mode
    else if (sample)
    {
+      if (!random_sample) nsample = 4;
       assert(nsample > 0);
 
       problem::u0.SetSize(mesh->Dimension());
@@ -556,14 +560,27 @@ int main(int argc, char *argv[])
 
       for (int s = 0; s < nsample; s++)
       {
-         for (int d = 0; d < problem::u0.Size(); d++)
+         if (random_sample)
          {
-            problem::u0(d) = 2.0 * UniformRandom() - 1.0;
-            problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
-            problem::offsets(d) = UniformRandom();
+            for (int d = 0; d < problem::u0.Size(); d++)
+            {
+               problem::u0(d) = 2.0 * UniformRandom() - 1.0;
+               problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
+               problem::offsets(d) = UniformRandom();
 
-            for (int d2 = 0; d2 < problem::u0.Size(); d2++)
-               problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                  problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+            }
+         }
+         else
+         {
+            problem::du = 0.0;
+            problem::offsets = 0.0;
+            problem::k = 0.0;
+
+            problem::u0(0) = (s / 2 == 0) ? 1.0 : -1.0;
+            problem::u0(1) = (s % 2 == 0) ? 1.0 : -1.0;
+            printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
          }
 
          SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
