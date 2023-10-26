@@ -118,7 +118,7 @@ double diff(Vector &a, Vector &b)
     are given vectors, and dt is a scalar. */
 class SteadyNavierStokes : public Operator
 {
-private:
+protected:
    int dim = -1;
    int order = -1;
 
@@ -171,7 +171,8 @@ public:
                       const bool use_dg_ = false, const bool pres_dbc_ = false)
       : mesh(mesh_), dim(mesh_->Dimension()), order(order_), sigma(-1.0), kappa((order_+2)*(order_+2)),
         nu(nu_), zeta(zeta_), use_dg(use_dg_), pres_dbc(pres_dbc_),
-        zero(0.0), one(1.0), minus_one(-1.0), half(0.), minus_half(-0.5)
+        zero(0.0), one(1.0), minus_one(-1.0), half(0.), minus_half(-0.5),
+        system_jac(NULL), mono_jac(NULL), uu(NULL), up(NULL), pu(NULL)
    {
       if (use_dg)
       {
@@ -402,6 +403,7 @@ public:
       }
    }
 
+   BlockVector* GetSolution() { return x; }
    GridFunction* GetVelocityGridFunction() { return u; }
    GridFunction* GetPressureGridFunction() { return p; }
    FiniteElementSpace* GetUfes() { return ufes; }
@@ -473,10 +475,10 @@ int main(int argc, char *argv[])
       mesh->UniformRefinement();
    }
 
-   SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-
    if (mms)
    {
+      SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+
       VectorFunctionCoefficient fcoeff(dim, fFun);
       FunctionCoefficient gcoeff(gFun);
 
@@ -545,6 +547,13 @@ int main(int argc, char *argv[])
       problem::offsets.SetSize(mesh->Dimension());
       problem::k.SetSize(mesh->Dimension(), mesh->Dimension());
 
+      SteadyNavierStokes *temp = new SteadyNavierStokes(mesh, order, nu, zeta, use_dg, pres_dbc);
+      const int fom_vdofs = temp->Height();
+      delete temp;
+      std::string filename = "ns_rom";
+      CAROM::Options option(fom_vdofs, nsample, 1, false);
+      CAROM::BasisGenerator snapshot_generator(option, false, filename);
+
       for (int s = 0; s < nsample; s++)
       {
          for (int d = 0; d < problem::u0.Size(); d++)
@@ -557,19 +566,31 @@ int main(int argc, char *argv[])
                problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
          }
 
+         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
          oper.SetupProblem();
          oper.Solve();
 
-         GridFunction *u = oper.GetVelocityGridFunction();
-         GridFunction *p = oper.GetPressureGridFunction();
+         snapshot_generator.takeSample(oper.GetSolution()->GetData(), 0.0, 0.01);
 
-         // 15. Save data in the ParaView format
-         ParaViewDataCollection paraview_dc("ns_sample_paraview", mesh);
-         paraview_dc.SetLevelsOfDetail(max(3,order+1));
-         paraview_dc.RegisterField("velocity", u);
-         paraview_dc.RegisterField("pressure", p);
-         paraview_dc.Save();
+         // GridFunction *u = oper.GetVelocityGridFunction();
+         // GridFunction *p = oper.GetPressureGridFunction();
+
+         // // 15. Save data in the ParaView format
+         // ParaViewDataCollection paraview_dc("ns_sample_paraview", mesh);
+         // paraview_dc.SetLevelsOfDetail(max(3,order+1));
+         // paraview_dc.RegisterField("velocity", u);
+         // paraview_dc.RegisterField("pressure", p);
+         // paraview_dc.Save();
       }
+
+      snapshot_generator.writeSnapshot();
+      snapshot_generator.endSamples();
+
+      const CAROM::Vector *rom_sv = snapshot_generator.getSingularValues();
+      printf("Singular values: ");
+      for (int d = 0; d < rom_sv->dim(); d++)
+         printf("%.3E\t", rom_sv->item(d));
+      printf("\n");
    }
    
    // 17. Free the used memory.
