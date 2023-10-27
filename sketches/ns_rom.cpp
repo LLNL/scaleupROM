@@ -51,6 +51,7 @@ using namespace mfem;
 
 static double nu = 0.1;
 static double zeta = 1.0;
+static bool direct_solve = true;
 
 enum Mode { MMS, SAMPLE, COMPARE, NUM_MODE };
 
@@ -154,7 +155,9 @@ protected:
 
    double atol=1.0e-10, rtol=1.0e-10;
    int maxIter=10000;
-   GMRESSolver *J_solver;
+   Solver *J_solver = NULL;
+   GMRESSolver *J_gmres = NULL;
+   MUMPSSolver *J_mumps = NULL;
    NewtonSolver *newton_solver;
 
    mutable StopWatch solveTimer, multTimer, jacTimer;
@@ -165,9 +168,9 @@ protected:
    // GSSmoother *p_prec = NULL;
    // OrthoSolver *ortho_p_prec = NULL;
 
-   // HYPRE_BigInt glob_size;
-   // mutable HYPRE_BigInt row_starts[2];
-   // mutable HypreParMatrix *uu_hypre = NULL;
+   HYPRE_BigInt glob_size;
+   mutable HYPRE_BigInt row_starts[2];
+   mutable HypreParMatrix *jac_hypre = NULL;
    // mutable HypreBoomerAMG *u_prec = NULL;
 
 public:
@@ -216,6 +219,9 @@ public:
       std::cout << "***********************************************************\n";
 
       height = width = vblock_offsets.Last();
+      glob_size = height;
+      row_starts[0] = 0;
+      row_starts[1] = height;
 
       x = new BlockVector(vblock_offsets);
       rhs = new BlockVector(vblock_offsets);
@@ -253,11 +259,21 @@ public:
       //    // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
       //    nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half_zeta));
 
-      J_solver = new GMRESSolver;
-      J_solver->SetAbsTol(atol);
-      J_solver->SetRelTol(rtol);
-      J_solver->SetMaxIter(maxIter);
-      J_solver->SetPrintLevel(-1);
+      if (direct_solve)
+      {
+         J_mumps = new MUMPSSolver();
+         J_mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+         J_solver = J_mumps;
+      }
+      else
+      {
+         J_gmres = new GMRESSolver;
+         J_gmres->SetAbsTol(atol);
+         J_gmres->SetRelTol(rtol);
+         J_gmres->SetMaxIter(maxIter);
+         J_gmres->SetPrintLevel(-1);
+         J_solver = J_gmres;
+      }
 
       newton_solver = new NewtonSolver;
       newton_solver->SetSolver(*J_solver);
@@ -365,7 +381,7 @@ public:
    {
       jacTimer.Start();
 
-      delete system_jac, mono_jac, uu;
+      delete system_jac, mono_jac, jac_hypre, uu;
       const Vector x_u(x.GetData()+vblock_offsets[0], M->Height()), x_p(x.GetData()+vblock_offsets[1], S->Height());
 
       SparseMatrix *grad_H = dynamic_cast<SparseMatrix *>(&H->GetGradient(x_u));
@@ -387,19 +403,26 @@ public:
       // jac_prec->SetDiagonalBlock(0, u_prec);
 
       mono_jac = system_jac->CreateMonolithic();
+      if (direct_solve)
+      {
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, mono_jac);
+      }
 
       jacTimer.Stop();
-      return *mono_jac;
+      if (direct_solve)
+         return *jac_hypre;
+      else
+         return *mono_jac;
    }
 
    virtual ~SteadyNavierStokes()
    {
-      delete system_jac, mono_jac, uu, up;
+      delete system_jac, mono_jac, jac_hypre, uu, up;
       delete M, S, H, F, G;
       delete x, rhs;
       delete u, p;
       delete ufec, pfec, ufes, pfes;
-      delete J_solver, newton_solver;
+      delete J_gmres, J_mumps, newton_solver;
       // delete jac_prec;
       // delete pMass, p_prec, ortho_p_prec;
    }
@@ -460,13 +483,28 @@ protected:
 
    mutable DenseMatrix *jac = NULL;
 
+   HYPRE_BigInt glob_size;
+   mutable HYPRE_BigInt row_starts[2];
+   Array<int> rows;
+   mutable SparseMatrix *jac_mono = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
 public:
    mutable StopWatch multTimer, jacTimer;
 
 public:
    TensorROM(DenseMatrix &lin_op_, DenseTensor &nlin_op_)
       : Operator(lin_op_.Height(), lin_op_.Width()), lin_op(&lin_op_),
-        nlin_op(&nlin_op_), jac(NULL) {}
+        nlin_op(&nlin_op_), jac(NULL)
+   {
+      glob_size = lin_op->Height();
+      row_starts[0] = 0;
+      row_starts[1] = lin_op->Height();
+      
+      rows.SetSize(glob_size);
+      for (int k = 0; k < glob_size; k++)
+         rows[k] = k;
+   }
 
    ~TensorROM() { delete jac; }
 
@@ -568,13 +606,24 @@ public:
    {
       jacTimer.Start();
 
-      delete jac;
+      delete jac, jac_hypre, jac_mono;
       jac = new DenseMatrix(*lin_op);
       TensorAddMultTranspose(x, 0, *jac);
       TensorAddMultTranspose(x, 1, *jac);
 
+      if (direct_solve)
+      {
+         jac_mono = new SparseMatrix(jac->NumRows());
+         jac_mono->SetSubMatrix(rows, rows, *jac);
+         jac_mono->Finalize();
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, jac_mono);
+      }
+
       jacTimer.Stop();
-      return *jac;
+      if (direct_solve)
+         return *jac_hypre;
+      else
+         return *jac;
    }
 
 };
@@ -623,6 +672,8 @@ int main(int argc, char *argv[])
                   "Number of samples to be generated.");
    args.AddOption(&num_basis, "-nb", "--nbasis",
                   "Number of basis for ROM.");
+   args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
+                  "Use direct or iterative solver.");
    args.Parse();
    if (!args.Good())
    {
@@ -872,14 +923,23 @@ int main(int argc, char *argv[])
          double atol=1.0e-10, rtol=1.0e-10;
          int maxIter=10000;
 
-         GMRESSolver J_solver;
-         J_solver.SetAbsTol(atol);
-         J_solver.SetRelTol(rtol);
-         J_solver.SetMaxIter(maxIter);
-         J_solver.SetPrintLevel(-1);
+         GMRESSolver J_gmres;
+         J_gmres.SetAbsTol(atol);
+         J_gmres.SetRelTol(rtol);
+         J_gmres.SetMaxIter(maxIter);
+         J_gmres.SetPrintLevel(-1);
+
+         MUMPSSolver J_mumps;
+         J_mumps.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+
+         Solver *J_solver;
+         if (direct_solve)
+            J_solver = &J_mumps;
+         else
+            J_solver = &J_gmres;
 
          NewtonSolver newton_solver;
-         newton_solver.SetSolver(J_solver);
+         newton_solver.SetSolver(*J_solver);
          newton_solver.SetOperator(rom_oper);
          newton_solver.SetPrintLevel(1); // print Newton iterations
          newton_solver.SetRelTol(rtol);
