@@ -152,10 +152,12 @@ protected:
    mutable BlockMatrix *system_jac;
    mutable SparseMatrix *mono_jac, *uu, *up, *pu;
 
-   double atol=1.0e-15, rtol=1.0e-15;
+   double atol=1.0e-10, rtol=1.0e-10;
    int maxIter=10000;
    GMRESSolver *J_solver;
    NewtonSolver *newton_solver;
+
+   mutable StopWatch solveTimer, multTimer, jacTimer;
    
    // mutable BlockDiagonalPreconditioner *jac_prec;
    // BilinearForm *pMass = NULL;
@@ -346,6 +348,7 @@ public:
    /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
    virtual void Mult(const Vector &x, Vector &y) const
    {
+      multTimer.Start();
       Vector x_u(x.GetData()+vblock_offsets[0], M->Height()), x_p(x.GetData()+vblock_offsets[1], S->Height());
       Vector y_u(y.GetData(), M->Height()), y_p(y.GetData()+vblock_offsets[1], S->Height());
 
@@ -353,11 +356,15 @@ public:
       M->AddMult(x_u, y_u);
       S->AddMultTranspose(x_p, y_u);
       S->Mult(x_u, y_p);
+
+      multTimer.Stop();
    }
 
    /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
    virtual Operator &GetGradient(const Vector &x) const
    {
+      jacTimer.Start();
+
       delete system_jac, mono_jac, uu;
       const Vector x_u(x.GetData()+vblock_offsets[0], M->Height()), x_p(x.GetData()+vblock_offsets[1], S->Height());
 
@@ -380,6 +387,8 @@ public:
       // jac_prec->SetDiagonalBlock(0, u_prec);
 
       mono_jac = system_jac->CreateMonolithic();
+
+      jacTimer.Stop();
       return *mono_jac;
    }
 
@@ -398,11 +407,21 @@ public:
    // BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }
    virtual void Solve()
    {
+      printf("FOM solve: %.3E sec\n", solveTimer.RealTime());
+      solveTimer.Start();
+
       newton_solver->Mult(*rhs, *x);
       if (!pres_dbc)
       {
          (*p) -= p->Sum() / p->Size();
       }
+
+      solveTimer.Stop();
+      printf("FOM mult: %.3E sec\n", multTimer.RealTime());
+      printf("FOM jac: %.3E sec\n", jacTimer.RealTime());
+      printf("FOM solve: %.3E sec\n", solveTimer.RealTime());
+
+      ResetTimer();
    }
 
    SparseMatrix* GetLinearTerm()
@@ -424,6 +443,13 @@ public:
    FiniteElementSpace* GetUfes() { return ufes; }
    FiniteElementSpace* GetPfes() { return pfes; }
    ConstantCoefficient* GetZeta() { return &zeta; }
+
+   void ResetTimer()
+   {
+      solveTimer.Clear();
+      multTimer.Clear();
+      jacTimer.Clear();
+   }
 };
 
 class TensorROM : public Operator
@@ -433,6 +459,10 @@ protected:
    DenseTensor *nlin_op = NULL;
 
    mutable DenseMatrix *jac = NULL;
+
+public:
+   mutable StopWatch multTimer, jacTimer;
+
 public:
    TensorROM(DenseMatrix &lin_op_, DenseTensor &nlin_op_)
       : Operator(lin_op_.Height(), lin_op_.Width()), lin_op(&lin_op_),
@@ -525,18 +555,25 @@ public:
 
    virtual void Mult(const Vector &x, Vector &y) const
    {
+      multTimer.Start();
+
       TensorContract(x, x, y);
       lin_op->AddMult(x, y);
+
+      multTimer.Stop();
    }
 
    /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
    virtual Operator &GetGradient(const Vector &x) const
    {
+      jacTimer.Start();
+
       delete jac;
       jac = new DenseMatrix(*lin_op);
       TensorAddMultTranspose(x, 0, *jac);
       TensorAddMultTranspose(x, 1, *jac);
 
+      jacTimer.Stop();
       return *jac;
    }
 
@@ -832,7 +869,7 @@ int main(int argc, char *argv[])
          Vector rom_rhs(num_basis), rom_sol(num_basis);
          basis.MultTranspose((*oper.GetRHS()), rom_rhs);
 
-         double atol=1.0e-15, rtol=1.0e-15;
+         double atol=1.0e-10, rtol=1.0e-10;
          int maxIter=10000;
 
          GMRESSolver J_solver;
@@ -848,7 +885,14 @@ int main(int argc, char *argv[])
          newton_solver.SetRelTol(rtol);
          newton_solver.SetAbsTol(atol);
          newton_solver.SetMaxIter(100);
+
+         StopWatch solveTimer;
+         solveTimer.Start();
          newton_solver.Mult(rom_rhs, rom_sol);
+         solveTimer.Stop();
+         printf("ROM mult: %.3E sec\n", rom_oper.multTimer.RealTime());
+         printf("ROM jac: %.3E sec\n", rom_oper.jacTimer.RealTime());
+         printf("ROM solve: %.3E sec\n", solveTimer.RealTime());
 
          Vector sol(basis.NumRows());
          basis.Mult(rom_sol, sol);
