@@ -54,6 +54,7 @@ static double zeta = 1.0;
 static bool direct_solve = true;
 
 enum Mode { MMS, SAMPLE, COMPARE, NUM_MODE };
+enum RomMode { TENSOR, EQP, NUM_ROMMODE };
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -683,6 +684,8 @@ int main(int argc, char *argv[])
    bool use_dg = false;
    const char *mode_str = "";
    Mode mode = Mode::NUM_MODE;
+   const char *rom_mode_str = "";
+   RomMode rom_mode = RomMode::TENSOR;
    bool random_sample = true;
    int nsample = -1;
    int num_basis = -1;
@@ -701,6 +704,8 @@ int main(int argc, char *argv[])
                   "Use discontinuous Galerkin scheme.");
    args.AddOption(&mode_str, "-mode", "--mode",
                   "Mode: mms, sample, compare");
+   args.AddOption(&rom_mode_str, "-rm", "--rom-mode",
+                  "RomMode: tensor, eqp.");
    args.AddOption(&random_sample, "-rs", "--random-sample", "-no-rs", "--no-random-sample",
                   "Sample will be generated randomly.");
    args.AddOption(&nsample, "-ns", "--nsample",
@@ -724,6 +729,14 @@ int main(int argc, char *argv[])
    else
    {
       mfem_error("Unknown mode!\n");
+   }
+
+   if (!strcmp(rom_mode_str, "tensor"))          rom_mode = RomMode::TENSOR;
+   else if (!strcmp(rom_mode_str, "sample"))     rom_mode = RomMode::EQP;
+   else
+   {
+      if (!(rom_mode == RomMode::TENSOR) && !(rom_mode == RomMode::EQP))
+         mfem_error("Unknown mode!\n");
    }
 
    if (!random_sample)
@@ -922,9 +935,24 @@ int main(int argc, char *argv[])
 
          FiniteElementSpace *ufes = oper.GetUfes();
          FiniteElementSpace *pfes = oper.GetPfes();
-         DenseTensor *nlin_rom = oper.GetReducedTensor(basis);
 
-         TensorROM rom_oper(lin_rom, *nlin_rom);
+         DenseTensor *nlin_rom = NULL;
+         Operator *rom_oper = NULL;
+         switch (rom_mode)
+         {
+            case RomMode::TENSOR:
+            {
+               nlin_rom = oper.GetReducedTensor(basis);
+               rom_oper = new TensorROM(lin_rom, *nlin_rom);
+            }
+            break;
+            case RomMode::EQP:
+            break;
+            default:
+               mfem_error("ROM Mode is not set!");
+            break;
+         }
+         
          Vector rom_rhs(num_basis), rom_sol(num_basis);
          basis.MultTranspose((*oper.GetRHS()), rom_rhs);
 
@@ -948,7 +976,7 @@ int main(int argc, char *argv[])
 
          NewtonSolver newton_solver;
          newton_solver.SetSolver(*J_solver);
-         newton_solver.SetOperator(rom_oper);
+         newton_solver.SetOperator(*rom_oper);
          newton_solver.SetPrintLevel(1); // print Newton iterations
          newton_solver.SetRelTol(rtol);
          newton_solver.SetAbsTol(atol);
@@ -958,8 +986,8 @@ int main(int argc, char *argv[])
          solveTimer.Start();
          newton_solver.Mult(rom_rhs, rom_sol);
          solveTimer.Stop();
-         printf("ROM mult: %.3E sec\n", rom_oper.multTimer.RealTime());
-         printf("ROM jac: %.3E sec\n", rom_oper.jacTimer.RealTime());
+         // printf("ROM mult: %.3E sec\n", rom_oper.multTimer.RealTime());
+         // printf("ROM jac: %.3E sec\n", rom_oper.jacTimer.RealTime());
          printf("ROM solve: %.3E sec\n", solveTimer.RealTime());
 
          Vector sol(basis.NumRows());
@@ -991,6 +1019,8 @@ int main(int argc, char *argv[])
 
          delete linear_term;
          delete u_rom, p_rom;
+         delete nlin_rom;
+         delete rom_oper;
       }
       break;
       default:
