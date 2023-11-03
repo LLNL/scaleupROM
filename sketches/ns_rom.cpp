@@ -473,6 +473,41 @@ public:
       multTimer.Clear();
       jacTimer.Clear();
    }
+
+   DenseTensor* GetReducedTensor(DenseMatrix &basis)
+   {
+      const int num_basis = basis.NumCols();
+
+      DenseTensor *nlin_rom = new DenseTensor(num_basis, num_basis, num_basis);
+      Vector tmp(ufes->GetVSize());
+      // DenseTensor is column major and i is the fastest index. 
+      // For fast iteration, we set k to be the test function index.
+      for (int i = 0; i < num_basis; i++)
+      {
+         // Vector basis_i(basis.GetColumn(i), basis.NumRows());
+         Vector u_i(basis.GetColumn(i), ufes->GetVSize());
+         GridFunction ui_gf(ufes, u_i.GetData());
+         VectorGridFunctionCoefficient ui_coeff(&ui_gf);
+         NonlinearForm Hi(ufes);
+         Hi.AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(zeta, &ui_coeff));
+         for (int j = 0; j < num_basis; j++)
+         {
+            // Vector basis_j(basis.GetColumn(j), basis.NumRows());
+            Vector u_j(basis.GetColumn(j), ufes->GetVSize());
+            tmp = 0.0;
+            Hi.Mult(u_j, tmp);
+            
+            for (int k = 0; k < num_basis; k++)
+            {
+               // Vector basis_k(basis.GetColumn(k), basis.NumRows());
+               Vector u_k(basis.GetColumn(k), ufes->GetVSize());
+               (*nlin_rom)(i, j, k) = u_k * tmp;
+            }
+         }
+      }
+
+      return nlin_rom;
+   }
 };
 
 class TensorROM : public Operator
@@ -885,38 +920,11 @@ int main(int argc, char *argv[])
          DenseMatrix lin_rom;
          mfem::RtAP(basis, *linear_term, basis, lin_rom);
 
-         DenseTensor nlin_rom(num_basis, num_basis, num_basis);
          FiniteElementSpace *ufes = oper.GetUfes();
          FiniteElementSpace *pfes = oper.GetPfes();
-         ConstantCoefficient *zeta_coeff = oper.GetZeta();
-         Vector tmp(ufes->GetVSize());
-         // DenseTensor is column major and i is the fastest index. 
-         // For fast iteration, we set k to be the test function index.
-         for (int i = 0; i < num_basis; i++)
-         {
-            // Vector basis_i(basis.GetColumn(i), basis.NumRows());
-            Vector u_i(basis.GetColumn(i), ufes->GetVSize());
-            GridFunction ui_gf(ufes, u_i.GetData());
-            VectorGridFunctionCoefficient ui_coeff(&ui_gf);
-            NonlinearForm Hi(ufes);
-            Hi.AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(*zeta_coeff, &ui_coeff));
-            for (int j = 0; j < num_basis; j++)
-            {
-               // Vector basis_j(basis.GetColumn(j), basis.NumRows());
-               Vector u_j(basis.GetColumn(j), ufes->GetVSize());
-               tmp = 0.0;
-               Hi.Mult(u_j, tmp);
-               
-               for (int k = 0; k < num_basis; k++)
-               {
-                  // Vector basis_k(basis.GetColumn(k), basis.NumRows());
-                  Vector u_k(basis.GetColumn(k), ufes->GetVSize());
-                  nlin_rom(i, j, k) = u_k * tmp;
-               }
-            }
-         }
+         DenseTensor *nlin_rom = oper.GetReducedTensor(basis);
 
-         TensorROM rom_oper(lin_rom, nlin_rom);
+         TensorROM rom_oper(lin_rom, *nlin_rom);
          Vector rom_rhs(num_basis), rom_sol(num_basis);
          basis.MultTranspose((*oper.GetRHS()), rom_rhs);
 
