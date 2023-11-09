@@ -45,6 +45,7 @@
 #include "dg_mixed_bilin.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
+#include "linalg/NNLS.h"
 
 using namespace std;
 using namespace mfem;
@@ -977,6 +978,7 @@ int main(int argc, char *argv[])
                const int nsnap = snapshots->numColumns();
 
                assert(basis.NumRows() == snapshots->numRows());
+               assert(basis.NumRows() == (ufes->GetTrueVSize() + pfes->GetTrueVSize()));
 
                // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
                CAROM::Matrix Gt(NQ, NB * nsnap, true);
@@ -1028,6 +1030,72 @@ int main(int argc, char *argv[])
                      // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
                   // }
                }  // for (int i = 0; i < nsnap; ++i)
+
+               Array<double> const& w_el = ir->GetWeights();
+               CAROM::Vector w(ne * nqe, true);
+
+               for (int i = 0; i < ne; ++i)
+                  for (int j = 0; j < nqe; ++j)
+                     w(j + (i * nqe)) = w_el[j];
+
+               //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
+               // CAROM::Vector const& w, CAROM::Matrix & Gt,
+               // CAROM::Vector & sol)
+               double nnls_tol = 1.0e-14;
+               int maxNNLSnnz = 0;
+               const double delta = 1.0e-14;
+               CAROM::Vector eqpSol(ne * nqe, true);
+               {
+                  CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
+
+                  CAROM::Vector rhs_ub(Gt.numColumns(), false);
+                  // G.mult(w, rhs_ub);  // rhs = Gw
+                  // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
+                  Gt.transposeMult(w, rhs_ub);
+
+                  CAROM::Vector rhs_lb(rhs_ub);
+                  CAROM::Vector rhs_Gw(rhs_ub);
+
+                  for (int i = 0; i < rhs_ub.dim(); ++i)
+                  {
+                     rhs_lb(i) -= delta;
+                     rhs_ub(i) += delta;
+                  }
+
+                  nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
+                  nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
+
+                  int nnz = 0;
+                  for (int i = 0; i < eqpSol.dim(); ++i)
+                  {
+                     if (eqpSol(i) != 0.0)
+                     {
+                           nnz++;
+                     }
+                  }
+
+                  cout << rank << ": Number of nonzeros in NNLS solution: " << nnz
+                        << ", out of " << eqpSol.dim() << endl;
+
+                  MPI_Allreduce(MPI_IN_PLACE, &nnz, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+                  if (rank == 0)
+                     cout << "Global number of nonzeros in NNLS solution: " << nnz << endl;
+
+                  // Check residual of NNLS solution
+                  CAROM::Vector res(Gt.numColumns(), false);
+                  Gt.transposeMult(eqpSol, res);
+
+                  const double normGsol = res.norm();
+                  const double normRHS = rhs_Gw.norm();
+
+                  res -= rhs_Gw;
+                  const double relNorm = res.norm() / std::max(normGsol, normRHS);
+                  cout << rank << ": relative residual norm for NNLS solution of Gs = Gw: " <<
+                        relNorm << endl;
+
+               }
+
                mfem_error("Implemented up to this point.\n");
             }  // case RomMode::EQP:
             break;
