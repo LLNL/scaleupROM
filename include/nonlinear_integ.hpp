@@ -117,6 +117,11 @@ public:
                                       const Vector &elfun,
                                       Vector &elvect);
 
+   void AssembleElementQuadrature(const FiniteElement &el,
+                                 ElementTransformation &T,
+                                 const Vector &eltest,
+                                 DenseMatrix &elquad);
+
    using VectorConvectionNLFIntegrator::AssembleElementGrad;
 };
 

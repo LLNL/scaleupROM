@@ -583,6 +583,20 @@ void VectorConvectionTrilinearFormIntegrator::AssembleElementVector(
    const int nd = el.GetDof();
    dim = el.GetDim();
 
+   // NOTE: this is for a test of AssembleElementQuadrature,
+   //       which should return the equivalent answer.
+   // DenseMatrix elquad;
+   // AssembleElementQuadrature(el, T, elfun, elquad);
+   // elvect.SetSize(nd * dim);
+   // elvect = 0.0;
+   // for (int j = 0; j < elquad.NumCols(); j++)
+   // {
+   //    Vector tmp(elquad.GetColumn(j), elquad.NumRows());
+   //    elvect += tmp;
+   // }
+
+   // return; 
+
    shape.SetSize(nd);
    dshape.SetSize(nd, dim);
    elvect.SetSize(nd * dim);
@@ -611,6 +625,49 @@ void VectorConvectionTrilinearFormIntegrator::AssembleElementVector(
       gradEF.Mult(vec1, vec2);
       vec2 *= w;
       AddMultVWt(shape, vec2, ELV);
+   }
+}
+
+void VectorConvectionTrilinearFormIntegrator::AssembleElementQuadrature(
+   const FiniteElement &el,
+   ElementTransformation &T,
+   const Vector &eltest,
+   DenseMatrix &elquad)
+{
+   const int nd = el.GetDof();
+   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(el, T);
+   const int nq = ir->GetNPoints();
+   dim = el.GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+   elquad.SetSize(nd * dim, nq);
+   gradEF.SetSize(dim);
+
+   EF.UseExternalData(eltest.GetData(), nd, dim);
+
+   Vector vec1(dim), vec2(dim), vec_tr(dim);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      ELV.UseExternalData(elquad.GetColumn(i), nd, dim);
+
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      T.SetIntPoint(&ip);
+      el.CalcShape(ip, shape);
+      el.CalcPhysDShape(T, dshape);
+      double w = ip.weight * T.Weight();
+      if (Q) { w *= Q->Eval(T, ip); }
+
+      MultAtB(EF, dshape, gradEF);
+      if (vQ)
+         vQ->Eval(vec1, T, ip);
+      else
+         EF.MultTranspose(shape, vec1);
+      gradEF.Mult(vec1, vec2);
+      vec2 *= w;
+
+      MultVWt(shape, vec2, ELV);
    }
 }
 

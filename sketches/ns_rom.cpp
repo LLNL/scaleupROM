@@ -151,6 +151,8 @@ protected:
    Array<int> block_offsets, vblock_offsets;
    Array<int> u_ess_attr, p_ess_attr;
 
+   const IntegrationRule *ir_nl = NULL;
+
    mutable BlockMatrix *system_jac;
    mutable SparseMatrix *mono_jac, *uu, *up, *pu;
 
@@ -255,7 +257,11 @@ public:
       if (use_dg)
          S->AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
 
-      H->AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(zeta));
+      ir_nl = &(IntRules.Get(ufes->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1)))));
+      auto nl_integ = new VectorConvectionTrilinearFormIntegrator(zeta);
+      nl_integ->SetIntRule(ir_nl);
+      H->AddDomainIntegrator(nl_integ);
+
       // if (use_dg)
       //    // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
       //    nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half_zeta));
@@ -424,6 +430,7 @@ public:
       delete u, p;
       delete ufec, pfec, ufes, pfes;
       delete J_gmres, J_mumps, newton_solver;
+      // delete ir_nl;
       // delete jac_prec;
       // delete pMass, p_prec, ortho_p_prec;
    }
@@ -467,6 +474,7 @@ public:
    FiniteElementSpace* GetUfes() { return ufes; }
    FiniteElementSpace* GetPfes() { return pfes; }
    ConstantCoefficient* GetZeta() { return &zeta; }
+   const IntegrationRule* GetNonlinearIntRule() { return ir_nl; }
 
    void ResetTimer()
    {
@@ -490,7 +498,9 @@ public:
          GridFunction ui_gf(ufes, u_i.GetData());
          VectorGridFunctionCoefficient ui_coeff(&ui_gf);
          NonlinearForm Hi(ufes);
-         Hi.AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(zeta, &ui_coeff));
+         auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(zeta, &ui_coeff);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         Hi.AddDomainIntegrator(nl_integ_tmp);
          for (int j = 0; j < num_basis; j++)
          {
             // Vector basis_j(basis.GetColumn(j), basis.NumRows());
@@ -732,7 +742,7 @@ int main(int argc, char *argv[])
    }
 
    if (!strcmp(rom_mode_str, "tensor"))          rom_mode = RomMode::TENSOR;
-   else if (!strcmp(rom_mode_str, "sample"))     rom_mode = RomMode::EQP;
+   else if (!strcmp(rom_mode_str, "eqp"))     rom_mode = RomMode::EQP;
    else
    {
       if (!(rom_mode == RomMode::TENSOR) && !(rom_mode == RomMode::EQP))
@@ -947,6 +957,79 @@ int main(int argc, char *argv[])
             }
             break;
             case RomMode::EQP:
+            {
+               const int fom_vdofs = oper.Height();
+               CAROM::Options option(fom_vdofs, nsample, 1, false);
+               CAROM::BasisGenerator snapshot_generator(option, false, filename);
+               // std::string snapshot_filename = filename + "_snapshot";
+               snapshot_generator.loadSamples(filename + "_snapshot", "snapshot");
+               // TODO: what happen if we do not deep-copy?
+               const CAROM::Matrix *snapshots = snapshot_generator.getSnapshotMatrix();
+
+               const IntegrationRule *ir = oper.GetNonlinearIntRule();
+               auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
+               nl_integ->SetIntRule(ir);
+
+               const int nqe = ir->GetNPoints();
+               const int ne = ufes->GetNE();
+               const int NB = basis.NumCols();
+               const int NQ = ne * nqe;
+               const int nsnap = snapshots->numColumns();
+
+               assert(basis.NumRows() == snapshots->numRows());
+
+               // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
+               CAROM::Matrix Gt(NQ, NB * nsnap, true);
+               // For 0 <= j < NB, 0 <= i < nsnap, 0 <= e < ne, 0 <= m < nqe,
+               // G(j + (i*NB), (e*nqe) + m)
+               // is the coefficient of v_j^T M(p_i) V v_i at point m of element e,
+               // with respect to the integration rule weight at that point,
+               // where the "exact" quadrature solution is ir0->GetWeights().
+
+               Vector v_i(ufes->GetTrueVSize());
+               Vector r(nqe);
+
+               Array<int> vdofs;
+               Vector el_x, el_tr;
+               DenseMatrix el_quad;
+               const FiniteElement *fe;
+               ElementTransformation *T;
+               DofTransformation *doftrans;
+
+               for (int i = 0; i < nsnap; ++i)
+               {
+                  for (int k = 0; k < ufes->GetTrueVSize(); ++k)
+                        v_i[k] = (*snapshots)(k, i);
+
+                  for (int e = 0; e < ne; ++e)
+                  {
+                     fe = ufes->GetFE(e);
+                     doftrans = ufes->GetElementVDofs(e, vdofs);
+                     T = ufes->GetElementTransformation(e);
+                     v_i.GetSubVector(vdofs, el_x);
+
+                     nl_integ->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
+
+                     for (int j = 0; j < NB; ++j)
+                     {
+                        Vector v_j(basis.GetColumn(j), ufes->GetVSize());
+                        v_j.GetSubVector(vdofs, el_tr);
+
+                        el_quad.MultTranspose(el_tr, r);
+
+                        for (int m = 0; m < nqe; ++m)
+                           Gt(m + (e * nqe), j + (i * NB)) = r[m];
+                     }  // for (int j = 0; j < NB; ++j)
+                  }  // for (int e = 0; e < ne; ++e)
+
+                  // if (precondition)
+                  // {
+                     // // Preconditioning is done by (V^T M(p_i) V)^{-1} (of size NB x NB).
+                     // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
+                  // }
+               }  // for (int i = 0; i < nsnap; ++i)
+               mfem_error("Implemented up to this point.\n");
+            }  // case RomMode::EQP:
             break;
             default:
                mfem_error("ROM Mode is not set!");
