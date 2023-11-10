@@ -437,7 +437,7 @@ public:
    }
 
    // BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }
-   virtual void Solve()
+   virtual bool Solve()
    {
       printf("FOM solve: %.3E sec\n", solveTimer.RealTime());
       solveTimer.Start();
@@ -454,6 +454,8 @@ public:
       printf("FOM solve: %.3E sec\n", solveTimer.RealTime());
 
       ResetTimer();
+
+      return newton_solver->GetConverged();
    }
 
    SparseMatrix* GetLinearTerm()
@@ -469,6 +471,7 @@ public:
    }
 
    BlockVector* GetSolution() { return x; }
+   void SetSolution(const BlockVector &sol) { (*x) = sol; return; }
    BlockVector* GetRHS() { return rhs; }
    GridFunction* GetVelocityGridFunction() { return u; }
    GridFunction* GetPressureGridFunction() { return p; }
@@ -704,6 +707,8 @@ int main(int argc, char *argv[])
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");
+   args.AddOption(&nu, "-nu", "--nu",
+                  "Viscosity.");
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
@@ -881,7 +886,18 @@ int main(int argc, char *argv[])
 
             SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
             oper.SetupProblem();
-            oper.Solve();
+            bool converged = oper.Solve();
+            if (!converged)
+            {
+               SteadyNavierStokes helper(mesh, order, 2.0 * nu, zeta, use_dg, pres_dbc);
+               helper.SetupProblem();
+               bool helper_converged = helper.Solve();
+               assert(helper_converged);
+               
+               oper.SetSolution(*(helper.GetSolution()));
+               converged = oper.Solve();
+               assert(converged);
+            }
 
             snapshot_generator.takeSample(oper.GetSolution()->GetData(), 0.0, 0.01);
 
@@ -975,7 +991,8 @@ int main(int argc, char *argv[])
                const int ne = ufes->GetNE();
                const int NB = basis.NumCols();
                const int NQ = ne * nqe;
-               const int nsnap = snapshots->numColumns();
+               //const int nsnap = snapshots->numColumns();
+               const int nsnap = 1000;
 
                assert(basis.NumRows() == snapshots->numRows());
                assert(basis.NumRows() == (ufes->GetTrueVSize() + pfes->GetTrueVSize()));
@@ -1041,9 +1058,9 @@ int main(int argc, char *argv[])
                //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
                // CAROM::Vector const& w, CAROM::Matrix & Gt,
                // CAROM::Vector & sol)
-               double nnls_tol = 1.0e-14;
+               double nnls_tol = 1.0e-11;
                int maxNNLSnnz = 0;
-               const double delta = 1.0e-14;
+               const double delta = 1.0e-4;
                CAROM::Vector eqpSol(ne * nqe, true);
                {
                   CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
@@ -1062,7 +1079,7 @@ int main(int argc, char *argv[])
                      rhs_ub(i) += delta;
                   }
 
-                  nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
+                  //nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
                   nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
 
                   int nnz = 0;
@@ -1167,6 +1184,13 @@ int main(int argc, char *argv[])
 
          printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
          printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
+
+         // 15. Save data in the ParaView format
+         ParaViewDataCollection paraview_dc("ns_paraview", mesh);
+         paraview_dc.SetLevelsOfDetail(order+1);
+         paraview_dc.RegisterField("velocity", u);
+         paraview_dc.RegisterField("pressure", p);
+         paraview_dc.Save();
 
          delete linear_term;
          delete u_rom, p_rom;
