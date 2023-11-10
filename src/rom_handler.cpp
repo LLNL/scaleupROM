@@ -786,7 +786,7 @@ void MFEMROMHandler::SaveBasisVisualization(
    const int num_var = var_names.size();
    assert(fes.Size() == num_var * numSub);
 
-   std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
+   std::string visual_prefix = config.GetRequiredOption<std::string>("basis/visualization/prefix");
    if (train_mode == TrainMode::UNIVERSAL)
       visual_prefix += "_universal";
 
