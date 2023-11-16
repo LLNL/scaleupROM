@@ -74,6 +74,9 @@ void PrintVector(const Vector &vec,
 SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename);
 void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename);
 
+// Matrix-Vector multiplication on the specified rows.
+void MultSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
+
 }
 
 #endif

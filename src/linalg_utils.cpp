@@ -295,4 +295,33 @@ void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename)
    assert(success);
 }
 
+void MultSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y)
+{
+   const int nrow = rows.Size(), ncol = mat.NumCols(), height = mat.NumRows();
+   assert(x.Size() == ncol);
+   assert(y.Size() == nrow);
+
+   const int rmin = rows.Min(), rmax = rows.Max();
+   assert((rmin >= 0) && (rmin < mat.NumRows()));
+   assert((rmax >= 0) && (rmax < mat.NumRows()));
+
+   const double *d_mat = mat.Read();
+   const double *d_x = x.Read();
+   const int *d_rows = rows.Read();
+   double *d_y = y.GetData();
+
+   double xc = d_x[0];
+   for (int r = 0; r < nrow; r++)
+      d_y[r] = d_mat[d_rows[r]] * xc;
+   d_mat += height;
+
+   for (int c = 1; c < ncol; c++)
+   {
+      xc = d_x[c];
+      for (int r = 0; r < nrow; r++)
+         d_y[r] += d_mat[d_rows[r]] * xc;
+      d_mat += height;
+   }
+}
+
 }
