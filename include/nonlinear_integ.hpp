@@ -96,35 +96,6 @@ public:
 
 };
 
-class VectorConvectionTrilinearFormIntegrator :
-   public VectorConvectionNLFIntegrator
-{
-private:
-   int dim;
-   Coefficient *Q{};
-   VectorCoefficient *vQ{};
-   DenseMatrix dshape, dshapex, EF, gradEF, ELV;
-   Vector shape;
-
-public:
-   VectorConvectionTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
-      : Q(&q), vQ(vq), VectorConvectionNLFIntegrator(q) { }
-
-   VectorConvectionTrilinearFormIntegrator() = default;
-
-   virtual void AssembleElementVector(const FiniteElement &el,
-                                      ElementTransformation &trans,
-                                      const Vector &elfun,
-                                      Vector &elvect);
-
-   void AssembleElementQuadrature(const FiniteElement &el,
-                                 ElementTransformation &T,
-                                 const Vector &eltest,
-                                 DenseMatrix &elquad);
-
-   using VectorConvectionNLFIntegrator::AssembleElementGrad;
-};
-
 } // namespace mfem
 
 #endif

@@ -164,6 +164,12 @@ set(scaleupROMObj_SOURCES
   include/nonlinear_integ.hpp
   src/nonlinear_integ.cpp
 
+  include/hyperreduction_integ.hpp
+  src/hyperreduction_integ.cpp
+
+  # include/rom_nonlinearform.hpp
+  # src/rom_nonlinearform.cpp
+
   # include/multiblock_nonlinearform.hpp
   # src/multiblock_nonlinearform.cpp
 

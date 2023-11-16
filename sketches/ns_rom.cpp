@@ -42,6 +42,7 @@
 #include "etc.hpp"
 #include "linalg_utils.hpp"
 #include "nonlinear_integ.hpp"
+#include "hyperreduction_integ.hpp"
 #include "dg_mixed_bilin.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
@@ -991,8 +992,7 @@ int main(int argc, char *argv[])
                const int ne = ufes->GetNE();
                const int NB = basis.NumCols();
                const int NQ = ne * nqe;
-               //const int nsnap = snapshots->numColumns();
-               const int nsnap = 1000;
+               const int nsnap = min(1000, snapshots->numColumns());
 
                assert(basis.NumRows() == snapshots->numRows());
                assert(basis.NumRows() == (ufes->GetTrueVSize() + pfes->GetTrueVSize()));
@@ -1027,7 +1027,16 @@ int main(int argc, char *argv[])
                      T = ufes->GetElementTransformation(e);
                      v_i.GetSubVector(vdofs, el_x);
 
-                     nl_integ->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
+                     const int nd = fe->GetDof();
+                     el_quad.SetSize(nd * dim, nqe);
+                     for (int i = 0; i < ir->GetNPoints(); i++)
+                     {
+                        Vector EQ(el_quad.GetColumn(i), nd * dim);
+
+                        const IntegrationPoint &ip = ir->IntPoint(i);
+                        nl_integ->AssembleQuadratureVector(*fe, *T, ip, ip.weight, el_x, EQ);
+                     }
+                     // nl_integ->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
 
                      for (int j = 0; j < NB; ++j)
                      {
@@ -1079,7 +1088,7 @@ int main(int argc, char *argv[])
                      rhs_ub(i) += delta;
                   }
 
-                  //nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
+                  // nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
                   nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
 
                   int nnz = 0;
