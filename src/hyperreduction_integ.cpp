@@ -66,12 +66,12 @@ void VectorConvectionTrilinearFormIntegrator::AssembleElementVector(
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
-      // NOTE: this is for a test of AssembleQuadratureVector,
-      //       which should return the equivalent answer.
-      Vector tmp(nd * dim);
-      AssembleQuadratureVector(el, T, ip, ip.weight, elfun, tmp);
-      elvect += tmp;
-      continue;
+      // // NOTE: this is for a test of AssembleQuadratureVector,
+      // //       which should return the equivalent answer.
+      // Vector tmp(nd * dim);
+      // AssembleQuadratureVector(el, T, ip, ip.weight, elfun, tmp);
+      // elvect += tmp;
+      // continue;
 
       T.SetIntPoint(&ip);
       el.CalcShape(ip, shape);

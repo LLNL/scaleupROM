@@ -81,6 +81,13 @@ public:
        NonlinearFormIntegrator%s and gradient Operator. */
    virtual ~ROMNonlinearForm();
 
+   void SetBasis(DenseMatrix &basis_)
+   {
+      assert(basis_.NumCols() == height);
+      assert(basis_.NumRows() == fes->GetTrueVSize());
+      basis = &basis_;
+   }
+
    /// Adds new Domain Integrator.
    void AddDomainIntegrator(HyperReductionIntegrator *nlfi)
    {

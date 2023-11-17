@@ -52,6 +52,8 @@ add_executable(nonlinear_integ_grad nonlinear_integ_grad.cpp $<TARGET_OBJECTS:sc
 
 add_executable(test_linalg_utils test_linalg_utils.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
+add_executable(test_rom_nonlinearform test_rom_nonlinearform.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
 if(GMSH)
     add_subdirectory(gmsh)
 endif(GMSH)
