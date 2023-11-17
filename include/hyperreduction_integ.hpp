@@ -26,6 +26,14 @@ public:
                                           const double &iw,
                                           const Vector &eltest,
                                           Vector &elquad);
+
+   virtual void AssembleQuadratureVector(const FiniteElement &el1,
+                                          const FiniteElement &el2,
+                                          FaceElementTransformations &T,
+                                          const IntegrationPoint &ip,
+                                          const double &iw,
+                                          const Vector &eltest,
+                                          Vector &elquad);
 };
 
 class VectorConvectionTrilinearFormIntegrator : virtual public HyperReductionIntegrator

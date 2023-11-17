@@ -23,7 +23,15 @@ void HyperReductionIntegrator::AssembleQuadratureVector(
    const double &iw, const Vector &eltest, Vector &elquad)
 {
    mfem_error ("HyperReductionIntegrator::AssembleQuadratureVector(...)\n"
-               "   is not implemented for this class.");  
+               "for element is not implemented for this class.");  
+}
+
+void HyperReductionIntegrator::AssembleQuadratureVector(
+   const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &T,
+   const IntegrationPoint &ip, const double &iw, const Vector &eltest, Vector &elquad)
+{
+   mfem_error ("HyperReductionIntegrator::AssembleQuadratureVector(...)\n"
+               "for face is not implemented for this class.");  
 }
 
 const IntegrationRule&
