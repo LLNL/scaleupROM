@@ -44,6 +44,17 @@ dg_integ_mms:
     - cd ci-build/test
     - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./dg_integ_mms
 
+linalg_utils:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_linalg_utils
+
 nonlinear_integ_grad:
   stage: test
   dependencies:
