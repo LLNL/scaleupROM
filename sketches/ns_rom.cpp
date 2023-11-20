@@ -1103,7 +1103,7 @@ int main(int argc, char *argv[])
                         Vector EQ(el_quad.GetColumn(i), nd * dim);
 
                         const IntegrationPoint &ip = ir->IntPoint(i);
-                        nl_integ->AssembleQuadratureVector(*fe, *T, ip, ip.weight, el_x, EQ);
+                        nl_integ->AssembleQuadratureVector(*fe, *T, ip, 1.0, el_x, EQ);
                      }
                      // nl_integ->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
 
@@ -1140,16 +1140,16 @@ int main(int argc, char *argv[])
                int maxNNLSnnz = 0;
                const double delta = 1.0e-5;
                CAROM::Vector eqpSol(ne * nqe, true);
+               CAROM::Vector rhs_Gw(Gt.numColumns(), false);
+               // G.mult(w, rhs_ub);  // rhs = Gw
+               // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
+               Gt.transposeMult(w, rhs_Gw);
+               int nnz = 0;
                {
                   CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
 
-                  CAROM::Vector rhs_ub(Gt.numColumns(), false);
-                  // G.mult(w, rhs_ub);  // rhs = Gw
-                  // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
-                  Gt.transposeMult(w, rhs_ub);
-
-                  CAROM::Vector rhs_lb(rhs_ub);
-                  CAROM::Vector rhs_Gw(rhs_ub);
+                  CAROM::Vector rhs_ub(rhs_Gw);
+                  CAROM::Vector rhs_lb(rhs_Gw);
 
                   for (int i = 0; i < rhs_ub.dim(); ++i)
                   {
@@ -1160,7 +1160,7 @@ int main(int argc, char *argv[])
                   // nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
                   nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
 
-                  int nnz = 0;
+                  nnz = 0;
                   for (int i = 0; i < eqpSol.dim(); ++i)
                   {
                      if (eqpSol(i) != 0.0)
@@ -1193,30 +1193,19 @@ int main(int argc, char *argv[])
 
                Array<int> sample_el(0), sample_qp(0);
                Array<double> sample_qw(0);
-               if (random_sample)
+               for (int i = 0; i < eqpSol.dim(); ++i)
                {
-                  for (int i = 0; i < eqpSol.dim(); ++i)
+                  if (eqpSol(i) > 1.0e-12)
                   {
-                     if (eqpSol(i) > 1.0e-12)
-                     {
-                        const int e = i / nqe;  // Element index
-                        sample_el.Append(i / nqe);
-                        sample_qp.Append(i % nqe);
-                        sample_qw.Append(eqpSol(i));
-                     }
+                     const int e = i / nqe;  // Element index
+                     sample_el.Append(i / nqe);
+                     sample_qp.Append(i % nqe);
+                     sample_qw.Append(eqpSol(i));
                   }
                }
-               else
-               {
-                  for (int e = 0; e < ne; e++)
-                     for (int q = 0; q < nqe; q++)
-                     {
-                        sample_el.Append(e);
-                        sample_qp.Append(q);
-                        sample_qw.Append(w_el[q]);
-                     }
-               }
                printf("Size of sampled qp: %d\n", sample_el.Size());
+               if (nnz != sample_el.Size())
+                  printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 
                rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
                rom_nlinf->AddDomainIntegrator(nl_integ);
