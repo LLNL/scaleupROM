@@ -66,6 +66,17 @@ nonlinear_integ_grad:
     - cd ci-build/test
     - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./nonlinear_integ_grad
 
+rom_nonlinearform:
+  stage: test
+  dependencies:
+    - compile
+  tags:
+    - shell
+    - quartz
+  script:
+    - cd ci-build/test
+    - singularity exec --cleanenv -B $CUSTOM_CI_BUILDS_DIR $IMAGE_FILE ./test_rom_nonlinearform
+
 poisson_dd_mms:
   stage: test
   dependencies:

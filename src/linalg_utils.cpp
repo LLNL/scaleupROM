@@ -154,10 +154,10 @@ void RtAP(DenseMatrix& R,
    const int num_row = R.NumCols();
    const int num_col = P.NumCols();
    RtAP.SetSize(num_row, num_col);
+   Vector vec_i, vec_j;
    for (int i = 0; i < num_row; i++)
       for (int j = 0; j < num_col; j++)
       {
-         Vector vec_i, vec_j;
          R.GetColumnReference(i, vec_i);
          P.GetColumnReference(j, vec_j);
          // NOTE: mfem::SparseMatrix.InnerProduct(x, y) computes y^t A x
@@ -177,10 +177,10 @@ SparseMatrix* RtAP(DenseMatrix& R,
    const int num_row = R.NumCols();
    const int num_col = P.NumCols();
    SparseMatrix *RAP = new SparseMatrix(num_row, num_col);
+   Vector vec_i, vec_j;
    for (int i = 0; i < num_row; i++)
       for (int j = 0; j < num_col; j++)
       {
-         Vector vec_i, vec_j;
          R.GetColumnReference(i, vec_i);
          P.GetColumnReference(j, vec_j);
          // NOTE: mfem::SparseMatrix.InnerProduct(x, y) computes y^t A x
@@ -347,6 +347,87 @@ void AddMultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, c
          yc += d_mat[d_rows[r]] * d_x[r];
       d_y[c] += yc;
       d_mat += height;
+   }
+}
+
+void MultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y)
+{
+   const int nrow = rows.Size(), ncol = mat.NumCols(), height = mat.NumRows();
+   assert(x.Size() == nrow);
+   assert(y.Size() == ncol);
+
+   const int rmin = rows.Min(), rmax = rows.Max();
+   assert((rmin >= 0) && (rmin < mat.NumRows()));
+   assert((rmax >= 0) && (rmax < mat.NumRows()));
+
+   const double *d_mat = mat.Read();
+   const double *d_x = x.Read();
+   const int *d_rows = rows.Read();
+   double *d_y = y.GetData();
+
+   double yc;
+   for (int c = 0; c < ncol; c++)
+   {
+      yc = 0.0;
+      for (int r = 0; r < nrow; r++)
+         yc += d_mat[d_rows[r]] * d_x[r];
+      d_y[c] = yc;
+      d_mat += height;
+   }
+}
+
+void SubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                   const DenseMatrix& A,
+                   const DenseMatrix& P, const Array<int> &Prows,
+                   DenseMatrix& RAP)
+{
+   const int Arow = Rrows.Size(), Acol = Prows.Size();
+   const int height = R.NumCols(), width = P.NumCols();
+   const int Pheight = P.NumRows();
+   assert(A.NumRows() == Arow);
+   assert(A.NumCols() == Acol);
+
+   {  // row index checks.
+      int rmin = Rrows.Min(), rmax = Rrows.Max();
+      assert((rmin >= 0) && (rmin < R.NumRows()));
+      assert((rmax >= 0) && (rmax < R.NumRows()));
+      rmin = Prows.Min();
+      rmax = Prows.Max();
+      assert((rmin >= 0) && (rmin < P.NumRows()));
+      assert((rmax >= 0) && (rmax < P.NumRows()));
+   }
+
+   RAP.SetSize(height, width);
+   Vector tmp(Arow), RAP_col;
+
+   const double *d_P = P.Read();
+   double *d_tmp = tmp.GetData();
+   double pr;
+
+   for (int j = 0; j < width; j++)
+   {
+      const double *d_A = A.Read();
+
+      // step 1: tmp = A * P[:, j]
+      pr = d_P[Prows[0]];
+      for (int r = 0; r < Arow; r++)
+         d_tmp[r] = d_A[r] * pr;
+      d_A += Arow;
+
+      for (int c = 1; c < Acol; c++)
+      {
+         pr = d_P[Prows[c]];
+         for (int r = 0; r < Arow; r++)
+            d_tmp[r] += d_A[r] * pr;
+         d_A += Arow;
+      }
+
+      // step 2: RAP[:, j] = R^t * tmp
+      RAP.GetColumnReference(j, RAP_col);
+      MultTransposeSubMatrix(R, Rrows, tmp, RAP_col);
+
+      // Move the pointer to the next column of P
+      d_P += Pheight;
    }
 }
 

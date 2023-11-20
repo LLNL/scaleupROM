@@ -23,7 +23,7 @@ void HyperReductionIntegrator::AssembleQuadratureVector(
    const double &iw, const Vector &eltest, Vector &elquad)
 {
    mfem_error ("HyperReductionIntegrator::AssembleQuadratureVector(...)\n"
-               "for element is not implemented for this class.");  
+               "for element is not implemented for this class.");
 }
 
 void HyperReductionIntegrator::AssembleQuadratureVector(
@@ -31,7 +31,23 @@ void HyperReductionIntegrator::AssembleQuadratureVector(
    const IntegrationPoint &ip, const double &iw, const Vector &eltest, Vector &elquad)
 {
    mfem_error ("HyperReductionIntegrator::AssembleQuadratureVector(...)\n"
-               "for face is not implemented for this class.");  
+               "for face is not implemented for this class.");
+}
+
+void HyperReductionIntegrator::AssembleQuadratureGrad(
+   const FiniteElement &el, ElementTransformation &T, const IntegrationPoint &ip,
+   const double &iw, const Vector &eltest, DenseMatrix &quadmat)
+{
+   mfem_error ("HyperReductionIntegrator::AssembleQuadratureGrad(...)\n"
+               "for element is not implemented for this class.");
+}
+
+void HyperReductionIntegrator::AssembleQuadratureGrad(
+   const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &T,
+   const IntegrationPoint &ip, const double &iw, const Vector &eltest, DenseMatrix &quadmat)
+{
+   mfem_error ("HyperReductionIntegrator::AssembleQuadratureGrad(...)\n"
+               "for face is not implemented for this class.");
 }
 
 const IntegrationRule&
@@ -240,6 +256,75 @@ void VectorConvectionTrilinearFormIntegrator::AssembleElementGrad(
          {
             elmat.AddMatrix(w * gradEF(ii, jj), elmat_comp, ii * nd, jj * nd);
          }
+      }
+   }
+}
+
+void VectorConvectionTrilinearFormIntegrator::AssembleQuadratureGrad(
+   const FiniteElement &el,
+   ElementTransformation &trans,
+   const IntegrationPoint &ip,
+   const double &iw,
+   const Vector &elfun,
+   DenseMatrix &elmat)
+{
+   const int nd = el.GetDof();
+   dim = el.GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+   dshapex.SetSize(nd, dim);
+   elmat.SetSize(nd * dim);
+   elmat_comp.SetSize(nd);
+   gradEF.SetSize(dim);
+
+   EF.UseExternalData(elfun.GetData(), nd, dim);
+
+   double w;
+   Vector vec1(dim), vec2(dim), vec3(nd);
+
+   elmat = 0.0;
+   trans.SetIntPoint(&ip);
+
+   el.CalcShape(ip, shape);
+   el.CalcDShape(ip, dshape);
+
+   Mult(dshape, trans.InverseJacobian(), dshapex);
+
+   // w = ip.weight;
+   w = iw;
+
+   if (Q)
+   {
+      w *= Q->Eval(trans, ip);
+   }
+
+   MultAtB(EF, dshapex, gradEF);
+   EF.MultTranspose(shape, vec1);
+
+   trans.AdjugateJacobian().Mult(vec1, vec2);
+
+   vec2 *= w;
+   dshape.Mult(vec2, vec3);
+   MultVWt(shape, vec3, elmat_comp);
+
+   for (int ii = 0; ii < dim; ii++)
+   {
+      elmat.AddMatrix(elmat_comp, ii * nd, ii * nd);
+   }
+
+   MultVVt(shape, elmat_comp);
+   // w = ip.weight * trans.Weight();
+   w = iw * trans.Weight();
+   if (Q)
+   {
+      w *= Q->Eval(trans, ip);
+   }
+   for (int ii = 0; ii < dim; ii++)
+   {
+      for (int jj = 0; jj < dim; jj++)
+      {
+         elmat.AddMatrix(w * gradEF(ii, jj), elmat_comp, ii * nd, jj * nd);
       }
    }
 }

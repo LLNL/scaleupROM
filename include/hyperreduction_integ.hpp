@@ -34,6 +34,21 @@ public:
                                           const double &iw,
                                           const Vector &eltest,
                                           Vector &elquad);
+
+   virtual void AssembleQuadratureGrad(const FiniteElement &el,
+                                       ElementTransformation &T,
+                                       const IntegrationPoint &ip,
+                                       const double &iw,
+                                       const Vector &eltest,
+                                       DenseMatrix &quadmat);
+
+   virtual void AssembleQuadratureGrad(const FiniteElement &el1,
+                                       const FiniteElement &el2,
+                                       FaceElementTransformations &T,
+                                       const IntegrationPoint &ip,
+                                       const double &iw,
+                                       const Vector &eltest,
+                                       DenseMatrix &quadmat);
 };
 
 class VectorConvectionTrilinearFormIntegrator : virtual public HyperReductionIntegrator
@@ -75,6 +90,13 @@ public:
                                     ElementTransformation &trans,
                                     const Vector &elfun,
                                     DenseMatrix &elmat);
+
+   virtual void AssembleQuadratureGrad(const FiniteElement &el,
+                                       ElementTransformation &trans,
+                                       const IntegrationPoint &ip,
+                                       const double &iw,
+                                       const Vector &elfun,
+                                       DenseMatrix &elmat) override;
 };
 
 } // namespace mfem

@@ -78,6 +78,13 @@ void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename)
 // Rows are not necessarily sorted and they can be duplicated.
 void MultSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
 void AddMultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
+void MultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
+// Currently needed only for DenseMatrix A.
+// For a SparseMatrix A, we can utilize PartMult within this routine.
+void SubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                   const DenseMatrix& A,
+                   const DenseMatrix& P, const Array<int> &Prows,
+                   DenseMatrix& RAP);
 
 }
 

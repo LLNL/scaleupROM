@@ -17,7 +17,7 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
 {
    Mesh *mesh = new Mesh("meshes/test.4x4.mesh");
    const int dim = mesh->Dimension();
-   const int order = 2;
+   const int order = UniformRandom(1, 3);
 
    FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
    FiniteElementSpace *fes(new FiniteElementSpace(mesh, h1_coll, dim));
@@ -77,6 +77,89 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
 
    delete mesh, h1_coll, fes;
    delete nform, rform;
+   return;
+}
+
+TEST(ROMNonlinearForm_gradient, VectorConvectionTrilinearFormIntegrator)
+{
+   Mesh *mesh = new Mesh("meshes/test.4x4.mesh");
+   const int dim = mesh->Dimension();
+   const int order = UniformRandom(1, 3);
+
+   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+   FiniteElementSpace *fes(new FiniteElementSpace(mesh, h1_coll, dim));
+   const int ndofs = fes->GetTrueVSize();
+
+   const int num_basis = 20;
+   // a fictitious basis.
+   DenseMatrix basis(ndofs, num_basis);
+   for (int i = 0; i < ndofs; i++)
+      for (int j = 0; j < num_basis; j++)
+         basis(i, j) = UniformRandom();
+
+   IntegrationRule ir = IntRules.Get(fes->GetFE(0)->GetGeomType(),
+                                    (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
+   ConstantCoefficient pi(3.141592);
+   auto *integ = new VectorConvectionTrilinearFormIntegrator(pi);
+   integ->SetIntRule(&ir);
+
+   ROMNonlinearForm *rform(new ROMNonlinearForm(num_basis, fes));
+   rform->AddDomainIntegrator(integ);
+   rform->SetBasis(basis);
+
+   // we set the full elements/quadrature points,
+   // so that the resulting vector is equilvalent to FOM.
+   const int nsample = UniformRandom(15, 20);
+   const int nqe = ir.GetNPoints();
+   const int ne = fes->GetNE();
+   Array<double> const& w_el = ir.GetWeights();
+   Array<int> sample_el(nsample), sample_qp(nsample);
+   Array<double> sample_qw(nsample);
+   for (int s = 0; s < nsample; s++)
+   {
+      sample_el[s] = UniformRandom(0, ne-1);
+      sample_qp[s] = UniformRandom(0, nqe-1);
+      sample_qw[s] = UniformRandom();
+   }
+   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+
+   Vector rom_u(num_basis);
+   for (int k = 0; k < rom_u.Size(); k++)
+      rom_u(k) = UniformRandom();
+
+   Vector rom_y(num_basis);
+   rform->Mult(rom_u, rom_y);
+   SparseMatrix *jac = dynamic_cast<SparseMatrix *>(&(rform->GetGradient(rom_u)));
+
+   double J0 = 0.5 * (rom_y * rom_y);
+   Vector grad(num_basis);
+   jac->MultTranspose(rom_y, grad);
+   double gg = sqrt(grad * grad);
+   printf("J0: %.15E\n", J0);
+   printf("grad: %.15E\n", gg);
+
+   Vector du(grad);
+   du /= gg;
+
+   Vector rom_y1(num_basis);
+   const int Nk = 40;
+   printf("amp\tJ1\tdJdx\terror\n");
+   for (int k = 0; k < Nk; k++)
+   {
+      double amp = pow(10.0, -0.25 * k);
+      Vector rom_u1(rom_u);
+      rom_u1.Add(amp, du);
+
+      rform->Mult(rom_u1, rom_y1);
+      double J1 = 0.5 * (rom_y1 * rom_y1);
+      double dJdx = (J1 - J0) / amp;
+      double error = abs(dJdx - gg) / gg;
+
+      printf("%.5E\t%.5E\t%.5E\t%.5E\n", amp, J1, dJdx, error);
+   }
+
+   delete mesh, h1_coll, fes;
+   delete rform;
    return;
 }
 
