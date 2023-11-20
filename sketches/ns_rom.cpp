@@ -47,6 +47,7 @@
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
 #include "linalg/NNLS.h"
+#include "rom_nonlinearform.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -557,7 +558,7 @@ public:
          rows[k] = k;
    }
 
-   ~TensorROM() { delete jac; }
+   ~TensorROM() { delete jac, jac_mono, jac_hypre; }
 
    void TensorContract(const Vector &xi, const Vector &xj, Vector &yk) const
    {
@@ -668,6 +669,72 @@ public:
          jac_mono->SetSubMatrix(rows, rows, *jac);
          jac_mono->Finalize();
          jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, jac_mono);
+      }
+
+      jacTimer.Stop();
+      if (direct_solve)
+         return *jac_hypre;
+      else
+         return *jac;
+   }
+
+};
+
+class EQPROM : public Operator
+{
+protected:
+   DenseMatrix *lin_op = NULL;
+   ROMNonlinearForm *rnlf = NULL;
+
+   mutable SparseMatrix *jac = NULL;
+
+   HYPRE_BigInt glob_size;
+   mutable HYPRE_BigInt row_starts[2];
+   Array<int> rows;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
+public:
+   mutable StopWatch multTimer, jacTimer;
+
+public:
+   EQPROM(DenseMatrix &lin_op_, ROMNonlinearForm &rnlf_)
+      : Operator(lin_op_.Height(), lin_op_.Width()), lin_op(&lin_op_),
+        rnlf(&rnlf_), jac(NULL)
+   {
+      glob_size = lin_op->Height();
+      row_starts[0] = 0;
+      row_starts[1] = lin_op->Height();
+      
+      rows.SetSize(glob_size);
+      for (int k = 0; k < glob_size; k++)
+         rows[k] = k;
+   }
+
+   ~EQPROM() { delete jac, jac_hypre; }
+
+   virtual void Mult(const Vector &x, Vector &y) const
+   {
+      multTimer.Start();
+      rnlf->Mult(x, y);
+      lin_op->AddMult(x, y);
+
+      multTimer.Stop();
+   }
+
+   /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
+   virtual Operator &GetGradient(const Vector &x) const
+   {
+      jacTimer.Start();
+
+      delete jac, jac_hypre;
+      SparseMatrix *grad_H = dynamic_cast<SparseMatrix *>(&rnlf->GetGradient(x));
+      jac = new SparseMatrix(*grad_H);
+      jac->AddSubMatrix(rows, rows, *lin_op);
+      jac->Finalize();
+
+      if (direct_solve)
+      {
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, jac);
       }
 
       jacTimer.Stop();
@@ -954,7 +1021,7 @@ int main(int argc, char *argv[])
 
          CAROM::BasisReader basis_reader(filename);
          const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
-         DenseMatrix basis;
+         DenseMatrix basis, u_basis;
          CAROM::CopyMatrix(*carom_basis, basis);
 
          SparseMatrix *linear_term = oper.GetLinearTerm();
@@ -963,8 +1030,10 @@ int main(int argc, char *argv[])
 
          FiniteElementSpace *ufes = oper.GetUfes();
          FiniteElementSpace *pfes = oper.GetPfes();
+         u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
 
          DenseTensor *nlin_rom = NULL;
+         ROMNonlinearForm *rom_nlinf = NULL;
          Operator *rom_oper = NULL;
          switch (rom_mode)
          {
@@ -1069,7 +1138,7 @@ int main(int argc, char *argv[])
                // CAROM::Vector & sol)
                double nnls_tol = 1.0e-11;
                int maxNNLSnnz = 0;
-               const double delta = 1.0e-4;
+               const double delta = 1.0e-5;
                CAROM::Vector eqpSol(ne * nqe, true);
                {
                   CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
@@ -1122,7 +1191,39 @@ int main(int argc, char *argv[])
 
                }
 
-               mfem_error("Implemented up to this point.\n");
+               Array<int> sample_el(0), sample_qp(0);
+               Array<double> sample_qw(0);
+               if (random_sample)
+               {
+                  for (int i = 0; i < eqpSol.dim(); ++i)
+                  {
+                     if (eqpSol(i) > 1.0e-12)
+                     {
+                        const int e = i / nqe;  // Element index
+                        sample_el.Append(i / nqe);
+                        sample_qp.Append(i % nqe);
+                        sample_qw.Append(eqpSol(i));
+                     }
+                  }
+               }
+               else
+               {
+                  for (int e = 0; e < ne; e++)
+                     for (int q = 0; q < nqe; q++)
+                     {
+                        sample_el.Append(e);
+                        sample_qp.Append(q);
+                        sample_qw.Append(w_el[q]);
+                     }
+               }
+               printf("Size of sampled qp: %d\n", sample_el.Size());
+
+               rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
+               rom_nlinf->AddDomainIntegrator(nl_integ);
+               rom_nlinf->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+               rom_nlinf->SetBasis(u_basis);
+
+               rom_oper = new EQPROM(lin_rom, *rom_nlinf);
             }  // case RomMode::EQP:
             break;
             default:
