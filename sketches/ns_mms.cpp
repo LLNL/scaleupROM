@@ -173,7 +173,9 @@ public:
    /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
    virtual Operator &GetGradient(const Vector &x) const
    {
-      delete system_jac, mono_jac, uu;
+      delete system_jac;
+      delete mono_jac;
+      delete uu;
       const Vector x_u(x.GetData()+block_offsets[0], M->Height()), x_p(x.GetData()+block_offsets[1], S->Height());
 
       SparseMatrix *grad_H = dynamic_cast<SparseMatrix *>(&H->GetGradient(x_u));
@@ -185,7 +187,8 @@ public:
       system_jac->SetBlock(1,0, pu);
 
       // update preconditioner.
-      delete u_prec, uu_hypre;
+      delete u_prec;
+      delete uu_hypre;
       uu_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, uu);
       u_prec = new HypreBoomerAMG(*uu_hypre);
       u_prec->SetPrintLevel(0);
@@ -198,9 +201,14 @@ public:
 
    virtual ~SteadyNavierStokes()
    {
-      delete system_jac, mono_jac, uu, up;
+      delete system_jac;
+      delete mono_jac;
+      delete uu;
+      delete up;
       delete jac_prec;
-      delete pMass, p_prec, ortho_p_prec;
+      delete pMass;
+      delete p_prec;
+      delete ortho_p_prec;
    }
 
    BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }

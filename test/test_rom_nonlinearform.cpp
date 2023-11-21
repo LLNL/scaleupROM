@@ -75,8 +75,11 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
    for (int k = 0; k < rom_y.Size(); k++)
       EXPECT_NEAR(rom_y(k), Pty(k), 1.0e-12);
 
-   delete mesh, h1_coll, fes;
-   delete nform, rform;
+   delete mesh;
+   delete h1_coll;
+   delete fes;
+   delete nform;
+   delete rform;
    return;
 }
 
@@ -158,7 +161,9 @@ TEST(ROMNonlinearForm_gradient, VectorConvectionTrilinearFormIntegrator)
       printf("%.5E\t%.5E\t%.5E\t%.5E\n", amp, J1, dJdx, error);
    }
 
-   delete mesh, h1_coll, fes;
+   delete mesh;
+   delete h1_coll;
+   delete fes;
    delete rform;
    return;
 }

@@ -392,7 +392,10 @@ public:
    {
       jacTimer.Start();
 
-      delete system_jac, mono_jac, jac_hypre, uu;
+      delete system_jac;
+      delete mono_jac;
+      delete jac_hypre;
+      delete uu;
       const Vector x_u(x.GetData()+vblock_offsets[0], M->Height()), x_p(x.GetData()+vblock_offsets[1], S->Height());
 
       SparseMatrix *grad_H = dynamic_cast<SparseMatrix *>(&H->GetGradient(x_u));
@@ -406,7 +409,8 @@ public:
       system_jac->SetBlock(1,0, pu);
 
       // // update preconditioner.
-      // delete u_prec, uu_hypre;
+      // delete u_prec
+      // delete uu_hypre;
       // uu_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, uu);
       // u_prec = new HypreBoomerAMG(*uu_hypre);
       // u_prec->SetPrintLevel(0);
@@ -428,15 +432,31 @@ public:
 
    virtual ~SteadyNavierStokes()
    {
-      delete system_jac, mono_jac, jac_hypre, uu, up;
-      delete M, S, H, F, G;
-      delete x, rhs;
-      delete u, p;
-      delete ufec, pfec, ufes, pfes;
-      delete J_gmres, J_mumps, newton_solver;
+      delete system_jac;
+      delete mono_jac;
+      delete jac_hypre;
+      delete uu;
+      delete up;
+      delete M;
+      delete S;
+      delete H;
+      delete F;
+      delete G;
+      delete x;
+      delete rhs;
+      delete u;
+      delete p;
+      delete ufec;
+      delete pfec;
+      delete ufes;
+      delete pfes;
+      delete J_gmres;
+      delete J_mumps;
+      delete newton_solver;
       // delete ir_nl;
       // delete jac_prec;
-      // delete pMass, p_prec, ortho_p_prec;
+      // delete pMass
+      // delete p_prec, ortho_p_prec;
    }
 
    // BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }
@@ -659,7 +679,9 @@ public:
    {
       jacTimer.Start();
 
-      delete jac, jac_hypre, jac_mono;
+      delete jac;
+      delete jac_hypre;
+      delete jac_mono;
       jac = new DenseMatrix(*lin_op);
       TensorAddMultTranspose(x, 0, *jac);
       TensorAddMultTranspose(x, 1, *jac);
@@ -1358,7 +1380,8 @@ int main(int argc, char *argv[])
          paraview_dc.Save();
 
          delete linear_term;
-         delete u_rom, p_rom;
+         delete u_rom;
+         delete p_rom;
          delete nlin_rom;
          delete rom_oper;
       }
