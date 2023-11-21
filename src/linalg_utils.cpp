@@ -376,10 +376,10 @@ void MultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, cons
    }
 }
 
-void SubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
-                   const DenseMatrix& A,
-                   const DenseMatrix& P, const Array<int> &Prows,
-                   DenseMatrix& RAP)
+void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                      const DenseMatrix& A,
+                      const DenseMatrix& P, const Array<int> &Prows,
+                      DenseMatrix& RAP)
 {
    const int Arow = Rrows.Size(), Acol = Prows.Size();
    const int height = R.NumCols(), width = P.NumCols();
@@ -422,9 +422,9 @@ void SubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
          d_A += Arow;
       }
 
-      // step 2: RAP[:, j] = R^t * tmp
+      // step 2: RAP[:, j] += R^t * tmp
       RAP.GetColumnReference(j, RAP_col);
-      MultTransposeSubMatrix(R, Rrows, tmp, RAP_col);
+      AddMultTransposeSubMatrix(R, Rrows, tmp, RAP_col);
 
       // Move the pointer to the next column of P
       d_P += Pheight;

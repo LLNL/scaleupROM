@@ -27,6 +27,8 @@ ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f)
 
 ROMNonlinearForm::~ROMNonlinearForm()
 {
+   delete Grad;
+
    for (int i = 0; i <  dnfi.Size(); i++)
    {
       delete dnfi[i];
@@ -310,7 +312,8 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
    if (Grad == NULL)
    {
       // Grad = new SparseMatrix(fes->GetVSize());
-      Grad = new SparseMatrix(width);
+      // Grad = new SparseMatrix(width);
+      Grad = new DenseMatrix(height, width);
    }
    else
    {
@@ -347,8 +350,8 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             dnfi[k]->AssembleQuadratureGrad(*fe, *T, ip, sample->qw, el_x, elmat);
             if (doftrans) { doftrans->TransformDual(elmat); }
 
-            SubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, quadmat);
-            Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
@@ -397,7 +400,8 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
             fnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
-            Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
@@ -478,17 +482,18 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
             bfnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
-            Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
 
-   if (!Grad->Finalized())
-   {
-      Grad->Finalize(skip_zeros);
-   }
+   // if (!Grad->Finalized())
+   // {
+   //    Grad->Finalize(skip_zeros);
+   // }
 
-   SparseMatrix *mGrad = Grad;
+   DenseMatrix *mGrad = Grad;
    
    // TODO(kevin): will need to consider how we should address this case.
    //              do we really need prolongation when we lift up from ROM?

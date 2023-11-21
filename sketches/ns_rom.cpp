@@ -687,11 +687,12 @@ protected:
    DenseMatrix *lin_op = NULL;
    ROMNonlinearForm *rnlf = NULL;
 
-   mutable SparseMatrix *jac = NULL;
+   mutable DenseMatrix *jac = NULL;
 
    HYPRE_BigInt glob_size;
    mutable HYPRE_BigInt row_starts[2];
    Array<int> rows;
+   mutable SparseMatrix *jac_mono = NULL;
    mutable HypreParMatrix *jac_hypre = NULL;
 
 public:
@@ -727,15 +728,17 @@ public:
    {
       jacTimer.Start();
 
-      delete jac, jac_hypre;
-      SparseMatrix *grad_H = dynamic_cast<SparseMatrix *>(&rnlf->GetGradient(x));
-      jac = new SparseMatrix(*grad_H);
-      jac->AddSubMatrix(rows, rows, *lin_op);
-      jac->Finalize();
+      delete jac, jac_mono, jac_hypre;
+      DenseMatrix *grad_H = dynamic_cast<DenseMatrix *>(&rnlf->GetGradient(x));
+      jac = new DenseMatrix(*grad_H);
+      *jac += *lin_op;
 
       if (direct_solve)
       {
-         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, jac);
+         jac_mono = new SparseMatrix(jac->NumRows());
+         jac_mono->SetSubMatrix(rows, rows, *jac);
+         jac_mono->Finalize();
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, jac_mono);
       }
 
       jacTimer.Stop();

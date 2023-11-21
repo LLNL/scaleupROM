@@ -81,10 +81,10 @@ void AddMultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, c
 void MultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
 // Currently needed only for DenseMatrix A.
 // For a SparseMatrix A, we can utilize PartMult within this routine.
-void SubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
-                   const DenseMatrix& A,
-                   const DenseMatrix& P, const Array<int> &Prows,
-                   DenseMatrix& RAP);
+void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                      const DenseMatrix& A,
+                      const DenseMatrix& P, const Array<int> &Prows,
+                      DenseMatrix& RAP);
 
 }
 

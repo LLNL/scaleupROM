@@ -46,6 +46,9 @@ protected:
    /// Needs to be converted to MFEM DenseMatrix.
    DenseMatrix *basis = NULL;   // not owned
 
+   /// Projection ROM's jacobian matrix is dense most of time.
+   mutable DenseMatrix *Grad = NULL;
+
    /// Set of Domain Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> dnfi; // owned
    // hyper reduction sampling indexes.
