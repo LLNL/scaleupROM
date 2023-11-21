@@ -48,6 +48,7 @@
 #include "dg_linear.hpp"
 #include "linalg/NNLS.h"
 #include "rom_nonlinearform.hpp"
+#include "hdf5_utils.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -56,7 +57,7 @@ static double nu = 0.1;
 static double zeta = 1.0;
 static bool direct_solve = true;
 
-enum Mode { MMS, SAMPLE, COMPARE, NUM_MODE };
+enum Mode { MMS, SAMPLE, BUILD, COMPARE, NUM_MODE };
 enum RomMode { TENSOR, EQP, NUM_ROMMODE };
 
 // Define the analytical solution and forcing terms / boundary conditions
@@ -771,6 +772,7 @@ int main(int argc, char *argv[])
    bool random_sample = true;
    int nsample = -1;
    int num_basis = -1;
+   double eqp_tol = 1.0e-5;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -798,6 +800,8 @@ int main(int argc, char *argv[])
                   "Number of basis for ROM.");
    args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
                   "Use direct or iterative solver.");
+   args.AddOption(&eqp_tol, "-et", "--eqp-tolerance",
+                  "Tolerance for EQP NNLS solver.");
    args.Parse();
    if (!args.Good())
    {
@@ -809,6 +813,7 @@ int main(int argc, char *argv[])
    assert(!pres_dbc);
    if (!strcmp(mode_str, "mms"))             mode = Mode::MMS;
    else if (!strcmp(mode_str, "sample"))     mode = Mode::SAMPLE;
+   else if (!strcmp(mode_str, "build"))     mode = Mode::BUILD;
    else if (!strcmp(mode_str, "compare"))    mode = Mode::COMPARE;
    else
    {
@@ -990,61 +995,20 @@ int main(int argc, char *argv[])
          printf("\n");
       }
       break;
-      case (Mode::COMPARE):
+      case (Mode::BUILD):
       {
-         if (random_sample)
-         {
-            for (int d = 0; d < problem::u0.Size(); d++)
-            {
-               problem::u0(d) = 2.0 * UniformRandom() - 1.0;
-               problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
-               problem::offsets(d) = UniformRandom();
-
-               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
-                  problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
-            }
-         }
-         else
-         {
-            problem::du = 0.0;
-            problem::offsets = 0.0;
-            problem::k = 0.0;
-
-            problem::u0(0) = 1.0;
-            problem::u0(1) = -1.0;
-            printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
-         }
-
-         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-         oper.SetupProblem();
-         oper.Solve();
-
-         CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
-         DenseMatrix basis, u_basis;
-         CAROM::CopyMatrix(*carom_basis, basis);
-
-         SparseMatrix *linear_term = oper.GetLinearTerm();
-         DenseMatrix lin_rom;
-         mfem::RtAP(basis, *linear_term, basis, lin_rom);
-
-         FiniteElementSpace *ufes = oper.GetUfes();
-         FiniteElementSpace *pfes = oper.GetPfes();
-         u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
-
-         DenseTensor *nlin_rom = NULL;
-         ROMNonlinearForm *rom_nlinf = NULL;
-         Operator *rom_oper = NULL;
          switch (rom_mode)
          {
-            case RomMode::TENSOR:
-            {
-               nlin_rom = oper.GetReducedTensor(basis);
-               rom_oper = new TensorROM(lin_rom, *nlin_rom);
-            }
-            break;
             case RomMode::EQP:
             {
+               SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+               oper.SetupProblem();
+
+               CAROM::BasisReader basis_reader(filename);
+               const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+               DenseMatrix basis, u_basis;
+               CAROM::CopyMatrix(*carom_basis, basis);
+
                const int fom_vdofs = oper.Height();
                CAROM::Options option(fom_vdofs, nsample, 1, false);
                CAROM::BasisGenerator snapshot_generator(option, false, filename);
@@ -1053,6 +1017,8 @@ int main(int argc, char *argv[])
                // TODO: what happen if we do not deep-copy?
                const CAROM::Matrix *snapshots = snapshot_generator.getSnapshotMatrix();
 
+               FiniteElementSpace *ufes = oper.GetUfes();
+               FiniteElementSpace *pfes = oper.GetPfes();
                const IntegrationRule *ir = oper.GetNonlinearIntRule();
                auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
                nl_integ->SetIntRule(ir);
@@ -1138,7 +1104,7 @@ int main(int argc, char *argv[])
                // CAROM::Vector & sol)
                double nnls_tol = 1.0e-11;
                int maxNNLSnnz = 0;
-               const double delta = 1.0e-5;
+               const double delta = eqp_tol;
                CAROM::Vector eqpSol(ne * nqe, true);
                CAROM::Vector rhs_Gw(Gt.numColumns(), false);
                // G.mult(w, rhs_ub);  // rhs = Gw
@@ -1206,6 +1172,103 @@ int main(int argc, char *argv[])
                printf("Size of sampled qp: %d\n", sample_el.Size());
                if (nnz != sample_el.Size())
                   printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
+
+               {  // save the sample to a hdf5 file.
+                  std::string sample_file = filename + "_sample.h5";
+
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fcreate(sample_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::WriteDataset(file_id, "sample_element", sample_el);
+                  hdf5_utils::WriteDataset(file_id, "sample_quadrature_point", sample_qp);
+                  hdf5_utils::WriteDataset(file_id, "sample_quadrature_weight", sample_qw);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+            }  // case RomMode::EQP:
+            break;
+         }  // switch (rom_mode)
+      }
+      break;
+      case (Mode::COMPARE):
+      {
+         if (random_sample)
+         {
+            for (int d = 0; d < problem::u0.Size(); d++)
+            {
+               problem::u0(d) = 2.0 * UniformRandom() - 1.0;
+               problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
+               problem::offsets(d) = UniformRandom();
+
+               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                  problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+            }
+         }
+         else
+         {
+            problem::du = 0.0;
+            problem::offsets = 0.0;
+            problem::k = 0.0;
+
+            problem::u0(0) = 1.0;
+            problem::u0(1) = -1.0;
+            printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
+         }
+
+         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+         oper.SetupProblem();
+         oper.Solve();
+
+         CAROM::BasisReader basis_reader(filename);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         DenseMatrix basis, u_basis;
+         CAROM::CopyMatrix(*carom_basis, basis);
+
+         SparseMatrix *linear_term = oper.GetLinearTerm();
+         DenseMatrix lin_rom;
+         mfem::RtAP(basis, *linear_term, basis, lin_rom);
+
+         FiniteElementSpace *ufes = oper.GetUfes();
+         FiniteElementSpace *pfes = oper.GetPfes();
+         u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
+
+         DenseTensor *nlin_rom = NULL;
+         ROMNonlinearForm *rom_nlinf = NULL;
+         Operator *rom_oper = NULL;
+         switch (rom_mode)
+         {
+            case RomMode::TENSOR:
+            {
+               nlin_rom = oper.GetReducedTensor(basis);
+               rom_oper = new TensorROM(lin_rom, *nlin_rom);
+            }
+            break;
+            case RomMode::EQP:
+            {
+               Array<int> sample_el, sample_qp;
+               Array<double> sample_qw;
+               {  // load the sample from a hdf5 file.
+                  std::string sample_file = filename + "_sample.h5";
+
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fopen(sample_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::ReadDataset(file_id, "sample_element", sample_el);
+                  hdf5_utils::ReadDataset(file_id, "sample_quadrature_point", sample_qp);
+                  hdf5_utils::ReadDataset(file_id, "sample_quadrature_weight", sample_qw);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+
+               const IntegrationRule *ir = oper.GetNonlinearIntRule();
+               auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
+               nl_integ->SetIntRule(ir);
 
                rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
                rom_nlinf->AddDomainIntegrator(nl_integ);
