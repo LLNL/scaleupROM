@@ -108,22 +108,28 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int el = sample->el;
-            if (el != prev_el)
-            {
-               fe = fes->GetFE(el);
-               doftrans = fes->GetElementVDofs(el, vdofs);
-               T = fes->GetElementTransformation(el);
-               MultSubMatrix(*basis, vdofs, x, el_x);
-               if (doftrans) { doftrans->InvTransformPrimal(el_x); }
-
-               prev_el = el;
-            }
-
+            T = fes->GetElementTransformation(el);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
-            dnfi[k]->AssembleQuadratureVector(*fe, *T, ip, sample->qw, el_x, el_y);
-            if (doftrans) { doftrans->TransformDual(el_y); }
 
-            AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+            if (precompute && (dnfi[k]->precomputable))
+               dnfi[k]->AddAssembleVector_Fast(i, sample->qw, *T, ip, x, y);
+            else
+            {
+               if (el != prev_el)
+               {
+                  fe = fes->GetFE(el);
+                  doftrans = fes->GetElementVDofs(el, vdofs);
+                  MultSubMatrix(*basis, vdofs, x, el_x);
+                  if (doftrans) { doftrans->InvTransformPrimal(el_x); }
+
+                  prev_el = el;
+               }
+
+               dnfi[k]->AssembleQuadratureVector(*fe, *T, ip, sample->qw, el_x, el_y);
+               if (doftrans) { doftrans->TransformDual(el_y); }
+
+               AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+            }  // not (precompute && (dnfi[k]->precomputable))
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
@@ -147,33 +153,39 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int face = sample->face;
-            if (face != prev_face)
-            {
-               tr = mesh->GetInteriorFaceTransformations(face);
-               if (tr == NULL)
-               {
-                  // for EQP, this indicates an ill sampling.
-                  // for other hyper reductions, we can simply continue the loop.
-                  mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
-                             "   indicating that an empty quadrature point is sampled.\n");
-               }  // if (tr == NULL)
-
-               fe1 = fes->GetFE(tr->Elem1No);
-               fe2 = fes->GetFE(tr->Elem2No);
-
-               fes->GetElementVDofs(tr->Elem1No, vdofs);
-               fes->GetElementVDofs(tr->Elem2No, vdofs2);
-               vdofs.Append (vdofs2);
-
-               MultSubMatrix(*basis, vdofs, x, el_x);
-
-               prev_face = face;
-            }  // if (face != prev_face)
-
+            tr = mesh->GetInteriorFaceTransformations(face);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
-            fnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->qw, el_x, el_y);
 
-            AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+            if (precompute && (fnfi[k]->precomputable))
+               fnfi[k]->AddAssembleVector_Fast(i, sample->qw, *tr, ip, x, y);
+            else
+            {
+               if (face != prev_face)
+               {
+                  if (tr == NULL)
+                  {
+                     // for EQP, this indicates an ill sampling.
+                     // for other hyper reductions, we can simply continue the loop.
+                     mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
+                              "   indicating that an empty quadrature point is sampled.\n");
+                  }  // if (tr == NULL)
+
+                  fe1 = fes->GetFE(tr->Elem1No);
+                  fe2 = fes->GetFE(tr->Elem2No);
+
+                  fes->GetElementVDofs(tr->Elem1No, vdofs);
+                  fes->GetElementVDofs(tr->Elem2No, vdofs2);
+                  vdofs.Append (vdofs2);
+
+                  MultSubMatrix(*basis, vdofs, x, el_x);
+
+                  prev_face = face;
+               }  // if (face != prev_face)
+
+               fnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->qw, el_x, el_y);
+
+               AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+            }  // not (precompute && (dnfi[k]->precomputable))
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
@@ -228,34 +240,40 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
                // continue;
             }
 
-            if (be != prev_be)
+            tr = mesh->GetBdrFaceTransformations (be);
+            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
+
+            if (precompute && (bfnfi[k]->precomputable))
+               bfnfi[k]->AddAssembleVector_Fast(i, sample->qw, *tr, ip, x, y);
+            else
             {
-               tr = mesh->GetBdrFaceTransformations (be);
-               if (tr == NULL)
+               if (be != prev_be)
                {
-                  // for EQP, this indicates an ill sampling.
-                  // for other hyper reductions, we can simply continue the loop.
-                  mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
-                             "   indicating that an empty quadrature point is sampled.\n");
+                  if (tr == NULL)
+                  {
+                     // for EQP, this indicates an ill sampling.
+                     // for other hyper reductions, we can simply continue the loop.
+                     mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
+                              "   indicating that an empty quadrature point is sampled.\n");
+                  }
+
+                  fes->GetElementVDofs(tr->Elem1No, vdofs);
+
+                  fe1 = fes->GetFE(tr->Elem1No);
+                  // The fe2 object is really a dummy and not used on the boundaries,
+                  // but we can't dereference a NULL pointer, and we don't want to
+                  // actually make a fake element.
+                  fe2 = fe1;
+
+                  MultSubMatrix(*basis, vdofs, x, el_x);
+
+                  prev_be = be;
                }
 
-               fes->GetElementVDofs(tr->Elem1No, vdofs);
+               bfnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->qw, el_x, el_y);
 
-               fe1 = fes->GetFE(tr->Elem1No);
-               // The fe2 object is really a dummy and not used on the boundaries,
-               // but we can't dereference a NULL pointer, and we don't want to
-               // actually make a fake element.
-               fe2 = fe1;
-
-               MultSubMatrix(*basis, vdofs, x, el_x);
-
-               prev_be = be;
-            }
-
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
-            bfnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->qw, el_x, el_y);
-
-            AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+               AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+            }  // not (precompute && (dnfi[k]->precomputable))
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
@@ -335,23 +353,29 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int el = sample->el;
-            if (el != prev_el)
-            {
-               fe = fes->GetFE(el);
-               doftrans = fes->GetElementVDofs(el, vdofs);
-               T = fes->GetElementTransformation(el);
-               MultSubMatrix(*basis, vdofs, x, el_x);
-               if (doftrans) { doftrans->InvTransformPrimal(el_x); }
-
-               prev_el = el;
-            }
-
+            T = fes->GetElementTransformation(el);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
-            dnfi[k]->AssembleQuadratureGrad(*fe, *T, ip, sample->qw, el_x, elmat);
-            if (doftrans) { doftrans->TransformDual(elmat); }
 
-            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
-            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            if (precompute && (dnfi[k]->precomputable))
+               dnfi[k]->AddAssembleGrad_Fast(i, sample->qw, *T, ip, x, *Grad);
+            else
+            {
+               if (el != prev_el)
+               {
+                  fe = fes->GetFE(el);
+                  doftrans = fes->GetElementVDofs(el, vdofs);
+                  MultSubMatrix(*basis, vdofs, x, el_x);
+                  if (doftrans) { doftrans->InvTransformPrimal(el_x); }
+
+                  prev_el = el;
+               }
+
+               dnfi[k]->AssembleQuadratureGrad(*fe, *T, ip, sample->qw, el_x, elmat);
+               if (doftrans) { doftrans->TransformDual(elmat); }
+
+               AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+               // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            }  // not (precompute && (dnfi[k]->precomputable))
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
@@ -375,33 +399,39 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int face = sample->face;
-            if (face != prev_face)
-            {
-               tr = mesh->GetInteriorFaceTransformations(face);
-               if (tr == NULL)
-               {
-                  // for EQP, this indicates an ill sampling.
-                  // for other hyper reductions, we can simply continue the loop.
-                  mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
-                             "   indicating that an empty quadrature point is sampled.\n");
-               }  // if (tr == NULL)
-
-               fe1 = fes->GetFE(tr->Elem1No);
-               fe2 = fes->GetFE(tr->Elem2No);
-
-               fes->GetElementVDofs(tr->Elem1No, vdofs);
-               fes->GetElementVDofs(tr->Elem2No, vdofs2);
-               vdofs.Append (vdofs2);
-
-               MultSubMatrix(*basis, vdofs, x, el_x);
-
-               prev_face = face;
-            }  // if (face != prev_face)
-
+            tr = mesh->GetInteriorFaceTransformations(face);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
-            fnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
-            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
-            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+
+            if (precompute && (fnfi[k]->precomputable))
+               fnfi[k]->AddAssembleGrad_Fast(i, sample->qw, *tr, ip, x, *Grad);
+            else
+            {
+               if (face != prev_face)
+               {
+                  if (tr == NULL)
+                  {
+                     // for EQP, this indicates an ill sampling.
+                     // for other hyper reductions, we can simply continue the loop.
+                     mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
+                              "   indicating that an empty quadrature point is sampled.\n");
+                  }  // if (tr == NULL)
+
+                  fe1 = fes->GetFE(tr->Elem1No);
+                  fe2 = fes->GetFE(tr->Elem2No);
+
+                  fes->GetElementVDofs(tr->Elem1No, vdofs);
+                  fes->GetElementVDofs(tr->Elem2No, vdofs2);
+                  vdofs.Append (vdofs2);
+
+                  MultSubMatrix(*basis, vdofs, x, el_x);
+
+                  prev_face = face;
+               }  // if (face != prev_face)
+
+               fnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
+               AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+               // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            }  // not (precompute && (dnfi[k]->precomputable))
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
@@ -456,34 +486,40 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
                // continue;
             }
 
-            if (be != prev_be)
+            tr = mesh->GetBdrFaceTransformations (be);
+            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
+
+            if (precompute && (bfnfi[k]->precomputable))
+               bfnfi[k]->AddAssembleGrad_Fast(i, sample->qw, *tr, ip, x, *Grad);
+            else
             {
-               tr = mesh->GetBdrFaceTransformations (be);
-               if (tr == NULL)
+               if (be != prev_be)
                {
-                  // for EQP, this indicates an ill sampling.
-                  // for other hyper reductions, we can simply continue the loop.
-                  mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
-                             "   indicating that an empty quadrature point is sampled.\n");
+                  if (tr == NULL)
+                  {
+                     // for EQP, this indicates an ill sampling.
+                     // for other hyper reductions, we can simply continue the loop.
+                     mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
+                              "   indicating that an empty quadrature point is sampled.\n");
+                  }
+
+                  fes->GetElementVDofs(tr->Elem1No, vdofs);
+
+                  fe1 = fes->GetFE(tr->Elem1No);
+                  // The fe2 object is really a dummy and not used on the boundaries,
+                  // but we can't dereference a NULL pointer, and we don't want to
+                  // actually make a fake element.
+                  fe2 = fe1;
+
+                  MultSubMatrix(*basis, vdofs, x, el_x);
+
+                  prev_be = be;
                }
 
-               fes->GetElementVDofs(tr->Elem1No, vdofs);
-
-               fe1 = fes->GetFE(tr->Elem1No);
-               // The fe2 object is really a dummy and not used on the boundaries,
-               // but we can't dereference a NULL pointer, and we don't want to
-               // actually make a fake element.
-               fe2 = fe1;
-
-               MultSubMatrix(*basis, vdofs, x, el_x);
-
-               prev_be = be;
-            }
-
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
-            bfnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
-            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
-            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+               bfnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
+               AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+               // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+            }  // not (precompute && (dnfi[k]->precomputable))
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())

@@ -1219,6 +1219,7 @@ int main(int argc, char *argv[])
                rom_nlinf->AddDomainIntegrator(nl_integ);
                rom_nlinf->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
                rom_nlinf->SetBasis(u_basis);
+               rom_nlinf->SetPrecomputeMode(precompute);
 
                if (precompute)
                   rom_nlinf->PrecomputeCoefficients();

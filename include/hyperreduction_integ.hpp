@@ -74,6 +74,19 @@ public:
    virtual void AppendPrecomputeCoefficients(const FiniteElementSpace *fes,
                                              DenseMatrix &basis,
                                              const SampleInfo &sample);
+
+   virtual void AddAssembleVector_Fast(const int s, const double qw,
+                                       ElementTransformation &T, const IntegrationPoint &ip,
+                                       const Vector &x, Vector &y) const;
+   virtual void AddAssembleVector_Fast(const int s, const double qw,
+                                       FaceElementTransformations &T, const IntegrationPoint &ip,
+                                       const Vector &x, Vector &y) const;
+   virtual void AddAssembleGrad_Fast(const int s, const double qw,
+                                     ElementTransformation &T, const IntegrationPoint &ip,
+                                     const Vector &x, DenseMatrix &jac) const;
+   virtual void AddAssembleGrad_Fast(const int s, const double qw,
+                                     FaceElementTransformations &T, const IntegrationPoint &ip,
+                                     const Vector &x, DenseMatrix &jac) const;
 };
 
 class VectorConvectionTrilinearFormIntegrator : virtual public HyperReductionIntegrator
@@ -128,6 +141,13 @@ public:
    virtual void AppendPrecomputeCoefficients(const FiniteElementSpace *fes,
                                              DenseMatrix &basis,
                                              const SampleInfo &sample) override;
+
+   virtual void AddAssembleVector_Fast(const int s, const double qw,
+                                       ElementTransformation &T, const IntegrationPoint &ip,
+                                       const Vector &x, Vector &y) const override;
+   virtual void AddAssembleGrad_Fast(const int s, const double qw,
+                                     ElementTransformation &T, const IntegrationPoint &ip,
+                                     const Vector &x, DenseMatrix &jac) const override;
 };
 
 } // namespace mfem

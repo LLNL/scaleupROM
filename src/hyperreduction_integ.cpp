@@ -12,6 +12,7 @@
 // Implementation of Bilinear Form Integrators
 
 #include "hyperreduction_integ.hpp"
+#include "linalg_utils.hpp"
 
 using namespace std;
 
@@ -54,6 +55,38 @@ void HyperReductionIntegrator::AppendPrecomputeCoefficients(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
    mfem_error ("HyperReductionIntegrator::AppendPrecomputeCoefficients(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::AddAssembleVector_Fast(
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y) const
+{
+   mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::AddAssembleVector_Fast(
+   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y) const
+{
+   mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::AddAssembleGrad_Fast(
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac) const
+{
+   mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::AddAssembleGrad_Fast(
+   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac) const
+{
+   mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
                "even though this class is set to be precomputable!\n");
 }
@@ -411,6 +444,36 @@ void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeCoefficients(
    }  // for (int i = 0; i < nbasis; i++)
 
    coeffs.Append(elten);
+}
+
+void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y) const
+{
+   const DenseTensor *tensor = coeffs[s];
+   Vector tmp(tensor->SizeK());
+   y.SetSize(tensor->SizeK());
+
+   double w = qw;
+   if (Q) 
+   {
+      T.SetIntPoint(&ip);
+      w *= Q->Eval(T, ip);
+   }
+   TensorAddScaledContract(*tensor, w, x, x, y);
+}
+
+void VectorConvectionTrilinearFormIntegrator::AddAssembleGrad_Fast(
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac) const
+{
+   const DenseTensor *tensor = coeffs[s];
+   double w = qw;
+   if (Q) 
+   {
+      T.SetIntPoint(&ip);
+      w *= Q->Eval(T, ip);
+   }
+   TensorAddScaledMultTranspose(*tensor, w, x, 0, jac);
+   TensorAddScaledMultTranspose(*tensor, w, x, 1, jac);
 }
 
 }
