@@ -86,6 +86,14 @@ void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
                       const DenseMatrix& P, const Array<int> &Prows,
                       DenseMatrix& RAP);
 
+// DenseTensor is column major and i is the fastest index. 
+// y_k = T_{ijk} * x_i * x_j
+void TensorContract(const DenseTensor &tensor, const Vector &xi, const Vector &xj, Vector &yk);
+// Contracts along the axis (0 or 1) and add the multipled transpose.
+// axis 0: M_{kj} += T_{ijk} * x_i
+// axis 1: M_{ki} += T_{ijk} * x_j
+void TensorAddMultTranspose(const DenseTensor &tensor, const Vector &x, const int axis, DenseMatrix &M);
+
 }
 
 #endif

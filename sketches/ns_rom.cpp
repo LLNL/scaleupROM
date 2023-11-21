@@ -581,94 +581,11 @@ public:
 
    ~TensorROM() { delete jac, jac_mono, jac_hypre; }
 
-   void TensorContract(const Vector &xi, const Vector &xj, Vector &yk) const
-   {
-      assert(xi.Size() == nlin_op->SizeI());
-      assert(xj.Size() == nlin_op->SizeJ());
-      yk.SetSize(nlin_op->SizeK());
-
-      const double *tdata = nlin_op->Data();
-      const double *dxi, *dxj;
-      double *dyk = yk.HostWrite();
-      for (int k = 0; k < nlin_op->SizeK(); k++, dyk++)
-      {
-         (*dyk) = 0.0;
-
-         dxj = xj.HostRead();
-         for (int j = 0; j < nlin_op->SizeJ(); j++, dxj++)
-         {
-            dxi = xi.HostRead();
-            for (int i = 0; i < nlin_op->SizeI(); i++, dxi++, tdata++)
-            {
-               (*dyk) += (*tdata) * (*dxi) * (*dxj);
-            }
-         }
-      }
-
-      return;
-   }
-
-   void TensorAddMultTranspose(const Vector &x, const int axis, DenseMatrix &M) const 
-   {
-      int size_ax, size_nx;
-      int offset, stride;
-      switch (axis)
-      {
-         case 0:
-         {
-            assert(x.Size() == nlin_op->SizeI());
-            assert(M.NumRows() == nlin_op->SizeK());
-            assert(M.NumCols() == nlin_op->SizeJ());
-            size_ax = nlin_op->SizeI();
-            size_nx = nlin_op->SizeJ();
-            offset = nlin_op->SizeI();
-            stride = 1;
-         }
-         break;
-         case 1:
-         {
-            assert(x.Size() == nlin_op->SizeJ());
-            assert(M.NumRows() == nlin_op->SizeK());
-            assert(M.NumCols() == nlin_op->SizeI());
-            size_ax = nlin_op->SizeJ();
-            size_nx = nlin_op->SizeI();
-            offset = 1;
-            stride = nlin_op->SizeI();
-         }
-         break;
-         default:
-            mfem_error("TensorMult axis should be between 0 and 1!\n");
-            break;
-      }
-
-      const double *tdata, *dx;
-      double *dM = M.HostReadWrite();
-
-      for (int nx = 0; nx < size_nx; nx++)
-      {
-         for (int k = 0; k < nlin_op->SizeK(); k++, dM++)
-         {
-            // commented for AddMultTranspose.
-            // (*dM) = 0.0;
-
-            dx = x.HostRead();
-            tdata = nlin_op->GetData(k) + offset * nx;
-            for (int ax = 0; ax < size_ax; ax++, dx++)
-            {
-               (*dM) += (*tdata) * (*dx);
-               tdata += stride;
-            }
-         }
-      }
-
-      return;
-   }
-
    virtual void Mult(const Vector &x, Vector &y) const
    {
       multTimer.Start();
 
-      TensorContract(x, x, y);
+      TensorContract(*nlin_op, x, x, y);
       lin_op->AddMult(x, y);
 
       multTimer.Stop();
@@ -683,8 +600,8 @@ public:
       delete jac_hypre;
       delete jac_mono;
       jac = new DenseMatrix(*lin_op);
-      TensorAddMultTranspose(x, 0, *jac);
-      TensorAddMultTranspose(x, 1, *jac);
+      TensorAddMultTranspose(*nlin_op, x, 0, *jac);
+      TensorAddMultTranspose(*nlin_op, x, 1, *jac);
 
       if (direct_solve)
       {

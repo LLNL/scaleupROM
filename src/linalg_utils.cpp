@@ -431,4 +431,87 @@ void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
    }
 }
 
+void TensorContract(const DenseTensor &tensor, const Vector &xi, const Vector &xj, Vector &yk)
+{
+   assert(xi.Size() == tensor.SizeI());
+   assert(xj.Size() == tensor.SizeJ());
+   yk.SetSize(tensor.SizeK());
+
+   const double *tdata = tensor.Data();
+   const double *dxi, *dxj;
+   double *dyk = yk.HostWrite();
+   for (int k = 0; k < tensor.SizeK(); k++, dyk++)
+   {
+      (*dyk) = 0.0;
+
+      dxj = xj.HostRead();
+      for (int j = 0; j < tensor.SizeJ(); j++, dxj++)
+      {
+         dxi = xi.HostRead();
+         for (int i = 0; i < tensor.SizeI(); i++, dxi++, tdata++)
+         {
+            (*dyk) += (*tdata) * (*dxi) * (*dxj);
+         }
+      }
+   }
+
+   return;
+}
+
+void TensorAddMultTranspose(const DenseTensor &tensor, const Vector &x, const int axis, DenseMatrix &M)
+{
+   int size_ax, size_nx;
+   int offset, stride;
+   switch (axis)
+   {
+      case 0:
+      {
+         assert(x.Size() == tensor.SizeI());
+         assert(M.NumRows() == tensor.SizeK());
+         assert(M.NumCols() == tensor.SizeJ());
+         size_ax = tensor.SizeI();
+         size_nx = tensor.SizeJ();
+         offset = tensor.SizeI();
+         stride = 1;
+      }
+      break;
+      case 1:
+      {
+         assert(x.Size() == tensor.SizeJ());
+         assert(M.NumRows() == tensor.SizeK());
+         assert(M.NumCols() == tensor.SizeI());
+         size_ax = tensor.SizeJ();
+         size_nx = tensor.SizeI();
+         offset = 1;
+         stride = tensor.SizeI();
+      }
+      break;
+      default:
+         mfem_error("TensorMult axis should be between 0 and 1!\n");
+         break;
+   }
+
+   const double *tdata, *dx;
+   double *dM = M.HostReadWrite();
+
+   for (int nx = 0; nx < size_nx; nx++)
+   {
+      for (int k = 0; k < tensor.SizeK(); k++, dM++)
+      {
+         // commented for AddMultTranspose.
+         // (*dM) = 0.0;
+
+         dx = x.HostRead();
+         tdata = tensor.GetData(k) + offset * nx;
+         for (int ax = 0; ax < size_ax; ax++, dx++)
+         {
+            (*dM) += (*tdata) * (*dx);
+            tdata += stride;
+         }
+      }
+   }
+
+   return;
+}
+
 }
