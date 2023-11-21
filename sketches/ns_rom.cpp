@@ -715,6 +715,7 @@ int main(int argc, char *argv[])
    int nsample = -1;
    int num_basis = -1;
    double eqp_tol = 1.0e-5;
+   bool precompute = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -744,6 +745,8 @@ int main(int argc, char *argv[])
                   "Use direct or iterative solver.");
    args.AddOption(&eqp_tol, "-et", "--eqp-tolerance",
                   "Tolerance for EQP NNLS solver.");
+   args.AddOption(&precompute, "-pre", "--precompute", "-no-pre", "--no-precompute",
+                  "Precompute hypre-reduction coefficients.");
    args.Parse();
    if (!args.Good())
    {
@@ -1216,6 +1219,9 @@ int main(int argc, char *argv[])
                rom_nlinf->AddDomainIntegrator(nl_integ);
                rom_nlinf->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
                rom_nlinf->SetBasis(u_basis);
+
+               if (precompute)
+                  rom_nlinf->PrecomputeCoefficients();
 
                rom_oper = new EQPROM(lin_rom, *rom_nlinf);
             }  // case RomMode::EQP:

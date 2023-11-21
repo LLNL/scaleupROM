@@ -100,11 +100,11 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<DomainSampleInfo> *sample_info = dnfi_sample[k];
+         Array<SampleInfo> *sample_info = dnfi_sample[k];
          assert(sample_info);
 
          int prev_el = -1;
-         DomainSampleInfo *sample = sample_info->GetData();
+         SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int el = sample->el;
@@ -139,11 +139,11 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<FaceSampleInfo> *sample_info = fnfi_sample[k];
+         Array<SampleInfo> *sample_info = fnfi_sample[k];
          assert(sample_info);
 
          int prev_face = -1;
-         FaceSampleInfo *sample = sample_info->GetData();
+         SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int face = sample->face;
@@ -209,11 +209,11 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<BdrSampleInfo> *sample_info = bfnfi_sample[k];
+         Array<SampleInfo> *sample_info = bfnfi_sample[k];
          assert(sample_info);
 
          int prev_be = -1;
-         BdrSampleInfo *sample = sample_info->GetData();
+         SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int be = sample->be;
@@ -327,11 +327,11 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<DomainSampleInfo> *sample_info = dnfi_sample[k];
+         Array<SampleInfo> *sample_info = dnfi_sample[k];
          assert(sample_info);
 
          int prev_el = -1;
-         DomainSampleInfo *sample = sample_info->GetData();
+         SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int el = sample->el;
@@ -367,11 +367,11 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<FaceSampleInfo> *sample_info = fnfi_sample[k];
+         Array<SampleInfo> *sample_info = fnfi_sample[k];
          assert(sample_info);
 
          int prev_face = -1;
-         FaceSampleInfo *sample = sample_info->GetData();
+         SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int face = sample->face;
@@ -437,11 +437,11 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<BdrSampleInfo> *sample_info = bfnfi_sample[k];
+         Array<SampleInfo> *sample_info = bfnfi_sample[k];
          assert(sample_info);
 
          int prev_be = -1;
-         BdrSampleInfo *sample = sample_info->GetData();
+         SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int be = sample->be;
@@ -513,6 +513,89 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
    // }
 
    return *mGrad;
+}
+
+void ROMNonlinearForm::PrecomputeCoefficients()
+{
+   assert(basis);
+   assert(basis->NumCols() == height);
+
+   Mesh *mesh = fes->GetMesh();
+
+   if (dnfi.Size())
+   {
+      for (int k = 0; k < dnfi.Size(); k++)
+      {
+         Array<SampleInfo> *sample_info = dnfi_sample[k];
+         assert(sample_info);
+
+         SampleInfo *sample = sample_info->GetData();
+         for (int i = 0; i < sample_info->Size(); i++, sample++)
+            dnfi[k]->AppendPrecomputeCoefficients(fes, *basis, *sample);
+      }  // for (int k = 0; k < dnfi.Size(); k++)
+   }  // if (dnfi.Size())
+
+   if (fnfi.Size())
+   {
+      for (int k = 0; k < fnfi.Size(); k++)
+      {
+         Array<SampleInfo> *sample_info = fnfi_sample[k];
+         assert(sample_info);
+
+         SampleInfo *sample = sample_info->GetData();
+         for (int i = 0; i < sample_info->Size(); i++, sample++)
+            fnfi[k]->AppendPrecomputeCoefficients(fes, *basis, *sample);
+      }  // for (int k = 0; k < fnfi.Size(); k++)
+   }  // if (fnfi.Size())
+
+   if (bfnfi.Size())
+   {
+      // Which boundary attributes need to be processed?
+      Array<int> bdr_attr_marker(mesh->bdr_attributes.Size() ?
+                                 mesh->bdr_attributes.Max() : 0);
+      bdr_attr_marker = 0;
+      for (int k = 0; k < bfnfi.Size(); k++)
+      {
+         if (bfnfi_marker[k] == NULL)
+         {
+            bdr_attr_marker = 1;
+            break;
+         }
+         Array<int> &bdr_marker = *bfnfi_marker[k];
+         MFEM_ASSERT(bdr_marker.Size() == bdr_attr_marker.Size(),
+                     "invalid boundary marker for boundary face integrator #"
+                     << k << ", counting from zero");
+         for (int i = 0; i < bdr_attr_marker.Size(); i++)
+         {
+            bdr_attr_marker[i] |= bdr_marker[i];
+         }
+      }  // for (int k = 0; k < bfnfi.Size(); k++)
+
+      for (int k = 0; k < bfnfi.Size(); k++)
+      {
+         Array<SampleInfo> *sample_info = bfnfi_sample[k];
+         assert(sample_info);
+
+         int prev_be = -1;
+         SampleInfo *sample = sample_info->GetData();
+         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         {
+            int be = sample->be;
+            const int bdr_attr = mesh->GetBdrAttribute(i);
+            if (bfnfi_marker[k] &&
+                   (*bfnfi_marker[k])[bdr_attr-1] == 0)
+            { 
+               // for EQP, this indicates an ill sampling.
+               // for other hyper reductions, we can simply continue the loop.
+               mfem_error("The sampled boundary element does not have a boundary condition,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
+               // continue;
+            }
+
+            bfnfi[k]->AppendPrecomputeCoefficients(fes, *basis, *sample);
+         }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
+      }  // for (int k = 0; k < bfnfi.Size(); k++)
+   }  // if (bfnfi.Size())
 }
 
 }

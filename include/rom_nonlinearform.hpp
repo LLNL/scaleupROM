@@ -20,27 +20,6 @@ namespace mfem
 
 class ROMNonlinearForm : public NonlinearForm
 {
-private:
-   struct DomainSampleInfo {
-      int el;         // element index
-      int qp;         // quadrature point
-      double qw;      // quadrature weight
-      // can add dofs for other hyper reductions.
-   };
-
-   struct FaceSampleInfo {
-      int face;         // face index
-      int qp;         // quadrature point
-      double qw;      // quadrature weight
-      // can add dofs for other hyper reductions.
-   };
-
-   struct BdrSampleInfo {
-      int be;         // boundary element index
-      int qp;         // quadrature point
-      double qw;      // quadrature weight
-      // can add dofs for other hyper reductions.
-   };
 protected:
    /// ROM basis for projection.
    /// Needs to be converted to MFEM DenseMatrix.
@@ -52,27 +31,18 @@ protected:
    /// Set of Domain Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> dnfi; // owned
    // hyper reduction sampling indexes.
-   Array<Array<DomainSampleInfo> *> dnfi_sample;
-//    Array<Array<int> *> dnfi_sample_el;  // owned
-//    Array<Array<int> *> dnfi_sample_qp;  // owned
-//    Array<Array<double> *> dnfi_sample_qw;  // owned
-
-   // technically we can define for sample dofs as well.
-//    Array<Array<int> *> dnfi_sample_dof;  // owned
+   Array<Array<SampleInfo> *> dnfi_sample;
 
    /// Set of interior face Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> fnfi; // owned
-   Array<Array<FaceSampleInfo> *> fnfi_sample;
-//    Array<Array<int> *> fnfi_sample_el;  // owned
-//    Array<Array<int> *> fnfi_sample_qp;  // owned
-//    Array<Array<double> *> fnfi_sample_qw;  // owned
+   Array<Array<SampleInfo> *> fnfi_sample;
 
    /// Set of boundary face Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> bfnfi; // owned
-   Array<Array<BdrSampleInfo> *> bfnfi_sample;
-//    Array<Array<int> *> bfnfi_sample_el;  // owned
-//    Array<Array<int> *> bfnfi_sample_qp;  // owned
-//    Array<Array<double> *> bfnfi_sample_qw;  // owned
+   Array<Array<SampleInfo> *> bfnfi_sample;
+
+   /// @brief Flag for precomputing necessary coefficients for fast computation.
+   bool precompute = false;
 
 public:
    /// Construct a NonlinearForm on the given FiniteElementSpace, @a f.
@@ -83,6 +53,10 @@ public:
    /** @brief Destroy the NonlinearForm including the owned
        NonlinearFormIntegrator%s and gradient Operator. */
    virtual ~ROMNonlinearForm();
+
+   void SetPrecomputeMode(const bool precompute_) { precompute = precompute_; }
+
+   void PrecomputeCoefficients();
 
    void SetBasis(DenseMatrix &basis_)
    {
@@ -96,9 +70,6 @@ public:
    {
       dnfi.Append(nlfi);
       dnfi_sample.Append(NULL);
-    //   dnfi_sample_el.Append(NULL);
-    //   dnfi_sample_qp.Append(NULL);
-    //   dnfi_sample_qw.Append(NULL);
    }
 
    void UpdateDomainIntegratorSampling(const int i, const Array<int> &el, const Array<int> &qp, const Array<double> &qw)
@@ -106,9 +77,9 @@ public:
       assert((i >= 0) && (i < dnfi.Size()));
       assert(dnfi.Size() == dnfi_sample.Size());
 
-      dnfi_sample[i] = new Array<DomainSampleInfo>(0);
+      dnfi_sample[i] = new Array<SampleInfo>(0);
       for (int s = 0; s < el.Size(); s++)
-         dnfi_sample[i]->Append(DomainSampleInfo({el[s], qp[s], qw[s]}));
+         dnfi_sample[i]->Append({.el=el[s], .face=-1, .be=-1, .qp=qp[s], .qw=qw[s]});
    }
 
    /// Access all integrators added with AddDomainIntegrator().
@@ -120,9 +91,6 @@ public:
    {
       fnfi.Append(nlfi);
       fnfi_sample.Append(NULL);
-    //   fnfi_sample_el.Append(NULL);
-    //   fnfi_sample_qp.Append(NULL);
-    //   fnfi_sample_qw.Append(NULL);
    }
 
    void UpdateInteriorFaceIntegratorSampling(const int i, const Array<int> &face, const Array<int> &qp, const Array<double> &qw)
@@ -130,9 +98,9 @@ public:
       assert((i >= 0) && (i < fnfi.Size()));
       assert(fnfi.Size() == fnfi_sample.Size());
 
-      fnfi_sample[i] = new Array<FaceSampleInfo>(0);
+      fnfi_sample[i] = new Array<SampleInfo>(0);
       for (int s = 0; s < face.Size(); s++)
-         fnfi_sample[i]->Append(FaceSampleInfo({face[s], qp[s], qw[s]}));
+         fnfi_sample[i]->Append({.el=-1, .face=face[s], .be=-1, .qp=qp[s], .qw=qw[s]});
    }
 
    /** @brief Access all interior face integrators added with
@@ -146,9 +114,6 @@ public:
       bfnfi.Append(nlfi);
       bfnfi_marker.Append(NULL);
       bfnfi_sample.Append(NULL);
-    //   bfnfi_sample_el.Append(NULL);
-    //   bfnfi_sample_qp.Append(NULL);
-    //   bfnfi_sample_qw.Append(NULL);
    }
 
    /** @brief Adds new Boundary Face Integrator, restricted to specific boundary
@@ -159,9 +124,6 @@ public:
       bfnfi.Append(nfi);
       bfnfi_marker.Append(&bdr_marker);
       bfnfi_sample.Append(NULL);
-    //   bfnfi_sample_el.Append(NULL);
-    //   bfnfi_sample_qp.Append(NULL);
-    //   bfnfi_sample_qw.Append(NULL);
    }
 
    void UpdateBdrFaceIntegratorSampling(const int i, const Array<int> &be, const Array<int> &qp, const Array<double> &qw)
@@ -169,9 +131,9 @@ public:
       assert((i >= 0) && (i < bfnfi.Size()));
       assert(bfnfi.Size() == bfnfi_sample.Size());
 
-      bfnfi_sample[i] = new Array<BdrSampleInfo>(0);
+      bfnfi_sample[i] = new Array<SampleInfo>(0);
       for (int s = 0; s < be.Size(); s++)
-         bfnfi_sample[i]->Append(BdrSampleInfo({be[s], qp[s], qw[s]}));
+         bfnfi_sample[i]->Append({.el=-1, .face=-1, .be=be[s], .qp=qp[s], .qw=qw[s]});
    }
 
    /** @brief Access all boundary face integrators added with

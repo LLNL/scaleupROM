@@ -17,8 +17,29 @@
 namespace mfem
 {
 
+struct SampleInfo {
+   int el;         // element index (used for DomainIntegrator)
+   int face;       // face index (used for InteriorFaceIntegrator)
+   int be;         // boundary element index (used for BdrFaceIntegrator)
+   int qp;         // quadrature point
+   double qw;      // quadrature weight
+   // can add dofs for other hyper reductions.
+};
+
 class HyperReductionIntegrator : virtual public NonlinearFormIntegrator
 {
+public:
+   const bool precomputable;
+
+protected:
+   HyperReductionIntegrator(const bool precomputable_ = false)
+      : precomputable(precomputable_), NonlinearFormIntegrator() {}
+
+   // removed const qualifier for basis in order to use its column view vector.
+   void GetBasisElement(DenseMatrix &basis, const int col,
+                        const Array<int> vdofs, Vector &basis_el,
+                        DofTransformation *dof_trans = NULL);
+
 public:
    virtual void AssembleQuadratureVector(const FiniteElement &el,
                                           ElementTransformation &T,
@@ -49,6 +70,10 @@ public:
                                        const double &iw,
                                        const Vector &eltest,
                                        DenseMatrix &quadmat);
+
+   virtual void AppendPrecomputeCoefficients(const FiniteElementSpace *fes,
+                                             DenseMatrix &basis,
+                                             const SampleInfo &sample);
 };
 
 class VectorConvectionTrilinearFormIntegrator : virtual public HyperReductionIntegrator
@@ -60,11 +85,18 @@ private:
    DenseMatrix dshape, dshapex, elmat_comp, EF, gradEF, ELV;
    Vector shape;
 
+   // DenseTensor is column major and i is the fastest index. 
+   // For fast iteration, we set k to be the test function index.
+   Array<DenseTensor *> coeffs;
+
 public:
    VectorConvectionTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
-      : Q(&q), vQ(vq), HyperReductionIntegrator() { }
+      : HyperReductionIntegrator(true), Q(&q), vQ(vq), coeffs(0) { }
 
    VectorConvectionTrilinearFormIntegrator() = default;
+
+   ~VectorConvectionTrilinearFormIntegrator()
+   { for (int k = 0; k < coeffs.Size(); k++) delete coeffs[k]; }
 
    static const IntegrationRule &GetRule(const FiniteElement &fe,
                                          ElementTransformation &T);
@@ -81,11 +113,6 @@ public:
                                           const Vector &eltest,
                                           Vector &elquad) override;
 
-   // void AssembleElementQuadrature(const FiniteElement &el,
-   //                               ElementTransformation &T,
-   //                               const Vector &eltest,
-   //                               DenseMatrix &elquad);
-
    virtual void AssembleElementGrad(const FiniteElement &el,
                                     ElementTransformation &trans,
                                     const Vector &elfun,
@@ -97,6 +124,10 @@ public:
                                        const double &iw,
                                        const Vector &elfun,
                                        DenseMatrix &elmat) override;
+
+   virtual void AppendPrecomputeCoefficients(const FiniteElementSpace *fes,
+                                             DenseMatrix &basis,
+                                             const SampleInfo &sample) override;
 };
 
 } // namespace mfem

@@ -50,6 +50,23 @@ void HyperReductionIntegrator::AssembleQuadratureGrad(
                "for face is not implemented for this class.");
 }
 
+void HyperReductionIntegrator::AppendPrecomputeCoefficients(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   mfem_error ("HyperReductionIntegrator::AppendPrecomputeCoefficients(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::GetBasisElement(
+   DenseMatrix &basis, const int col, const Array<int> vdofs, Vector &basis_el, DofTransformation *dof_trans)
+{
+   Vector tmp;
+   basis.GetColumnReference(col, tmp);
+   tmp.GetSubVector(vdofs, basis_el);   // this involves a copy.
+   if (dof_trans) {dof_trans->InvTransformPrimal(basis_el); }
+}
+
 const IntegrationRule&
 VectorConvectionTrilinearFormIntegrator::GetRule(const FiniteElement &fe,
                                                 ElementTransformation &T)
@@ -327,6 +344,73 @@ void VectorConvectionTrilinearFormIntegrator::AssembleQuadratureGrad(
          elmat.AddMatrix(w * gradEF(ii, jj), elmat_comp, ii * nd, jj * nd);
       }
    }
+}
+
+void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeCoefficients(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   const int nbasis = basis.NumCols();
+   // Not all nonlinear form integrators can have tensors as coefficients.
+   // This is the special case of polynominally nonlinear operator.
+   // For more general nonlinear operators, probably shape/dshape have to be stored.
+   DenseTensor *elten = new DenseTensor(nbasis, nbasis, nbasis);
+
+   const int el = sample.el;
+   const FiniteElement *fe = fes->GetFE(el);
+   Array<int> vdofs;
+   // TODO(kevin): not exactly sure what doftrans impacts.
+   DofTransformation *doftrans = fes->GetElementVDofs(el, vdofs);
+   ElementTransformation *T = fes->GetElementTransformation(el);
+   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(*fe, *T);
+   const IntegrationPoint &ip = ir->IntPoint(sample.qp);
+
+   // double w = ip.weight * T.Weight();
+   double w = T->Weight();  // quadrature weight will be multipled in Mult step.
+   // CoefficientFunction will be multiplied at Mult step.
+   // if (Q) { w *= Q->Eval(*T, ip); }
+
+   const int nd = fe->GetDof();
+   dim = fe->GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+   gradEF.SetSize(dim);
+
+   T->SetIntPoint(&ip);
+   fe->CalcShape(ip, shape);
+   fe->CalcPhysDShape(*T, dshape);
+
+   Vector vec1(dim), vec2(dim);
+   Vector vec3(nd * dim);
+   elmat_comp.UseExternalData(vec3.GetData(), nd, dim);
+   Vector basis_i, basis_j, basis_k;
+
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i, doftrans);
+      EF.UseExternalData(basis_i.GetData(), nd, dim);
+      EF.MultTranspose(shape, vec1);
+
+      for (int j = 0; j < nbasis; j++)
+      {
+         GetBasisElement(basis, j, vdofs, basis_j, doftrans);
+         ELV.UseExternalData(basis_j.GetData(), nd, dim);
+         MultAtB(ELV, dshape, gradEF);
+         gradEF.Mult(vec1, vec2);
+         vec2 *= w;
+         MultVWt(shape, vec2, elmat_comp);
+         if (doftrans) { doftrans->TransformDual(vec3); }
+
+         for (int k = 0; k < nbasis; k++)
+         {
+            GetBasisElement(basis, k, vdofs, basis_k);   // doftrans is already applied above for test function.
+
+            (*elten)(i, j, k) = (basis_k * vec3);
+         }  // for (int k = 0; k < nbasis; k++)
+      }  // for (int j = 0; j < nbasis; j++)
+   }  // for (int i = 0; i < nbasis; i++)
+
+   coeffs.Append(elten);
 }
 
 }
