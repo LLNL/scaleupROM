@@ -60,7 +60,7 @@ void HyperReductionIntegrator::AppendPrecomputeCoefficients(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y) const
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -68,7 +68,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y) const
+   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -76,7 +76,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac) const
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -84,7 +84,7 @@ void HyperReductionIntegrator::AddAssembleGrad_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac) const
+   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -383,10 +383,10 @@ void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeCoefficients(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
    const int nbasis = basis.NumCols();
-   // Not all nonlinear form integrators can have tensors as coefficients.
-   // This is the special case of polynominally nonlinear operator.
-   // For more general nonlinear operators, probably shape/dshape have to be stored.
-   DenseTensor *elten = new DenseTensor(nbasis, nbasis, nbasis);
+   // // Not all nonlinear form integrators can have tensors as coefficients.
+   // // This is the special case of polynominally nonlinear operator.
+   // // For more general nonlinear operators, probably shape/dshape have to be stored.
+   // DenseTensor *elten = new DenseTensor(nbasis, nbasis, nbasis);
 
    const int el = sample.el;
    const FiniteElement *fe = fes->GetFE(el);
@@ -407,73 +407,144 @@ void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeCoefficients(
 
    shape.SetSize(nd);
    dshape.SetSize(nd, dim);
-   gradEF.SetSize(dim);
+   // gradEF.SetSize(dim);
 
    T->SetIntPoint(&ip);
    fe->CalcShape(ip, shape);
    fe->CalcPhysDShape(*T, dshape);
 
-   Vector vec1(dim), vec2(dim);
-   Vector vec3(nd * dim);
-   elmat_comp.UseExternalData(vec3.GetData(), nd, dim);
-   Vector basis_i, basis_j, basis_k;
-
+   Vector basis_i;
+   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
+   Array<DenseMatrix *> *gradEFs = new Array<DenseMatrix *>(0);
    for (int i = 0; i < nbasis; i++)
    {
       GetBasisElement(basis, i, vdofs, basis_i, doftrans);
       EF.UseExternalData(basis_i.GetData(), nd, dim);
+
+      Vector vec1;
+      vec1s->GetColumnReference(i, vec1);
       EF.MultTranspose(shape, vec1);
 
-      for (int j = 0; j < nbasis; j++)
-      {
-         GetBasisElement(basis, j, vdofs, basis_j, doftrans);
-         ELV.UseExternalData(basis_j.GetData(), nd, dim);
-         MultAtB(ELV, dshape, gradEF);
-         gradEF.Mult(vec1, vec2);
-         vec2 *= w;
-         MultVWt(shape, vec2, elmat_comp);
-         if (doftrans) { doftrans->TransformDual(vec3); }
+      DenseMatrix *gradEF1 = new DenseMatrix(dim);
+      MultAtB(EF, dshape, *gradEF1);
+      gradEFs->Append(gradEF1);
+   }
+   shapes.Append(vec1s);
+   dshapes.Append(gradEFs);
 
-         for (int k = 0; k < nbasis; k++)
-         {
-            GetBasisElement(basis, k, vdofs, basis_k);   // doftrans is already applied above for test function.
+   // Vector vec1(dim), vec2(dim);
+   // Vector vec3(nd * dim);
+   // elmat_comp.UseExternalData(vec3.GetData(), nd, dim);
+   // Vector basis_i, basis_j, basis_k;
 
-            (*elten)(i, j, k) = (basis_k * vec3);
-         }  // for (int k = 0; k < nbasis; k++)
-      }  // for (int j = 0; j < nbasis; j++)
-   }  // for (int i = 0; i < nbasis; i++)
+   // for (int i = 0; i < nbasis; i++)
+   // {
+   //    GetBasisElement(basis, i, vdofs, basis_i, doftrans);
+   //    EF.UseExternalData(basis_i.GetData(), nd, dim);
+   //    EF.MultTranspose(shape, vec1);
 
-   coeffs.Append(elten);
+   //    for (int j = 0; j < nbasis; j++)
+   //    {
+   //       GetBasisElement(basis, j, vdofs, basis_j, doftrans);
+   //       ELV.UseExternalData(basis_j.GetData(), nd, dim);
+   //       MultAtB(ELV, dshape, gradEF);
+   //       gradEF.Mult(vec1, vec2);
+   //       vec2 *= w;
+   //       MultVWt(shape, vec2, elmat_comp);
+   //       if (doftrans) { doftrans->TransformDual(vec3); }
+
+   //       for (int k = 0; k < nbasis; k++)
+   //       {
+   //          GetBasisElement(basis, k, vdofs, basis_k);   // doftrans is already applied above for test function.
+
+   //          (*elten)(i, j, k) = (basis_k * vec3);
+   //       }  // for (int k = 0; k < nbasis; k++)
+   //    }  // for (int j = 0; j < nbasis; j++)
+   // }  // for (int i = 0; i < nbasis; i++)
+
+   // coeffs.Append(elten);
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y) const
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
 {
-   const DenseTensor *tensor = coeffs[s];
-   Vector tmp(tensor->SizeK());
-   y.SetSize(tensor->SizeK());
-
-   double w = qw;
+   T.SetIntPoint(&ip);
+   double w = qw * T.Weight();
    if (Q) 
-   {
-      T.SetIntPoint(&ip);
       w *= Q->Eval(T, ip);
-   }
-   TensorAddScaledContract(*tensor, w, x, x, y);
+
+   dim = shapes[s]->NumRows();
+   Vector vec1(dim), vec2(dim);
+   shapes[s]->Mult(x, vec1);
+   Array<DenseMatrix *> *gradEFs = dshapes[s];
+
+   gradEF.SetSize(dim);
+   gradEF = 0.0;
+   for (int k = 0; k < gradEFs->Size(); k++)
+      gradEF.Add(x(k), *((*gradEFs)[k]));
+   gradEF.Mult(vec1, vec2);
+
+   assert(y.Size() == x.Size());
+   shapes[s]->AddMultTranspose(vec2, y, w);
+
+   // const DenseTensor *tensor = coeffs[s];
+   // Vector tmp(tensor->SizeK());
+   // y.SetSize(tensor->SizeK());
+   // double w = qw;
+   // if (Q) 
+   // {
+   //    T.SetIntPoint(&ip);
+   //    w *= Q->Eval(T, ip);
+   // }
+   // TensorAddScaledContract(*tensor, w, x, x, y);
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac) const
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
 {
-   const DenseTensor *tensor = coeffs[s];
-   double w = qw;
+   T.SetIntPoint(&ip);
+   double w = qw * T.Weight();
    if (Q) 
-   {
-      T.SetIntPoint(&ip);
       w *= Q->Eval(T, ip);
+
+   dim = shapes[s]->NumRows();
+   int nbasis = shapes[s]->NumCols();
+   Vector vec1(dim), vec2(dim);
+   shapes[s]->Mult(x, vec1);
+   Array<DenseMatrix *> *gradEFs = dshapes[s];
+
+   gradEF.SetSize(dim);
+   gradEF = 0.0;
+   for (int k = 0; k < gradEFs->Size(); k++)
+      gradEF.Add(x(k), *((*gradEFs)[k]));
+   gradEF *= w;
+
+   ELV.SetSize(dim, nbasis);
+   Mult(gradEF, *shapes[s], ELV);
+
+   for (int k = 0; k < nbasis; k++)
+   {
+      ELV.GetColumnReference(k, vec2);
+      (*gradEFs)[k]->AddMult(vec1, vec2, w);
    }
-   TensorAddScaledMultTranspose(*tensor, w, x, 0, jac);
-   TensorAddScaledMultTranspose(*tensor, w, x, 1, jac);
+
+   Vector jac_col;
+   for (int k = 0; k < nbasis; k++)
+   {
+      jac.GetColumnReference(k, jac_col);
+      ELV.GetColumnReference(k, vec2);
+      shapes[s]->AddMultTranspose(vec2, jac_col);
+   }
+
+   // const DenseTensor *tensor = coeffs[s];
+   // double w = qw;
+   // if (Q) 
+   // {
+   //    T.SetIntPoint(&ip);
+   //    w *= Q->Eval(T, ip);
+   // }
+   // TensorAddScaledMultTranspose(*tensor, w, x, 0, jac);
+   // TensorAddScaledMultTranspose(*tensor, w, x, 1, jac);
 }
 
 }
