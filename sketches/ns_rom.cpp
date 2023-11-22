@@ -982,18 +982,39 @@ int main(int argc, char *argv[])
       break;
       case (Mode::BUILD):
       {
+         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+         oper.SetupProblem();
+
+         CAROM::BasisReader basis_reader(filename);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         DenseMatrix basis;
+         CAROM::CopyMatrix(*carom_basis, basis);
+
          switch (rom_mode)
          {
+            case RomMode::TENSOR:
+            {
+               DenseTensor *nlin_rom = oper.GetReducedTensor(basis);
+
+               {  // save the sample to a hdf5 file.
+                  std::string tensor_file = filename + "_tensor.h5";
+
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fcreate(tensor_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::WriteDataset(file_id, "tensor", *nlin_rom);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+
+               delete nlin_rom;
+            }
+            break;
             case RomMode::EQP:
             {
-               SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-               oper.SetupProblem();
-
-               CAROM::BasisReader basis_reader(filename);
-               const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
-               DenseMatrix basis, u_basis;
-               CAROM::CopyMatrix(*carom_basis, basis);
-
                const int fom_vdofs = oper.Height();
                CAROM::Options option(fom_vdofs, nsample, 1, false);
                CAROM::BasisGenerator snapshot_generator(option, false, filename);
@@ -1232,7 +1253,21 @@ int main(int argc, char *argv[])
          {
             case RomMode::TENSOR:
             {
-               nlin_rom = oper.GetReducedTensor(basis);
+               nlin_rom = new DenseTensor;
+               {  // load the sample from a hdf5 file.
+                  std::string tensor_file = filename + "_tensor.h5";
+
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fopen(tensor_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::ReadDataset(file_id, "tensor", *nlin_rom);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+
                tenrom = new TensorROM(lin_rom, *nlin_rom);
                rom_oper = tenrom;
             }

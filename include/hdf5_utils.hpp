@@ -173,6 +173,9 @@ void WriteDataset(hid_t &source, std::string dataset, const Vector &value);
 void ReadDataset(hid_t &source, std::string dataset, DenseMatrix &value);
 void WriteDataset(hid_t &source, std::string dataset, const DenseMatrix &value);
 
+void ReadDataset(hid_t &source, std::string dataset, DenseTensor &value);
+void WriteDataset(hid_t &source, std::string dataset, const DenseTensor &value);
+
 inline bool pathExists(hid_t id, const std::string& path)
 {
   return H5Lexists(id, path.c_str(), H5P_DEFAULT) > 0;

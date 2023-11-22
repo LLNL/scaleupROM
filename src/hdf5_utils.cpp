@@ -379,4 +379,52 @@ void WriteDataset(hid_t &source, std::string dataset, const Vector &value)
    assert(errf >= 0);
 }
 
+void ReadDataset(hid_t &source, std::string dataset, DenseTensor &value)
+{
+   herr_t errf = 0;
+   
+   hid_t dset_id = H5Dopen(source, dataset.c_str(), H5P_DEFAULT);
+   assert(dset_id >= 0);
+
+   hid_t dspace_id = H5Dget_space(dset_id);
+   int ndims = H5Sget_simple_extent_ndims(dspace_id);
+   assert(ndims == 3);
+
+   hsize_t dims[ndims];
+   errf = H5Sget_simple_extent_dims(dspace_id, dims, NULL);
+   assert(errf >= 0);
+
+   // hdf5 is row-major, while mfem::DenseTensor is column major. we load the transpose.
+   value.SetSize(dims[2], dims[1], dims[0]);
+   hid_t dataType = hdf5_utils::GetType(value(0, 0, 0));
+   H5Dread(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Write());
+
+   errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+}
+
+void WriteDataset(hid_t &source, std::string dataset, const DenseTensor &value)
+{
+   herr_t errf = 0;
+
+   hid_t dataType = hdf5_utils::GetType(value(0,0,0));
+   hsize_t dims[3];
+   // hdf5 is row-major, while mfem::DenseTensor is column major. we save the transpose.
+   dims[0] = value.SizeK();
+   dims[1] = value.SizeJ();
+   dims[2] = value.SizeI();
+
+   hid_t dspace_id = H5Screate_simple(3, dims, NULL);
+   assert(dspace_id >= 0);
+
+   hid_t dset_id = H5Dcreate2(source, dataset.c_str(), dataType, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(dset_id >= 0);
+   
+   errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
+   assert(errf >= 0);
+
+   errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+}
+
 }
