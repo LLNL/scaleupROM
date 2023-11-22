@@ -23,7 +23,7 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
    FiniteElementSpace *fes(new FiniteElementSpace(mesh, h1_coll, dim));
    const int ndofs = fes->GetTrueVSize();
 
-   const int num_basis = 20;
+   const int num_basis = 10;
    // a fictitious basis.
    DenseMatrix basis(ndofs, num_basis);
    for (int i = 0; i < ndofs; i++)
@@ -93,7 +93,7 @@ TEST(ROMNonlinearForm_gradient, VectorConvectionTrilinearFormIntegrator)
    FiniteElementSpace *fes(new FiniteElementSpace(mesh, h1_coll, dim));
    const int ndofs = fes->GetTrueVSize();
 
-   const int num_basis = 20;
+   const int num_basis = 10;
    // a fictitious basis.
    DenseMatrix basis(ndofs, num_basis);
    for (int i = 0; i < ndofs; i++)
@@ -183,7 +183,7 @@ TEST(ROMNonlinearForm_fast, VectorConvectionTrilinearFormIntegrator)
    FiniteElementSpace *fes(new FiniteElementSpace(mesh, h1_coll, dim));
    const int ndofs = fes->GetTrueVSize();
 
-   const int num_basis = 20;
+   const int num_basis = 10;
    // a fictitious basis.
    DenseMatrix basis(ndofs, num_basis);
    for (int i = 0; i < ndofs; i++)

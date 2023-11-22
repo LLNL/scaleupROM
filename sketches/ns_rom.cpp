@@ -168,6 +168,7 @@ protected:
    NewtonSolver *newton_solver;
 
    mutable StopWatch solveTimer, multTimer, jacTimer;
+   mutable int num_mult, num_jac;
    
    // mutable BlockDiagonalPreconditioner *jac_prec;
    // BilinearForm *pMass = NULL;
@@ -186,7 +187,8 @@ public:
       : mesh(mesh_), dim(mesh_->Dimension()), order(order_), sigma(-1.0), kappa((order_+2)*(order_+2)),
         nu(nu_), zeta(zeta_), use_dg(use_dg_), pres_dbc(pres_dbc_),
         zero(0.0), one(1.0), minus_one(-1.0), half(0.), minus_half(-0.5),
-        system_jac(NULL), mono_jac(NULL), uu(NULL), up(NULL), pu(NULL)
+        system_jac(NULL), mono_jac(NULL), uu(NULL), up(NULL), pu(NULL),
+        num_mult(0), num_jac(0)
    {
       if (use_dg)
       {
@@ -385,6 +387,7 @@ public:
       S->Mult(x_u, y_p);
 
       multTimer.Stop();
+      num_mult++;
    }
 
    /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
@@ -424,6 +427,7 @@ public:
       }
 
       jacTimer.Stop();
+      num_jac++;
       if (direct_solve)
          return *jac_hypre;
       else
@@ -476,7 +480,7 @@ public:
       printf("FOM jac: %.3E sec\n", jacTimer.RealTime());
       printf("FOM solve: %.3E sec\n", solveTimer.RealTime());
 
-      ResetTimer();
+      // ResetTimer();
 
       return newton_solver->GetConverged();
    }
@@ -503,6 +507,9 @@ public:
    ConstantCoefficient* GetZeta() { return &zeta; }
    const IntegrationRule* GetNonlinearIntRule() { return ir_nl; }
 
+   const double GetAvgMultTime() { return multTimer.RealTime() / static_cast<double>(num_mult); }
+   const double GetAvgGradTime() { return jacTimer.RealTime() / static_cast<double>(num_jac); }
+   const double GetSolveTime() { return solveTimer.RealTime(); }
    void ResetTimer()
    {
       solveTimer.Clear();
@@ -564,11 +571,12 @@ protected:
 
 public:
    mutable StopWatch multTimer, jacTimer;
+   mutable int num_mult, num_jac;
 
 public:
    TensorROM(DenseMatrix &lin_op_, DenseTensor &nlin_op_)
       : Operator(lin_op_.Height(), lin_op_.Width()), lin_op(&lin_op_),
-        nlin_op(&nlin_op_), jac(NULL)
+        nlin_op(&nlin_op_), jac(NULL), num_mult(0), num_jac(0)
    {
       glob_size = lin_op->Height();
       row_starts[0] = 0;
@@ -590,6 +598,9 @@ public:
       printf("%.3E\n", jacTimer.RealTime());
    }
 
+   const double GetAvgMultTime() { return multTimer.RealTime() / static_cast<double>(num_mult); }
+   const double GetAvgGradTime() { return jacTimer.RealTime() / static_cast<double>(num_jac); }
+
    virtual void Mult(const Vector &x, Vector &y) const
    {
       multTimer.Start();
@@ -598,6 +609,7 @@ public:
       lin_op->AddMult(x, y);
 
       multTimer.Stop();
+      num_mult++;
    }
 
    /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
@@ -621,6 +633,7 @@ public:
       }
 
       jacTimer.Stop();
+      num_jac++;
       if (direct_solve)
          return *jac_hypre;
       else
@@ -645,6 +658,7 @@ protected:
 
 public:
    mutable StopWatch multTimer, jacTimer;
+   mutable int num_mult, num_jac;
 
 public:
    EQPROM(DenseMatrix &lin_op_, ROMNonlinearForm &rnlf_)
@@ -671,6 +685,9 @@ public:
       printf("%.3E\n", jacTimer.RealTime());
    }
 
+   const double GetAvgMultTime() { return multTimer.RealTime() / static_cast<double>(num_mult); }
+   const double GetAvgGradTime() { return jacTimer.RealTime() / static_cast<double>(num_jac); }
+
    virtual void Mult(const Vector &x, Vector &y) const
    {
       multTimer.Start();
@@ -678,6 +695,7 @@ public:
       lin_op->AddMult(x, y);
 
       multTimer.Stop();
+      num_mult++;
    }
 
    /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
@@ -699,6 +717,7 @@ public:
       }
 
       jacTimer.Stop();
+      num_jac++;
       if (direct_solve)
          return *jac_hypre;
       else
@@ -734,6 +753,7 @@ int main(int argc, char *argv[])
    int num_basis = -1;
    double eqp_tol = 1.0e-5;
    bool precompute = false;
+   const char *compare_output_file = "result.h5";
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -765,6 +785,8 @@ int main(int argc, char *argv[])
                   "Tolerance for EQP NNLS solver.");
    args.AddOption(&precompute, "-pre", "--precompute", "-no-pre", "--no-precompute",
                   "Precompute hypre-reduction coefficients.");
+   args.AddOption(&compare_output_file, "-of", "--output-file",
+                  "Output file name to store the comparison result.");
    args.Parse();
    if (!args.Good())
    {
@@ -1184,6 +1206,9 @@ int main(int argc, char *argv[])
          SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
          oper.SetupProblem();
          oper.Solve();
+         const double fom_mult = oper.GetAvgMultTime();
+         const double fom_jac = oper.GetAvgGradTime();
+         const double fom_solve = oper.GetSolveTime();
 
          CAROM::BasisReader basis_reader(filename);
          const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
@@ -1201,12 +1226,15 @@ int main(int argc, char *argv[])
          DenseTensor *nlin_rom = NULL;
          ROMNonlinearForm *rom_nlinf = NULL;
          Operator *rom_oper = NULL;
+         TensorROM *tenrom = NULL;
+         EQPROM *eqprom = NULL;
          switch (rom_mode)
          {
             case RomMode::TENSOR:
             {
                nlin_rom = oper.GetReducedTensor(basis);
-               rom_oper = new TensorROM(lin_rom, *nlin_rom);
+               tenrom = new TensorROM(lin_rom, *nlin_rom);
+               rom_oper = tenrom;
             }
             break;
             case RomMode::EQP:
@@ -1242,7 +1270,8 @@ int main(int argc, char *argv[])
                if (precompute)
                   rom_nlinf->PrecomputeCoefficients();
 
-               rom_oper = new EQPROM(lin_rom, *rom_nlinf);
+               eqprom = new EQPROM(lin_rom, *rom_nlinf);
+               rom_oper = eqprom;
             }  // case RomMode::EQP:
             break;
             default:
@@ -1287,6 +1316,23 @@ int main(int argc, char *argv[])
          // printf("ROM jac: %.3E sec\n", rom_oper.jacTimer.RealTime());
          printf("ROM solve: %.3E sec\n", solveTimer.RealTime());
 
+         double rom_mult, rom_jac;
+         switch (rom_mode)
+         {
+            case RomMode::TENSOR:
+            {
+               rom_mult = tenrom->GetAvgMultTime();
+               rom_jac = tenrom->GetAvgGradTime();
+            }
+            break;
+            case RomMode::EQP:
+            {
+               rom_mult = eqprom->GetAvgMultTime();
+               rom_jac = eqprom->GetAvgGradTime();
+            }
+            break;
+         }
+
          Vector sol(basis.NumRows());
          basis.Mult(rom_sol, sol);
          GridFunction *u_rom = new GridFunction;
@@ -1320,6 +1366,25 @@ int main(int argc, char *argv[])
          paraview_dc.RegisterField("velocity", u);
          paraview_dc.RegisterField("pressure", p);
          paraview_dc.Save();
+
+         {  // save the comparison result to a hdf5 file.
+            hid_t file_id;
+            herr_t errf = 0;
+            file_id = H5Fcreate(compare_output_file, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+            assert(file_id >= 0);
+
+            hdf5_utils::WriteAttribute(file_id, "fom/mult", fom_mult);
+            hdf5_utils::WriteAttribute(file_id, "fom/grad", fom_jac);
+            hdf5_utils::WriteAttribute(file_id, "fom/solve", fom_solve);
+            hdf5_utils::WriteAttribute(file_id, "rom/mult", rom_mult);
+            hdf5_utils::WriteAttribute(file_id, "rom/grad", rom_jac);
+            hdf5_utils::WriteAttribute(file_id, "rom/solve", solveTimer.RealTime());
+            hdf5_utils::WriteAttribute(file_id, "rel_error/u", err_u / norm_u);
+            hdf5_utils::WriteAttribute(file_id, "rel_error/p", err_p / norm_p);
+
+            errf = H5Fclose(file_id);
+            assert(errf >= 0);
+         }
 
          delete linear_term;
          delete u_rom;
