@@ -1316,6 +1316,7 @@ int main(int argc, char *argv[])
          
          Vector rom_rhs(num_basis), rom_sol(num_basis);
          basis.MultTranspose((*oper.GetRHS()), rom_rhs);
+         rom_sol = 0.0;
 
          double atol=1.0e-10, rtol=1.0e-10;
          int maxIter=10000;
