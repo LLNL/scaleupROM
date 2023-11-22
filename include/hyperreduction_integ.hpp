@@ -100,14 +100,16 @@ private:
 
    // // DenseTensor is column major and i is the fastest index. 
    // // For fast iteration, we set k to be the test function index.
-   // Array<DenseTensor *> coeffs;
+   Array<DenseTensor *> coeffs;
    Array<DenseMatrix *> shapes;
    Array<Array<DenseMatrix *> *> dshapes;
+
+   bool tensor = true;
 
 public:
    VectorConvectionTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
       // : HyperReductionIntegrator(true), Q(&q), vQ(vq), coeffs(0) { }
-      : HyperReductionIntegrator(true), Q(&q), vQ(vq), shapes(0), dshapes(0) { }
+      : HyperReductionIntegrator(true), Q(&q), vQ(vq), shapes(0), dshapes(0), coeffs(0) { }
 
    VectorConvectionTrilinearFormIntegrator() = default;
 
