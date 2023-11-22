@@ -20,6 +20,10 @@ namespace mfem
 
 class ROMNonlinearForm : public NonlinearForm
 {
+private:
+   static const int Nt = 6;
+   mutable StopWatch *jac_timers[Nt];
+
 protected:
    /// ROM basis for projection.
    /// Needs to be converted to MFEM DenseMatrix.

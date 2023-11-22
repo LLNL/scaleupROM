@@ -579,7 +579,16 @@ public:
          rows[k] = k;
    }
 
-   ~TensorROM() { delete jac, jac_mono, jac_hypre; }
+   ~TensorROM()
+   {
+      delete jac;
+      delete jac_mono;
+      delete jac_hypre;
+
+      printf("%10s\t%10s\n", "mult", "grad");
+      printf("%.3E\t", multTimer.RealTime());
+      printf("%.3E\n", jacTimer.RealTime());
+   }
 
    virtual void Mult(const Vector &x, Vector &y) const
    {
@@ -651,7 +660,16 @@ public:
          rows[k] = k;
    }
 
-   ~EQPROM() { delete jac, jac_hypre; }
+   ~EQPROM()
+   {
+      delete jac;
+      delete jac_mono;
+      delete jac_hypre;
+
+      printf("%10s\t%10s\n", "mult", "grad");
+      printf("%.3E\t", multTimer.RealTime());
+      printf("%.3E\n", jacTimer.RealTime());
+   }
 
    virtual void Mult(const Vector &x, Vector &y) const
    {
@@ -1308,6 +1326,7 @@ int main(int argc, char *argv[])
          delete p_rom;
          delete nlin_rom;
          delete rom_oper;
+         delete rom_nlinf;
       }
       break;
       default:
