@@ -663,7 +663,7 @@ public:
 public:
    EQPROM(DenseMatrix &lin_op_, ROMNonlinearForm &rnlf_)
       : Operator(lin_op_.Height(), lin_op_.Width()), lin_op(&lin_op_),
-        rnlf(&rnlf_), jac(NULL)
+        rnlf(&rnlf_), jac(NULL), num_mult(0), num_jac(0)
    {
       glob_size = lin_op->Height();
       row_starts[0] = 0;
