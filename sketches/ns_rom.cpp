@@ -990,6 +990,26 @@ int main(int argc, char *argv[])
          const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
          printf("weight on pressure: %.3E\n", pres_wgt);
          DenseMatrix basis;
+         std::string basis_file = filename + "_basis.h5";
+         if (FileExists(basis_file))
+         {  // load basis from a hdf5 format.
+            hid_t file_id;
+            herr_t errf = 0;
+            file_id = H5Fopen(basis_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+            assert(file_id >= 0);
+
+            hdf5_utils::ReadDataset(file_id, "basis", basis);
+
+            errf = H5Fclose(file_id);
+            assert(errf >= 0);
+
+            if (num_basis != basis.NumCols())
+            {
+               assert(num_basis < basis.NumCols());
+               basis.SetSize(basis.NumRows(), num_basis);
+            }
+         }
+         else
          {  // perform generalized SVD with a weight on the pressure.
             assert(nsample > 0);
             const int fom_vdofs = oper.Height();
@@ -1015,7 +1035,6 @@ int main(int argc, char *argv[])
                   basis(i,j) /= sqrt(pres_wgt);
 
             {  // save basis in a hdf5 format.
-               std::string basis_file = filename + "_basis.h5";
                hid_t file_id;
                herr_t errf = 0;
                file_id = H5Fcreate(basis_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -1025,6 +1044,12 @@ int main(int argc, char *argv[])
 
                errf = H5Fclose(file_id);
                assert(errf >= 0);
+            }
+
+            if (num_basis != basis.NumCols())
+            {
+               assert(num_basis < basis.NumCols());
+               basis.SetSize(basis.NumRows(), num_basis);
             }
          }
 
