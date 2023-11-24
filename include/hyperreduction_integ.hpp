@@ -104,7 +104,8 @@ private:
    Array<DenseMatrix *> shapes;
    Array<Array<DenseMatrix *> *> dshapes;
 
-   bool tensor = true;
+   // Tensor precomputation is more expensive.
+   bool tensor = false;
 
 public:
    VectorConvectionTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
