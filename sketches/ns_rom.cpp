@@ -1546,6 +1546,14 @@ int main(int argc, char *argv[])
             file_id = H5Fcreate(compare_output_file, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
             assert(file_id >= 0);
 
+            Array<double> params;
+            for (int d = 0; d < problem::u0.Size(); d++) params.Append(problem::u0(d));
+            for (int d = 0; d < problem::u0.Size(); d++) params.Append(problem::du(d));
+            for (int d = 0; d < problem::u0.Size(); d++) params.Append(problem::offsets(d));
+            for (int d = 0; d < problem::u0.Size(); d++)
+               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                  params.Append(problem::k(d, d2));
+
             hdf5_utils::WriteAttribute(file_id, "fom/mult", fom_mult);
             hdf5_utils::WriteAttribute(file_id, "fom/grad", fom_jac);
             hdf5_utils::WriteAttribute(file_id, "fom/solve", fom_solve);
@@ -1554,6 +1562,7 @@ int main(int argc, char *argv[])
             hdf5_utils::WriteAttribute(file_id, "rom/solve", solveTimer.RealTime());
             hdf5_utils::WriteAttribute(file_id, "rel_error/u", err_u / norm_u);
             hdf5_utils::WriteAttribute(file_id, "rel_error/p", err_p / norm_p);
+            hdf5_utils::WriteDataset(file_id, "params", params);
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);
