@@ -840,20 +840,20 @@ int main(int argc, char *argv[])
       mesh->UniformRefinement();
    }
 
+   SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
+   FiniteElementSpace *ufes = oper.GetUfes();
+   FiniteElementSpace *pfes = oper.GetPfes();
+
    switch (mode)
    {
       case (Mode::MMS):
       {
-         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-
          VectorFunctionCoefficient fcoeff(dim, fFun);
          FunctionCoefficient gcoeff(gFun);
 
          VectorFunctionCoefficient ucoeff(dim, uFun_ex);
          FunctionCoefficient pcoeff(pFun_ex);
 
-         FiniteElementSpace *ufes = oper.GetUfes();
-         FiniteElementSpace *pfes = oper.GetPfes();
          GridFunction u_ex(ufes), p_ex(pfes);
          u_ex.ProjectCoefficient(ucoeff);
          p_ex.ProjectCoefficient(pcoeff);
@@ -910,9 +910,7 @@ int main(int argc, char *argv[])
       {
          assert(nsample > 0);
 
-         SteadyNavierStokes *temp = new SteadyNavierStokes(mesh, order, nu, zeta, use_dg, pres_dbc);
-         const int fom_vdofs = temp->Height();
-         delete temp;
+         const int fom_vdofs = oper.Height();
 
          CAROM::Options option(fom_vdofs, nsample, 1, false);
          CAROM::BasisGenerator snapshot_generator(option, false, filename);
@@ -942,9 +940,9 @@ int main(int argc, char *argv[])
                printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
             }
 
-            SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-            oper.SetupProblem();
-            bool converged = oper.Solve();
+            SteadyNavierStokes temp(mesh, order, nu, zeta, use_dg, pres_dbc);
+            temp.SetupProblem();
+            bool converged = temp.Solve();
             if (!converged)
             {
                SteadyNavierStokes helper(mesh, order, 2.0 * nu, zeta, use_dg, pres_dbc);
@@ -952,15 +950,15 @@ int main(int argc, char *argv[])
                bool helper_converged = helper.Solve();
                assert(helper_converged);
                
-               oper.SetSolution(*(helper.GetSolution()));
-               converged = oper.Solve();
+               temp.SetSolution(*(helper.GetSolution()));
+               converged = temp.Solve();
                assert(converged);
             }
 
-            snapshot_generator.takeSample(oper.GetSolution()->GetData(), 0.0, 0.01);
+            snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
 
-            // GridFunction *u = oper.GetVelocityGridFunction();
-            // GridFunction *p = oper.GetPressureGridFunction();
+            // GridFunction *u = temp.GetVelocityGridFunction();
+            // GridFunction *p = temp.GetPressureGridFunction();
 
             // // 15. Save data in the ParaView format
             // ParaViewDataCollection paraview_dc("ns_sample_paraview", mesh);
@@ -982,9 +980,6 @@ int main(int argc, char *argv[])
       break;
       case (Mode::BUILD):
       {
-         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
-         FiniteElementSpace *ufes = oper.GetUfes();
-         FiniteElementSpace *pfes = oper.GetPfes();
          oper.SetupProblem();
 
          const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
@@ -1290,7 +1285,6 @@ int main(int argc, char *argv[])
             printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
          }
 
-         SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
          oper.SetupProblem();
          oper.Solve();
          const double fom_mult = oper.GetAvgMultTime();
@@ -1320,8 +1314,6 @@ int main(int argc, char *argv[])
          // const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
          // CAROM::CopyMatrix(*carom_basis, basis);
 
-         FiniteElementSpace *ufes = oper.GetUfes();
-         FiniteElementSpace *pfes = oper.GetPfes();
          const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
          printf("weight on pressure: %.3E\n", pres_wgt);
          Vector wgt(oper.Height());
