@@ -761,6 +761,8 @@ int main(int argc, char *argv[])
                   "Mesh file to use.");
    args.AddOption(&nu, "-nu", "--nu",
                   "Viscosity.");
+   args.AddOption(&zeta, "-zeta", "--zeta",
+                  "Scalar coefficient for advection.");
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
