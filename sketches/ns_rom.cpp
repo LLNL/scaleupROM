@@ -1538,6 +1538,20 @@ int main(int argc, char *argv[])
          paraview_dc.RegisterField("pres_rom", p_rom);
          paraview_dc.RegisterField("vel_error", u_error);
          paraview_dc.RegisterField("pres_error", p_error);
+         Array<GridFunction *> basisgf_u(num_basis), basisgf_p(num_basis);
+         for (int k = 0; k < num_basis; k++)
+         {
+            basisgf_u[k] = new GridFunction(ufes);
+            basisgf_p[k] = new GridFunction(pfes);
+
+            basisgf_u[k]->MakeRef(ufes, basis.GetColumn(k));
+            basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
+
+            std::string ustr = "u_basis" + std::to_string(k);
+            std::string pstr = "p_basis" + std::to_string(k);
+            paraview_dc.RegisterField(ustr.c_str(), basisgf_u[k]);
+            paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+         }
          paraview_dc.Save();
 
          {  // save the comparison result to a hdf5 file.
@@ -1568,6 +1582,11 @@ int main(int argc, char *argv[])
             assert(errf >= 0);
          }
 
+         for (int k = 0; k < num_basis; k++)
+         {
+            delete basisgf_u[k];
+            delete basisgf_p[k];
+         }
          delete linear_term;
          delete u_rom;
          delete p_rom;
