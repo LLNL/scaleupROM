@@ -1465,6 +1465,13 @@ int main(int argc, char *argv[])
          GridFunction *p = oper.GetPressureGridFunction();
          VectorGridFunctionCoefficient u_coeff(u), p_coeff(p);
 
+         GridFunction *u_error = new GridFunction(ufes);
+         GridFunction *p_error = new GridFunction(pfes);
+         *u_error = *u_rom;
+         *u_error -= *u;
+         *p_error = *p_rom;
+         *p_error -= *p;
+
          int order_quad = max(2, 2*(order+1)+1);
          const IntegrationRule *irs[Geometry::NumGeom];
          for (int i=0; i < Geometry::NumGeom; ++i)
@@ -1480,11 +1487,39 @@ int main(int argc, char *argv[])
          printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
          printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
+         if ( (err_p / norm_p) > 1.0e-1 )
+         {
+            printf("Pressure relative error > 0.1\n");
+            printf("u0: ");
+            for (int d = 0; d < problem::u0.Size(); d++)
+               printf("%.3E\t", problem::u0(d));
+            printf("\n");
+            printf("du: ");
+            for (int d = 0; d < problem::u0.Size(); d++)
+               printf("%.3E\t", problem::du(d));
+            printf("\n");
+            printf("offsets: ");
+            for (int d = 0; d < problem::u0.Size(); d++)
+               printf("%.3E\t", problem::offsets(d));
+            printf("\n");
+            printf("k:\n");
+            for (int d = 0; d < problem::u0.Size(); d++)
+            {
+               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                  printf("%.3E\t", problem::k(d, d2));
+               printf("\n");
+            }
+         }
+
          // 15. Save data in the ParaView format
          ParaViewDataCollection paraview_dc("ns_paraview", mesh);
          paraview_dc.SetLevelsOfDetail(order+1);
          paraview_dc.RegisterField("velocity", u);
          paraview_dc.RegisterField("pressure", p);
+         paraview_dc.RegisterField("vel_rom", u_rom);
+         paraview_dc.RegisterField("pres_rom", p_rom);
+         paraview_dc.RegisterField("vel_error", u_error);
+         paraview_dc.RegisterField("pres_error", p_error);
          paraview_dc.Save();
 
          {  // save the comparison result to a hdf5 file.
@@ -1509,6 +1544,8 @@ int main(int argc, char *argv[])
          delete linear_term;
          delete u_rom;
          delete p_rom;
+         delete u_error;
+         delete p_error;
          delete nlin_rom;
          delete rom_oper;
          delete rom_nlinf;
