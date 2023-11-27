@@ -754,6 +754,7 @@ int main(int argc, char *argv[])
    double eqp_tol = 1.0e-5;
    bool precompute = false;
    const char *compare_output_file = "result.h5";
+   bool wgt_basis = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -787,6 +788,8 @@ int main(int argc, char *argv[])
                   "Precompute hypre-reduction coefficients.");
    args.AddOption(&compare_output_file, "-of", "--output-file",
                   "Output file name to store the comparison result.");
+   args.AddOption(&wgt_basis, "-wb", "--weighted-basis", "-no-wb", "--no-weighted-basis",
+                  "Perform generalized SVD for ROM basis with specified weight.");
    args.Parse();
    if (!args.Good())
    {
@@ -843,6 +846,7 @@ int main(int argc, char *argv[])
    SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
    FiniteElementSpace *ufes = oper.GetUfes();
    FiniteElementSpace *pfes = oper.GetPfes();
+   const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
 
    switch (mode)
    {
@@ -982,76 +986,80 @@ int main(int argc, char *argv[])
       {
          oper.SetupProblem();
 
-         const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
-         printf("weight on pressure: %.3E\n", pres_wgt);
          DenseMatrix basis;
-         std::string basis_file = filename + "_basis.h5";
-         if (FileExists(basis_file))
-         {  // load basis from a hdf5 format.
-            hid_t file_id;
-            herr_t errf = 0;
-            file_id = H5Fopen(basis_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-            assert(file_id >= 0);
+         if (wgt_basis)
+         {
+            printf("weight on pressure: %.3E\n", pres_wgt);
 
-            hdf5_utils::ReadDataset(file_id, "basis", basis);
-
-            errf = H5Fclose(file_id);
-            assert(errf >= 0);
-
-            if (num_basis != basis.NumCols())
-            {
-               assert(num_basis < basis.NumCols());
-               basis.SetSize(basis.NumRows(), num_basis);
-            }
-         }
-         else
-         {  // perform generalized SVD with a weight on the pressure.
-            assert(nsample > 0);
-            const int fom_vdofs = oper.Height();
-            CAROM::Options option(fom_vdofs, nsample, 1, false);
-            CAROM::BasisGenerator snapshot_reader(option, false, filename);
-            snapshot_reader.loadSamples(filename + "_snapshot", "snapshot");
-            const CAROM::Matrix *snapshots = snapshot_reader.getSnapshotMatrix();
-            DenseMatrix wgted_snapshots;
-            CAROM::CopyMatrix(*snapshots, wgted_snapshots);
-            for (int i = ufes->GetTrueVSize(); i < wgted_snapshots.NumRows(); i++)
-               for (int j = 0; j < wgted_snapshots.NumCols(); j++)
-                  wgted_snapshots(i,j) *= sqrt(pres_wgt);
-
-            CAROM::BasisGenerator basis_generator(option, false, filename);
-            for (int j = 0; j < wgted_snapshots.NumCols(); j++)
-               basis_generator.takeSample(wgted_snapshots.GetColumn(j), 0.0, 0.01);
-            basis_generator.endSamples();
-
-            const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
-            CAROM::CopyMatrix(*carom_basis, basis);
-            for (int i = ufes->GetTrueVSize(); i < basis.NumRows(); i++)
-               for (int j = 0; j < basis.NumCols(); j++)
-                  basis(i,j) /= sqrt(pres_wgt);
-
-            {  // save basis in a hdf5 format.
+            std::string basis_file = filename + "_basis.h5";
+            if (FileExists(basis_file))
+            {  // load basis from a hdf5 format.
                hid_t file_id;
                herr_t errf = 0;
-               file_id = H5Fcreate(basis_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+               file_id = H5Fopen(basis_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
                assert(file_id >= 0);
 
-               hdf5_utils::WriteDataset(file_id, "basis", basis);
+               hdf5_utils::ReadDataset(file_id, "basis", basis);
 
                errf = H5Fclose(file_id);
                assert(errf >= 0);
-            }
 
-            if (num_basis != basis.NumCols())
-            {
-               assert(num_basis < basis.NumCols());
-               basis.SetSize(basis.NumRows(), num_basis);
+               if (num_basis != basis.NumCols())
+               {
+                  assert(num_basis < basis.NumCols());
+                  basis.SetSize(basis.NumRows(), num_basis);
+               }
+            }
+            else
+            {  // perform generalized SVD with a weight on the pressure.
+               assert(nsample > 0);
+               const int fom_vdofs = oper.Height();
+               CAROM::Options option(fom_vdofs, nsample, 1, false);
+               CAROM::BasisGenerator snapshot_reader(option, false, filename);
+               snapshot_reader.loadSamples(filename + "_snapshot", "snapshot");
+               const CAROM::Matrix *snapshots = snapshot_reader.getSnapshotMatrix();
+               DenseMatrix wgted_snapshots;
+               CAROM::CopyMatrix(*snapshots, wgted_snapshots);
+               for (int i = ufes->GetTrueVSize(); i < wgted_snapshots.NumRows(); i++)
+                  for (int j = 0; j < wgted_snapshots.NumCols(); j++)
+                     wgted_snapshots(i,j) *= sqrt(pres_wgt);
+
+               CAROM::BasisGenerator basis_generator(option, false, filename);
+               for (int j = 0; j < wgted_snapshots.NumCols(); j++)
+                  basis_generator.takeSample(wgted_snapshots.GetColumn(j), 0.0, 0.01);
+               basis_generator.endSamples();
+
+               const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
+               CAROM::CopyMatrix(*carom_basis, basis);
+               for (int i = ufes->GetTrueVSize(); i < basis.NumRows(); i++)
+                  for (int j = 0; j < basis.NumCols(); j++)
+                     basis(i,j) /= sqrt(pres_wgt);
+
+               {  // save basis in a hdf5 format.
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fcreate(basis_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::WriteDataset(file_id, "basis", basis);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+
+               if (num_basis != basis.NumCols())
+               {
+                  assert(num_basis < basis.NumCols());
+                  basis.SetSize(basis.NumRows(), num_basis);
+               }
             }
          }
-
-         // CAROM::BasisReader basis_reader(filename);
-         // const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
-         // DenseMatrix basis;
-         // CAROM::CopyMatrix(*carom_basis, basis);
+         else
+         {
+            CAROM::BasisReader basis_reader(filename);
+            const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+            CAROM::CopyMatrix(*carom_basis, basis);
+         }
 
          switch (rom_mode)
          {
@@ -1291,40 +1299,48 @@ int main(int argc, char *argv[])
          const double fom_jac = oper.GetAvgGradTime();
          const double fom_solve = oper.GetSolveTime();
 
-         DenseMatrix basis, u_basis;
-         {  // load basis from a hdf5 format.
-            std::string basis_file = filename + "_basis.h5";
-            hid_t file_id;
-            herr_t errf = 0;
-            file_id = H5Fopen(basis_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-            assert(file_id >= 0);
+         DenseMatrix basis, u_basis, basisM;
+         if (wgt_basis)
+         {
+            {  // load basis from a hdf5 format.
+               std::string basis_file = filename + "_basis.h5";
+               hid_t file_id;
+               herr_t errf = 0;
+               file_id = H5Fopen(basis_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+               assert(file_id >= 0);
 
-            hdf5_utils::ReadDataset(file_id, "basis", basis);
+               hdf5_utils::ReadDataset(file_id, "basis", basis);
 
-            errf = H5Fclose(file_id);
-            assert(errf >= 0);
+               errf = H5Fclose(file_id);
+               assert(errf >= 0);
 
-            if (num_basis != basis.NumCols())
-            {
-               assert(num_basis < basis.NumCols());
-               basis.SetSize(basis.NumRows(), num_basis);
+               if (num_basis != basis.NumCols())
+               {
+                  assert(num_basis < basis.NumCols());
+                  basis.SetSize(basis.NumRows(), num_basis);
+               }
             }
-         }
-         // CAROM::BasisReader basis_reader(filename);
-         // const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
-         // CAROM::CopyMatrix(*carom_basis, basis);
 
-         const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
-         printf("weight on pressure: %.3E\n", pres_wgt);
-         Vector wgt(oper.Height());
-         wgt = 1.0;
-         for (int k = ufes->GetTrueVSize(); k < wgt.Size(); k++) wgt(k) = pres_wgt;
-         DenseMatrix basisM(basis);
-         basisM.RightScaling(wgt);
+            printf("weight on pressure: %.3E\n", pres_wgt);
+            Vector wgt(oper.Height());
+            wgt = 1.0;
+            for (int k = ufes->GetTrueVSize(); k < wgt.Size(); k++) wgt(k) = pres_wgt;
+            basisM = basis;
+            basisM.RightScaling(wgt);
+         }
+         else
+         {
+            CAROM::BasisReader basis_reader(filename);
+            const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+            CAROM::CopyMatrix(*carom_basis, basis);
+         }
 
          SparseMatrix *linear_term = oper.GetLinearTerm();
          DenseMatrix lin_rom;
-         mfem::RtAP(basisM, *linear_term, basis, lin_rom);
+         if (wgt_basis)
+            mfem::RtAP(basisM, *linear_term, basis, lin_rom);
+         else
+            mfem::RtAP(basis, *linear_term, basis, lin_rom);
 
          u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
 
