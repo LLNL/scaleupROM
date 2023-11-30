@@ -73,7 +73,8 @@ StokesSolver::StokesSolver()
 StokesSolver::~StokesSolver()
 {
    delete nu_coeff;
-   delete vec_diff, norm_flux;
+   delete vec_diff;
+   delete norm_flux;
 
    DeletePointers(fs);
    DeletePointers(gs);
@@ -84,9 +85,17 @@ StokesSolver::~StokesSolver()
    DeletePointers(ud_coeffs);
    DeletePointers(sn_coeffs);
 
-   delete mMat, bMat, pmMat;
-   delete M, B, pM;
-   delete systemOp, Bt, systemOp_mono, systemOp_hypre, mumps;
+   delete mMat;
+   delete bMat;
+   delete pmMat;
+   delete M;
+   delete B;
+   delete pM;
+   delete systemOp;
+   delete Bt;
+   delete systemOp_mono;
+   delete systemOp_hypre;
+   delete mumps;
 }
 
 void StokesSolver::SetupBCVariables()
@@ -563,7 +572,8 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 
       comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
 
-      delete bt_mat, sys_comp;
+      delete bt_mat;
+      delete sys_comp;
    }
 }
 
@@ -613,7 +623,8 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 
          (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
 
-         delete bt_mat, sys_comp;
+         delete bt_mat;
+         delete sys_comp;
       }
    }
 }
@@ -689,7 +700,11 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-            delete m_mats_p(i, j), b_mats_p(i, j), bt_mats_p(i, j);
+         {
+            delete m_mats_p(i, j);
+            delete b_mats_p(i, j);
+            delete bt_mats_p(i, j);
+         }
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
@@ -771,7 +786,9 @@ void StokesSolver::Solve()
 
       if (use_amg)
       {
-         delete Mop, amg_prec, p_prec;
+         delete Mop;
+         delete amg_prec;
+         delete p_prec;
          if (pres_dbc) delete ortho_p_prec;
          delete systemPrec;
       }
@@ -909,7 +926,10 @@ void StokesSolver::Solve_obsolete()
 
    delete schur;
    if (use_amg)
-      delete Mop, amg_prec;
+   {
+      delete Mop;
+      delete amg_prec;
+   }
 }
 
 void StokesSolver::ProjectOperatorOnReducedBasis()
@@ -935,7 +955,12 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
 
    for (int i = 0; i < bt_mats.NumRows(); i++)
       for (int j = 0; j < bt_mats.NumCols(); j++)
-      { delete bt_mats(i, j), tmp(i, j), ioffsets(i, j), joffsets(i, j); }
+      {
+         delete bt_mats(i, j);
+         delete tmp(i, j);
+         delete ioffsets(i, j);
+         delete joffsets(i, j);
+      }
 }
 
 void StokesSolver::SanityCheckOnCoeffs()

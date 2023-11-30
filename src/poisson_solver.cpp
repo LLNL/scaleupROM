@@ -60,8 +60,10 @@ PoissonSolver::~PoissonSolver()
    DeletePointers(bdr_coeffs);
    DeletePointers(rhs_coeffs);
 
-   delete globalMat_mono, globalMat;
-   delete globalMat_hypre, mumps;
+   delete globalMat_mono;
+   delete globalMat;
+   delete globalMat_hypre;
+   delete mumps;
 }
 
 void PoissonSolver::SetupBCVariables()

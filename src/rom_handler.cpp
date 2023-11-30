@@ -516,10 +516,12 @@ MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &i
 MFEMROMHandler::~MFEMROMHandler()
 {
    DeletePointers(spatialbasis);
-   delete romMat, romMat_mono;
+   delete romMat;
+   delete romMat_mono;
    delete reduced_rhs;
    delete reduced_sol;
-   delete romMat_hypre, mumps;
+   delete romMat_hypre;
+   delete mumps;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -743,7 +745,8 @@ SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 {
    assert(save_operator == ROMBuildingLevel::GLOBAL);
-   delete romMat, romMat_mono;
+   delete romMat;
+   delete romMat_mono;
    
    std::string filename;
    if (input_prefix == "")
@@ -770,7 +773,8 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 
 void MFEMROMHandler::LoadOperator(BlockMatrix *input_mat)
 {
-   delete romMat, romMat_mono;
+   delete romMat;
+   delete romMat_mono;
    romMat = input_mat;
    romMat_mono = romMat->CreateMonolithic();
    if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
@@ -786,7 +790,7 @@ void MFEMROMHandler::SaveBasisVisualization(
    const int num_var = var_names.size();
    assert(fes.Size() == num_var * numSub);
 
-   std::string visual_prefix = config.GetRequiredOption<std::string>("model_reduction/visualization/prefix");
+   std::string visual_prefix = config.GetRequiredOption<std::string>("basis/visualization/prefix");
    if (train_mode == TrainMode::UNIVERSAL)
       visual_prefix += "_universal";
 
