@@ -80,6 +80,54 @@ public:
    using LinearFormIntegrator::AssembleRHSElementVect;
 };
 
+/// Class for boundary integration \f$ L(v) = (g \cdot n, v) \f$
+class DGBdrLaxFriedrichsLFIntegrator : public LinearFormIntegrator
+{
+private:
+   Vector shape;
+   VectorCoefficient &Q;
+   DenseMatrix ELV;
+public:
+   /// Constructs a boundary integrator with a given Coefficient QG
+   DGBdrLaxFriedrichsLFIntegrator(VectorCoefficient &QG)
+      : Q(QG) { }
+
+   virtual bool SupportsDevice() { return false; }
+
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       ElementTransformation &Tr,
+                                       Vector &elvect);
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       FaceElementTransformations &Tr,
+                                       Vector &elvect);
+   using LinearFormIntegrator::AssembleRHSElementVect;
+};
+
+class DGBdrTemamLFIntegrator : public LinearFormIntegrator
+{
+private:
+   Vector shape;
+   Coefficient *Z = NULL;
+   VectorCoefficient &Q;
+   DenseMatrix ELV;
+
+   double w;
+public:
+   /// Constructs a boundary integrator with a given Coefficient QG
+   DGBdrTemamLFIntegrator(VectorCoefficient &QG, Coefficient *ZG = NULL)
+      : Q(QG), Z(ZG) { }
+
+   virtual bool SupportsDevice() { return false; }
+
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       ElementTransformation &Tr,
+                                       Vector &elvect);
+   virtual void AssembleRHSElementVect(const FiniteElement &el,
+                                       FaceElementTransformations &Tr,
+                                       Vector &elvect);
+   using LinearFormIntegrator::AssembleRHSElementVect;
+};
+
 } // namespace mfem
 
 #endif

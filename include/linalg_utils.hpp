@@ -74,6 +74,32 @@ void PrintVector(const Vector &vec,
 SparseMatrix* ReadSparseMatrixFromHDF(const std::string filename);
 void WriteSparseMatrixToHDF(const SparseMatrix* mat, const std::string filename);
 
+// Matrix-Vector multiplication on the specified rows.
+// Rows are not necessarily sorted and they can be duplicated.
+void MultSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
+void AddMultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
+void MultTransposeSubMatrix(const DenseMatrix &mat, const Array<int> &rows, const Vector &x, Vector &y);
+// Currently needed only for DenseMatrix A.
+// For a SparseMatrix A, we can utilize PartMult within this routine.
+void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                      const DenseMatrix& A,
+                      const DenseMatrix& P, const Array<int> &Prows,
+                      DenseMatrix& RAP);
+
+// DenseTensor is column major and i is the fastest index. 
+// y_k = T_{ijk} * x_i * x_j
+void TensorContract(const DenseTensor &tensor, const Vector &xi, const Vector &xj, Vector &yk);
+// y_k += w * T_{ijk} * x_i * x_j
+void TensorAddScaledContract(const DenseTensor &tensor, const double w, const Vector &xi, const Vector &xj, Vector &yk);
+// Contracts along the axis (0 or 1) and add the multipled transpose.
+// axis 0: M_{kj} += T_{ijk} * x_i
+// axis 1: M_{ki} += T_{ijk} * x_j
+void TensorAddMultTranspose(const DenseTensor &tensor, const Vector &x, const int axis, DenseMatrix &M);
+// Contracts along the axis (0 or 1) and add the multipled transpose.
+// axis 0: M_{kj} += w * T_{ijk} * x_i
+// axis 1: M_{ki} += w * T_{ijk} * x_j
+void TensorAddScaledMultTranspose(const DenseTensor &tensor, const double w, const Vector &x, const int axis, DenseMatrix &M);
+
 }
 
 #endif
