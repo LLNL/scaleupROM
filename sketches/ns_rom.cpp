@@ -1481,7 +1481,6 @@ int main(int argc, char *argv[])
          // 12. Create the grid functions u and p. Compute the L2 error norms.
          GridFunction *u = oper.GetVelocityGridFunction();
          GridFunction *p = oper.GetPressureGridFunction();
-         VectorGridFunctionCoefficient u_coeff(u), p_coeff(p);
 
          GridFunction *u_error = new GridFunction(ufes);
          GridFunction *p_error = new GridFunction(pfes);
@@ -1489,6 +1488,11 @@ int main(int argc, char *argv[])
          *u_error -= *u;
          *p_error = *p_rom;
          *p_error -= *p;
+
+         // set a pressure constant just for relative error.
+         (*p) += 1.0;
+         (*p_rom) += 1.0;
+         VectorGridFunctionCoefficient u_coeff(u), p_coeff(p);
 
          int order_quad = max(2, 2*(order+1)+1);
          const IntegrationRule *irs[Geometry::NumGeom];
