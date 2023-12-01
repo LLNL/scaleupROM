@@ -1426,7 +1426,7 @@ int main(int argc, char *argv[])
          const double fom_jac = oper.GetAvgGradTime();
          const double fom_solve = oper.GetSolveTime();
 
-         DenseMatrix basis, u_basis, basisM;
+         DenseMatrix basis, u_basis, ubasis, pbasis, basisM;
          if (wgt_basis)
          {
             {  // load basis from a hdf5 format.
@@ -1457,7 +1457,6 @@ int main(int argc, char *argv[])
          }
          else if (rom_mode == RomMode::TENSOR2)
          {
-            DenseMatrix ubasis, pbasis;
             CAROM::BasisReader ubasis_reader(filename + "_vel");
             CAROM::BasisReader pbasis_reader(filename + "_pres");
             const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
