@@ -1718,16 +1718,30 @@ int main(int argc, char *argv[])
          for (int k = 0; k < num_basis; k++)
          {
             basisgf_u[k] = new GridFunction(ufes);
-            basisgf_p[k] = new GridFunction(pfes);
-
             basisgf_u[k]->MakeRef(ufes, basis.GetColumn(k));
-            basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
-
             std::string ustr = "u_basis" + std::to_string(k);
-            std::string pstr = "p_basis" + std::to_string(k);
             paraview_dc.RegisterField(ustr.c_str(), basisgf_u[k]);
-            paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+
+            if (rom_mode != RomMode::TENSOR2)
+            {
+               basisgf_p[k] = new GridFunction(pfes);
+               basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
+               std::string pstr = "p_basis" + std::to_string(k);
+               paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+            }
          }
+         if (rom_mode == RomMode::TENSOR2)
+         {
+            basisgf_p.SetSize(num_pbasis);
+            for (int k = 0; k < num_pbasis; k++)
+            {
+               basisgf_p[k] = new GridFunction(pfes);
+               basisgf_p[k]->MakeRef(pfes, pbasis.GetColumn(k));
+               std::string pstr = "p_basis" + std::to_string(k);
+               paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+            }
+         }
+
          paraview_dc.Save();
 
          {  // save the comparison result to a hdf5 file.
