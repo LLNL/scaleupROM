@@ -32,8 +32,8 @@ public:
    const bool precomputable;
 
 protected:
-   HyperReductionIntegrator(const bool precomputable_ = false)
-      : precomputable(precomputable_), NonlinearFormIntegrator() {}
+   HyperReductionIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)
+      : precomputable(precomputable_), NonlinearFormIntegrator(ir) {}
 
    // removed const qualifier for basis in order to use its column view vector.
    void GetBasisElement(DenseMatrix &basis, const int col,
