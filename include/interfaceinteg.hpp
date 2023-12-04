@@ -5,17 +5,17 @@
 #ifndef SCALEUPROM_INTERFACE_INTEGRATOR_HPP
 #define SCALEUPROM_INTERFACE_INTEGRATOR_HPP
 
-// #include <fem/bilininteg.hpp>
 #include "mfem.hpp"
+#include "hyperreduction_integ.hpp"
 
 namespace mfem
 {
 
-class InterfaceNonlinearFormIntegrator : public NonlinearFormIntegrator
+class InterfaceNonlinearFormIntegrator : virtual public HyperReductionIntegrator
 {
 protected:
-  InterfaceNonlinearFormIntegrator(const IntegrationRule *ir = NULL)
-      : NonlinearFormIntegrator(ir) {}
+  InterfaceNonlinearFormIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)
+      : HyperReductionIntegrator(precomputable_, ir) {}
 public:
    // FaceElementTransformations belongs to one mesh (having mesh pointer).
    // In order to extract element/transformation from each mesh,
