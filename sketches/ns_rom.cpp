@@ -58,7 +58,7 @@ static double zeta = 1.0;
 static bool direct_solve = true;
 
 enum Mode { MMS, SAMPLE, BUILD, COMPARE, NUM_MODE };
-enum RomMode { TENSOR, EQP, NUM_ROMMODE };
+enum RomMode { TENSOR, TENSOR2, EQP, NUM_ROMMODE };
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -587,7 +587,7 @@ public:
          rows[k] = k;
    }
 
-   ~TensorROM()
+   virtual ~TensorROM()
    {
       delete jac;
       delete jac_mono;
@@ -623,6 +623,71 @@ public:
       jac = new DenseMatrix(*lin_op);
       TensorAddMultTranspose(*nlin_op, x, 0, *jac);
       TensorAddMultTranspose(*nlin_op, x, 1, *jac);
+
+      if (direct_solve)
+      {
+         jac_mono = new SparseMatrix(jac->NumRows());
+         jac_mono->SetSubMatrix(rows, rows, *jac);
+         jac_mono->Finalize();
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, jac_mono);
+      }
+
+      jacTimer.Stop();
+      num_jac++;
+      if (direct_solve)
+         return *jac_hypre;
+      else
+         return *jac;
+   }
+
+};
+
+class TensorROM2 : public TensorROM
+{
+protected:
+   int velrom_size = -1;
+   Array<int> uidx;
+   mutable DenseMatrix jac_vel;
+
+public:
+   TensorROM2(DenseMatrix &lin_op_, DenseTensor &nlin_op_)
+      : TensorROM(lin_op_, nlin_op_), velrom_size(nlin_op_.SizeK()),
+        jac_vel(nlin_op_.SizeK(), nlin_op_.SizeI()), uidx(nlin_op_.SizeK())
+   {
+      for (int k = 0; k < uidx.Size(); k++) uidx[k] = k;
+   }
+
+   virtual void Mult(const Vector &x, Vector &y) const override
+   {
+      multTimer.Start();
+
+      const Vector x_vel(x.GetData(), velrom_size);
+      Vector y_vel(y.GetData(), velrom_size);
+      y = 0.0;
+
+      TensorContract(*nlin_op, x_vel, x_vel, y_vel);
+      lin_op->AddMult(x, y);
+
+      multTimer.Stop();
+      num_mult++;
+   }
+
+   /// Compute J = M + dt S + dt^2 grad_H(x + dt (v + dt k)).
+   virtual Operator &GetGradient(const Vector &x) const override
+   {
+      jacTimer.Start();
+
+      const Vector x_vel(x.GetData(), velrom_size);
+
+      jac_vel = 0.0;
+      TensorAddMultTranspose(*nlin_op, x_vel, 0, jac_vel);
+      TensorAddMultTranspose(*nlin_op, x_vel, 1, jac_vel);
+
+      delete jac;
+      delete jac_hypre;
+      delete jac_mono;
+      jac = new DenseMatrix(*lin_op);
+      jac->AddSubMatrix(uidx, jac_vel);
 
       if (direct_solve)
       {
@@ -751,6 +816,7 @@ int main(int argc, char *argv[])
    bool random_sample = true;
    int nsample = -1;
    int num_basis = -1;
+   int num_pbasis = -1;
    double eqp_tol = 1.0e-5;
    bool precompute = false;
    const char *compare_output_file = "result.h5";
@@ -781,7 +847,9 @@ int main(int argc, char *argv[])
    args.AddOption(&nsample, "-ns", "--nsample",
                   "Number of samples to be generated.");
    args.AddOption(&num_basis, "-nb", "--nbasis",
-                  "Number of basis for ROM.");
+                  "Number of basis for ROM. For TENSOR2, number of basis for velocity.");
+   args.AddOption(&num_pbasis, "-npb", "--npbasis",
+                  "Number of pressure basis for ROM. Used only for TENSOR2.");
    args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
                   "Use direct or iterative solver.");
    args.AddOption(&eqp_tol, "-et", "--eqp-tolerance",
@@ -811,17 +879,22 @@ int main(int argc, char *argv[])
    }
 
    if (!strcmp(rom_mode_str, "tensor"))          rom_mode = RomMode::TENSOR;
-   else if (!strcmp(rom_mode_str, "eqp"))     rom_mode = RomMode::EQP;
+   else if (!strcmp(rom_mode_str, "tensor2"))    rom_mode = RomMode::TENSOR2;
+   else if (!strcmp(rom_mode_str, "eqp"))        rom_mode = RomMode::EQP;
    else
    {
       if (!(rom_mode == RomMode::TENSOR) && !(rom_mode == RomMode::EQP))
          mfem_error("Unknown mode!\n");
    }
 
+   if (wgt_basis && (rom_mode == RomMode::TENSOR2))
+      mfem_error("TENSOR2 does not support weighted basis!\n");
+
    if (!random_sample)
    {
       nsample = 4;
       num_basis = nsample;
+      num_pbasis = nsample;
    }
 
    std::string filename = "ns_rom";
@@ -1086,6 +1159,58 @@ int main(int argc, char *argv[])
                delete nlin_rom;
             }
             break;
+            case RomMode::TENSOR2:
+            {
+               if (!(FileExists(filename + "_vel.000000") && FileExists(filename + "_pres.000000")))
+               {
+                  const int fom_vdofs = oper.Height();
+                  CAROM::Options option(fom_vdofs, nsample, 1, false);
+                  CAROM::BasisGenerator snapshot_generator(option, false, filename);
+                  // std::string snapshot_filename = filename + "_snapshot";
+                  snapshot_generator.loadSamples(filename + "_snapshot", "snapshot");
+                  // TODO: what happen if we do not deep-copy?
+                  const CAROM::Matrix *snapshots = snapshot_generator.getSnapshotMatrix();
+                  DenseMatrix mfem_snapshots;
+                  CAROM::CopyMatrix(*snapshots, mfem_snapshots);
+
+                  const int u_vdofs = ufes->GetTrueVSize();
+                  const int p_vdofs = pfes->GetTrueVSize();
+                  CAROM::Options u_option(u_vdofs, nsample, 1, false);
+                  CAROM::Options p_option(p_vdofs, nsample, 1, false);
+                  CAROM::BasisGenerator ubasis_generator(u_option, false, filename + "_vel");
+                  CAROM::BasisGenerator pbasis_generator(p_option, false, filename + "_pres");
+
+                  for (int s = 0; s < nsample; s++)
+                  {
+                     ubasis_generator.takeSample(mfem_snapshots.GetColumn(s), 0.0, 0.01);
+                     pbasis_generator.takeSample(mfem_snapshots.GetColumn(s) + u_vdofs, 0.0, 0.01);
+                  }
+                  ubasis_generator.endSamples();
+                  pbasis_generator.endSamples();
+               }
+
+               DenseMatrix ubasis;
+               CAROM::BasisReader ubasis_reader(filename + "_vel");
+               const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+               CAROM::CopyMatrix(*carom_ubasis, ubasis);
+
+               DenseTensor *nlin_rom = oper.GetReducedTensor(ubasis);
+               {  // save the sample to a hdf5 file.
+                  std::string tensor_file = filename + "_tensor.h5";
+
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fcreate(tensor_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::WriteDataset(file_id, "tensor", *nlin_rom);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+
+            }
+            break;
             case RomMode::EQP:
             {
                const int fom_vdofs = oper.Height();
@@ -1301,7 +1426,7 @@ int main(int argc, char *argv[])
          const double fom_jac = oper.GetAvgGradTime();
          const double fom_solve = oper.GetSolveTime();
 
-         DenseMatrix basis, u_basis, basisM;
+         DenseMatrix basis, u_basis, ubasis, pbasis, basisM;
          if (wgt_basis)
          {
             {  // load basis from a hdf5 format.
@@ -1329,6 +1454,25 @@ int main(int argc, char *argv[])
             for (int k = ufes->GetTrueVSize(); k < wgt.Size(); k++) wgt(k) = pres_wgt;
             basisM = basis;
             basisM.RightScaling(wgt);
+         }
+         else if (rom_mode == RomMode::TENSOR2)
+         {
+            CAROM::BasisReader ubasis_reader(filename + "_vel");
+            CAROM::BasisReader pbasis_reader(filename + "_pres");
+            const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+            const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+            CAROM::CopyMatrix(*carom_ubasis, ubasis);
+            CAROM::CopyMatrix(*carom_pbasis, pbasis);
+
+            basis.SetSize(ubasis.NumRows() + pbasis.NumRows(), ubasis.NumCols() + pbasis.NumCols());
+            Array<int> uridx(ubasis.NumRows()), ucidx(ubasis.NumCols()), pridx(pbasis.NumRows()), pcidx(pbasis.NumCols());
+            for (int k = 0; k < ubasis.NumRows(); k++) uridx[k] = k;
+            for (int k = 0; k < ubasis.NumCols(); k++) ucidx[k] = k;
+            for (int k = 0; k < pbasis.NumRows(); k++) pridx[k] = k + ubasis.NumRows();
+            for (int k = 0; k < pbasis.NumCols(); k++) pcidx[k] = k + ubasis.NumCols();
+            basis = 0.0;
+            basis.SetSubMatrix(uridx, ucidx, ubasis);
+            basis.SetSubMatrix(pridx, pcidx, pbasis);
          }
          else
          {
@@ -1371,6 +1515,27 @@ int main(int argc, char *argv[])
                }
 
                tenrom = new TensorROM(lin_rom, *nlin_rom);
+               rom_oper = tenrom;
+            }
+            break;
+            case RomMode::TENSOR2:
+            {
+               nlin_rom = new DenseTensor;
+               {  // load the sample from a hdf5 file.
+                  std::string tensor_file = filename + "_tensor.h5";
+
+                  hid_t file_id;
+                  herr_t errf = 0;
+                  file_id = H5Fopen(tensor_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+                  assert(file_id >= 0);
+
+                  hdf5_utils::ReadDataset(file_id, "tensor", *nlin_rom);
+
+                  errf = H5Fclose(file_id);
+                  assert(errf >= 0);
+               }
+
+               tenrom = new TensorROM2(lin_rom, *nlin_rom);
                rom_oper = tenrom;
             }
             break;
@@ -1417,6 +1582,11 @@ int main(int argc, char *argv[])
          }
          
          Vector rom_rhs(num_basis), rom_sol(num_basis);
+         if (rom_mode == RomMode::TENSOR2)
+         {
+            rom_rhs.SetSize(num_basis + num_pbasis);
+            rom_sol.SetSize(num_basis + num_pbasis);
+         }
          basis.MultTranspose((*oper.GetRHS()), rom_rhs);
          rom_sol = 0.0;
 
@@ -1458,6 +1628,7 @@ int main(int argc, char *argv[])
          switch (rom_mode)
          {
             case RomMode::TENSOR:
+            case RomMode::TENSOR2:
             {
                rom_mult = tenrom->GetAvgMultTime();
                rom_jac = tenrom->GetAvgGradTime();
@@ -1546,16 +1717,30 @@ int main(int argc, char *argv[])
          for (int k = 0; k < num_basis; k++)
          {
             basisgf_u[k] = new GridFunction(ufes);
-            basisgf_p[k] = new GridFunction(pfes);
-
             basisgf_u[k]->MakeRef(ufes, basis.GetColumn(k));
-            basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
-
             std::string ustr = "u_basis" + std::to_string(k);
-            std::string pstr = "p_basis" + std::to_string(k);
             paraview_dc.RegisterField(ustr.c_str(), basisgf_u[k]);
-            paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+
+            if (rom_mode != RomMode::TENSOR2)
+            {
+               basisgf_p[k] = new GridFunction(pfes);
+               basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
+               std::string pstr = "p_basis" + std::to_string(k);
+               paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+            }
          }
+         if (rom_mode == RomMode::TENSOR2)
+         {
+            basisgf_p.SetSize(num_pbasis);
+            for (int k = 0; k < num_pbasis; k++)
+            {
+               basisgf_p[k] = new GridFunction(pfes);
+               basisgf_p[k]->MakeRef(pfes, pbasis.GetColumn(k));
+               std::string pstr = "p_basis" + std::to_string(k);
+               paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+            }
+         }
+
          paraview_dc.Save();
 
          {  // save the comparison result to a hdf5 file.
@@ -1589,6 +1774,10 @@ int main(int argc, char *argv[])
          for (int k = 0; k < num_basis; k++)
          {
             delete basisgf_u[k];
+         }
+         int tmp = (rom_mode == RomMode::TENSOR2) ? num_pbasis : num_basis;
+         for (int k = 0; k < tmp; k++)
+         {
             delete basisgf_p[k];
          }
          delete linear_term;
