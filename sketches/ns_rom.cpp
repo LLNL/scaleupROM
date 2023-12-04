@@ -1774,6 +1774,10 @@ int main(int argc, char *argv[])
          for (int k = 0; k < num_basis; k++)
          {
             delete basisgf_u[k];
+         }
+         int tmp = (rom_mode == RomMode::TENSOR2) ? num_pbasis : num_basis;
+         for (int k = 0; k < tmp; k++)
+         {
             delete basisgf_p[k];
          }
          delete linear_term;
