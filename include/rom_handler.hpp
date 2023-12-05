@@ -119,6 +119,8 @@ public:
    int GetBasisIndexForSubdomain(const int &subdomain_index);
    void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
+   virtual Vector* GetBasisVector(const int &basis_index, const int &column_idx, const int size=-1, const int offset=0)
+   { mfem_error("ROMHandler::GetBasisVector is not supported! Use MFEMROMHandler.\n"); }
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
@@ -192,6 +194,7 @@ public:
    virtual void LoadReducedBasis();
    void GetBasis(const int &basis_index, DenseMatrix* &basis);
    void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
+   virtual Vector* GetBasisVector(const int &basis_index, const int &column_idx, const int size=-1, const int offset=0) override;
    // virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);

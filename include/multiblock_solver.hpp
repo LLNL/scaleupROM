@@ -99,6 +99,8 @@ protected:
    // boundary condition is enforced via forcing term.
    Array<Array<SparseMatrix *> *> bdr_mats;
    Array<Array2D<SparseMatrix *> *> port_mats;   // reference ports.
+   // DenseTensor objects from nonlinear operators
+   // will be defined per each derived MultiBlockSolver.
 
 public:
    MultiBlockSolver();
@@ -192,14 +194,14 @@ public:
    void SaveROMElements(const std::string &filename);
    // Save ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   void SaveCompBdrROMElement(hid_t &file_id);
+   virtual void SaveCompBdrROMElement(hid_t &file_id);
    void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
    void SaveInterfaceROMElement(hid_t &file_id);
 
    void LoadROMElements(const std::string &filename);
    // Load ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   void LoadCompBdrROMElement(hid_t &file_id);
+   virtual void LoadCompBdrROMElement(hid_t &file_id);
    void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
    void LoadInterfaceROMElement(hid_t &file_id);
 
