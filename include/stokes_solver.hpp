@@ -175,6 +175,8 @@ public:
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrixes();
+   virtual void SetupMUMPSSolver();
+   virtual void SetupPressureMassMatrix();
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);

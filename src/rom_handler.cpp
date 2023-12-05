@@ -547,6 +547,18 @@ void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix
    GetBasis(idx, basis);
 }
 
+const Vector* MFEMROMHandler::GetBasisVector(
+   const int &basis_index, const int &column_idx, const int size, const int offset)
+{
+   assert(num_basis_sets > 0);
+   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+   assert((column_idx >= 0) && (column_idx < num_basis[basis_index]));
+
+   // This vector does not assume ownership of the basis data.
+   const int vec_size = (size > 0) ? size : spatialbasis[basis_index]->NumRows();
+   return new Vector(spatialbasis[basis_index]->GetColumn(column_idx) + offset, vec_size);
+}
+
 void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    assert(mats.NumRows() == numSub);
