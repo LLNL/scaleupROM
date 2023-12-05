@@ -1,13 +1,8 @@
 name: CI
-on: [push]
-  # workflow_dispatch: {}
-  # push:
-  #   branches:
-  #     - main
-  # pull_request:
-  #   types: [opened, labeled, synchronize]
-  #   branches:
-  #     - main
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   test:
@@ -16,7 +11,7 @@ jobs:
       - name: test ci
         run: |
             echo "test run"
-        
+
   # docker-image:
   #   uses: ./.github/workflows/docker.yml
   # linux-build:
