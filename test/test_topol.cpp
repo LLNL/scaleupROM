@@ -1,3 +1,7 @@
+// Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
+//
+// SPDX-License-Identifier: MIT
+
 #include<gtest/gtest.h>
 #include "topology_handler.hpp"
 #include "component_topology_handler.hpp"

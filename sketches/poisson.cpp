@@ -1,16 +1,6 @@
-//                       MFEM Example 0 - Parallel Version
+// Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
 //
-// Compile with: make ex0p
-//
-// Sample runs:  mpirun -np 4 ex0p
-//               mpirun -np 4 ex0p -m ../data/fichera.mesh
-//               mpirun -np 4 ex0p -m ../data/square-disc.mesh -o 2
-//
-// Description: This example code demonstrates the most basic parallel usage of
-//              MFEM to define a simple finite element discretization of the
-//              Laplace problem -Delta u = 1 with zero Dirichlet boundary
-//              conditions. General 2D/3D serial mesh files and finite element
-//              polynomial degrees can be specified by command line options.
+// SPDX-License-Identifier: MIT
 
 #include "mfem.hpp"
 #include <fstream>

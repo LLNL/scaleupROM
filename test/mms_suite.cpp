@@ -1,3 +1,7 @@
+// Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
+//
+// SPDX-License-Identifier: MIT
+
 #include "mms_suite.hpp"
 #include<gtest/gtest.h>
 #include "dg_linear.hpp"

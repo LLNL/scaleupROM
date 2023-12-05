@@ -1,3 +1,7 @@
+# Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 # trace generated using paraview version 5.11.0
 #import paraview
 #paraview.compatibility.major = 5

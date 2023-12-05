@@ -1,3 +1,7 @@
+// Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
+//
+// SPDX-License-Identifier: MIT
+
 #include<gtest/gtest.h>
 #include "hyperreduction_integ.hpp"
 #include "rom_nonlinearform.hpp"

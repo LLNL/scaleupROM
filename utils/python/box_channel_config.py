@@ -1,3 +1,7 @@
+# Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 import numpy as np
 from copy import deepcopy
 from config import Configuration, Empty, ObjectInSpace

@@ -1,3 +1,7 @@
+# Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 file(COPY square-circle.geo DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY square.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY test.multi_comp.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)

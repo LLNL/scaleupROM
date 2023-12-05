@@ -1,12 +1,6 @@
-###############################################################################
+# Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
 #
-#  Copyright (c) 2023, Lawrence Livermore National Security, LLC
-#  and other scaleUP SI developers. See the top-level COPYRIGHT
-#  file for details.
-#
-#  SPDX-License-Identifier: (Apache-2.0 OR MIT)
-#
-###############################################################################
+# SPDX-License-Identifier: MIT
 
 # Require CMake version 3.12 or later to expose modern features of
 # CMake for maintainability. With additional work, it is possible to

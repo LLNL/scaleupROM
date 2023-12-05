@@ -1,39 +1,6 @@
-//                                MFEM Example 5
+// Copyright 2023 Lawrence Livermore National Security, LLC. See the top-level LICENSE file for details.
 //
-// Compile with: make ex5
-//
-// Sample runs:  ex5 -m ../data/square-disc.mesh
-//               ex5 -m ../data/star.mesh
-//               ex5 -m ../data/star.mesh -pa
-//               ex5 -m ../data/beam-tet.mesh
-//               ex5 -m ../data/beam-hex.mesh
-//               ex5 -m ../data/beam-hex.mesh -pa
-//               ex5 -m ../data/escher.mesh
-//               ex5 -m ../data/fichera.mesh
-//
-// Device sample runs:
-//               ex5 -m ../data/star.mesh -pa -d cuda
-//               ex5 -m ../data/star.mesh -pa -d raja-cuda
-//               ex5 -m ../data/star.mesh -pa -d raja-omp
-//               ex5 -m ../data/beam-hex.mesh -pa -d cuda
-//
-// Description:  This example code solves a simple 2D/3D mixed Darcy problem
-//               corresponding to the saddle point system
-//
-//                                 k*u + grad p = f
-//                                 - div u      = g
-//
-//               with natural boundary condition -p = <given pressure>.
-//               Here, we use a given exact solution (u,p) and compute the
-//               corresponding r.h.s. (f,g).  We discretize with Raviart-Thomas
-//               finite elements (velocity u) and piecewise discontinuous
-//               polynomials (pressure p).
-//
-//               The example demonstrates the use of the BlockOperator class, as
-//               well as the collective saving of several grid functions in
-//               VisIt (visit.llnl.gov) and ParaView (paraview.org) formats.
-//
-//               We recommend viewing examples 1-4 before viewing this example.
+// SPDX-License-Identifier: MIT
 
 #include "mfem.hpp"
 #include <fstream>
