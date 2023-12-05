@@ -12,7 +12,7 @@ on:
 jobs:
   docker-image:
     uses: ./.github/workflows/docker.yml
-  linux-build:
+  linux:
     runs-on: ubuntu-latest
     needs: [docker-image]
     container:
@@ -37,31 +37,12 @@ jobs:
             cd ${GITHUB_WORKSPACE}/build
             cmake .. -DBUILD_SKETCHES=On
             make -j 4
-      - name: Upload the compiled artifacts
-        uses: actions/upload-artifact@master
-        with:
-          name: build-dir
-          path: ${GITHUB_WORKSPACE}/build
-  linux-test:
-    runs-on: ubuntu-latest
-    needs: [docker-image, linux-build]
-    container:
-      image: ghcr.io/llnl/scaleuprom/scaleuprom_env:latest
-      options: --user 1001 --privileged
-      volumes:
-        - /mnt:/mnt
-    steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-      - name: Set Swap Space
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 10
-      - name: Check out scaleupROM
-        uses: actions/checkout@v3
-      - name: Download the compiled artifacts
-        uses: actions/download-artifact@master
-        with:
-          name: build-dir
+      - name: Test parser
+        run: |
+            cd ${GITHUB_WORKSPACE}/build/test
+            ./test_parser
+      # - name: Upload the compiled artifacts
+      #   uses: actions/upload-artifact@master
+      #   with:
+      #     name: build-dir
+      #     path: ${GITHUB_WORKSPACE}/build
