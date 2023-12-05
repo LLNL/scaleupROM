@@ -113,7 +113,7 @@ public:
    void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
    virtual Vector* GetBasisVector(const int &basis_index, const int &column_idx, const int size=-1, const int offset=0)
-   { mfem_error("ROMHandler::GetBasisVector is not supported! Use MFEMROMHandler.\n"); }
+   { mfem_error("ROMHandler::GetBasisVector is not supported! Use MFEMROMHandler.\n"); return NULL; }
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.

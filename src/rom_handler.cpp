@@ -547,7 +547,7 @@ void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix
    GetBasis(idx, basis);
 }
 
-const Vector* MFEMROMHandler::GetBasisVector(
+Vector* MFEMROMHandler::GetBasisVector(
    const int &basis_index, const int &column_idx, const int size, const int offset)
 {
    assert(num_basis_sets > 0);
