@@ -59,23 +59,11 @@ RUN sudo make -j 16
 ENV LIBROM_DIR=$LIB_DIR/libROM
 
 # install python
-RUN sudo apt-get update
-RUN sudo apt-get install -yq python3 python3-pip
+RUN sudo apt-get update && sudo apt-get install -yq python3 python3-pip
+RUN sudo pip3 install --upgrade pip && sudo pip3 install numpy scipy argparse tables PyYAML h5py
 
-RUN echo "numpy" >> requirements.txt
-RUN echo "scipy" >> requirements.txt
-RUN echo "argparse" >> requirements.txt
-RUN echo "tables" >> requirements.txt
-RUN echo "PyYAML" >> requirements.txt
-RUN echo "h5py" >> requirements.txt
-RUN sudo pip3 install --upgrade pip
-RUN sudo pip3 install -r ./requirements.txt
-
-# install h5dump
-RUN sudo apt-get install -yq hdf5-tools
-
-# install gmsh
-RUN sudo apt-get install -yq gmsh
+# install h5dump and gmsh
+RUN sudo apt-get install -yq hdf5-tools gmsh
 
 # create and switch to a user
 WORKDIR /home/$USERNAME
