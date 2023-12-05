@@ -367,12 +367,6 @@ void StokesSolver::Assemble()
    AssembleRHS();
 
    AssembleOperator();
-
-   if (direct_solve)
-      SetupMUMPSSolver();
-   else
-      // pressure mass matrix for preconditioner.
-      SetupPressureMassMatrix();
 }
 
 void StokesSolver::AssembleRHS()
@@ -394,6 +388,17 @@ void StokesSolver::AssembleRHS()
 }
 
 void StokesSolver::AssembleOperator()
+{
+   AssembleOperatorBase();
+
+   if (direct_solve)
+      SetupMUMPSSolver();
+   else
+      // pressure mass matrix for preconditioner.
+      SetupPressureMassMatrix();
+}
+
+void StokesSolver::AssembleOperatorBase()
 {
    SanityCheckOnCoeffs();
 
@@ -489,6 +494,7 @@ void StokesSolver::SetupPressureMassMatrix()
 {
    assert(pms.Size() == numSub);
    delete pmMat;
+   delete pM;
 
    pmMat = new BlockMatrix(p_offsets);
    for (int m = 0; m < numSub; m++)
@@ -764,6 +770,7 @@ void StokesSolver::Solve()
          amg_prec->SetSystemsOptions(vdim[0], true);
 
          // pressure mass preconditioner
+         assert(pM);
          p_prec = new GSSmoother(*pM);
          if (!pres_dbc)
          {

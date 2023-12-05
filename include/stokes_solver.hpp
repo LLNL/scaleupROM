@@ -172,6 +172,7 @@ public:
    virtual void Assemble();
    virtual void AssembleRHS();
    virtual void AssembleOperator();
+   virtual void AssembleOperatorBase();   // base function that NS solver inherits.
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrixes();
