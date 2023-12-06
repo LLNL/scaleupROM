@@ -42,7 +42,7 @@ public:
    virtual Operator &GetGradient(const Vector &x) const;
 };
 
-class SteadyNSSolver : virtual public StokesSolver, virtual public Operator
+class SteadyNSSolver : public StokesSolver
 {
 
 friend class ParameterizedProblem;

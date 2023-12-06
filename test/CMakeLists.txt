@@ -12,6 +12,7 @@ file(COPY inputs/test.parser.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 
 add_executable(poisson_dd_mms poisson_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
+add_executable(steady_ns_dd_mms steady_ns_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(dg_integ_mms dg_integ_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 file(COPY inputs/dd_mms.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)

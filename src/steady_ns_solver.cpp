@@ -38,13 +38,17 @@ SteadyNSOperator::SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *
       assert(hs_[m]);
       Hop->SetDiagonalBlock(m, hs_[m]);
    }
+
+   hs_mats.SetSize(hs.Size());
+   hs_mats = NULL;
 }
 
 SteadyNSOperator::~SteadyNSOperator()
 {
    delete Hop;
    delete system_jac;
-   DeletePointers(hs_mats);
+   // NonlinearForm owns the gradient operator.
+   // DeletePointers(hs_mats);
    delete hs_jac;
    delete uu_mono;
    delete mono_jac;
@@ -64,19 +68,19 @@ void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
 
 Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 {
-   DeletePointers(hs_mats);
+   // NonlinearForm owns the gradient operator.
+   // DeletePointers(hs_mats);
    delete hs_jac;
    delete uu_mono;
    delete system_jac;
    delete mono_jac;
    delete jac_hypre;
-   
-   const Vector x_u(x.GetData(), u_offsets.Last());
 
    hs_jac = new BlockMatrix(u_offsets);
    hs_mats.SetSize(hs.Size());
    for (int i = 0; i < hs.Size(); i++)
    {
+      const Vector x_u(x.GetData() + u_offsets[i], u_offsets[i+1] - u_offsets[i]);
       hs_mats[i] = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
 
       hs_jac->SetBlock(i, i, hs_mats[i]);
@@ -120,7 +124,8 @@ SteadyNSSolver::SteadyNSSolver()
 SteadyNSSolver::~SteadyNSSolver()
 {
    DeletePointers(hs);
-   delete mumps;
+   // mumps is deleted by StokesSolver.
+   // delete mumps;
    delete J_gmres;
    delete newton_solver;
 }
@@ -220,13 +225,13 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
 void SteadyNSSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    int jac_maxIter = config.GetOption<int>("solver/jacobian/max_iter", 10000);
-   double jac_rtol = config.GetOption<double>("solver/jacobian/relative_tolerance", 1.e-15);
-   double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-15);
+   double jac_rtol = config.GetOption<double>("solver/jacobian/relative_tolerance", 1.e-10);
+   double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
    int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
 
    // same size as var_offsets, but sorted by variables first (then by subdomain).
