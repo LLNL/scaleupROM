@@ -58,7 +58,8 @@ SteadyNSOperator::~SteadyNSOperator()
 void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
 {
    assert(linearOp);
-   Vector x_u(x.GetData(), u_offsets.Last()), y_u(y.GetData(), u_offsets.Last());
+   x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
+   y_u.MakeRef(y, 0, u_offsets.Last());
 
    y = 0.0;
 
@@ -80,7 +81,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    hs_mats.SetSize(hs.Size());
    for (int i = 0; i < hs.Size(); i++)
    {
-      const Vector x_u(x.GetData() + u_offsets[i], u_offsets[i+1] - u_offsets[i]);
+      x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
       hs_mats[i] = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
 
       hs_jac->SetBlock(i, i, hs_mats[i]);
@@ -107,6 +108,77 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 }
 
 /*
+   SteadyNSTensorROM
+*/
+
+SteadyNSTensorROM::SteadyNSTensorROM(
+   SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_)
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_),
+     block_offsets(block_offsets_), direct_solve(direct_solve_)
+{
+   // TODO: this needs to be changed for parallel implementation.
+   sys_glob_size = height;
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = height;
+
+   block_idxs.SetSize(hs.Size());
+   for (int m = 0; m < hs.Size(); m++)
+   {
+      block_idxs[m] = new Array<int>(block_offsets[m+1] - block_offsets[m]);
+      for (int k = 0; k < block_idxs[m]->Size(); k++)
+         (*block_idxs[m])[k] = k;
+   }
+}
+
+SteadyNSTensorROM::~SteadyNSTensorROM()
+{
+   DeletePointers(block_idxs);
+}
+
+void SteadyNSTensorROM::Mult(const Vector &x, Vector &y) const
+{
+   y = 0.0;
+   linearOp->Mult(x, y);
+
+   for (int m = 0; m < hs.Size(); m++)
+   {
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+      y_comp.MakeRef(y, block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+
+      TensorAddScaledContract(*hs[m], 1.0, x_comp, x_comp, y_comp);
+   }
+}
+
+Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
+{
+   delete jac_mono;
+   delete jac_hypre;
+   jac_mono = new SparseMatrix(*linearOp);
+   DenseMatrix jac_comp;
+
+   for (int m = 0; m < hs.Size(); m++)
+   {
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+
+      jac_comp.SetSize(block_offsets[m+1] - block_offsets[m]);
+      jac_comp = 0.0;
+      TensorAddMultTranspose(*hs[m], x, 0, jac_comp);
+      TensorAddMultTranspose(*hs[m], x, 1, jac_comp);
+
+      jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], jac_comp);
+   }
+   jac_mono->Finalize();
+   
+   if (direct_solve)
+   {
+      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, jac_mono);
+      return *jac_hypre;
+   }
+   else
+      return *jac_mono;
+}
+
+/*
    SteadyNSSolver
 */
 
@@ -128,6 +200,13 @@ SteadyNSSolver::~SteadyNSSolver()
    // delete mumps;
    delete J_gmres;
    delete newton_solver;
+}
+
+void SteadyNSSolver::InitVariables()
+{
+   StokesSolver::InitVariables();
+   if (use_rom)
+      rom_handler->SetNonlinearMode(true);
 }
 
 void SteadyNSSolver::BuildOperators()
@@ -295,4 +374,15 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
 {
    StokesSolver::ProjectOperatorOnReducedBasis();
 
+}
+
+void SteadyNSSolver::SolveROM()
+{
+   assert(comp_tensors.Size() == numSub);
+   for (int m = 0; m < numSub; m++) assert(comp_tensors[m]);
+
+   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+   // NOTE(kevin): currently assumes direct solve.
+   SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), comp_tensors, *(rom_handler->GetBlockOffsets()));
+   rom_handler->NonlinearSolve(rom_oper, &U_domain);
 }

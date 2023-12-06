@@ -10,11 +10,13 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
-// A proxy Operator used for Newton Solver.
+// A proxy Operator used for FOM Newton Solver.
 class SteadyNSOperator : public Operator
 {
 protected:
    bool direct_solve;
+
+   mutable Vector x_u, y_u;
 
    Array<int> u_offsets, vblock_offsets;
    Array<NonlinearForm *> hs;
@@ -37,6 +39,32 @@ public:
    SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, Array<int> &u_offsets_, const bool direct_solve_=true);
 
    virtual ~SteadyNSOperator();
+
+   virtual void Mult(const Vector &x, Vector &y) const;
+   virtual Operator &GetGradient(const Vector &x) const;
+};
+
+// A proxy Operator used for ROM Newton Solver.
+class SteadyNSTensorROM : public Operator
+{
+protected:
+   bool direct_solve;
+
+   Array<int> block_offsets;
+   Array<Array<int> *> block_idxs;
+   Array<DenseTensor *> hs;
+   SparseMatrix *linearOp = NULL;
+
+   mutable Vector x_comp, y_comp;
+   mutable SparseMatrix *jac_mono = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
+   HYPRE_BigInt sys_glob_size;
+   mutable HYPRE_BigInt sys_row_starts[2];
+public:
+   SteadyNSTensorROM(SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true);
+
+   virtual ~SteadyNSTensorROM();
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;
@@ -69,28 +97,12 @@ public:
 
    virtual ~SteadyNSSolver();
 
-   // virtual void SetupBCVariables() override;
-   // virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1);
-   // virtual void AddBCFunction(const Vector &F, const int battr = -1);
-   // virtual void InitVariables();
-
-   // void DeterminePressureDirichlet();
+   virtual void InitVariables();
 
    virtual void BuildOperators() override;
-   // virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
-   
-   // virtual bool BCExistsOnBdr(const int &global_battr_idx);
-   // virtual void SetupBCOperators() override;
-   // virtual void SetupRHSBCOperators();
-   // virtual void SetupDomainBCOperators();
 
    virtual void Assemble();
-   // virtual void AssembleRHS();
-   // virtual void AssembleOperator();
-   // // For bilinear case.
-   // // system-specific.
-   // virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
@@ -103,13 +115,7 @@ public:
 
    virtual void ProjectOperatorOnReducedBasis();
 
-   // void SanityCheckOnCoeffs();
-
-   // virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
-
-   // // to ensure incompressibility for the problems with all velocity dirichlet bc.
-   // void SetComplementaryFlux(const Array<bool> nz_dbcs);
-
+   virtual void SolveROM() override;
 };
 
 #endif
