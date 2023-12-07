@@ -384,6 +384,11 @@ void SteadyNSSolver::Solve()
    double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
    int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
 
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file;
+   if (use_restart)
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+
    // same size as var_offsets, but sorted by variables first (then by subdomain).
    Array<int> offsets_byvar(num_var * numSub + 1);
    offsets_byvar = 0;
@@ -397,7 +402,13 @@ void SteadyNSSolver::Solve()
    BlockVector rhs_byvar(offsets_byvar);
    BlockVector sol_byvar(offsets_byvar);
    SortByVariables(*RHS, rhs_byvar);
-   sol_byvar = 0.0;
+   if (use_restart)
+   {
+      LoadSolution(restart_file);
+      SortByVariables(*U, sol_byvar);
+   }
+   else
+      sol_byvar = 0.0;
 
    SteadyNSOperator oper(systemOp, hs, u_offsets, direct_solve);
 
