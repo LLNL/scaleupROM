@@ -1,0 +1,70 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  solver: steady-ns
+  mode: single_run
+  use_rom: true
+
+mesh:
+  filename: meshes/test.2x2.mesh
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+solver:
+  relative_tolerance: 1.0e-15
+  absolute_tolerance: 1.0e-15
+  jacobian:
+    relative_tolerance: 1.0e-15
+    absolute_tolerance: 1.0e-15
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: sample_gen_output
+
+parameterized_problem:
+  name: stokes_channel
+
+single_run:
+  stokes_channel:
+    nu: 2.5
+
+sample_generation:
+  maximum_number_of_snapshots: 400
+  component_sampling: false
+  file_path:
+    prefix: "ns_channel"
+  parameters:
+    - key: single_run/stokes_channel/nu
+      type: double
+      sample_size: 3
+      minimum: 2.0
+      maximum: 3.0
+
+basis:
+  prefix: "ns0"
+  number_of_basis: 3
+  tags:
+    - name: comp0
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  # individual/universal
+  subdomain_training: individual
+  save_operator:
+    level: global
+    prefix: "proj_inv"
+  compare_solution:
+    enabled: true
+  solver_type: direct

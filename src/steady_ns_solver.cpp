@@ -53,13 +53,6 @@ SteadyNSOperator::~SteadyNSOperator()
    delete uu_mono;
    delete mono_jac;
    delete jac_hypre;
-
-   if (use_rom)
-   {
-      DeletePointers(comp_tensors);
-      if (rom_handler->SaveOperator() != ROMBuildingLevel::COMPONENT)
-         DeletePointers(subdomain_tensors);
-   }
 }
 
 void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
@@ -132,8 +125,8 @@ SteadyNSTensorROM::SteadyNSTensorROM(
    for (int m = 0; m < hs.Size(); m++)
    {
       block_idxs[m] = new Array<int>(block_offsets[m+1] - block_offsets[m]);
-      for (int k = 0; k < block_idxs[m]->Size(); k++)
-         (*block_idxs[m])[k] = k;
+      for (int k = 0, idx = block_offsets[m]; k < block_idxs[m]->Size(); k++, idx++)
+         (*block_idxs[m])[k] = idx;
    }
 }
 
@@ -169,8 +162,8 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 
       jac_comp.SetSize(block_offsets[m+1] - block_offsets[m]);
       jac_comp = 0.0;
-      TensorAddMultTranspose(*hs[m], x, 0, jac_comp);
-      TensorAddMultTranspose(*hs[m], x, 1, jac_comp);
+      TensorAddMultTranspose(*hs[m], x_comp, 0, jac_comp);
+      TensorAddMultTranspose(*hs[m], x_comp, 1, jac_comp);
 
       jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], jac_comp);
    }
@@ -193,7 +186,7 @@ SteadyNSSolver::SteadyNSSolver()
    : StokesSolver(), zeta_coeff(zeta)
 {
    // StokesSolver reads viscosity from stokes/nu.
-   nu = config.GetOption<double>("navier-stokes/nu", 1.0);
+   nu = config.GetOption<double>("stokes/nu", 1.0);
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);
 
@@ -207,6 +200,13 @@ SteadyNSSolver::~SteadyNSSolver()
    // delete mumps;
    delete J_gmres;
    delete newton_solver;
+
+   if (use_rom)
+   {
+      DeletePointers(comp_tensors);
+      if (rom_handler->SaveOperator() != ROMBuildingLevel::COMPONENT)
+         DeletePointers(subdomain_tensors);
+   }
 }
 
 void SteadyNSSolver::InitVariables()
@@ -270,15 +270,20 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
       file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       assert(file_id >= 0);
 
-      hid_t grp_id;
-      grp_id = H5Gopen2(grp_id, "ROM_tensors", H5P_DEFAULT);
-      assert(grp_id >= 0);
+      {
+         hid_t grp_id;
+         grp_id = H5Gopen2(file_id, "ROM_tensors", H5P_DEFAULT);
+         assert(grp_id >= 0);
 
-      for (int m = 0; m < numSub; m++)
-         hdf5_utils::ReadDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
+         for (int m = 0; m < numSub; m++)
+         {
+            subdomain_tensors[m] = new DenseTensor;
+            hdf5_utils::ReadDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
+         }
 
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
+         errf = H5Gclose(grp_id);
+         assert(errf >= 0);
+      }
 
       errf = H5Fclose(file_id);
       assert(errf >= 0);
@@ -351,6 +356,7 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
       comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
+      comp_tensors[c] = new DenseTensor;
       hdf5_utils::ReadDataset(comp_grp_id, "tensor", *comp_tensors[c]);
 
       errf = H5Gclose(comp_grp_id);
@@ -490,7 +496,7 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    assert(basis && fespace);
    const int nvdofs = fespace->GetTrueVSize();
    const int num_basis = basis->NumCols();
-   assert(basis->NumRows() == nvdofs);
+   assert(basis->NumRows() >= nvdofs);
 
    DenseTensor *tensor = new DenseTensor(num_basis, num_basis, num_basis);
 

@@ -385,6 +385,35 @@ TEST(Stokes_Workflow, ComponentWiseWithDirectSolve)
    return;
 }
 
+TEST(SteadyNS_Workflow, MFEMIndividualTest)
+{
+   config = InputParser("inputs/steady_ns.base.yml");
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
+
+   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
+   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
+   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
 int main(int argc, char* argv[])
 {
    ::testing::InitGoogleTest(&argc, argv);
