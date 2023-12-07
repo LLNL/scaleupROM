@@ -377,7 +377,7 @@ SteadyNSSolver *SolveWithRefinement(const int num_refinement)
 
 void CheckConvergence(const double &threshold)
 {
-   nu = config.GetOption<double>("navier-stokes/nu", 1.0);
+   nu = config.GetOption<double>("stokes/nu", 1.0);
 
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
    int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
