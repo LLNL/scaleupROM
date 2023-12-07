@@ -5,8 +5,32 @@ main:
   use_rom: true
 
 mesh:
-  filename: meshes/test.2x2.mesh
-  uniform_refinement: 0
+  type: component-wise
+  uniform_refinement: 2
+  component-wise:
+    global_config: "meshes/test.global.h5"
+    components:
+      - name: "square"
+        file: "meshes/test.1x1.mesh"
+    ports:
+      - name: "port1"
+        file: "meshes/test.port1.h5"
+        comp1:
+          name: "square"
+          attr: 3
+        comp2:
+          name: "square"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "meshes/test.port2.h5"
+        comp1:
+          name: "square"
+          attr: 2
+        comp2:
+          name: "square"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
 
 domain-decomposition:
   type: interior_penalty
@@ -34,25 +58,25 @@ parameterized_problem:
 
 single_run:
   stokes_channel:
-    nu: 2.5
+    nu: 2.0
 
 sample_generation:
   maximum_number_of_snapshots: 400
   component_sampling: false
   file_path:
-    prefix: "ns_channel"
+    prefix: "stokes"
   parameters:
     - key: single_run/stokes_channel/nu
       type: double
-      sample_size: 3
+      sample_size: 1
       minimum: 2.0
-      maximum: 3.0
+      maximum: 2.0
 
 basis:
   prefix: "ns0"
-  number_of_basis: 3
+  number_of_basis: 4
   tags:
-    - name: comp0
+    - name: square
   svd:
     save_spectrum: true
     update_right_sv: false
@@ -62,10 +86,10 @@ basis:
 model_reduction:
   rom_handler_type: mfem
   # individual/universal
-  subdomain_training: individual
+  subdomain_training: universal
   save_operator:
-    level: global
-    prefix: "proj_inv"
+    level: component
+    prefix: "test.rom_elem"
   compare_solution:
     enabled: true
-  solver_type: direct
+  solver_type: gmres
