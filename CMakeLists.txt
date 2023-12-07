@@ -179,6 +179,9 @@ set(scaleupROMObj_SOURCES
   include/stokes_solver.hpp
   src/stokes_solver.cpp
 
+  include/steady_ns_solver.hpp
+  src/steady_ns_solver.cpp
+
   include/input_parser.hpp
   src/input_parser.cpp
 

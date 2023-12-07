@@ -55,6 +55,7 @@ protected:
    bool save_lspg_basis = false;
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
    TrainMode train_mode = NUM_TRAINMODE;
+   bool nonlinear_mode = false;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
@@ -105,6 +106,10 @@ public:
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
+   virtual SparseMatrix* GetOperator()
+   { mfem_error("ROMHandler::GetOperator is not supported! Use MFEMROMHandler.\n"); return NULL; }
+   const bool GetNonlinearMode() { return nonlinear_mode; }
+   void SetNonlinearMode(const bool nl_mode) { nonlinear_mode = nl_mode; }
 
    // virtual void FormReducedBasis();
    virtual void LoadReducedBasis();
@@ -112,6 +117,10 @@ public:
    int GetBasisIndexForSubdomain(const int &subdomain_index);
    void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
+   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis)
+   { mfem_error("ROMHandler::GetBasis only supports CAROM::Matrix! Use MFEMROMHandler.\n"); }
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
+   { mfem_error("ROMHandler::GetBasis only supports CAROM::Matrix! Use MFEMROMHandler.\n"); }
    virtual void SetBlockSizes();
    virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
@@ -123,6 +132,8 @@ public:
       ProjectVectorOnReducedBasis(RHS, reduced_rhs);
    }
    virtual void Solve(BlockVector* U);
+   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL)
+   { mfem_error("ROMHandler::NonlinearSolve is not supported! Use MFEMROMHandler.\n"); }
 
    // P_i^T * mat * P_j
    virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat);
@@ -156,6 +167,7 @@ protected:
       DIRECT,
       CG,
       MINRES,
+      GMRES,
       NUM_SOLVERTYPE
    } linsol_type;
    MUMPSSolver::MatType mat_type;
@@ -179,12 +191,15 @@ public:
    MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler();
+
+   virtual SparseMatrix* GetOperator() override
+   { assert(romMat_mono); return romMat_mono; }
    
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   void GetBasis(const int &basis_index, DenseMatrix* &basis);
-   void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis);
+   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis) override;
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) override;
    // virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
@@ -194,6 +209,7 @@ public:
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) override
    { ProjectVectorOnReducedBasis(RHS, reduced_rhs); }
    virtual void Solve(BlockVector* U);
+   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
    
    // P_i^T * mat * P_j
    virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat);

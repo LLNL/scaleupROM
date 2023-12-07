@@ -12,6 +12,7 @@ file(COPY inputs/test.parser.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 
 add_executable(poisson_dd_mms poisson_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
+add_executable(steady_ns_dd_mms steady_ns_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(dg_integ_mms dg_integ_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 file(COPY inputs/dd_mms.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
@@ -29,10 +30,12 @@ file(COPY inputs/test_param_prob.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs
 add_executable(test_workflow test_workflow.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 file(COPY inputs/test.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY inputs/stokes.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
+file(COPY inputs/steady_ns.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/test.2x2.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 
 file(COPY inputs/test.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY inputs/stokes.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
+file(COPY inputs/steady_ns.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/test.1x1.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/test.global.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 

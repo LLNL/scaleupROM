@@ -172,9 +172,12 @@ public:
    virtual void Assemble();
    virtual void AssembleRHS();
    virtual void AssembleOperator();
+   virtual void AssembleOperatorBase();   // base function that NS solver inherits.
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrixes();
+   virtual void SetupMUMPSSolver();
+   virtual void SetupPressureMassMatrix();
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);

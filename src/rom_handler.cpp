@@ -716,6 +716,67 @@ void MFEMROMHandler::Solve(BlockVector* U)
    }
 }
 
+void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec)
+{
+   assert(U->NumBlocks() == numSub);
+
+   printf("Solve ROM.\n");
+   reduced_sol = new BlockVector(rom_block_offsets);
+   (*reduced_sol) = 0.0;
+
+   int maxIter = config.GetOption<int>("solver/max_iter", 100);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   int print_level = config.GetOption<int>("solver/print_level", 0);   
+
+   int jac_maxIter = config.GetOption<int>("solver/jacobian/max_iter", 10000);
+   double jac_rtol = config.GetOption<double>("solver/jacobian/relative_tolerance", 1.e-10);
+   double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
+   int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
+   std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
+   if (prec_str != "none") assert(prec);
+
+   Solver *J_solver = NULL;
+   if (linsol_type == SolverType::DIRECT)
+   {
+      mumps = new MUMPSSolver();
+      mumps->SetMatrixSymType(mat_type);
+      mumps->SetPrintLevel(jac_print_level);
+      J_solver = mumps;
+   }
+   else
+   {
+      IterativeSolver *iter_solver = SetIterativeSolver(linsol_type, prec_str);
+      iter_solver->SetAbsTol(jac_atol);
+      iter_solver->SetRelTol(jac_rtol);
+      iter_solver->SetMaxIter(jac_maxIter);
+      iter_solver->SetPrintLevel(jac_print_level);
+      if (prec) iter_solver->SetPreconditioner(*prec);
+      J_solver = iter_solver;
+   }
+
+   NewtonSolver newton_solver;
+   newton_solver.SetSolver(*J_solver);
+   newton_solver.SetOperator(oper);
+   newton_solver.SetPrintLevel(print_level); // print Newton iterations
+   newton_solver.SetRelTol(rtol);
+   newton_solver.SetAbsTol(atol);
+   newton_solver.SetMaxIter(maxIter);
+
+   newton_solver.Mult(*reduced_rhs, *reduced_sol);
+
+   for (int i = 0; i < numSub; i++)
+   {
+      assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
+
+      DenseMatrix* basis_i;
+      GetBasisOnSubdomain(i, basis_i);
+
+      // 23. reconstruct FOM state
+      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
+   }
+}
+
 SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
 {
    assert((i >= 0) && (i < num_basis_sets));
@@ -854,6 +915,12 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
          else                    solver = new MINRESSolver();
          break;
       }
+      case (SolverType::GMRES):
+      {
+         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_WORLD);
+         else                    solver = new GMRESSolver();
+         break;
+      }
       default:
       {
          mfem_error("Unknown ROM iterative linear solver type!\n");
@@ -866,7 +933,10 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
 
 void MFEMROMHandler::SetupDirectSolver()
 {
-   if (linsol_type != MFEMROMHandler::SolverType::DIRECT) return;
+   // If nonlinear mode, Jacobian will keep changing within Solve, thus no need of initial LU factorization.
+   if ((linsol_type != MFEMROMHandler::SolverType::DIRECT) || nonlinear_mode)
+      return;
+
    assert(romMat_mono);
    delete romMat_hypre, mumps;
 

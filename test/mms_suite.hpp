@@ -8,6 +8,7 @@
 #include "mfem.hpp"
 #include "poisson_solver.hpp"
 #include "stokes_solver.hpp"
+#include "steady_ns_solver.hpp"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -57,6 +58,22 @@ StokesSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence(const double &threshold = 0.1);
 
 }   // namespace stokes
+
+namespace steady_ns
+{
+
+static double nu;
+static const double zeta = 1.0;
+
+void uFun_ex(const Vector & x, Vector & u);
+double pFun_ex(const Vector & x);
+void fFun(const Vector & x, Vector & f);
+double gFun(const Vector & x);
+
+SteadyNSSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence(const double &threshold = 1.0);
+
+}   // namespace steady_ns
 
 namespace fem
 {

@@ -389,6 +389,17 @@ void StokesSolver::AssembleRHS()
 
 void StokesSolver::AssembleOperator()
 {
+   AssembleOperatorBase();
+
+   if (direct_solve)
+      SetupMUMPSSolver();
+   else
+      // pressure mass matrix for preconditioner.
+      SetupPressureMassMatrix();
+}
+
+void StokesSolver::AssembleOperatorBase()
+{
    SanityCheckOnCoeffs();
 
    assert(ms.Size() == numSub);
@@ -457,34 +468,44 @@ void StokesSolver::AssembleOperator()
    systemOp->SetBlock(0,0, M);
    systemOp->SetBlock(0,1, Bt);
    systemOp->SetBlock(1,0, B);
+}
 
-   if (direct_solve)
+void StokesSolver::SetupMUMPSSolver()
+{
+   assert(systemOp);
+   delete systemOp_mono;
+   delete systemOp_hypre;
+   delete mumps;
+
+   systemOp_mono = systemOp->CreateMonolithic();
+
+   // TODO: need to change when the actual parallelization is implemented.
+   sys_glob_size = systemOp_mono->NumRows();
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = systemOp_mono->NumRows();
+   systemOp_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, systemOp_mono);
+
+   mumps = new MUMPSSolver();
+   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+   mumps->SetOperator(*systemOp_hypre);
+}
+
+void StokesSolver::SetupPressureMassMatrix()
+{
+   assert(pms.Size() == numSub);
+   delete pmMat;
+   delete pM;
+
+   pmMat = new BlockMatrix(p_offsets);
+   for (int m = 0; m < numSub; m++)
    {
-      systemOp_mono = systemOp->CreateMonolithic();
+      assert(pms[m]);
+      pms[m]->Assemble();
+      pms[m]->Finalize();
 
-      // TODO: need to change when the actual parallelization is implemented.
-      sys_glob_size = systemOp_mono->NumRows();
-      sys_row_starts[0] = 0;
-      sys_row_starts[1] = systemOp_mono->NumRows();
-      systemOp_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, systemOp_mono);
-
-      mumps = new MUMPSSolver();
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
-      mumps->SetOperator(*systemOp_hypre);
+      pmMat->SetBlock(m, m, &(pms[m]->SpMat()));
    }
-   else
-   {
-      // pressure mass matrix for preconditioner.
-      pmMat = new BlockMatrix(p_offsets);
-      for (int m = 0; m < numSub; m++)
-      {
-         pms[m]->Assemble();
-         pms[m]->Finalize();
-
-         pmMat->SetBlock(m, m, &(pms[m]->SpMat()));
-      }
-      pM = pmMat->CreateMonolithic();
-   }
+   pM = pmMat->CreateMonolithic();
 }
 
 void StokesSolver::AssembleInterfaceMatrixes()
@@ -749,6 +770,7 @@ void StokesSolver::Solve()
          amg_prec->SetSystemsOptions(vdim[0], true);
 
          // pressure mass preconditioner
+         assert(pM);
          p_prec = new GSSmoother(*pM);
          if (!pres_dbc)
          {

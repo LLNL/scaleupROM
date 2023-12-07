@@ -6,6 +6,7 @@
 #include "multiblock_solver.hpp"
 #include "poisson_solver.hpp"
 #include "stokes_solver.hpp"
+#include "steady_ns_solver.hpp"
 #include "etc.hpp"
 #include <fstream>
 #include <iostream>
@@ -50,6 +51,7 @@ MultiBlockSolver* InitSolver()
    MultiBlockSolver *solver = NULL;
    if (solver_type == "poisson")       { solver = new PoissonSolver; }
    else if (solver_type == "stokes")   { solver = new StokesSolver; }
+   else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
@@ -301,7 +303,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
                case ROMBuildingLevel::GLOBAL:
                {
                   printf("loading operator file.. ");
-                  rom->LoadOperatorFromFile();
+                  test->LoadROMOperatorFromFile();
                   break;
                }
                case ROMBuildingLevel::NONE:
@@ -339,7 +341,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
                case ROMBuildingLevel::GLOBAL:
                {
                   printf("loading global operator file.. ");
-                  rom->LoadOperatorFromFile();
+                  test->LoadROMOperatorFromFile();
                   break;
                }
                case ROMBuildingLevel::NONE:

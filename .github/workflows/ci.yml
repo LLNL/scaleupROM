@@ -65,6 +65,10 @@ jobs:
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
             ./stokes_dd_mms
+      - name: Test SteadyNS DD solver
+        run: |
+            cd ${GITHUB_WORKSPACE}/build/test
+            ./steady_ns_dd_mms
       - name: Test parametrized problem
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
