@@ -301,7 +301,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
                case ROMBuildingLevel::GLOBAL:
                {
                   printf("loading operator file.. ");
-                  rom->LoadOperatorFromFile();
+                  test->LoadROMOperatorFromFile();
                   break;
                }
                case ROMBuildingLevel::NONE:
@@ -339,7 +339,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
                case ROMBuildingLevel::GLOBAL:
                {
                   printf("loading global operator file.. ");
-                  rom->LoadOperatorFromFile();
+                  test->LoadROMOperatorFromFile();
                   break;
                }
                case ROMBuildingLevel::NONE:

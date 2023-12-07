@@ -86,7 +86,7 @@ protected:
    const IntegrationRule *ir_nl = NULL;
 
    // component ROM element for nonlinear convection.
-   Array<DenseTensor *> comp_tensors;
+   Array<DenseTensor *> comp_tensors, subdomain_tensors;
 
    Solver *J_solver = NULL;
    GMRESSolver *J_gmres = NULL;
@@ -104,18 +104,23 @@ public:
 
    virtual void Assemble();
 
+   virtual void LoadROMOperatorFromFile(const std::string input_prefix="");
+
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
    // virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
    // virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
-   virtual void SaveCompBdrROMElement(hid_t &file_id);
-   virtual void LoadCompBdrROMElement(hid_t &file_id);
+   virtual void SaveCompBdrROMElement(hid_t &file_id) override;
+   virtual void LoadCompBdrROMElement(hid_t &file_id) override;
 
    virtual void Solve();
 
    virtual void ProjectOperatorOnReducedBasis();
 
    virtual void SolveROM() override;
+
+private:
+   DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
 };
 
 #endif

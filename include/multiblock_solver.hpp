@@ -175,6 +175,10 @@ public:
       InterfaceNonlinearFormIntegrator *interface_integ,
       Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
 
+   // Global ROM operator Loading.
+   virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
+   { rom_handler->LoadOperatorFromFile(input_prefix); }
+
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
    void AllocateROMElements();

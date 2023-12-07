@@ -53,6 +53,13 @@ SteadyNSOperator::~SteadyNSOperator()
    delete uu_mono;
    delete mono_jac;
    delete jac_hypre;
+
+   if (use_rom)
+   {
+      DeletePointers(comp_tensors);
+      if (rom_handler->SaveOperator() != ROMBuildingLevel::COMPONENT)
+         DeletePointers(subdomain_tensors);
+   }
 }
 
 void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
@@ -206,7 +213,11 @@ void SteadyNSSolver::InitVariables()
 {
    StokesSolver::InitVariables();
    if (use_rom)
+   {
       rom_handler->SetNonlinearMode(true);
+      subdomain_tensors.SetSize(numSub);
+      subdomain_tensors = NULL;
+   }
 }
 
 void SteadyNSSolver::BuildOperators()
@@ -242,10 +253,43 @@ void SteadyNSSolver::Assemble()
    // nonlinear operator?
 }
 
+void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
+{
+   assert(rom_handler->SaveOperator() == ROMBuildingLevel::GLOBAL);
+
+   rom_handler->LoadOperatorFromFile(input_prefix);
+   
+   subdomain_tensors.SetSize(numSub);
+   subdomain_tensors = NULL;
+   {
+      std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
+      assert(FileExists(filename));
+
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hid_t grp_id;
+      grp_id = H5Gopen2(grp_id, "ROM_tensors", H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      for (int m = 0; m < numSub; m++)
+         hdf5_utils::ReadDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
+   }
+}
+
 void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    StokesSolver::BuildCompROMElement(fes_comp);
 
+   DenseMatrix *basis = NULL;
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
    comp_tensors = NULL;
@@ -253,52 +297,73 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
-      const int nvdofs = fes_comp[fidx]->GetVSize();
-
-      const int num_basis_c = rom_handler->GetNumBasis(c);
-      comp_tensors[c] = new DenseTensor(num_basis_c, num_basis_c, num_basis_c);
-      Vector tmp(nvdofs);
-      DenseMatrix tmp_jk(num_basis_c, num_basis_c);
-
-      // DenseTensor is column major and i is the fastest index. 
-      // For fast iteration, we set k to be the test function index.
-      for (int i = 0; i < num_basis_c; i++)
-      {
-         Vector *u_i = rom_handler->GetBasisVector(c, i, nvdofs);
-         GridFunction ui_gf(fes_comp[fidx], u_i->GetData());
-         VectorGridFunctionCoefficient ui_coeff(&ui_gf);
-
-         NonlinearForm h_comp(fes_comp[fidx]);
-         auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(zeta_coeff, &ui_coeff);
-         nl_integ_tmp->SetIntRule(ir_nl);
-         h_comp.AddDomainIntegrator(nl_integ_tmp);
-         // if (full_dg)
-         //    h_comp.AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
-
-         for (int j = 0; j < num_basis_c; j++)
-         {
-            Vector *u_j = rom_handler->GetBasisVector(c, j, nvdofs);
-            tmp = 0.0;
-            h_comp.Mult(*u_j, tmp);
-            
-            for (int k = 0; k < num_basis_c; k++)
-            {
-               Vector *u_k = rom_handler->GetBasisVector(c, k, nvdofs);
-               (*comp_tensors[c])(i, j, k) = (*u_k) * tmp;
-            }  // for (int k = 0; k < num_basis_c; k++)
-         }  // for (int j = 0; j < num_basis_c; j++)
-      }  // for (int i = 0; i < num_basis_c; i++)
+      rom_handler->GetBasis(c, basis);
+      comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
    }  // for (int c = 0; c < num_comp; c++)
 }
 
 void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
 {
+   MultiBlockSolver::SaveCompBdrROMElement(file_id);
 
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_tensors.Size() == num_comp);
+
+   hid_t grp_id;
+   herr_t errf;
+   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      assert(comp_tensors[c]);
+
+      hid_t comp_grp_id;
+      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      assert(comp_grp_id >= 0);
+
+      hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
+
+      errf = H5Gclose(comp_grp_id);
+      assert(errf >= 0);
+   }  // for (int c = 0; c < num_comp; c++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
 }
 
 void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
 {
+   MultiBlockSolver::LoadCompBdrROMElement(file_id);
 
+   const int num_comp = topol_handler->GetNumComponents();
+   comp_tensors.SetSize(num_comp);
+   comp_tensors = NULL;
+
+   hid_t grp_id;
+   herr_t errf;
+   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      hid_t comp_grp_id;
+      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      assert(comp_grp_id >= 0);
+
+      hdf5_utils::ReadDataset(comp_grp_id, "tensor", *comp_tensors[c]);
+
+      errf = H5Gclose(comp_grp_id);
+      assert(errf >= 0);
+   }  // for (int c = 0; c < num_comp; c++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   subdomain_tensors.SetSize(numSub);
+   subdomain_tensors = NULL;
+   for (int m = 0; m < numSub; m++)
+      subdomain_tensors[m] = comp_tensors[rom_handler->GetBasisIndexForSubdomain(m)];
 }
 
 void SteadyNSSolver::Solve()
@@ -374,15 +439,92 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
 {
    StokesSolver::ProjectOperatorOnReducedBasis();
 
+   subdomain_tensors.SetSize(numSub);
+   subdomain_tensors = NULL;
+
+   DenseMatrix *basis = NULL;
+   for (int m = 0; m < numSub; m++)
+   {
+      rom_handler->GetBasisOnSubdomain(m, basis);
+      subdomain_tensors[m] = GetReducedTensor(basis, ufes[m]);
+   }
+
+   if (rom_handler->SaveOperator() == ROMBuildingLevel::GLOBAL)
+   {
+      std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
+      assert(FileExists(filename));
+
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, "ROM_tensors", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      for (int m = 0; m < numSub; m++)
+         hdf5_utils::WriteDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
+   }
 }
 
 void SteadyNSSolver::SolveROM()
 {
-   assert(comp_tensors.Size() == numSub);
-   for (int m = 0; m < numSub; m++) assert(comp_tensors[m]);
+   assert(subdomain_tensors.Size() == numSub);
+   for (int m = 0; m < numSub; m++) assert(subdomain_tensors[m]);
 
    BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
    // NOTE(kevin): currently assumes direct solve.
-   SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), comp_tensors, *(rom_handler->GetBlockOffsets()));
+   SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
    rom_handler->NonlinearSolve(rom_oper, &U_domain);
+}
+
+DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)
+{
+   assert(basis && fespace);
+   const int nvdofs = fespace->GetTrueVSize();
+   const int num_basis = basis->NumCols();
+   assert(basis->NumRows() == nvdofs);
+
+   DenseTensor *tensor = new DenseTensor(num_basis, num_basis, num_basis);
+
+   Vector tmp(nvdofs), u_i, u_j, u_k;
+   DenseMatrix tmp_jk(num_basis, num_basis);
+
+   // DenseTensor is column major and i is the fastest index. 
+   // For fast iteration, we set k to be the test function index.
+   for (int i = 0; i < num_basis; i++)
+   {
+      u_i.SetDataAndSize(basis->GetColumn(i), nvdofs);
+      GridFunction ui_gf(fespace, u_i.GetData());
+      VectorGridFunctionCoefficient ui_coeff(&ui_gf);
+
+      NonlinearForm h_comp(fespace);
+      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(zeta_coeff, &ui_coeff);
+      nl_integ_tmp->SetIntRule(ir_nl);
+      h_comp.AddDomainIntegrator(nl_integ_tmp);
+      // if (full_dg)
+      //    h_comp.AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+
+      for (int j = 0; j < num_basis; j++)
+      {
+         u_j.SetDataAndSize(basis->GetColumn(j), nvdofs);
+         tmp = 0.0;
+         h_comp.Mult(u_j, tmp);
+         
+         for (int k = 0; k < num_basis; k++)
+         {
+            u_k.SetDataAndSize(basis->GetColumn(k), nvdofs);
+            (*tensor)(i, j, k) = u_k * tmp;
+         }  // for (int k = 0; k < num_basis_c; k++)
+      }  // for (int j = 0; j < num_basis_c; j++)
+   }  // for (int i = 0; i < num_basis_c; i++)
+
+   return tensor;
 }
