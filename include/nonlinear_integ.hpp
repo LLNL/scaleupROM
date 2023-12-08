@@ -35,6 +35,41 @@ public:
                                     DenseMatrix &elmat);
 };
 
+/*
+   TrilinearForm domain integrator that computes Temam's domain integral:
+   For the trial velocity u and the test velocity v,
+      0.5 * (u_l * (d/dx_l) u_m * v_m - u_l * d/dx_l v_m * u_m)
+*/
+class TemamTrilinearFormIntegrator :
+   public NonlinearFormIntegrator
+{
+private:
+   int dim;
+   Coefficient *Q{};
+   VectorCoefficient *vQ{};
+   DenseMatrix dshape, dshapex, EF, gradEF, ELV, elmat_comp, elmat_comp2;
+   Vector shape;
+
+public:
+   TemamTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
+      : Q(&q), vQ(vq) { }
+
+   TemamTrilinearFormIntegrator() = default;
+
+   const IntegrationRule& GetRule(const FiniteElement &fe,
+                                  ElementTransformation &T);
+
+   virtual void AssembleElementVector(const FiniteElement &el,
+                                      ElementTransformation &trans,
+                                      const Vector &elfun,
+                                      Vector &elvect);
+
+   virtual void AssembleElementGrad(const FiniteElement &el,
+                                    ElementTransformation &trans,
+                                    const Vector &elfun,
+                                    DenseMatrix &elmat);
+};
+
 class DGLaxFriedrichsFluxIntegrator : public NonlinearFormIntegrator
 {
 private:
