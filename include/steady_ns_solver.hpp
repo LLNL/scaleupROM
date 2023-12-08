@@ -77,7 +77,7 @@ friend class ParameterizedProblem;
 
 protected:
    double zeta = 1.0;
-   ConstantCoefficient zeta_coeff;
+   ConstantCoefficient *zeta_coeff = NULL;
 
    // operator for nonlinear convection.
    Array<NonlinearForm *> hs;

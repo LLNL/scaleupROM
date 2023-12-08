@@ -183,18 +183,22 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 */
 
 SteadyNSSolver::SteadyNSSolver()
-   : StokesSolver(), zeta_coeff(zeta)
+   : StokesSolver()
 {
    // StokesSolver reads viscosity from stokes/nu.
    nu = config.GetOption<double>("stokes/nu", 1.0);
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);
 
+   zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
+   zeta_coeff = new ConstantCoefficient(zeta);
+
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 }
 
 SteadyNSSolver::~SteadyNSSolver()
 {
+   delete zeta_coeff;
    DeletePointers(hs);
    // mumps is deleted by StokesSolver.
    // delete mumps;
@@ -236,7 +240,7 @@ void SteadyNSSolver::BuildDomainOperators()
    {
       hs[m] = new NonlinearForm(ufes[m]);
 
-      auto nl_integ = new VectorConvectionTrilinearFormIntegrator(zeta_coeff);
+      auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
       nl_integ->SetIntRule(ir_nl);
       hs[m]->AddDomainIntegrator(nl_integ);
       // if (full_dg)
@@ -384,6 +388,7 @@ void SteadyNSSolver::Solve()
    double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
    int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
 
+   bool lbfgs = config.GetOption<bool>("solver/use_lbfgs", false);
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    std::string restart_file;
    if (use_restart)
@@ -429,7 +434,10 @@ void SteadyNSSolver::Solve()
       J_solver = J_gmres;
    }
 
-   newton_solver = new NewtonSolver;
+   if (lbfgs)
+      newton_solver = new LBFGSSolver;
+   else
+      newton_solver = new NewtonSolver;
    newton_solver->SetSolver(*J_solver);
    newton_solver->SetOperator(oper);
    newton_solver->SetPrintLevel(print_level); // print Newton iterations
@@ -523,7 +531,7 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
       VectorGridFunctionCoefficient ui_coeff(&ui_gf);
 
       NonlinearForm h_comp(fespace);
-      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(zeta_coeff, &ui_coeff);
+      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff, &ui_coeff);
       nl_integ_tmp->SetIntRule(ir_nl);
       h_comp.AddDomainIntegrator(nl_integ_tmp);
       // if (full_dg)
