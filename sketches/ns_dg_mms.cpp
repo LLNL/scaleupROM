@@ -18,6 +18,7 @@ using namespace mfem;
 
 static double nu = 0.1;
 static double zeta = 1.0;
+static bool direct_solve = true;
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -77,21 +78,15 @@ private:
    // int maxIter=10000;
    // MINRESSolver *J_solver;
    bool pres_dbc = false;
-   mutable BlockDiagonalPreconditioner *jac_prec;
-   BilinearForm *pMass = NULL;
-   SparseMatrix *pM = NULL;
-   GSSmoother *p_prec = NULL;
-   OrthoSolver *ortho_p_prec = NULL;
 
    HYPRE_BigInt glob_size;
    mutable HYPRE_BigInt row_starts[2];
-   mutable HypreParMatrix *uu_hypre = NULL;
-   mutable HypreBoomerAMG *u_prec = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
 
 public:
    SteadyNavierStokes(BilinearForm *M_, MixedBilinearForm *S_, NonlinearForm *H_, bool pres_dbc_=false)
       : Operator(M_->Height() + S_->Height()), dim(M_->FESpace()->GetVDim()), M(M_), S(S_), H(H_), pres_dbc(pres_dbc_),
-        system_jac(NULL), mono_jac(NULL), uu(NULL)//, J_solver(new MINRESSolver())
+        system_jac(NULL), mono_jac(NULL), uu(NULL)
    { 
       block_offsets.SetSize(3);
       block_offsets = 0;
@@ -101,31 +96,10 @@ public:
 
       pu = &(S->SpMat());
       up = Transpose(*pu);
-
-      jac_prec = new BlockDiagonalPreconditioner(block_offsets);
-      pMass = new BilinearForm(S_->TestFESpace());
-      pMass->AddDomainIntegrator(new MassIntegrator);
-      pMass->Assemble();
-      pMass->Finalize();
-      // pMass->FormSystemMatrix(p_ess_tdof, Ph);
-      pM = &(pMass->SpMat());
-      p_prec = new GSSmoother(*pM);
-
-      if (!pres_dbc)
-      {
-         ortho_p_prec = new OrthoSolver;
-         ortho_p_prec->SetSolver(*p_prec);
-         ortho_p_prec->SetOperator(*pM);
-      }
-
-      if (pres_dbc)
-         jac_prec->SetDiagonalBlock(1, p_prec);
-      else
-         jac_prec->SetDiagonalBlock(1, ortho_p_prec);
       
-      glob_size = M_->NumRows();
+      glob_size = block_offsets.Last();
       row_starts[0] = 0;
-      row_starts[1] = M_->NumRows();
+      row_starts[1] = block_offsets.Last();
    }
 
    /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
@@ -155,17 +129,14 @@ public:
       system_jac->SetBlock(0,1, up);
       system_jac->SetBlock(1,0, pu);
 
-      // update preconditioner.
-      delete u_prec;
-      delete uu_hypre;
-      uu_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, uu);
-      u_prec = new HypreBoomerAMG(*uu_hypre);
-      u_prec->SetPrintLevel(0);
-      u_prec->SetSystemsOptions(dim, true);
-      jac_prec->SetDiagonalBlock(0, u_prec);
-
       mono_jac = system_jac->CreateMonolithic();
-      return *mono_jac;
+      if (direct_solve)
+      {
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, mono_jac);
+         return *jac_hypre;
+      }
+      else
+         return *mono_jac;
    }
 
    virtual ~SteadyNavierStokes()
@@ -174,13 +145,8 @@ public:
       delete mono_jac;
       delete uu;
       delete up;
-      delete jac_prec;
-      delete pMass;
-      delete p_prec;
-      delete ortho_p_prec;
+      delete jac_hypre;
    }
-
-   BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }
 };
 
 int main(int argc, char *argv[])
@@ -214,6 +180,8 @@ int main(int argc, char *argv[])
                   "Use pressure Dirichlet condition.");
    args.AddOption(&use_dg, "-dg", "--use-dg", "-no-dg", "--no-use-dg",
                   "Use discontinuous Galerkin scheme.");
+   args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
+                  "Use discontinuous Galerkin scheme.");
    args.Parse();
    if (!args.Good())
    {
@@ -222,7 +190,7 @@ int main(int argc, char *argv[])
    }
    args.PrintOptions(cout);
 
-   assert(!pres_dbc);
+   // assert(!pres_dbc);
 
    // 3. Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
@@ -426,94 +394,35 @@ int main(int argc, char *argv[])
 //    delete ntemp;
 // }
 
-   // btVarf->AddDomainIntegrator(new MixedScalarWeakGradientIntegrator);
-   // btVarf->Assemble();
-   // btVarf->Finalize();
-
-   // // A \ F2.
-   // SparseMatrix A;
-   // OperatorHandle Bh, Ph;
-   // Vector U1, F1;
-   // Vector P1, G1;
-   // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, A, U1, F1);
-
-   // // It turns out that we do not remove pressure dirichlet bc dofs from this matrix.
-   // // bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
-   // bVarf->FormRectangularLinearSystem(u_ess_tdof, empty, u, *gform, Bh, U1, G1);
-   // SparseMatrix &B(bVarf->SpMat());
-   // SparseMatrix *Bt = Transpose(B);
-
-   // BlockMatrix systemOp(vblock_offsets);
-
-   // systemOp.SetBlock(0,0, &A);
-   // systemOp.SetBlock(0,1, Bt);
-   // systemOp.SetBlock(1,0, &B);
-
-   // // SparseMatrix &M(mVarf->SpMat());
-   // HYPRE_BigInt glob_size = A.NumRows();
-   // HYPRE_BigInt row_starts[2] = {0, A.NumRows()};
-   // HypreParMatrix Aop(MPI_COMM_WORLD, glob_size, row_starts, &A);
-   // HypreBoomerAMG A_prec(Aop);
-   // A_prec.SetPrintLevel(0);
-   // A_prec.SetSystemsOptions(dim, true);
-
-   // BilinearForm pMass(pfes);
-   // pMass.AddDomainIntegrator(new MassIntegrator);
-   // pMass.Assemble();
-   // pMass.Finalize();
-   // pMass.FormSystemMatrix(p_ess_tdof, Ph);
-   // SparseMatrix &pM(pMass.SpMat());
-   // // HYPRE_BigInt glob_size_p = pM.NumRows();
-   // // HYPRE_BigInt row_starts_p[2] = {0, pM.NumRows()};
-   // // HypreParMatrix pMop(MPI_COMM_WORLD, glob_size_p, row_starts_p, &pM);
-   // // HypreBoomerAMG p_prec(pMop);
-   // // p_prec.SetPrintLevel(0);
-   // GSSmoother p_prec(pM);
-
-   // OrthoSolver *ortho_p_prec = new OrthoSolver;
-   // ortho_p_prec->SetSolver(p_prec);
-   // ortho_p_prec->SetOperator(pM);
-
-   // BlockDiagonalPreconditioner systemPrec(vblock_offsets);
-   // systemPrec.SetDiagonalBlock(0, &A_prec);
-   // if (pres_dbc)
-   //    systemPrec.SetDiagonalBlock(1, &p_prec);
-   // else
-   //    systemPrec.SetDiagonalBlock(1, ortho_p_prec);
-
-// {
-//    int maxIter(10000);
-//    double rtol(1.e-15);
-//    double atol(1.e-15);
-//    MINRESSolver solver;
-//    solver.SetAbsTol(atol);
-//    solver.SetRelTol(rtol);
-//    solver.SetMaxIter(maxIter);
-//    solver.SetOperator(systemOp);
-//    // solver.SetPreconditioner(systemPrec);
-//    solver.SetPrintLevel(1);
-//    solver.Mult(rhs, x);
-// }
-
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
-   BlockDiagonalPreconditioner *jac_prec = oper.GetGradientPreconditioner();
 {
    int maxIter(10000);
    double rtol(1.e-10);
    double atol(1.e-10);
 
-   // MINRESSolver J_solver;
-   GMRESSolver J_solver;
-   J_solver.SetAbsTol(atol);
-   J_solver.SetRelTol(rtol);
-   J_solver.SetMaxIter(maxIter);
-   // J_solver.SetOperator(systemOp);
-   // J_solver.SetPreconditioner(*jac_prec);
-   J_solver.SetPrintLevel(-1);
+   Solver *J_solver = NULL;
+   GMRESSolver *J_gmres = NULL;
+   MUMPSSolver *J_mumps = NULL;
+   if (direct_solve)
+   {
+      J_mumps = new MUMPSSolver;
+      J_mumps->SetPrintLevel(-1);
+      J_mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      J_solver = J_mumps;
+   }
+   else
+   {
+      J_gmres = new GMRESSolver;
+      J_gmres->SetAbsTol(atol);
+      J_gmres->SetRelTol(rtol);
+      J_gmres->SetMaxIter(maxIter);
+      J_gmres->SetPrintLevel(-1);
+      J_solver = J_gmres;
+   }
 
    NewtonSolver newton_solver;
    // newton_solver.iterative_mode = false;
-   newton_solver.SetSolver(J_solver);
+   newton_solver.SetSolver(*J_solver);
    newton_solver.SetOperator(oper);
    newton_solver.SetPrintLevel(1); // print Newton iterations
    newton_solver.SetRelTol(rtol);
@@ -525,6 +434,8 @@ int main(int argc, char *argv[])
    // p.ProjectCoefficient(pcoeff);
    newton_solver.Mult(rhs, x);
    
+   delete J_mumps;
+   delete J_gmres;
 }
 
    if (!pres_dbc)
@@ -570,24 +481,15 @@ int main(int argc, char *argv[])
    // 17. Free the used memory.
    delete fform;
    delete gform;
-   // delete invM;
-   // delete invS;
-   // delete S;
-   // delete Bt;
-   // delete MinvBt;
    delete mVarf;
    delete bVarf;
    delete nVarf;
    delete fes;
    delete ufes;
    delete pfes;
-   // delete qfes;
    delete h1_coll;
    delete ph1_coll;
-   // delete W_space;
-   // delete R_space;
    delete l2_coll;
-   // delete hdiv_coll;
    delete mesh;
 
    return 0;
