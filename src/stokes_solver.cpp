@@ -1005,6 +1005,8 @@ void StokesSolver::SanityCheckOnCoeffs()
 void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    nu = function_factory::stokes_problem::nu;
+   delete nu_coeff;
+   nu_coeff = new ConstantCoefficient(nu);
 
    // clean up rhs for parametrized problem.
    if (f_coeffs.Size() > 0)
