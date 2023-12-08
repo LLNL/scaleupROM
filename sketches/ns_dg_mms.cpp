@@ -28,6 +28,7 @@ double gFun(const Vector & x);
 double f_natural(const Vector & x);
 void dudx_ex(const Vector & x, Vector & y);
 void uux_ex(const Vector & x, Vector & y);
+void fvec_natural(const Vector & x, Vector & y);
 
 double error(Operator &M, Vector &x, Vector &b)
 {
@@ -272,11 +273,12 @@ int main(int argc, char *argv[])
    // pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(nu), zeta_coeff(zeta), half_zeta(0.5 * zeta), minus_half_zeta(-0.5 * zeta);
+   ConstantCoefficient k(nu), zeta_coeff(zeta), half_zeta(0.5 * zeta), minus_zeta(-zeta), minus_half_zeta(-0.5 * zeta);
    ConstantCoefficient minus_one(-1.0), one(1.0), half(0.5), minus_half(-0.5);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
+   VectorFunctionCoefficient fvecnatcoeff(dim*dim, fvec_natural);
    VectorFunctionCoefficient dudxcoeff(dim, dudx_ex);
    VectorFunctionCoefficient uuxcoeff(dim, uux_ex);
    FunctionCoefficient gcoeff(gFun);
@@ -309,8 +311,12 @@ int main(int argc, char *argv[])
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
-
    fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
+
+   if (use_dg)
+      fform->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
+   else
+      fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
 
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
@@ -360,8 +366,8 @@ int main(int argc, char *argv[])
    nVarf->AddDomainIntegrator(nlc_nlfi2);
    if (use_dg)
       // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half_zeta));
-   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(minus_half_zeta), u_ess_attr);
+      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
+   nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
    // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
@@ -459,23 +465,30 @@ int main(int argc, char *argv[])
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
-   // GridFunction tmp(u);
-   // nVarf->Mult(u, tmp);
-
-   // printf("u\ttmp\n");
-   // for (int k = 0; k < u.Size(); k++)
-   //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
-
    // 15. Save data in the ParaView format
    ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
    // paraview_dc.SetPrefixPath("ParaView");
    paraview_dc.SetLevelsOfDetail(order);
-   // paraview_dc.SetCycle(0);
-//    paraview_dc.SetDataFormat(VTKFormat::BINARY);
-//    paraview_dc.SetHighOrderOutput(true);
-//    paraview_dc.SetTime(0.0); // set the time
+
+   // BlockVector res(vblock_offsets);
+   // Vector tmp(u_ex.Size() + p_ex.Size());
+   // tmp.SetVector(u_ex, 0);
+   // tmp.SetVector(p_ex, u_ex.Size());
+
+   // res = 0.0;
+   // oper.Mult(tmp, res);
+
+   // // 12. Create the grid functions u and p. Compute the L2 error norms.
+   // GridFunction res_u_ex, res_p_ex;
+   // res_u_ex.MakeRef(ufes, res.GetBlock(0), 0);
+   // res_p_ex.MakeRef(pfes, res.GetBlock(1), 0);
+   // paraview_dc.RegisterField("res_u_ex",&res_u_ex);
+   // paraview_dc.RegisterField("res_p_ex",&res_p_ex);
+
    paraview_dc.RegisterField("velocity",&u);
    paraview_dc.RegisterField("pressure",&p);
+   paraview_dc.RegisterField("u_ex",&u_ex);
+   paraview_dc.RegisterField("p_ex",&p_ex);
    paraview_dc.Save();
 
    // 17. Free the used memory.
@@ -568,4 +581,24 @@ void uux_ex(const Vector & x, Vector & y)
    uFun_ex(x, y);
    y(1) *= - y(0);
    y(0) *= - y(0);
+}
+
+void fvec_natural(const Vector & x, Vector & y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(x.Size() * x.Size());
+
+   double xi(x(0));
+   double yi(x(1));
+
+   // Grad u = du_i/dx_j - column-major order
+   y(0) = - sin(xi)*sin(yi);
+   y(1) = - cos(xi)*cos(yi);
+   y(2) = cos(xi)*cos(yi);
+   y(3) = sin(xi)*sin(yi);
+
+   y *= nu;
+
+   y(0) -= pFun_ex(x);
+   y(3) -= pFun_ex(x);
 }

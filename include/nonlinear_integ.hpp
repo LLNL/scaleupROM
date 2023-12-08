@@ -62,6 +62,15 @@ public:
 
 };
 
+/*
+   TrilinearForm face integrator that computes Temam's flux:
+   For the trial velocity u^1, u^2 and the test velocity v^1, v^2 on the interior face with the normal vector n^1,
+      0.5 * (u^1_l * n^1_l * (u^1_m - u^2_m) * v^1_m - u^1_l * n^1_l * (v^1_m - v^2_m) * u^1_m)
+   =  0.5 * u^1_l * n^1_l * (u^1_m * v^2_m - u^2_m * v^1_m)
+   If it's used on the boundary, then
+      0.5 * u^1_l * n^1_l * u^1_m * v^1_m.
+   A scalar coefficient can be multiplied if specified via Coefficient *Q.
+*/
 class DGTemamFluxIntegrator : public NonlinearFormIntegrator
 {
 private:

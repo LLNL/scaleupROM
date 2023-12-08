@@ -438,20 +438,25 @@ void DGTemamFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
          udof2.MultTranspose(shape2, u2);
       }
 
-      w = ip.weight;
+      // 0.5 factor remains whether boundary or interior face.
+      w = 0.5 * ip.weight;
       if (Q) { w *= Q->Eval(Tr, ip); }
 
       nor *= w;
       un = nor * u1;
       flux.Set(un, u1);
 
-      AddMultVWt(shape1, flux, elv1);
+      // If interior face, two flux terms cancel out.
       if (ndofs2)
-         AddMult_a_VWt(-1.0, shape2, flux, elv2);
-
-      if (ndofs2)
-         flux.Add(-un, u2);
-      AddMult_a_VWt(-1.0, shape1, flux, elv1);
+      {
+         AddMultVWt(shape2, flux, elv2);
+         flux.Set(-un, u2);
+         AddMultVWt(shape1, flux, elv1);
+      }
+      else
+      {
+         AddMultVWt(shape1, flux, elv1);
+      }
    }
 }
 
@@ -523,46 +528,45 @@ void DGTemamFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
          udof2.MultTranspose(shape2, u2);
       }
 
-      w = ip.weight;
+      // 0.5 factor remains whether boundary or interior face.
+      w = 0.5 * ip.weight;
       if (Q) { w *= Q->Eval(Tr, ip); }
 
       nor *= w;
       un = nor * u1;
-      flux = u1;
-      if (ndofs2) flux -= u2;
 
       MultVVt(shape1, elmat_comp11);
       if (ndofs2)
       {
          MultVWt(shape1, shape2, elmat_comp12);
          elmat_comp21.Transpose(elmat_comp12);
-         // MultVWt(shape2, shape1, elmat_comp21);
       }
 
-      for (int di = 0; di < dim; di++)
+      if (ndofs2)
       {
-         elmat.AddMatrix(un, elmat_comp11, di * ndofs1, di * ndofs1);
-         if (ndofs2)
-            elmat.AddMatrix(-un, elmat_comp21, di * ndofs2 + dim * ndofs1, di * ndofs1);
-
-         for (int dj = 0; dj < dim; dj++)
+         for (int di = 0; di < dim; di++)
          {
-            elmat.AddMatrix(u1(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
-            if (ndofs2)
-               elmat.AddMatrix(-u1(di) * nor(dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
+            elmat.AddMatrix(un, elmat_comp21, di * ndofs2 + dim * ndofs1, di * ndofs1);
+            elmat.AddMatrix(-un, elmat_comp12, di * ndofs1, di * ndofs2 + dim * ndofs1);
+
+            for (int dj = 0; dj < dim; dj++)
+            {
+               elmat.AddMatrix(u1(di) * nor(dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
+               elmat.AddMatrix(-u2(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
+            }
          }
       }
-
-      for (int di = 0; di < dim; di++)
+      else
       {
-         elmat.AddMatrix(-un, elmat_comp11, di * ndofs1, di * ndofs1);
-         if (ndofs2)
-            elmat.AddMatrix(un, elmat_comp12, di * ndofs1, di * ndofs2 + dim * ndofs1);
+         for (int di = 0; di < dim; di++)
+         {
+            elmat.AddMatrix(un, elmat_comp11, di * ndofs1, di * ndofs1);
 
-         for (int dj = 0; dj < dim; dj++)
-            elmat.AddMatrix(- flux(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
+            for (int dj = 0; dj < dim; dj++)
+               elmat.AddMatrix(u1(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
+         }
       }
-   }
+   }  // for (int pind = 0; pind < ir->GetNPoints(); ++pind)
 }
 
 }
