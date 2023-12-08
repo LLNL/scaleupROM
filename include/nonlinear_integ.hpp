@@ -56,8 +56,8 @@ public:
 
    TemamTrilinearFormIntegrator() = default;
 
-   const IntegrationRule& GetRule(const FiniteElement &fe,
-                                  ElementTransformation &T);
+   static const IntegrationRule& GetRule(const FiniteElement &fe,
+                                         ElementTransformation &T);
 
    virtual void AssembleElementVector(const FiniteElement &el,
                                       ElementTransformation &trans,

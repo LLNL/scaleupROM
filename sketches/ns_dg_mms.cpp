@@ -357,13 +357,15 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half_zeta);
-   auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
-   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(zeta_coeff);
+   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half_zeta);
+   // auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
+   // nlc_nlfi1->SetIntRule(&gll_ir_nl);
+   // nlc_nlfi2->SetIntRule(&gll_ir_nl);
+   // nVarf->AddDomainIntegrator(nlc_nlfi1);
+   // nVarf->AddDomainIntegrator(nlc_nlfi2);
+   auto *nlc_nlfi1 = new TemamTrilinearFormIntegrator(zeta_coeff);
    nlc_nlfi1->SetIntRule(&gll_ir_nl);
-   nlc_nlfi2->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi1);
-   nVarf->AddDomainIntegrator(nlc_nlfi2);
    if (use_dg)
       // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
       nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
