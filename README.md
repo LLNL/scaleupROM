@@ -22,6 +22,20 @@ scaleupROM is mainly built upon [MFEM](https://mfem.org/) and [libROM](https://w
 
 # Installation
 
+## Prerequisites
+
+- BLAS
+- LAPACK
+- HDF5
+- [yaml-cpp](https://github.com/jbeder/yaml-cpp)
+- [Gmsh](https://gmsh.info/)
+- [googletest](https://github.com/google/googletest)
+- [MFEM](https://mfem.org/)
+  - [hypre](https://github.com/hypre-space/hypre)
+  - [METIS](https://github.com/mfem/tpls)
+  - [MUMPS](https://github.com/scivision/mumps)
+- [libROM](https://librom.net/)
+
 **TODO**: set up installation instruction
 
 # Using Docker container
