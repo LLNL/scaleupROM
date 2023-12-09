@@ -178,6 +178,44 @@ void InterfaceForm::AssembleInterfaceMatrix(
    DeletePointers(vdofs);
 }
 
+void InterfaceForm::AssembleInterfaceMatrixAtPort(
+   const int p, Array<FiniteElementSpace *> &fes_comp, Array2D<SparseMatrix *> &mats_p) const
+{
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+
+   assert(topol_handler->GetType() == TopologyHandlerMode::COMPONENT);
+   assert((p >= 0) && (p < num_ref_ports));
+   DeletePointers(mats_p);
+   mats_p.SetSize(2, 2);
+
+   int c1, c2;
+   topol_handler->GetComponentPair(p, c1, c2);
+   Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+   Mesh *comp2 = topol_handler->GetComponentMesh(c2);
+
+   // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+   // Need to use two copied instances.
+   Mesh mesh1(*comp1);
+   Mesh mesh2(*comp2);
+
+   Array<int> c_idx(2);
+   c_idx[0] = c1;
+   c_idx[1] = c2;
+
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++)
+         mats_p(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
+
+   Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
+
+   // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+   // Need to use two copied instances.
+   AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], if_infos, mats_p);
+
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) mats_p(i, j)->Finalize();
+}
+
 void InterfaceForm::AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,
    FiniteElementSpace *fes1, FiniteElementSpace *fes2, Array<InterfaceInfo> *interface_infos,
    const Vector &x1, const Vector &x2, Vector &y1, Vector &y2) const
@@ -394,6 +432,51 @@ void MixedInterfaceForm::AssembleInterfaceMatrix(
    DeletePointers(test_vdofs);
    DeletePointers(trial_vdofs);
    DeletePointers(elemmats);
+}
+
+void MixedInterfaceForm::AssembleInterfaceMatrixAtPort(
+   const int p, Array<FiniteElementSpace *> &trial_fes_comp, 
+   Array<FiniteElementSpace *> &test_fes_comp, Array2D<SparseMatrix *> &mats_p) const
+{
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+
+   assert(topol_handler->GetType() == TopologyHandlerMode::COMPONENT);
+   assert((p >= 0) && (p < num_ref_ports));
+   DeletePointers(mats_p);
+   mats_p.SetSize(2, 2);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(trial_fes_comp.Size() == num_comp);
+   assert(test_fes_comp.Size() == num_comp);
+
+   int c1, c2;
+   topol_handler->GetComponentPair(p, c1, c2);
+   Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+   Mesh *comp2 = topol_handler->GetComponentMesh(c2);
+
+   // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+   // Need to use two copied instances.
+   Mesh mesh1(*comp1);
+   Mesh mesh2(*comp2);
+
+   Array<int> c_idx(2);
+   c_idx[0] = c1; c_idx[1] = c2;
+
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++)
+         mats_p(i, j) = new SparseMatrix(test_fes_comp[c_idx[i]]->GetTrueVSize(), trial_fes_comp[c_idx[j]]->GetTrueVSize());
+
+   Array<InterfaceInfo>* const if_infos = topol_handler->GetRefInterfaceInfos(p);
+
+   // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+   // Need to use two copied instances.
+   AssembleInterfaceMatrix(
+      &mesh1, &mesh2, trial_fes_comp[c_idx[0]], trial_fes_comp[c_idx[1]],
+      test_fes_comp[c_idx[0]], test_fes_comp[c_idx[1]], if_infos, mats_p);
+
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++)
+         mats_p(i, j)->Finalize();
 }
 
 }

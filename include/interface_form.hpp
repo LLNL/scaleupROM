@@ -56,9 +56,13 @@ public:
 
    void AssembleInterfaceMatrixes(Array2D<SparseMatrix *> &mats) const;
 
+   void AssembleInterfaceMatrixAtPort(const int p, Array<FiniteElementSpace *> &fes_comp, Array2D<SparseMatrix *> &mats_p) const;
+
    void InterfaceAddMult(const Vector &x, Vector &y) const;
 
    void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const;
+
+protected:
 
    // BilinearForm interface operator.
    void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
@@ -125,12 +129,17 @@ public:
 
    void AssembleInterfaceMatrixes(Array2D<SparseMatrix *> &mats) const;
 
+   void AssembleInterfaceMatrixAtPort(const int p, Array<FiniteElementSpace *> &trial_fes_comp, 
+                                      Array<FiniteElementSpace *> &test_fes_comp, Array2D<SparseMatrix *> &mats_p) const;
+
    void InterfaceAddMult(const Vector &x, Vector &y) const
    { "MixedInterfaceForm::InterfaceAddMult is not implemented yet!\n"; }
 
    void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
    { "MixedInterfaceForm::InterfaceGetGradient is not implemented yet!\n"; }
-      
+
+protected:
+
    // MixedBilinearForm interface operator.
    void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
       FiniteElementSpace *trial_fes1, FiniteElementSpace *trial_fes2,

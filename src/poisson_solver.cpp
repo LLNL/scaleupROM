@@ -413,30 +413,17 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
 
       int c1, c2;
       topol_handler->GetComponentPair(p, c1, c2);
-      Mesh *comp1 = topol_handler->GetComponentMesh(c1);
-      Mesh *comp2 = topol_handler->GetComponentMesh(c2);
-
-      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
-      // Need to use two copied instances.
-      Mesh mesh1(*comp1);
-      Mesh mesh2(*comp2);
 
       Array<int> c_idx(2);
       c_idx[0] = c1;
       c_idx[1] = c2;
-      Array2D<SparseMatrix *> spmats(2,2);
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-            spmats(i, j) = new SparseMatrix(fes_comp[c_idx[i]]->GetTrueVSize(), fes_comp[c_idx[j]]->GetTrueVSize());
 
-      Array<InterfaceInfo> *if_infos = topol_handler->GetRefInterfaceInfos(p);
+      Array2D<SparseMatrix *> spmats(2,2);
+      spmats = NULL;
 
       // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
       // Need to use two copied instances.
-      a_itf->AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
-
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();
+      a_itf->AssembleInterfaceMatrixAtPort(p, fes_comp, spmats);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
