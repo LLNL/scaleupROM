@@ -175,6 +175,20 @@ public:
       InterfaceNonlinearFormIntegrator *interface_integ,
       Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
 
+   // NonlinearForm interface operator.
+   void AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,
+      FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+      InterfaceNonlinearFormIntegrator *interface_integ,
+      Array<InterfaceInfo> *interface_infos,
+      const Vector &x1, const Vector &x2,
+      Vector &y1, Vector &y2) const;
+
+   void AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
+      FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+      InterfaceNonlinearFormIntegrator *interface_integ,
+      Array<InterfaceInfo> *interface_infos,
+      const Vector &x1, const Vector &x2, Array2D<SparseMatrix*> &mats) const;
+
    // Global ROM operator Loading.
    virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
    { rom_handler->LoadOperatorFromFile(input_prefix); }

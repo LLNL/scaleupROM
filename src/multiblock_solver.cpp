@@ -239,16 +239,16 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
                                                 Array<InterfaceInfo> *interface_infos,
                                                 Array2D<SparseMatrix*> &mats)
 {
+   Array2D<DenseMatrix*> elemmats;
+   FaceElementTransformations *tr1, *tr2;
+   const FiniteElement *fe1, *fe2;
+   Array<Array<int> *> vdofs(2);
+   vdofs[0] = new Array<int>;
+   vdofs[1] = new Array<int>;
+
    for (int bn = 0; bn < interface_infos->Size(); bn++)
    {
       InterfaceInfo *if_info = &((*interface_infos)[bn]);
-      
-      Array2D<DenseMatrix*> elemmats;
-      FaceElementTransformations *tr1, *tr2;
-      const FiniteElement *fe1, *fe2;
-      Array<Array<int> *> vdofs(2);
-      vdofs[0] = new Array<int>;
-      vdofs[1] = new Array<int>;
 
       topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
 
@@ -267,8 +267,12 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
                mats(i, j)->AddSubMatrix(*vdofs[i], *vdofs[j], *elemmats(i,j), skip_zeros);
             }
          }
+
+         DeletePointers(elemmats);
       }  // if ((tr1 != NULL) && (tr2 != NULL))
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+
+   DeletePointers(vdofs);
 }
 
 void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
@@ -277,19 +281,19 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
    InterfaceNonlinearFormIntegrator *interface_integ,
    Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats)
 {
+   Array2D<DenseMatrix*> elemmats;
+   FaceElementTransformations *tr1, *tr2;
+   const FiniteElement *trial_fe1, *trial_fe2, *test_fe1, *test_fe2;
+   Array<Array<int> *> test_vdofs(2), trial_vdofs(2);
+   trial_vdofs[0] = new Array<int>;
+   trial_vdofs[1] = new Array<int>;
+   test_vdofs[0] = new Array<int>;
+   test_vdofs[1] = new Array<int>;
+
    for (int bn = 0; bn < interface_infos->Size(); bn++)
    {
       InterfaceInfo *if_info = &((*interface_infos)[bn]);
       
-      Array2D<DenseMatrix*> elemmats;
-      FaceElementTransformations *tr1, *tr2;
-      const FiniteElement *trial_fe1, *trial_fe2, *test_fe1, *test_fe2;
-      Array<Array<int> *> test_vdofs(2), trial_vdofs(2);
-      trial_vdofs[0] = new Array<int>;
-      trial_vdofs[1] = new Array<int>;
-      test_vdofs[0] = new Array<int>;
-      test_vdofs[1] = new Array<int>;
-
       topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
 
       if ((tr1 != NULL) && (tr2 != NULL))
@@ -312,8 +316,100 @@ void MultiBlockSolver::AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
                mats(i, j)->AddSubMatrix(*test_vdofs[i], *trial_vdofs[j], *elemmats(i,j), skip_zeros);
             }
          }
+
+         DeletePointers(elemmats);
       }  // if ((tr1 != NULL) && (tr2 != NULL))
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+
+   DeletePointers(test_vdofs);
+   DeletePointers(trial_vdofs);
+}
+
+void MultiBlockSolver::AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,
+   FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+   InterfaceNonlinearFormIntegrator *interface_integ, Array<InterfaceInfo> *interface_infos,
+   const Vector &x1, const Vector &x2, Vector &y1, Vector &y2) const
+{
+   assert(x1.Size() == fes1->GetTrueVSize());
+   assert(x2.Size() == fes2->GetTrueVSize());
+   assert(y1.Size() == x1.Size());
+   assert(y2.Size() == x2.Size());
+
+   FaceElementTransformations *tr1, *tr2;
+   const FiniteElement *fe1, *fe2;
+   Array<int> vdofs1, vdofs2;
+   Vector el_x1, el_x2, el_y1, el_y2;
+
+   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   {
+      InterfaceInfo *if_info = &((*interface_infos)[bn]);
+
+      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+
+      if ((tr1 != NULL) && (tr2 != NULL))
+      {
+         fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+         fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+
+         x1.GetSubVector(vdofs1, el_x1);
+         x2.GetSubVector(vdofs2, el_x2);
+
+         // Both domains will have the adjacent element as Elem1.
+         fe1 = fes1->GetFE(tr1->Elem1No);
+         fe2 = fes2->GetFE(tr2->Elem1No);
+
+         interface_integ->AssembleInterfaceVector(*fe1, *fe2, *tr1, *tr2, el_x1, el_x2, el_y1, el_y2);
+
+         y1.AddElementVector(vdofs1, el_y1);
+         y2.AddElementVector(vdofs2, el_y2);
+      }  // if ((tr1 != NULL) && (tr2 != NULL))
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+}
+
+void MultiBlockSolver::AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
+   FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+   InterfaceNonlinearFormIntegrator *interface_integ, Array<InterfaceInfo> *interface_infos,
+   const Vector &x1, const Vector &x2, Array2D<SparseMatrix*> &mats) const
+{
+   assert(x1.Size() == fes1->GetTrueVSize());
+   assert(x2.Size() == fes2->GetTrueVSize());
+
+   Array2D<DenseMatrix*> elemmats(2, 2);
+   for (int i = 0; i < elemmats.NumRows(); i++)
+      for (int j = 0; j < elemmats.NumCols(); j++) elemmats(i, j) = new DenseMatrix; 
+   FaceElementTransformations *tr1, *tr2;
+   const FiniteElement *fe1, *fe2;
+   Array<int> vdofs1, vdofs2;
+   Vector el_x1, el_x2, el_y1, el_y2;
+
+   for (int bn = 0; bn < interface_infos->Size(); bn++)
+   {
+      InterfaceInfo *if_info = &((*interface_infos)[bn]);
+
+      topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+
+      if ((tr1 != NULL) && (tr2 != NULL))
+      {
+         fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+         fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+
+         x1.GetSubVector(vdofs1, el_x1);
+         x2.GetSubVector(vdofs2, el_x2);
+
+         // Both domains will have the adjacent element as Elem1.
+         fe1 = fes1->GetFE(tr1->Elem1No);
+         fe2 = fes2->GetFE(tr2->Elem1No);
+
+         interface_integ->AssembleInterfaceGrad(*fe1, *fe2, *tr1, *tr2, el_x1, el_x2, elemmats);
+
+         mats(0, 0)->AddSubMatrix(vdofs1, vdofs1, *elemmats(0, 0), skip_zeros);
+         mats(0, 1)->AddSubMatrix(vdofs1, vdofs2, *elemmats(0, 1), skip_zeros);
+         mats(1, 0)->AddSubMatrix(vdofs2, vdofs1, *elemmats(1, 0), skip_zeros);
+         mats(1, 1)->AddSubMatrix(vdofs2, vdofs2, *elemmats(1, 1), skip_zeros);
+      }  // if ((tr1 != NULL) && (tr2 != NULL))
+   }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
+
+   DeletePointers(elemmats);
 }
 
 void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes)

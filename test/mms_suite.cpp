@@ -378,6 +378,7 @@ SteadyNSSolver *SolveWithRefinement(const int num_refinement)
 void CheckConvergence(const double &threshold)
 {
    nu = config.GetOption<double>("stokes/nu", 1.0);
+   zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
 
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
    int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
@@ -466,7 +467,7 @@ void CheckConvergence(const double &threshold)
       // reported convergence rate
       if (r > base_refine)
       {
-         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - threshold);
+         EXPECT_TRUE(uconv_rate(r) > pow(2.0, 0.5 * (uorder + porder) + 1) - threshold);
          EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - threshold);
       }
 

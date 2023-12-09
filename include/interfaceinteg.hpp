@@ -24,7 +24,8 @@ public:
                                        const FiniteElement &el2,
                                        FaceElementTransformations &Tr1,
                                        FaceElementTransformations &Tr2,
-                                       const Vector &elfun, Vector &elvect);
+                                       const Vector &elfun1, const Vector &elfun2,
+                                       Vector &elvect1, Vector &elvect2);
 
    /// @brief Assemble the local action of the gradient of the
    /// NonlinearFormIntegrator resulting from a face integral term.
@@ -32,7 +33,8 @@ public:
                                       const FiniteElement &el2,
                                       FaceElementTransformations &Tr1,
                                       FaceElementTransformations &Tr2,
-                                      const Vector &elfun, DenseMatrix &elmat);
+                                      const Vector &elfun1, const Vector &elfun2,
+                                      Array2D<DenseMatrix*> &elmats);
 
    virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
                                        const FiniteElement &el2,
@@ -163,6 +165,36 @@ public:
                                        Array2D<DenseMatrix*> &elmats);
 
    using InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix;
+};
+
+class InterfaceDGTemamFluxIntegrator : public InterfaceNonlinearFormIntegrator
+{
+private:
+   int dim, ndofs1, ndofs2, nvdofs1, nvdofs2;
+   double w, un;
+   Coefficient *Q{};
+
+   Vector nor, shape1, shape2, u1, u2, flux;
+   DenseMatrix udof1, udof2, elv1, elv2;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21;
+
+public:
+   InterfaceDGTemamFluxIntegrator(Coefficient &q) : Q(&q) {};
+   virtual ~InterfaceDGTemamFluxIntegrator() {};
+
+   virtual void AssembleInterfaceVector(const FiniteElement &el1,
+                                       const FiniteElement &el2,
+                                       FaceElementTransformations &Tr1,
+                                       FaceElementTransformations &Tr2,
+                                       const Vector &elfun1, const Vector &elfun2,
+                                       Vector &elvect1, Vector &elvect2);
+
+   virtual void AssembleInterfaceGrad(const FiniteElement &el1,
+                                      const FiniteElement &el2,
+                                      FaceElementTransformations &Tr1,
+                                      FaceElementTransformations &Tr2,
+                                      const Vector &elfun1, const Vector &elfun2,
+                                      Array2D<DenseMatrix*> &elmats);
 };
 
 } // namespace mfem

@@ -4,11 +4,12 @@
 
 #include "steady_ns_solver.hpp"
 #include "hyperreduction_integ.hpp"
+#include "nonlinear_integ.hpp"
 // #include "input_parser.hpp"
 // #include "hdf5_utils.hpp"
 // #include "linalg_utils.hpp"
 // #include "dg_bilinear.hpp"
-// #include "dg_linear.hpp"
+#include "dg_linear.hpp"
 #include "etc.hpp"
 
 using namespace std;
@@ -18,8 +19,11 @@ using namespace mfem;
    SteadyNSOperator
 */
 
-SteadyNSOperator::SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, Array<int> &u_offsets_, const bool direct_solve_)
-   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), u_offsets(u_offsets_), direct_solve(direct_solve_),
+SteadyNSOperator::SteadyNSOperator(
+   BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, SteadyNSSolver *solver_,
+   Array<int> &u_offsets_, const bool direct_solve_)
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), solver(solver_),
+     u_offsets(u_offsets_), direct_solve(direct_solve_),
      M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0)))
 {
    vblock_offsets.SetSize(3);
@@ -39,7 +43,7 @@ SteadyNSOperator::SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *
       Hop->SetDiagonalBlock(m, hs_[m]);
    }
 
-   hs_mats.SetSize(hs.Size());
+   hs_mats.SetSize(hs.Size(), hs.Size());
    hs_mats = NULL;
 }
 
@@ -64,6 +68,7 @@ void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
    y = 0.0;
 
    Hop->Mult(x_u, y_u);
+   solver->InterfaceAddMult(x_u, y_u);
    linearOp->AddMult(x, y);
 }
 
@@ -78,14 +83,31 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    delete jac_hypre;
 
    hs_jac = new BlockMatrix(u_offsets);
-   hs_mats.SetSize(hs.Size());
    for (int i = 0; i < hs.Size(); i++)
-   {
-      x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
-      hs_mats[i] = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         if (i == j)
+         {
+            x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
+            hs_mats(i, j) = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+         }
+         else
+         {
+            delete hs_mats(i, j);
+            hs_mats(i, j) = new SparseMatrix(u_offsets[i+1] - u_offsets[i], u_offsets[j+1] - u_offsets[j]);
+         }
+      }
 
-      hs_jac->SetBlock(i, i, hs_mats[i]);
-   }
+   x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
+   solver->InterfaceGetGradient(x_u, hs_mats);
+
+   for (int i = 0; i < hs.Size(); i++)
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         hs_mats(i, j)->Finalize();
+         hs_jac->SetBlock(i, j, hs_mats(i, j));
+      }
+
    SparseMatrix *hs_jac_mono = hs_jac->CreateMonolithic();
    uu_mono = Add(*M, *hs_jac_mono);
    delete hs_jac_mono;
@@ -192,6 +214,8 @@ SteadyNSSolver::SteadyNSSolver()
 
    zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
    zeta_coeff = new ConstantCoefficient(zeta);
+   minus_zeta = new ConstantCoefficient(-zeta);
+   minus_half_zeta = new ConstantCoefficient(-0.5 * zeta);
 
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 }
@@ -199,6 +223,9 @@ SteadyNSSolver::SteadyNSSolver()
 SteadyNSSolver::~SteadyNSSolver()
 {
    delete zeta_coeff;
+   delete minus_zeta;
+   delete minus_half_zeta;
+   delete nl_interface;
    DeletePointers(hs);
    // mumps is deleted by StokesSolver.
    // delete mumps;
@@ -240,12 +267,46 @@ void SteadyNSSolver::BuildDomainOperators()
    {
       hs[m] = new NonlinearForm(ufes[m]);
 
-      auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+      auto nl_integ = new TemamTrilinearFormIntegrator(*zeta_coeff);
       nl_integ->SetIntRule(ir_nl);
       hs[m]->AddDomainIntegrator(nl_integ);
-      // if (full_dg)
-      //    hs[m]->AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+      if (full_dg)
+      {
+         auto nl_face = new DGTemamFluxIntegrator(*minus_zeta);
+         // nl_face->SetIntRule(ir_nl);
+         hs[m]->AddInteriorFaceIntegrator(nl_face);
+      }
    }
+
+   nl_interface = new InterfaceDGTemamFluxIntegrator(*minus_zeta);
+   // nl_interface->SetIntRule(ir_nl);
+}
+
+void SteadyNSSolver::SetupRHSBCOperators()
+{
+   StokesSolver::SetupRHSBCOperators();
+
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(fs[m] && gs[m]);
+      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0) continue;
+         // TODO: Non-homogeneous Neumann stress bc
+         if (!BCExistsOnBdr(b)) continue;
+
+         fs[m]->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(*ud_coeffs[b], minus_half_zeta), *bdr_markers[b]);
+      }
+   }
+}
+
+void SteadyNSSolver::SetupDomainBCOperators()
+{
+   StokesSolver::SetupDomainBCOperators();
+
+   // homogeneous Neumann boundary condition
+   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
 }
 
 void SteadyNSSolver::Assemble()
@@ -415,7 +476,7 @@ void SteadyNSSolver::Solve()
    else
       sol_byvar = 0.0;
 
-   SteadyNSOperator oper(systemOp, hs, u_offsets, direct_solve);
+   SteadyNSOperator oper(systemOp, hs, this, u_offsets, direct_solve);
 
    if (direct_solve)
    {
@@ -552,4 +613,74 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    }  // for (int i = 0; i < num_basis_c; i++)
 
    return tensor;
+}
+
+void SteadyNSSolver::InterfaceAddMult(const Vector &x, Vector &y) const
+{
+   xu_temp.Update(const_cast<Vector&>(x), u_offsets);
+   yu_temp.Update(y, u_offsets);
+
+   Array<int> midx(2);
+   Mesh *mesh1, *mesh2;
+   FiniteElementSpace *ufes1, *ufes2;
+
+   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   {
+      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
+
+      midx[0] = pInfo->Mesh1;
+      midx[1] = pInfo->Mesh2;
+
+      mesh1 = meshes[midx[0]];
+      mesh2 = meshes[midx[1]];
+
+      ufes1 = ufes[midx[0]];
+      ufes2 = ufes[midx[1]];
+
+      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
+      AssembleInterfaceVector(mesh1, mesh2, ufes1, ufes2, nl_interface, interface_infos,
+                              xu_temp.GetBlock(midx[0]), xu_temp.GetBlock(midx[1]),
+                              yu_temp.GetBlock(midx[0]), yu_temp.GetBlock(midx[1]));
+   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+
+   for (int i=0; i < yu_temp.NumBlocks(); ++i)
+      yu_temp.GetBlock(i).SyncAliasMemory(y);
+}
+
+void SteadyNSSolver::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
+{
+   assert(mats.NumRows() == numSub);
+   assert(mats.NumCols() == numSub);
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+         assert(mats(i, j));
+
+   xu_temp.Update(const_cast<Vector&>(x), u_offsets);
+
+   Array<int> midx(2);
+   Array2D<SparseMatrix *> mats_p(2,2);
+   Mesh *mesh1, *mesh2;
+   FiniteElementSpace *ufes1, *ufes2;
+
+   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   {
+      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
+      
+      midx[0] = pInfo->Mesh1;
+      midx[1] = pInfo->Mesh2;
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            mats_p(i, j) = mats(midx[i], midx[j]);
+
+      mesh1 = meshes[midx[0]];
+      mesh2 = meshes[midx[1]];
+
+      ufes1 = ufes[midx[0]];
+      ufes2 = ufes[midx[1]];
+
+      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
+      AssembleInterfaceGrad(mesh1, mesh2, ufes1, ufes2, nl_interface, interface_infos,
+                            xu_temp.GetBlock(midx[0]), xu_temp.GetBlock(midx[1]), mats_p);
+   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 }
