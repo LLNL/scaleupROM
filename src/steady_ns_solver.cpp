@@ -305,8 +305,21 @@ void SteadyNSSolver::SetupDomainBCOperators()
 {
    StokesSolver::SetupDomainBCOperators();
 
-   // homogeneous Neumann boundary condition
-   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
+   assert(hs.Size() == numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(hs[m]);
+      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0) continue;
+         
+         // homogeneous Neumann boundary condition
+         if (!BCExistsOnBdr(b))
+            hs[m]->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(*zeta_coeff), *bdr_markers[b]);
+      }
+   }
+   
 }
 
 void SteadyNSSolver::Assemble()
