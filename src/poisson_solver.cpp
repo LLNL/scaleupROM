@@ -44,7 +44,7 @@ PoissonSolver::PoissonSolver()
 
 PoissonSolver::~PoissonSolver()
 {
-   delete interface_integ;
+   delete a_itf;
 
    DeletePointers(bs);
    DeletePointers(as);
@@ -194,7 +194,8 @@ void PoissonSolver::BuildDomainOperators()
          as[m]->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
    }
 
-   interface_integ = new InterfaceDGDiffusionIntegrator(sigma, kappa);
+   a_itf = new InterfaceForm(meshes, fes, topol_handler);
+   a_itf->AddIntefaceIntegrator(new InterfaceDGDiffusionIntegrator(sigma, kappa));
 }
 
 bool PoissonSolver::BCExistsOnBdr(const int &global_battr_idx)
@@ -336,28 +337,8 @@ void PoissonSolver::AssembleOperator()
 
 void PoissonSolver::AssembleInterfaceMatrixes()
 {
-   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-   {
-      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
-
-      Array<int> midx(2);
-      midx[0] = pInfo->Mesh1;
-      midx[1] = pInfo->Mesh2;
-      Array2D<SparseMatrix *> mats_p(2,2);
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++) mats_p(i, j) = mats(midx[i], midx[j]);
-
-      Mesh *mesh1, *mesh2;
-      mesh1 = meshes[midx[0]];
-      mesh2 = meshes[midx[1]];
-
-      FiniteElementSpace *fes1, *fes2;
-      fes1 = fes[midx[0]];
-      fes2 = fes[midx[1]];
-
-      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      AssembleInterfaceMatrix(mesh1, mesh2, fes1, fes2, interface_integ, interface_infos, mats_p);
-   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   assert(a_itf);
+   a_itf->AssembleInterfaceMatrixes(mats);
 }
 
 void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
@@ -452,7 +433,7 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
 
       // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
       // Need to use two copied instances.
-      AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], interface_integ, if_infos, spmats);
+      a_itf->AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], if_infos, spmats);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++) spmats(i, j)->Finalize();

@@ -20,9 +20,9 @@ using namespace mfem;
 */
 
 SteadyNSOperator::SteadyNSOperator(
-   BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, SteadyNSSolver *solver_,
+   BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
    Array<int> &u_offsets_, const bool direct_solve_)
-   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), solver(solver_),
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), nl_itf(nl_itf_),
      u_offsets(u_offsets_), direct_solve(direct_solve_),
      M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0)))
 {
@@ -68,7 +68,7 @@ void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
    y = 0.0;
 
    Hop->Mult(x_u, y_u);
-   solver->InterfaceAddMult(x_u, y_u);
+   nl_itf->InterfaceAddMult(x_u, y_u);
    linearOp->AddMult(x, y);
 }
 
@@ -99,7 +99,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
       }
 
    x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
-   solver->InterfaceGetGradient(x_u, hs_mats);
+   nl_itf->InterfaceGetGradient(x_u, hs_mats);
 
    for (int i = 0; i < hs.Size(); i++)
       for (int j = 0; j < hs.Size(); j++)
@@ -225,7 +225,7 @@ SteadyNSSolver::~SteadyNSSolver()
    delete zeta_coeff;
    delete minus_zeta;
    delete minus_half_zeta;
-   delete nl_interface;
+   delete nl_itf;
    DeletePointers(hs);
    // mumps is deleted by StokesSolver.
    // delete mumps;
@@ -278,7 +278,8 @@ void SteadyNSSolver::BuildDomainOperators()
       }
    }
 
-   nl_interface = new InterfaceDGTemamFluxIntegrator(*minus_zeta);
+   nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
+   nl_itf->AddIntefaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
    // nl_interface->SetIntRule(ir_nl);
 }
 
@@ -489,7 +490,7 @@ void SteadyNSSolver::Solve()
    else
       sol_byvar = 0.0;
 
-   SteadyNSOperator oper(systemOp, hs, this, u_offsets, direct_solve);
+   SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);
 
    if (direct_solve)
    {
@@ -626,74 +627,4 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    }  // for (int i = 0; i < num_basis_c; i++)
 
    return tensor;
-}
-
-void SteadyNSSolver::InterfaceAddMult(const Vector &x, Vector &y) const
-{
-   xu_temp.Update(const_cast<Vector&>(x), u_offsets);
-   yu_temp.Update(y, u_offsets);
-
-   Array<int> midx(2);
-   Mesh *mesh1, *mesh2;
-   FiniteElementSpace *ufes1, *ufes2;
-
-   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-   {
-      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
-
-      midx[0] = pInfo->Mesh1;
-      midx[1] = pInfo->Mesh2;
-
-      mesh1 = meshes[midx[0]];
-      mesh2 = meshes[midx[1]];
-
-      ufes1 = ufes[midx[0]];
-      ufes2 = ufes[midx[1]];
-
-      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      AssembleInterfaceVector(mesh1, mesh2, ufes1, ufes2, nl_interface, interface_infos,
-                              xu_temp.GetBlock(midx[0]), xu_temp.GetBlock(midx[1]),
-                              yu_temp.GetBlock(midx[0]), yu_temp.GetBlock(midx[1]));
-   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-
-   for (int i=0; i < yu_temp.NumBlocks(); ++i)
-      yu_temp.GetBlock(i).SyncAliasMemory(y);
-}
-
-void SteadyNSSolver::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
-{
-   assert(mats.NumRows() == numSub);
-   assert(mats.NumCols() == numSub);
-   for (int i = 0; i < numSub; i++)
-      for (int j = 0; j < numSub; j++)
-         assert(mats(i, j));
-
-   xu_temp.Update(const_cast<Vector&>(x), u_offsets);
-
-   Array<int> midx(2);
-   Array2D<SparseMatrix *> mats_p(2,2);
-   Mesh *mesh1, *mesh2;
-   FiniteElementSpace *ufes1, *ufes2;
-
-   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-   {
-      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
-      
-      midx[0] = pInfo->Mesh1;
-      midx[1] = pInfo->Mesh2;
-
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-            mats_p(i, j) = mats(midx[i], midx[j]);
-
-      mesh1 = meshes[midx[0]];
-      mesh2 = meshes[midx[1]];
-
-      ufes1 = ufes[midx[0]];
-      ufes2 = ufes[midx[1]];
-
-      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      AssembleInterfaceGrad(mesh1, mesh2, ufes1, ufes2, nl_interface, interface_infos,
-                            xu_temp.GetBlock(midx[0]), xu_temp.GetBlock(midx[1]), mats_p);
-   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 }

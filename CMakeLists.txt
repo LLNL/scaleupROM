@@ -164,8 +164,8 @@ set(scaleupROMObj_SOURCES
   include/rom_nonlinearform.hpp
   src/rom_nonlinearform.cpp
 
-  # include/multiblock_nonlinearform.hpp
-  # src/multiblock_nonlinearform.cpp
+  include/interface_form.hpp
+  src/interface_form.cpp
 
   # include/multiblock_bilinearform.hpp
   # src/multiblock_bilinearform.cpp

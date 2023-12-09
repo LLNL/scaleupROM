@@ -10,6 +10,70 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
+// A proxy Operator used for FOM Newton Solver.
+// TODO(kevin): used a hack of having SteadyNSSolver *solver.
+// Ultimately, we should implement InterfaceForm to pass, not the MultiBlockSolver itself.
+class SteadyNSOperator : public Operator
+{
+protected:
+   bool direct_solve;
+
+   mutable Vector x_u, y_u;
+
+   Array<int> u_offsets, vblock_offsets;
+   InterfaceForm *nl_itf = NULL;
+   Array<NonlinearForm *> hs;
+   BlockOperator *Hop = NULL;
+
+   BlockMatrix *linearOp = NULL;
+   SparseMatrix *M = NULL, *B = NULL, *Bt = NULL;
+
+   // Jacobian matrix objects
+   mutable BlockMatrix *system_jac = NULL;
+   mutable Array2D<SparseMatrix *> hs_mats;
+   mutable BlockMatrix *hs_jac = NULL;
+   mutable SparseMatrix *uu_mono = NULL;
+   mutable SparseMatrix *mono_jac = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
+   HYPRE_BigInt sys_glob_size;
+   mutable HYPRE_BigInt sys_row_starts[2];
+public:
+   SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+                    Array<int> &u_offsets_, const bool direct_solve_=true);
+
+   virtual ~SteadyNSOperator();
+
+   virtual void Mult(const Vector &x, Vector &y) const;
+   virtual Operator &GetGradient(const Vector &x) const;
+};
+
+// A proxy Operator used for ROM Newton Solver.
+class SteadyNSTensorROM : public Operator
+{
+protected:
+   bool direct_solve;
+
+   Array<int> block_offsets;
+   Array<Array<int> *> block_idxs;
+   Array<DenseTensor *> hs;
+   SparseMatrix *linearOp = NULL;
+
+   mutable Vector x_comp, y_comp;
+   mutable SparseMatrix *jac_mono = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
+   HYPRE_BigInt sys_glob_size;
+   mutable HYPRE_BigInt sys_row_starts[2];
+public:
+   SteadyNSTensorROM(SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true);
+
+   virtual ~SteadyNSTensorROM();
+
+   virtual void Mult(const Vector &x, Vector &y) const;
+   virtual Operator &GetGradient(const Vector &x) const;
+};
+
 class SteadyNSSolver : public StokesSolver
 {
 
@@ -27,7 +91,7 @@ protected:
    const IntegrationRule *ir_nl = NULL;
 
    // interface integrator
-   InterfaceNonlinearFormIntegrator *nl_interface = NULL;
+   InterfaceForm *nl_itf = NULL;
    mutable BlockVector xu_temp, yu_temp;
 
    // component ROM element for nonlinear convection.
@@ -69,74 +133,6 @@ public:
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
-
-protected:
-   void InterfaceAddMult(const Vector &x, Vector &y) const;
-   void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const;
-};
-
-// A proxy Operator used for FOM Newton Solver.
-// TODO(kevin): used a hack of having SteadyNSSolver *solver.
-// Ultimately, we should implement InterfaceForm to pass, not the MultiBlockSolver itself.
-class SteadyNSOperator : public Operator
-{
-protected:
-   bool direct_solve;
-
-   mutable Vector x_u, y_u;
-
-   Array<int> u_offsets, vblock_offsets;
-   SteadyNSSolver *solver = NULL;
-   Array<NonlinearForm *> hs;
-   BlockOperator *Hop = NULL;
-
-   BlockMatrix *linearOp = NULL;
-   SparseMatrix *M = NULL, *B = NULL, *Bt = NULL;
-
-   // Jacobian matrix objects
-   mutable BlockMatrix *system_jac = NULL;
-   mutable Array2D<SparseMatrix *> hs_mats;
-   mutable BlockMatrix *hs_jac = NULL;
-   mutable SparseMatrix *uu_mono = NULL;
-   mutable SparseMatrix *mono_jac = NULL;
-   mutable HypreParMatrix *jac_hypre = NULL;
-
-   HYPRE_BigInt sys_glob_size;
-   mutable HYPRE_BigInt sys_row_starts[2];
-public:
-   SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, SteadyNSSolver *solver_,
-                    Array<int> &u_offsets_, const bool direct_solve_=true);
-
-   virtual ~SteadyNSOperator();
-
-   virtual void Mult(const Vector &x, Vector &y) const;
-   virtual Operator &GetGradient(const Vector &x) const;
-};
-
-// A proxy Operator used for ROM Newton Solver.
-class SteadyNSTensorROM : public Operator
-{
-protected:
-   bool direct_solve;
-
-   Array<int> block_offsets;
-   Array<Array<int> *> block_idxs;
-   Array<DenseTensor *> hs;
-   SparseMatrix *linearOp = NULL;
-
-   mutable Vector x_comp, y_comp;
-   mutable SparseMatrix *jac_mono = NULL;
-   mutable HypreParMatrix *jac_hypre = NULL;
-
-   HYPRE_BigInt sys_glob_size;
-   mutable HYPRE_BigInt sys_row_starts[2];
-public:
-   SteadyNSTensorROM(SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true);
-
-   virtual ~SteadyNSTensorROM();
-
-   virtual void Mult(const Vector &x, Vector &y) const;
-   virtual Operator &GetGradient(const Vector &x) const;
 };
 
 #endif

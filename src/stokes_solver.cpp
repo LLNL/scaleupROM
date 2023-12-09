@@ -64,8 +64,8 @@ StokesSolver::StokesSolver()
 StokesSolver::~StokesSolver()
 {
    delete nu_coeff;
-   delete vec_diff;
-   delete norm_flux;
+   delete m_itf;
+   delete b_itf;
 
    DeletePointers(fs);
    DeletePointers(gs);
@@ -284,8 +284,10 @@ void StokesSolver::BuildDomainOperators()
          bs[m]->AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
    }
 
-   vec_diff = new InterfaceDGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa);
-   norm_flux = new InterfaceDGNormalFluxIntegrator;
+   m_itf = new InterfaceForm(meshes, ufes, topol_handler);
+   b_itf = new MixedInterfaceForm(meshes, ufes, pfes, topol_handler);
+   m_itf->AddIntefaceIntegrator(new InterfaceDGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+   b_itf->AddIntefaceIntegrator(new InterfaceDGNormalFluxIntegrator);
 
    // pressure mass matrix for preconditioner.
    pms.SetSize(numSub);
@@ -510,35 +512,8 @@ void StokesSolver::SetupPressureMassMatrix()
 
 void StokesSolver::AssembleInterfaceMatrixes()
 {
-   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
-   {
-      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
-
-      Array<int> midx(2);
-      midx[0] = pInfo->Mesh1;
-      midx[1] = pInfo->Mesh2;
-      Array2D<SparseMatrix *> m_mats_p(2,2), b_mats_p(2,2);
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-         {
-            m_mats_p(i, j) = m_mats(midx[i], midx[j]);
-            b_mats_p(i, j) = b_mats(midx[i], midx[j]);
-         }
-
-      Mesh *mesh1, *mesh2;
-      mesh1 = meshes[midx[0]];
-      mesh2 = meshes[midx[1]];
-
-      FiniteElementSpace *ufes1, *ufes2, *pfes1, *pfes2;
-      ufes1 = ufes[midx[0]];
-      ufes2 = ufes[midx[1]];
-      pfes1 = pfes[midx[0]];
-      pfes2 = pfes[midx[1]];
-
-      Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
-      AssembleInterfaceMatrix(mesh1, mesh2, ufes1, ufes2, vec_diff, interface_infos, m_mats_p);
-      AssembleInterfaceMatrix(mesh1, mesh2, ufes1, ufes2, pfes1, pfes2, norm_flux, interface_infos, b_mats_p);
-   }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   m_itf->AssembleInterfaceMatrixes(m_mats);
+   b_itf->AssembleInterfaceMatrixes(b_mats);
 }
 
 void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
@@ -685,11 +660,11 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
 
       // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
       // Need to use two copied instances.
-      AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[f_idx[0]], fes_comp[f_idx[1]],
-                              vec_diff, if_infos, m_mats_p);
-      AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[f_idx[0]], fes_comp[f_idx[1]],
-                              fes_comp[f_idx[0]+1], fes_comp[f_idx[1]+1],
-                              norm_flux, if_infos, b_mats_p);
+      m_itf->AssembleInterfaceMatrix(
+         &mesh1, &mesh2, fes_comp[f_idx[0]], fes_comp[f_idx[1]], if_infos, m_mats_p);
+      b_itf->AssembleInterfaceMatrix(
+         &mesh1, &mesh2, fes_comp[f_idx[0]], fes_comp[f_idx[1]],
+         fes_comp[f_idx[0]+1], fes_comp[f_idx[1]+1], if_infos, b_mats_p);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)

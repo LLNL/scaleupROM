@@ -19,7 +19,7 @@ friend class ParameterizedProblem;
 
 protected:
    // interface integrator
-   InterfaceNonlinearFormIntegrator *interface_integ = NULL;
+   InterfaceForm *a_itf = NULL;
    // int skip_zeros = 1;
 
    // System matrix for Bilinear case.
