@@ -245,6 +245,19 @@ TEST(VectorConvectionTrilinearFormIntegrator, Test_grad)
    return;
 }
 
+TEST(TemamTrilinearFormIntegrator, Test_grad)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+
+   ConstantCoefficient pi(3.141592);
+   auto *nlc_nlfi = new TemamTrilinearFormIntegrator(pi);
+    
+   CheckGradient(nlc_nlfi, IntegratorType::DOMAIN, false);
+
+   return;
+}
+
 int main(int argc, char* argv[])
 {
    MPI_Init(&argc, &argv);

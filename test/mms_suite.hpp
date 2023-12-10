@@ -63,7 +63,7 @@ namespace steady_ns
 {
 
 static double nu;
-static const double zeta = 1.0;
+static double zeta = 1.0;
 
 void uFun_ex(const Vector & x, Vector & u);
 double pFun_ex(const Vector & x);

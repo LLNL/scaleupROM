@@ -91,7 +91,8 @@ protected:
    Array<GridFunction *> vels, ps;
 
    // interface integrator
-   InterfaceNonlinearFormIntegrator *vec_diff = NULL, *norm_flux = NULL;
+   InterfaceForm *m_itf = NULL;
+   MixedInterfaceForm *b_itf = NULL;
 
    // System matrix for Bilinear case.
    Array<int> u_offsets, p_offsets, vblock_offsets;

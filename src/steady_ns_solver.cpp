@@ -4,11 +4,12 @@
 
 #include "steady_ns_solver.hpp"
 #include "hyperreduction_integ.hpp"
+#include "nonlinear_integ.hpp"
 // #include "input_parser.hpp"
 // #include "hdf5_utils.hpp"
 // #include "linalg_utils.hpp"
 // #include "dg_bilinear.hpp"
-// #include "dg_linear.hpp"
+#include "dg_linear.hpp"
 #include "etc.hpp"
 
 using namespace std;
@@ -18,8 +19,11 @@ using namespace mfem;
    SteadyNSOperator
 */
 
-SteadyNSOperator::SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, Array<int> &u_offsets_, const bool direct_solve_)
-   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), u_offsets(u_offsets_), direct_solve(direct_solve_),
+SteadyNSOperator::SteadyNSOperator(
+   BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+   Array<int> &u_offsets_, const bool direct_solve_)
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), nl_itf(nl_itf_),
+     u_offsets(u_offsets_), direct_solve(direct_solve_),
      M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0)))
 {
    vblock_offsets.SetSize(3);
@@ -39,7 +43,7 @@ SteadyNSOperator::SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *
       Hop->SetDiagonalBlock(m, hs_[m]);
    }
 
-   hs_mats.SetSize(hs.Size());
+   hs_mats.SetSize(hs.Size(), hs.Size());
    hs_mats = NULL;
 }
 
@@ -64,6 +68,7 @@ void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
    y = 0.0;
 
    Hop->Mult(x_u, y_u);
+   if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u);
    linearOp->AddMult(x, y);
 }
 
@@ -78,14 +83,31 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    delete jac_hypre;
 
    hs_jac = new BlockMatrix(u_offsets);
-   hs_mats.SetSize(hs.Size());
    for (int i = 0; i < hs.Size(); i++)
-   {
-      x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
-      hs_mats[i] = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         if (i == j)
+         {
+            x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
+            hs_mats(i, j) = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+         }
+         else
+         {
+            delete hs_mats(i, j);
+            hs_mats(i, j) = new SparseMatrix(u_offsets[i+1] - u_offsets[i], u_offsets[j+1] - u_offsets[j]);
+         }
+      }
 
-      hs_jac->SetBlock(i, i, hs_mats[i]);
-   }
+   x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
+   if (nl_itf) nl_itf->InterfaceGetGradient(x_u, hs_mats);
+
+   for (int i = 0; i < hs.Size(); i++)
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         hs_mats(i, j)->Finalize();
+         hs_jac->SetBlock(i, j, hs_mats(i, j));
+      }
+
    SparseMatrix *hs_jac_mono = hs_jac->CreateMonolithic();
    uu_mono = Add(*M, *hs_jac_mono);
    delete hs_jac_mono;
@@ -183,18 +205,33 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 */
 
 SteadyNSSolver::SteadyNSSolver()
-   : StokesSolver(), zeta_coeff(zeta)
+   : StokesSolver()
 {
    // StokesSolver reads viscosity from stokes/nu.
    nu = config.GetOption<double>("stokes/nu", 1.0);
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);
 
+   zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
+   zeta_coeff = new ConstantCoefficient(zeta);
+   minus_zeta = new ConstantCoefficient(-zeta);
+   minus_half_zeta = new ConstantCoefficient(-0.5 * zeta);
+
+   std::string oper_str = config.GetOption<std::string>("navier-stokes/operator-type", "base");
+   if (oper_str == "base")       oper_type = OperType::BASE;
+   else if (oper_str == "temam") oper_type = OperType::TEMAM;
+   else
+      mfem_error("SteadyNSSolver: unknown operator type!\n");
+
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 }
 
 SteadyNSSolver::~SteadyNSSolver()
 {
+   delete zeta_coeff;
+   delete minus_zeta;
+   delete minus_half_zeta;
+   delete nl_itf;
    DeletePointers(hs);
    // mumps is deleted by StokesSolver.
    // delete mumps;
@@ -236,12 +273,84 @@ void SteadyNSSolver::BuildDomainOperators()
    {
       hs[m] = new NonlinearForm(ufes[m]);
 
-      auto nl_integ = new VectorConvectionTrilinearFormIntegrator(zeta_coeff);
-      nl_integ->SetIntRule(ir_nl);
-      hs[m]->AddDomainIntegrator(nl_integ);
-      // if (full_dg)
-      //    hs[m]->AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+      switch (oper_type)
+      {
+         case OperType::BASE:
+         {
+            auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+            nl_integ->SetIntRule(ir_nl);
+            hs[m]->AddDomainIntegrator(nl_integ);
+         }
+         break;
+         case OperType::TEMAM:
+         {
+            auto nl_integ = new TemamTrilinearFormIntegrator(*zeta_coeff);
+            nl_integ->SetIntRule(ir_nl);
+            hs[m]->AddDomainIntegrator(nl_integ);
+            if (full_dg)
+            {
+               auto nl_face = new DGTemamFluxIntegrator(*minus_zeta);
+               // nl_face->SetIntRule(ir_nl);
+               hs[m]->AddInteriorFaceIntegrator(nl_face);
+            }
+         }
+         break;
+         default:
+            mfem_error("SteadyNSSolver: unknown operator type!\n");
+         break;
+      }
    }
+
+   if (oper_type == OperType::TEMAM)
+   {
+      nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
+      nl_itf->AddIntefaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
+      // nl_interface->SetIntRule(ir_nl);
+   }
+}
+
+void SteadyNSSolver::SetupRHSBCOperators()
+{
+   StokesSolver::SetupRHSBCOperators();
+
+   if (oper_type != OperType::TEMAM) return;
+
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(fs[m] && gs[m]);
+      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0) continue;
+         // TODO: Non-homogeneous Neumann stress bc
+         if (!BCExistsOnBdr(b)) continue;
+
+         fs[m]->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(*ud_coeffs[b], minus_half_zeta), *bdr_markers[b]);
+      }
+   }
+}
+
+void SteadyNSSolver::SetupDomainBCOperators()
+{
+   StokesSolver::SetupDomainBCOperators();
+
+   if (oper_type != OperType::TEMAM) return;
+
+   assert(hs.Size() == numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(hs[m]);
+      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0) continue;
+         
+         // homogeneous Neumann boundary condition
+         if (!BCExistsOnBdr(b))
+            hs[m]->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(*zeta_coeff), *bdr_markers[b]);
+      }
+   }
+   
 }
 
 void SteadyNSSolver::Assemble()
@@ -384,6 +493,7 @@ void SteadyNSSolver::Solve()
    double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
    int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
 
+   bool lbfgs = config.GetOption<bool>("solver/use_lbfgs", false);
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    std::string restart_file;
    if (use_restart)
@@ -410,7 +520,7 @@ void SteadyNSSolver::Solve()
    else
       sol_byvar = 0.0;
 
-   SteadyNSOperator oper(systemOp, hs, u_offsets, direct_solve);
+   SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);
 
    if (direct_solve)
    {
@@ -429,7 +539,10 @@ void SteadyNSSolver::Solve()
       J_solver = J_gmres;
    }
 
-   newton_solver = new NewtonSolver;
+   if (lbfgs)
+      newton_solver = new LBFGSSolver;
+   else
+      newton_solver = new NewtonSolver;
    newton_solver->SetSolver(*J_solver);
    newton_solver->SetOperator(oper);
    newton_solver->SetPrintLevel(print_level); // print Newton iterations
@@ -509,6 +622,9 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    const int num_basis = basis->NumCols();
    assert(basis->NumRows() >= nvdofs);
 
+   if (oper_type == OperType::TEMAM)
+      mfem_error("SteadyNSSolver: Temam Operator is not implemented for ROM yet!\n");
+
    DenseTensor *tensor = new DenseTensor(num_basis, num_basis, num_basis);
 
    Vector tmp(nvdofs), u_i, u_j, u_k;
@@ -523,7 +639,7 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
       VectorGridFunctionCoefficient ui_coeff(&ui_gf);
 
       NonlinearForm h_comp(fespace);
-      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(zeta_coeff, &ui_coeff);
+      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff, &ui_coeff);
       nl_integ_tmp->SetIntRule(ir_nl);
       h_comp.AddDomainIntegrator(nl_integ_tmp);
       // if (full_dg)

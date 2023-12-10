@@ -18,6 +18,7 @@ using namespace mfem;
 
 static double nu = 0.1;
 static double zeta = 1.0;
+static bool direct_solve = true;
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -27,6 +28,7 @@ double gFun(const Vector & x);
 double f_natural(const Vector & x);
 void dudx_ex(const Vector & x, Vector & y);
 void uux_ex(const Vector & x, Vector & y);
+void fvec_natural(const Vector & x, Vector & y);
 
 double error(Operator &M, Vector &x, Vector &b)
 {
@@ -77,21 +79,15 @@ private:
    // int maxIter=10000;
    // MINRESSolver *J_solver;
    bool pres_dbc = false;
-   mutable BlockDiagonalPreconditioner *jac_prec;
-   BilinearForm *pMass = NULL;
-   SparseMatrix *pM = NULL;
-   GSSmoother *p_prec = NULL;
-   OrthoSolver *ortho_p_prec = NULL;
 
    HYPRE_BigInt glob_size;
    mutable HYPRE_BigInt row_starts[2];
-   mutable HypreParMatrix *uu_hypre = NULL;
-   mutable HypreBoomerAMG *u_prec = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
 
 public:
    SteadyNavierStokes(BilinearForm *M_, MixedBilinearForm *S_, NonlinearForm *H_, bool pres_dbc_=false)
       : Operator(M_->Height() + S_->Height()), dim(M_->FESpace()->GetVDim()), M(M_), S(S_), H(H_), pres_dbc(pres_dbc_),
-        system_jac(NULL), mono_jac(NULL), uu(NULL)//, J_solver(new MINRESSolver())
+        system_jac(NULL), mono_jac(NULL), uu(NULL)
    { 
       block_offsets.SetSize(3);
       block_offsets = 0;
@@ -101,31 +97,10 @@ public:
 
       pu = &(S->SpMat());
       up = Transpose(*pu);
-
-      jac_prec = new BlockDiagonalPreconditioner(block_offsets);
-      pMass = new BilinearForm(S_->TestFESpace());
-      pMass->AddDomainIntegrator(new MassIntegrator);
-      pMass->Assemble();
-      pMass->Finalize();
-      // pMass->FormSystemMatrix(p_ess_tdof, Ph);
-      pM = &(pMass->SpMat());
-      p_prec = new GSSmoother(*pM);
-
-      if (!pres_dbc)
-      {
-         ortho_p_prec = new OrthoSolver;
-         ortho_p_prec->SetSolver(*p_prec);
-         ortho_p_prec->SetOperator(*pM);
-      }
-
-      if (pres_dbc)
-         jac_prec->SetDiagonalBlock(1, p_prec);
-      else
-         jac_prec->SetDiagonalBlock(1, ortho_p_prec);
       
-      glob_size = M_->NumRows();
+      glob_size = block_offsets.Last();
       row_starts[0] = 0;
-      row_starts[1] = M_->NumRows();
+      row_starts[1] = block_offsets.Last();
    }
 
    /// Compute y = H(x + dt (v + dt k)) + M k + S (v + dt k).
@@ -155,17 +130,14 @@ public:
       system_jac->SetBlock(0,1, up);
       system_jac->SetBlock(1,0, pu);
 
-      // update preconditioner.
-      delete u_prec;
-      delete uu_hypre;
-      uu_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, uu);
-      u_prec = new HypreBoomerAMG(*uu_hypre);
-      u_prec->SetPrintLevel(0);
-      u_prec->SetSystemsOptions(dim, true);
-      jac_prec->SetDiagonalBlock(0, u_prec);
-
       mono_jac = system_jac->CreateMonolithic();
-      return *mono_jac;
+      if (direct_solve)
+      {
+         jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, mono_jac);
+         return *jac_hypre;
+      }
+      else
+         return *mono_jac;
    }
 
    virtual ~SteadyNavierStokes()
@@ -174,13 +146,8 @@ public:
       delete mono_jac;
       delete uu;
       delete up;
-      delete jac_prec;
-      delete pMass;
-      delete p_prec;
-      delete ortho_p_prec;
+      delete jac_hypre;
    }
-
-   BlockDiagonalPreconditioner* GetGradientPreconditioner() { return jac_prec; }
 };
 
 int main(int argc, char *argv[])
@@ -214,6 +181,8 @@ int main(int argc, char *argv[])
                   "Use pressure Dirichlet condition.");
    args.AddOption(&use_dg, "-dg", "--use-dg", "-no-dg", "--no-use-dg",
                   "Use discontinuous Galerkin scheme.");
+   args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
+                  "Use discontinuous Galerkin scheme.");
    args.Parse();
    if (!args.Good())
    {
@@ -222,7 +191,7 @@ int main(int argc, char *argv[])
    }
    args.PrintOptions(cout);
 
-   assert(!pres_dbc);
+   // assert(!pres_dbc);
 
    // 3. Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
@@ -304,11 +273,12 @@ int main(int argc, char *argv[])
    // pfes->GetEssentialTrueDofs(p_ess_attr, p_ess_tdof);
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
-   ConstantCoefficient k(nu), zeta_coeff(zeta), half_zeta(0.5 * zeta), minus_half_zeta(-0.5 * zeta);
+   ConstantCoefficient k(nu), zeta_coeff(zeta), half_zeta(0.5 * zeta), minus_zeta(-zeta), minus_half_zeta(-0.5 * zeta);
    ConstantCoefficient minus_one(-1.0), one(1.0), half(0.5), minus_half(-0.5);
 
    VectorFunctionCoefficient fcoeff(dim, fFun);
    FunctionCoefficient fnatcoeff(f_natural);
+   VectorFunctionCoefficient fvecnatcoeff(dim*dim, fvec_natural);
    VectorFunctionCoefficient dudxcoeff(dim, dudx_ex);
    VectorFunctionCoefficient uuxcoeff(dim, uux_ex);
    FunctionCoefficient gcoeff(gFun);
@@ -341,8 +311,12 @@ int main(int argc, char *argv[])
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
-
    fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
+
+   if (use_dg)
+      fform->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
+   else
+      fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
 
    fform->Assemble();
    fform->SyncAliasMemory(rhs);
@@ -383,17 +357,19 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half_zeta);
-   auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
-   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(zeta_coeff);
+   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half_zeta);
+   // auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
+   // nlc_nlfi1->SetIntRule(&gll_ir_nl);
+   // nlc_nlfi2->SetIntRule(&gll_ir_nl);
+   // nVarf->AddDomainIntegrator(nlc_nlfi1);
+   // nVarf->AddDomainIntegrator(nlc_nlfi2);
+   auto *nlc_nlfi1 = new TemamTrilinearFormIntegrator(zeta_coeff);
    nlc_nlfi1->SetIntRule(&gll_ir_nl);
-   nlc_nlfi2->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi1);
-   nVarf->AddDomainIntegrator(nlc_nlfi2);
    if (use_dg)
       // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(half_zeta));
-   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(minus_half_zeta), u_ess_attr);
+      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
+   nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
    // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
@@ -426,94 +402,35 @@ int main(int argc, char *argv[])
 //    delete ntemp;
 // }
 
-   // btVarf->AddDomainIntegrator(new MixedScalarWeakGradientIntegrator);
-   // btVarf->Assemble();
-   // btVarf->Finalize();
-
-   // // A \ F2.
-   // SparseMatrix A;
-   // OperatorHandle Bh, Ph;
-   // Vector U1, F1;
-   // Vector P1, G1;
-   // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, A, U1, F1);
-
-   // // It turns out that we do not remove pressure dirichlet bc dofs from this matrix.
-   // // bVarf->FormRectangularLinearSystem(u_ess_tdof, p_ess_tdof, u, *gform, Bh, U1, G1);
-   // bVarf->FormRectangularLinearSystem(u_ess_tdof, empty, u, *gform, Bh, U1, G1);
-   // SparseMatrix &B(bVarf->SpMat());
-   // SparseMatrix *Bt = Transpose(B);
-
-   // BlockMatrix systemOp(vblock_offsets);
-
-   // systemOp.SetBlock(0,0, &A);
-   // systemOp.SetBlock(0,1, Bt);
-   // systemOp.SetBlock(1,0, &B);
-
-   // // SparseMatrix &M(mVarf->SpMat());
-   // HYPRE_BigInt glob_size = A.NumRows();
-   // HYPRE_BigInt row_starts[2] = {0, A.NumRows()};
-   // HypreParMatrix Aop(MPI_COMM_WORLD, glob_size, row_starts, &A);
-   // HypreBoomerAMG A_prec(Aop);
-   // A_prec.SetPrintLevel(0);
-   // A_prec.SetSystemsOptions(dim, true);
-
-   // BilinearForm pMass(pfes);
-   // pMass.AddDomainIntegrator(new MassIntegrator);
-   // pMass.Assemble();
-   // pMass.Finalize();
-   // pMass.FormSystemMatrix(p_ess_tdof, Ph);
-   // SparseMatrix &pM(pMass.SpMat());
-   // // HYPRE_BigInt glob_size_p = pM.NumRows();
-   // // HYPRE_BigInt row_starts_p[2] = {0, pM.NumRows()};
-   // // HypreParMatrix pMop(MPI_COMM_WORLD, glob_size_p, row_starts_p, &pM);
-   // // HypreBoomerAMG p_prec(pMop);
-   // // p_prec.SetPrintLevel(0);
-   // GSSmoother p_prec(pM);
-
-   // OrthoSolver *ortho_p_prec = new OrthoSolver;
-   // ortho_p_prec->SetSolver(p_prec);
-   // ortho_p_prec->SetOperator(pM);
-
-   // BlockDiagonalPreconditioner systemPrec(vblock_offsets);
-   // systemPrec.SetDiagonalBlock(0, &A_prec);
-   // if (pres_dbc)
-   //    systemPrec.SetDiagonalBlock(1, &p_prec);
-   // else
-   //    systemPrec.SetDiagonalBlock(1, ortho_p_prec);
-
-// {
-//    int maxIter(10000);
-//    double rtol(1.e-15);
-//    double atol(1.e-15);
-//    MINRESSolver solver;
-//    solver.SetAbsTol(atol);
-//    solver.SetRelTol(rtol);
-//    solver.SetMaxIter(maxIter);
-//    solver.SetOperator(systemOp);
-//    // solver.SetPreconditioner(systemPrec);
-//    solver.SetPrintLevel(1);
-//    solver.Mult(rhs, x);
-// }
-
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
-   BlockDiagonalPreconditioner *jac_prec = oper.GetGradientPreconditioner();
 {
    int maxIter(10000);
    double rtol(1.e-10);
    double atol(1.e-10);
 
-   // MINRESSolver J_solver;
-   GMRESSolver J_solver;
-   J_solver.SetAbsTol(atol);
-   J_solver.SetRelTol(rtol);
-   J_solver.SetMaxIter(maxIter);
-   // J_solver.SetOperator(systemOp);
-   // J_solver.SetPreconditioner(*jac_prec);
-   J_solver.SetPrintLevel(-1);
+   Solver *J_solver = NULL;
+   GMRESSolver *J_gmres = NULL;
+   MUMPSSolver *J_mumps = NULL;
+   if (direct_solve)
+   {
+      J_mumps = new MUMPSSolver;
+      J_mumps->SetPrintLevel(-1);
+      J_mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      J_solver = J_mumps;
+   }
+   else
+   {
+      J_gmres = new GMRESSolver;
+      J_gmres->SetAbsTol(atol);
+      J_gmres->SetRelTol(rtol);
+      J_gmres->SetMaxIter(maxIter);
+      J_gmres->SetPrintLevel(-1);
+      J_solver = J_gmres;
+   }
 
    NewtonSolver newton_solver;
    // newton_solver.iterative_mode = false;
-   newton_solver.SetSolver(J_solver);
+   newton_solver.SetSolver(*J_solver);
    newton_solver.SetOperator(oper);
    newton_solver.SetPrintLevel(1); // print Newton iterations
    newton_solver.SetRelTol(rtol);
@@ -525,6 +442,8 @@ int main(int argc, char *argv[])
    // p.ProjectCoefficient(pcoeff);
    newton_solver.Mult(rhs, x);
    
+   delete J_mumps;
+   delete J_gmres;
 }
 
    if (!pres_dbc)
@@ -548,46 +467,44 @@ int main(int argc, char *argv[])
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
    printf("|| p_h - p_ex || / || p_ex || = %.5E\n", err_p / norm_p);
 
-   // GridFunction tmp(u);
-   // nVarf->Mult(u, tmp);
-
-   // printf("u\ttmp\n");
-   // for (int k = 0; k < u.Size(); k++)
-   //    printf("%.5E\t%.5E\n", u[k], tmp[k]);
-
    // 15. Save data in the ParaView format
    ParaViewDataCollection paraview_dc("stokes_mms_paraview", mesh);
    // paraview_dc.SetPrefixPath("ParaView");
    paraview_dc.SetLevelsOfDetail(order);
-   // paraview_dc.SetCycle(0);
-//    paraview_dc.SetDataFormat(VTKFormat::BINARY);
-//    paraview_dc.SetHighOrderOutput(true);
-//    paraview_dc.SetTime(0.0); // set the time
+
+   // BlockVector res(vblock_offsets);
+   // Vector tmp(u_ex.Size() + p_ex.Size());
+   // tmp.SetVector(u_ex, 0);
+   // tmp.SetVector(p_ex, u_ex.Size());
+
+   // res = 0.0;
+   // oper.Mult(tmp, res);
+
+   // // 12. Create the grid functions u and p. Compute the L2 error norms.
+   // GridFunction res_u_ex, res_p_ex;
+   // res_u_ex.MakeRef(ufes, res.GetBlock(0), 0);
+   // res_p_ex.MakeRef(pfes, res.GetBlock(1), 0);
+   // paraview_dc.RegisterField("res_u_ex",&res_u_ex);
+   // paraview_dc.RegisterField("res_p_ex",&res_p_ex);
+
    paraview_dc.RegisterField("velocity",&u);
    paraview_dc.RegisterField("pressure",&p);
+   paraview_dc.RegisterField("u_ex",&u_ex);
+   paraview_dc.RegisterField("p_ex",&p_ex);
    paraview_dc.Save();
 
    // 17. Free the used memory.
    delete fform;
    delete gform;
-   // delete invM;
-   // delete invS;
-   // delete S;
-   // delete Bt;
-   // delete MinvBt;
    delete mVarf;
    delete bVarf;
    delete nVarf;
    delete fes;
    delete ufes;
    delete pfes;
-   // delete qfes;
    delete h1_coll;
    delete ph1_coll;
-   // delete W_space;
-   // delete R_space;
    delete l2_coll;
-   // delete hdiv_coll;
    delete mesh;
 
    return 0;
@@ -666,4 +583,24 @@ void uux_ex(const Vector & x, Vector & y)
    uFun_ex(x, y);
    y(1) *= - y(0);
    y(0) *= - y(0);
+}
+
+void fvec_natural(const Vector & x, Vector & y)
+{
+   assert(x.Size() == 2);
+   y.SetSize(x.Size() * x.Size());
+
+   double xi(x(0));
+   double yi(x(1));
+
+   // Grad u = du_i/dx_j - column-major order
+   y(0) = - sin(xi)*sin(yi);
+   y(1) = - cos(xi)*cos(yi);
+   y(2) = cos(xi)*cos(yi);
+   y(3) = sin(xi)*sin(yi);
+
+   y *= nu;
+
+   y(0) -= pFun_ex(x);
+   y(3) -= pFun_ex(x);
 }

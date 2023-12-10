@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "interfaceinteg.hpp"
+#include "etc.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -12,18 +13,20 @@ namespace mfem
 {
 
 void InterfaceNonlinearFormIntegrator::AssembleInterfaceVector(
-  const FiniteElement &el1, const FiniteElement &el2,
-  FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
-  const Vector &elfun, Vector &elvect)
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const Vector &elfun1, const Vector &elfun2,
+   Vector &elvect1, Vector &elvect2)
 {
    mfem_error("InterfaceNonlinearFormIntegrator::AssembleInterfaceVector\n"
              "   is not implemented for this class.");
 }
 
 void InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad(
-  const FiniteElement &el1, const FiniteElement &el2,
-  FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
-  const Vector &elfun, DenseMatrix &elmat)
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const Vector &elfun1, const Vector &elfun2,
+   Array2D<DenseMatrix*> &elmats)
 {
    mfem_error("InterfaceNonlinearFormIntegrator::AssembleInterfaceGrad\n"
              "   is not implemented for this class.");
@@ -43,6 +46,11 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
   Array2D<DenseMatrix*> &elmats)
 {
+   assert(elmats.NumRows() == 2);
+   assert(elmats.NumCols() == 2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) assert(elmats(i, j));
+
    bool boundary = false;
 
    int dim, ndof1, ndof2, ndofs;
@@ -80,11 +88,10 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
    assert(ndof2 > 0);
 
    ndofs = ndof1 + ndof2;
-   elmats.SetSize(2,2);
-   elmats(0,0) = new DenseMatrix(ndof1, ndof1);
-   elmats(0,1) = new DenseMatrix(ndof1, ndof2);
-   elmats(1,0) = new DenseMatrix(ndof2, ndof1);
-   elmats(1,1) = new DenseMatrix(ndof2, ndof2);
+   elmats(0,0)->SetSize(ndof1, ndof1);
+   elmats(0,1)->SetSize(ndof1, ndof2);
+   elmats(1,0)->SetSize(ndof2, ndof1);
+   elmats(1,1)->SetSize(ndof2, ndof2);
    for (int i = 0; i < 2; i++)
       for (int j = 0; j < 2; j++) *elmats(i,j) = 0.0;
    // elmat.SetSize(ndofs);
@@ -348,6 +355,9 @@ void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
          }  // for (int j = 0; j < ndofs1; j++)
       }  // for (int i = 0; i < ndofs2; i++)
    }  // not if (kappa_is_nonzero)
+
+   if (kappa_is_nonzero)
+      DeletePointers(jmats);
 }
 
 void InterfaceDGVectorDiffusionIntegrator::AssembleInterfaceMatrix(
@@ -355,6 +365,11 @@ void InterfaceDGVectorDiffusionIntegrator::AssembleInterfaceMatrix(
    FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
    Array2D<DenseMatrix*> &elmats)
 {
+   assert(elmats.NumRows() == 2);
+   assert(elmats.NumCols() == 2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) assert(elmats(i, j));
+
    const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
    const int ndofs2 = (Trans2.Elem1No >= 0) ? el2.GetDof() : 0;
@@ -366,15 +381,12 @@ void InterfaceDGVectorDiffusionIntegrator::AssembleInterfaceMatrix(
    //    < { mu grad(u) . n }, [v] >
    // But eventually, it's going to be replaced by:
    //    elmat := -elmat + alpha*elmat^T + jmat
-   elmats.SetSize(2,2);
-   elmats(0,0) = new DenseMatrix(nvdofs1, nvdofs1);
-   elmats(0,1) = new DenseMatrix(nvdofs1, nvdofs2);
-   elmats(1,0) = new DenseMatrix(nvdofs2, nvdofs1);
-   elmats(1,1) = new DenseMatrix(nvdofs2, nvdofs2);
+   elmats(0,0)->SetSize(nvdofs1, nvdofs1);
+   elmats(0,1)->SetSize(nvdofs1, nvdofs2);
+   elmats(1,0)->SetSize(nvdofs2, nvdofs1);
+   elmats(1,1)->SetSize(nvdofs2, nvdofs2);
    for (int i = 0; i < 2; i++)
       for (int j = 0; j < 2; j++) *elmats(i,j) = 0.0;
-   // elmat.SetSize(nvdofs);
-   // elmat = 0.0;
 
    const bool kappa_is_nonzero = (kappa != 0.0);
    jmats.SetSize(2,2);
@@ -575,6 +587,9 @@ void InterfaceDGVectorDiffusionIntegrator::AssembleInterfaceMatrix(
          }  // for (int j = 0; j < nvdofs1; j++)
       }  // for (int i = 0; i < nvdofs2; i++)
    }  // not if (kappa_is_nonzero)
+
+   if (kappa_is_nonzero)
+      DeletePointers(jmats);
 }
 
 // static method
@@ -622,6 +637,11 @@ void InterfaceDGNormalFluxIntegrator::AssembleInterfaceMatrix(
    FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
    Array2D<DenseMatrix *> &elmats)
 {
+   assert(elmats.NumRows() == 2);
+   assert(elmats.NumCols() == 2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) assert(elmats(i, j));
+
    dim = trial_fe1.GetDim();
    trial_dof1 = trial_fe1.GetDof();
    trial_vdof1 = dim * trial_dof1;
@@ -653,15 +673,12 @@ void InterfaceDGNormalFluxIntegrator::AssembleInterfaceMatrix(
    }
    assert((trial_dof2 > 0) && (test_dof2 > 0));
 
-   elmats.SetSize(2,2);
-   elmats(0,0) = new DenseMatrix(test_dof1, trial_vdof1);
-   elmats(0,1) = new DenseMatrix(test_dof1, trial_vdof2);
-   elmats(1,0) = new DenseMatrix(test_dof2, trial_vdof1);
-   elmats(1,1) = new DenseMatrix(test_dof2, trial_vdof2);
+   elmats(0,0)->SetSize(test_dof1, trial_vdof1);
+   elmats(0,1)->SetSize(test_dof1, trial_vdof2);
+   elmats(1,0)->SetSize(test_dof2, trial_vdof1);
+   elmats(1,1)->SetSize(test_dof2, trial_vdof2);
    for (int i = 0; i < 2; i++)
       for (int j = 0; j < 2; j++) *elmats(i,j) = 0.0;
-   // elmat.SetSize((test_dof1 + test_dof2), (trial_vdof1 + trial_vdof2));
-   // elmat = 0.0;
 
    // TODO: need to revisit this part for proper convergence rate.
    const IntegrationRule *ir = IntRule;
@@ -779,6 +796,185 @@ void InterfaceDGNormalFluxIntegrator::AssembleInterfaceMatrix(
          //    }
       }  // if (trial_dof2)
    }  // for (p = 0; p < ir->GetNPoints(); p++)
+}
+
+void InterfaceDGTemamFluxIntegrator::AssembleInterfaceVector(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const Vector &elfun1, const Vector &elfun2,
+   Vector &elvect1, Vector &elvect2)
+{
+   dim = el1.GetDim();
+   ndofs1 = el1.GetDof();
+   ndofs2 = el2.GetDof();
+   nvdofs1 = dim * ndofs1;
+   nvdofs2 = dim * ndofs2;
+   elvect1.SetSize(nvdofs1);
+   elvect2.SetSize(nvdofs2);
+
+   nor.SetSize(dim);
+   flux.SetSize(dim);
+
+   udof1.UseExternalData(elfun1.GetData(), ndofs1, dim);
+   elv1.UseExternalData(elvect1.GetData(), ndofs1, dim);
+   shape1.SetSize(ndofs1);
+   u1.SetSize(dim);
+   
+   udof2.UseExternalData(elfun2.GetData(), ndofs2, dim);
+   elv2.UseExternalData(elvect2.GetData(), ndofs2, dim);
+   shape2.SetSize(ndofs2);
+   u2.SetSize(dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // a simple choice for the integration order; is this OK?
+      const int order = (int)(ceil(1.5 * (2 * max(el1.GetOrder(), el2.GetOrder()) - 1)));
+      ir = &IntRules.Get(Tr1.GetGeometryType(), order);
+   }
+
+   elvect1 = 0.0; elvect2 = 0.0;
+   for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(pind);
+
+      // Set the integration point in the face and the neighboring elements
+      Tr1.SetAllIntPoints(&ip);
+      Tr2.SetAllIntPoints(&ip);
+
+      // Access the neighboring elements' integration points
+      // Note: eip2 will only contain valid data if Elem2 exists
+      const IntegrationPoint &eip1 = Tr1.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Tr2.GetElement1IntPoint();
+
+      el1.CalcShape(eip1, shape1);
+      udof1.MultTranspose(shape1, u1);
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip1.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr1.Jacobian(), nor);
+      }
+
+      el2.CalcShape(eip2, shape2);
+      udof2.MultTranspose(shape2, u2);
+
+      // 0.5 factor remains whether boundary or interior face.
+      w = 0.5 * ip.weight;
+      if (Q) { w *= Q->Eval(*Tr1.Elem1, eip1); }
+
+      nor *= w;
+      un = nor * u1;
+      flux.Set(un, u1);
+
+      // If interior face, two flux terms cancel out.
+      AddMultVWt(shape2, flux, elv2);
+      flux.Set(-un, u2);
+      AddMultVWt(shape1, flux, elv1);
+   }
+}
+
+void InterfaceDGTemamFluxIntegrator::AssembleInterfaceGrad(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const Vector &elfun1, const Vector &elfun2,
+   Array2D<DenseMatrix*> &elmats)
+{
+   assert(elmats.NumRows() == 2);
+   assert(elmats.NumCols() == 2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) assert(elmats(i, j));
+
+   dim = el1.GetDim();
+   ndofs1 = el1.GetDof();
+   ndofs2 = el2.GetDof();
+   nvdofs1 = dim * ndofs1;
+   nvdofs2 = dim * ndofs2;
+   elmats(0, 0)->SetSize(nvdofs1);
+   elmats(0, 1)->SetSize(nvdofs1, nvdofs2);
+   elmats(1, 0)->SetSize(nvdofs2, nvdofs1);
+   elmats(1, 1)->SetSize(nvdofs2);
+   elmat_comp11.SetSize(ndofs1);
+
+   nor.SetSize(dim);
+   flux.SetSize(dim);
+
+   udof1.UseExternalData(elfun1.GetData(), ndofs1, dim);
+   shape1.SetSize(ndofs1);
+   u1.SetSize(dim);  
+
+   udof2.UseExternalData(elfun2.GetData(), ndofs2, dim);
+   shape2.SetSize(ndofs2);
+   u2.SetSize(dim);
+
+   elmat_comp12.SetSize(ndofs1, ndofs2);
+   elmat_comp21.SetSize(ndofs2, ndofs1);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // a simple choice for the integration order; is this OK?
+      const int order = (int)(ceil(1.5 * (2 * max(el1.GetOrder(), el2.GetOrder()) - 1)));
+      ir = &IntRules.Get(Tr1.GetGeometryType(), order);
+   } 
+
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++) *(elmats(i, j)) = 0.0;
+
+   for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(pind);
+
+      // Set the integration point in the face and the neighboring elements
+      Tr1.SetAllIntPoints(&ip);
+      Tr2.SetAllIntPoints(&ip);
+
+      // Access the neighboring elements' integration points
+      // Note: eip2 will only contain valid data if Elem2 exists
+      const IntegrationPoint &eip1 = Tr1.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Tr2.GetElement1IntPoint();
+
+      el1.CalcShape(eip1, shape1);
+      udof1.MultTranspose(shape1, u1);
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip1.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr1.Jacobian(), nor);
+      }
+
+      el2.CalcShape(eip2, shape2);
+      udof2.MultTranspose(shape2, u2);
+
+      // 0.5 factor remains whether boundary or interior face.
+      w = 0.5 * ip.weight;
+      if (Q) { w *= Q->Eval(*Tr1.Elem1, eip1); }
+
+      nor *= w;
+      un = nor * u1;
+
+      MultVVt(shape1, elmat_comp11);
+      MultVWt(shape1, shape2, elmat_comp12);
+      elmat_comp21.Transpose(elmat_comp12);
+
+      for (int di = 0; di < dim; di++)
+      {
+         elmats(1, 0)->AddMatrix(un, elmat_comp21, di * ndofs2, di * ndofs1);
+         elmats(0, 1)->AddMatrix(-un, elmat_comp12, di * ndofs1, di * ndofs2);
+
+         for (int dj = 0; dj < dim; dj++)
+         {
+            elmats(1, 0)->AddMatrix(u1(di) * nor(dj), elmat_comp21, di * ndofs2, dj * ndofs1);
+            elmats(0, 0)->AddMatrix(-u2(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
+         }
+      }
+   }  // for (int pind = 0; pind < ir->GetNPoints(); ++pind)
 }
 
 }

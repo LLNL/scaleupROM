@@ -72,7 +72,7 @@ TEST(DDSerialTest, Test_full_dg)
    config.dict_["mesh"]["filename"] = "meshes/square.tri.mesh";
    config.dict_["discretization"]["full-discrete-galerkin"] = true;
    config.dict_["solver"]["direct_solve"] = true;
-   CheckConvergence(1.0);
+   CheckConvergence();
 
    return;
 }

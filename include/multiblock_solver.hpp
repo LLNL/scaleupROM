@@ -7,6 +7,7 @@
 
 #include "topology_handler.hpp"
 #include "interfaceinteg.hpp"
+#include "interface_form.hpp"
 #include "mfem.hpp"
 #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
@@ -162,19 +163,6 @@ public:
    // system-specific.
    virtual void AssembleInterfaceMatrixes() = 0;
 
-   // BilinearForm interface operator.
-   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
-      FiniteElementSpace *fes1, FiniteElementSpace *fes2,
-      InterfaceNonlinearFormIntegrator *interface_integ,
-      Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
-      
-   // MixedBilinearForm interface operator.
-   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
-      FiniteElementSpace *trial_fes1, FiniteElementSpace *trial_fes2,
-      FiniteElementSpace *test_fes1, FiniteElementSpace *test_fes2, 
-      InterfaceNonlinearFormIntegrator *interface_integ,
-      Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats);
-
    // Global ROM operator Loading.
    virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
    { rom_handler->LoadOperatorFromFile(input_prefix); }
@@ -186,6 +174,7 @@ public:
    void BuildROMElements();
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
    virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   // TODO(kevin): part of this can be transferred to InterfaceForm.
    virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
 
    void SaveROMElements(const std::string &filename);

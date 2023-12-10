@@ -11,6 +11,8 @@
 using namespace mfem;
 
 // A proxy Operator used for FOM Newton Solver.
+// TODO(kevin): used a hack of having SteadyNSSolver *solver.
+// Ultimately, we should implement InterfaceForm to pass, not the MultiBlockSolver itself.
 class SteadyNSOperator : public Operator
 {
 protected:
@@ -19,6 +21,7 @@ protected:
    mutable Vector x_u, y_u;
 
    Array<int> u_offsets, vblock_offsets;
+   InterfaceForm *nl_itf = NULL;
    Array<NonlinearForm *> hs;
    BlockOperator *Hop = NULL;
 
@@ -27,7 +30,7 @@ protected:
 
    // Jacobian matrix objects
    mutable BlockMatrix *system_jac = NULL;
-   mutable Array<SparseMatrix *> hs_mats;
+   mutable Array2D<SparseMatrix *> hs_mats;
    mutable BlockMatrix *hs_jac = NULL;
    mutable SparseMatrix *uu_mono = NULL;
    mutable SparseMatrix *mono_jac = NULL;
@@ -36,7 +39,8 @@ protected:
    HYPRE_BigInt sys_glob_size;
    mutable HYPRE_BigInt sys_row_starts[2];
 public:
-   SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, Array<int> &u_offsets_, const bool direct_solve_=true);
+   SteadyNSOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+                    Array<int> &u_offsets_, const bool direct_solve_=true);
 
    virtual ~SteadyNSOperator();
 
@@ -74,16 +78,27 @@ class SteadyNSSolver : public StokesSolver
 {
 
 friend class ParameterizedProblem;
+friend class SteadyNSOperator;
 
 protected:
+   enum OperType {
+      BASE,
+      TEMAM,
+      NUM_OPERTYPE
+   } oper_type = BASE;
+
    double zeta = 1.0;
-   ConstantCoefficient zeta_coeff;
+   ConstantCoefficient *zeta_coeff = NULL, *minus_zeta = NULL, *minus_half_zeta = NULL;
 
    // operator for nonlinear convection.
    Array<NonlinearForm *> hs;
    
    // integration rule for nonliear operator.
    const IntegrationRule *ir_nl = NULL;
+
+   // interface integrator
+   InterfaceForm *nl_itf = NULL;
+   mutable BlockVector xu_temp, yu_temp;
 
    // component ROM element for nonlinear convection.
    Array<DenseTensor *> comp_tensors, subdomain_tensors;
@@ -101,6 +116,9 @@ public:
 
    virtual void BuildOperators() override;
    virtual void BuildDomainOperators();
+
+   virtual void SetupRHSBCOperators() override;
+   virtual void SetupDomainBCOperators() override;
 
    virtual void Assemble();
 
