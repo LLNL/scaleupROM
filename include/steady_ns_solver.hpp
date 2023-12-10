@@ -81,6 +81,12 @@ friend class ParameterizedProblem;
 friend class SteadyNSOperator;
 
 protected:
+   enum OperType {
+      BASE,
+      TEMAM,
+      NUM_OPERTYPE
+   } oper_type = BASE;
+
    double zeta = 1.0;
    ConstantCoefficient *zeta_coeff = NULL, *minus_zeta = NULL, *minus_half_zeta = NULL;
 

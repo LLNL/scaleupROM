@@ -467,7 +467,7 @@ void CheckConvergence(const double &threshold)
       // reported convergence rate
       if (r > base_refine)
       {
-         EXPECT_TRUE(uconv_rate(r) > pow(2.0, 0.5 * (uorder + porder) + 1) - threshold);
+         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - threshold);
          EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - threshold);
       }
 

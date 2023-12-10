@@ -68,7 +68,7 @@ void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
    y = 0.0;
 
    Hop->Mult(x_u, y_u);
-   nl_itf->InterfaceAddMult(x_u, y_u);
+   if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u);
    linearOp->AddMult(x, y);
 }
 
@@ -99,7 +99,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
       }
 
    x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
-   nl_itf->InterfaceGetGradient(x_u, hs_mats);
+   if (nl_itf) nl_itf->InterfaceGetGradient(x_u, hs_mats);
 
    for (int i = 0; i < hs.Size(); i++)
       for (int j = 0; j < hs.Size(); j++)
@@ -217,6 +217,12 @@ SteadyNSSolver::SteadyNSSolver()
    minus_zeta = new ConstantCoefficient(-zeta);
    minus_half_zeta = new ConstantCoefficient(-0.5 * zeta);
 
+   std::string oper_str = config.GetOption<std::string>("navier-stokes/operator-type", "base");
+   if (oper_str == "base")       oper_type = OperType::BASE;
+   else if (oper_str == "temam") oper_type = OperType::TEMAM;
+   else
+      mfem_error("SteadyNSSolver: unknown operator type!\n");
+
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 }
 
@@ -267,25 +273,47 @@ void SteadyNSSolver::BuildDomainOperators()
    {
       hs[m] = new NonlinearForm(ufes[m]);
 
-      auto nl_integ = new TemamTrilinearFormIntegrator(*zeta_coeff);
-      nl_integ->SetIntRule(ir_nl);
-      hs[m]->AddDomainIntegrator(nl_integ);
-      if (full_dg)
+      switch (oper_type)
       {
-         auto nl_face = new DGTemamFluxIntegrator(*minus_zeta);
-         // nl_face->SetIntRule(ir_nl);
-         hs[m]->AddInteriorFaceIntegrator(nl_face);
+         case OperType::BASE:
+         {
+            auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+            nl_integ->SetIntRule(ir_nl);
+            hs[m]->AddDomainIntegrator(nl_integ);
+         }
+         break;
+         case OperType::TEMAM:
+         {
+            auto nl_integ = new TemamTrilinearFormIntegrator(*zeta_coeff);
+            nl_integ->SetIntRule(ir_nl);
+            hs[m]->AddDomainIntegrator(nl_integ);
+            if (full_dg)
+            {
+               auto nl_face = new DGTemamFluxIntegrator(*minus_zeta);
+               // nl_face->SetIntRule(ir_nl);
+               hs[m]->AddInteriorFaceIntegrator(nl_face);
+            }
+         }
+         break;
+         default:
+            mfem_error("SteadyNSSolver: unknown operator type!\n");
+         break;
       }
    }
 
-   nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
-   nl_itf->AddIntefaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
-   // nl_interface->SetIntRule(ir_nl);
+   if (oper_type == OperType::TEMAM)
+   {
+      nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
+      nl_itf->AddIntefaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
+      // nl_interface->SetIntRule(ir_nl);
+   }
 }
 
 void SteadyNSSolver::SetupRHSBCOperators()
 {
    StokesSolver::SetupRHSBCOperators();
+
+   if (oper_type != OperType::TEMAM) return;
 
    for (int m = 0; m < numSub; m++)
    {
@@ -305,6 +333,8 @@ void SteadyNSSolver::SetupRHSBCOperators()
 void SteadyNSSolver::SetupDomainBCOperators()
 {
    StokesSolver::SetupDomainBCOperators();
+
+   if (oper_type != OperType::TEMAM) return;
 
    assert(hs.Size() == numSub);
    for (int m = 0; m < numSub; m++)
@@ -591,6 +621,9 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    const int nvdofs = fespace->GetTrueVSize();
    const int num_basis = basis->NumCols();
    assert(basis->NumRows() >= nvdofs);
+
+   if (oper_type == OperType::TEMAM)
+      mfem_error("SteadyNSSolver: Temam Operator is not implemented for ROM yet!\n");
 
    DenseTensor *tensor = new DenseTensor(num_basis, num_basis, num_basis);
 

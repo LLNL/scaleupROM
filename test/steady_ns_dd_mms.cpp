@@ -69,7 +69,7 @@ TEST(DDSerialTest, Test_full_dg)
    config.dict_["discretization"]["order"] = 1;
    config.dict_["manufactured_solution"]["number_of_refinement"] = 3;
    config.dict_["solver"]["jacobian"]["max_iter"] = 20000;
-   // config.dict_["mesh"]["filename"] = "meshes/square.tri.mesh";
+   config.dict_["mesh"]["filename"] = "meshes/square.tri.mesh";
    config.dict_["discretization"]["full-discrete-galerkin"] = true;
    config.dict_["solver"]["direct_solve"] = true;
    CheckConvergence();
