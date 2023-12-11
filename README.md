@@ -11,7 +11,6 @@ scaleupROM is mainly built upon [MFEM](https://mfem.org/) and [libROM](https://w
 
 - Discontinuous Galerkin domain decomposition
 - Projection-based reduced order model
-- EQP for nonlinear partial differential equations
 - Supporting physics equations:
   - Poisson equation
   - Stokes flow
@@ -19,6 +18,7 @@ scaleupROM is mainly built upon [MFEM](https://mfem.org/) and [libROM](https://w
 ## Features to be added
 
 - Steady Navier-Stokes flow
+- EQP for nonlinear partial differential equations
 
 # Installation
 

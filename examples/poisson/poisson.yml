@@ -1,0 +1,33 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: false
+  solver: poisson
+
+mesh:
+  filename: meshes/test.2x2.mesh
+  # makes 64x64 quadrilateral elements
+  uniform_refinement: 5
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+visualization:
+  enabled: true
+  unified_paraview: true
+  file_path:
+    prefix: paraview_output
+
+parameterized_problem:
+  name: poisson0
+
+single_run:
+  poisson0:
+    k: 2.5
