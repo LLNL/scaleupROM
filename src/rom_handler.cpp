@@ -15,8 +15,9 @@ using namespace std;
 namespace mfem
 {
 
-ROMHandler::ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
-   : topol_handler(input_topol),
+ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+   : train_mode(train_mode_),
+     topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
      vdim(input_vdim),
      fom_num_vdofs(input_num_vdofs),
@@ -71,20 +72,21 @@ void ROMHandler::ParseInputs()
       }
    }
 
-   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
-   if (train_mode_str == "individual")
+   switch (train_mode)
    {
-      train_mode = TrainMode::INDIVIDUAL;
-      num_basis_sets = numSub;
-   }
-   else if (train_mode_str == "universal")
-   {
-      train_mode = TrainMode::UNIVERSAL;
-      num_basis_sets = topol_handler->GetNumComponents();
-   }
-   else
-   {
-      mfem_error("Unknown subdomain training mode!\n");
+      case TrainMode::INDIVIDUAL:
+      {
+         num_basis_sets = numSub;
+      }
+      break;
+      case TrainMode::UNIVERSAL:
+      {
+         num_basis_sets = topol_handler->GetNumComponents();
+      }
+      break;
+      default:
+         mfem_error("ROMHandler - subdomain training mode is not set!\n");
+      break;
    }
    
    const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
@@ -93,7 +95,8 @@ void ROMHandler::ParseInputs()
    assert(num_basis.Size() > 0);
 
    YAML::Node basis_list = config.FindNode("basis/tags");
-   if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
+   if ((!basis_list) && (num_basis_default <= 0))
+      mfem_error("TrainROM - cannot find the basis tag list!\n");
 
    for (int c = 0; c < num_basis_sets; c++)
    {
@@ -117,27 +120,6 @@ void ROMHandler::ParseInputs()
    
    for (int k = 0; k < num_basis.Size(); k++)
       assert(num_basis[k] > 0);
-
-   // component_sampling = config.GetOption<bool>("sample_generation/component_sampling", false);
-   // if ((train_mode == TrainMode::INDIVIDUAL) && component_sampling)
-   //    mfem_error("Component sampling is only supported with universal basis!\n");
-
-   // std::string proj_mode_str = config.GetOption<std::string>("model_reduction/projection_type", "lspg");
-   // if (proj_mode_str == "galerkin")
-   // {
-   //    proj_mode = ProjectionMode::GALERKIN;
-   // }
-   // else if (proj_mode_str == "lspg")
-   // {
-   //    proj_mode = ProjectionMode::LSPG;
-   // }
-   // else
-   // {
-   //    mfem_error("Unknown projection mode!\n");
-   // }
-
-   // if (proj_mode == ProjectionMode::LSPG)
-   //    save_lspg_basis = config.GetOption<bool>("model_reduction/lspg/save_lspg_basis", true);
 
    max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
@@ -474,8 +456,8 @@ void ROMHandler::GetBasisTags(std::vector<std::string> &basis_tags)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
-   : ROMHandler(input_topol, input_vdim, input_num_vdofs)
+MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+   : ROMHandler(train_mode_, input_topol, input_vdim, input_num_vdofs)
 {
    romMat = new BlockMatrix(rom_block_offsets);
    romMat->owns_blocks = true;

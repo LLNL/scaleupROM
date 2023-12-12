@@ -131,6 +131,12 @@ void MultiBlockSolver::ParseInputs()
    // rom inputs.
    use_rom = config.GetOption<bool>("main/use_rom", false);
 
+   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
+   if (train_mode_str == "individual")       train_mode = TrainMode::INDIVIDUAL;
+   else if (train_mode_str == "universal")   train_mode = TrainMode::UNIVERSAL;
+   else
+      mfem_error("Unknown subdomain training mode!\n");
+
    // save solution if single run.
    save_sol = config.GetOption<bool>("save_solution/enabled", false);
    if (save_sol)
@@ -254,7 +260,6 @@ void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fe
 void MultiBlockSolver::AllocateROMElements()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
    const int num_comp = topol_handler->GetNumComponents();
@@ -281,7 +286,6 @@ void MultiBlockSolver::AllocateROMElements()
 void MultiBlockSolver::BuildROMElements()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
@@ -304,7 +308,6 @@ void MultiBlockSolver::BuildROMElements()
 void MultiBlockSolver::SaveROMElements(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
    hid_t file_id;
@@ -423,7 +426,6 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
 void MultiBlockSolver::LoadROMElements(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
    hid_t file_id;
@@ -541,7 +543,6 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
 void MultiBlockSolver::AssembleROM()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
 
    const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
@@ -780,11 +781,11 @@ void MultiBlockSolver::InitROMHandler()
 
    if (rom_handler_str == "base")
    {
-      rom_handler = new ROMHandler(topol_handler, rom_vdim, num_vdofs);
+      rom_handler = new ROMHandler(train_mode, topol_handler, rom_vdim, num_vdofs);
    }
    else if (rom_handler_str == "mfem")
    {
-      rom_handler = new MFEMROMHandler(topol_handler, rom_vdim, num_vdofs);
+      rom_handler = new MFEMROMHandler(train_mode, topol_handler, rom_vdim, num_vdofs);
    }
    else
    {

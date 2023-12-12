@@ -92,7 +92,8 @@ protected:
 
    void ParseInputs();
 public:
-   ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+   ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
+              const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~ROMHandler();
 
@@ -188,7 +189,8 @@ protected:
    mfem::BlockVector *reduced_sol = NULL;
 
 public:
-   MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+   MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
+                  const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler();
 

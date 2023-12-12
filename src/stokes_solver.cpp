@@ -519,7 +519,6 @@ void StokesSolver::AssembleInterfaceMatrixes()
 void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
@@ -567,7 +566,6 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
@@ -619,7 +617,6 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
