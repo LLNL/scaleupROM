@@ -793,11 +793,19 @@ void MultiBlockSolver::InitROMHandler()
    }
 }
 
+void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
+{
+   // TODO: support variable-separate basis case.
+   basis_tags.resize(numSub);
+   for (int m = 0; m < numSub; m++)
+      basis_tags[m] = GetBasisTag(m, train_mode, topol_handler);
+}
+
 void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags)
 {
    // TODO: get offsets set by rom_handler.
    U_snapshots = new BlockVector(U->GetData(), domain_offsets); // View vector for U.
-   rom_handler->GetBasisTags(basis_tags);
+   GetBasisTags(basis_tags);
    assert(U_snapshots->NumBlocks() == basis_tags.size());
 }
 

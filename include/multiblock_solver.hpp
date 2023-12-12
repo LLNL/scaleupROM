@@ -207,6 +207,8 @@ public:
    void CopySolution(BlockVector *input_sol);
 
    void InitROMHandler();
+   void GetBasisTags(std::vector<std::string> &basis_tags);
+
    virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;

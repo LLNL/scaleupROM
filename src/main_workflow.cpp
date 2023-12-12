@@ -100,7 +100,6 @@ void GenerateSamples(MPI_Comm comm)
       sample_generator->SetSampleParams(s);
 
       test = InitSolver();
-      if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
       problem->SetSingleRun();

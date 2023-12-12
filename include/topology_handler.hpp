@@ -88,7 +88,7 @@ public:
    const int GetNumSubdomains(const int &c) { return sub_composition[c]; }
    const int GetNumComponents() { return num_comp; }
    const int GetNumPorts() { return num_ports; }
-   const int GetMeshType(const int &m) { return mesh_types[m]; }
+   const int GetMeshType(const int &m) const { return mesh_types[m]; }
    const int GetComponentIndexOfMesh(const int &m) { return mesh_comp_idx[m]; }
    const std::string GetComponentName(const int &c) const { return comp_names[c]; }
    const PortInfo* GetPortInfo(const int &k) { return &(port_infos[k]); }

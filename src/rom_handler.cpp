@@ -15,6 +15,47 @@ using namespace std;
 namespace mfem
 {
 
+const std::string GetBasisTagForComponent(
+   const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler)
+{
+   switch (train_mode)
+   {
+      case (INDIVIDUAL):   { return "dom" + std::to_string(comp_idx); break; }
+      case (UNIVERSAL):    { return topol_handler->GetComponentName(comp_idx); break; }
+      default:
+      {
+         mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
+         break;
+      }
+   }
+   return "";
+}
+
+const std::string GetBasisTag(
+   const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler)
+{
+   switch (train_mode)
+   {
+      case (INDIVIDUAL):
+      {
+         return "dom" + std::to_string(subdomain_index);
+         break;
+      }
+      case (UNIVERSAL):
+      {
+         int c_type = topol_handler->GetMeshType(subdomain_index);
+         return topol_handler->GetComponentName(c_type);
+         break;
+      }
+      default:
+      {
+         mfem_error("ROMHandler::GetBasisTag - Unknown training mode!\n");
+         break;
+      }
+   }
+   return "";
+}
+
 ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
    : train_mode(train_mode_),
      topol_handler(input_topol),
@@ -96,11 +137,11 @@ void ROMHandler::ParseInputs()
 
    YAML::Node basis_list = config.FindNode("basis/tags");
    if ((!basis_list) && (num_basis_default <= 0))
-      mfem_error("TrainROM - cannot find the basis tag list!\n");
+      mfem_error("ROMHandler - cannot find the basis tag list, nor default number of basis is not set!\n");
 
    for (int c = 0; c < num_basis_sets; c++)
    {
-      std::string basis_tag = GetBasisTagForComponent(c);
+      std::string basis_tag = GetBasisTagForComponent(c, train_mode, topol_handler);
 
       // Not so sure we need to explicitly list out all the needed basis tags here.
       for (int p = 0; p < basis_list.size(); p++)
@@ -181,7 +222,7 @@ void ROMHandler::LoadReducedBasis()
    carom_spatialbasis.SetSize(num_basis_sets);
    for (int k = 0; k < num_basis_sets; k++)
    {
-      basis_name = basis_prefix + "_" + GetBasisTagForComponent(k);
+      basis_name = basis_prefix + "_" + GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name);
 
       carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
@@ -375,53 +416,6 @@ void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
 
    romMat_inv->read(prefix);
    operator_loaded = true;
-}
-
-const std::string ROMHandler::GetBasisTagForComponent(const int &comp_idx)
-{
-   switch (train_mode)
-   {
-      case (INDIVIDUAL):   { return "dom" + std::to_string(comp_idx); break; }
-      case (UNIVERSAL):    { return topol_handler->GetComponentName(comp_idx); break; }
-      default:
-      {
-         mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
-         break;
-      }
-   }
-   return "";
-}
-
-const std::string ROMHandler::GetBasisTag(const int &subdomain_index)
-{
-   switch (train_mode)
-   {
-      case (INDIVIDUAL):
-      {
-         return "dom" + std::to_string(subdomain_index);
-         break;
-      }
-      case (UNIVERSAL):
-      {
-         int c_type = topol_handler->GetMeshType(subdomain_index);
-         return topol_handler->GetComponentName(c_type);
-         break;
-      }
-      default:
-      {
-         mfem_error("ROMHandler::GetBasisTag - Unknown training mode!\n");
-         break;
-      }
-   }
-   return "";
-}
-
-void ROMHandler::GetBasisTags(std::vector<std::string> &basis_tags)
-{
-   // TODO: support variable-separate basis case.
-   basis_tags.resize(numSub);
-   for (int m = 0; m < numSub; m++)
-      basis_tags[m] = GetBasisTag(m);
 }
 
 // void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)

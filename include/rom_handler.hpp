@@ -30,12 +30,8 @@ enum ROMBuildingLevel
    NUM_BLD_LVL
 };
 
-// enum ProjectionMode
-// {
-//    GALERKIN,
-//    LSPG,
-//    NUM_PROJMODE
-// };
+const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler);
+const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler);
 
 class ROMHandler
 {
@@ -144,10 +140,6 @@ public:
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(BlockMatrix *input_mat)
    { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
-
-   const std::string GetBasisTagForComponent(const int &comp_idx);
-   const std::string GetBasisTag(const int &subdomain_index);
-   void GetBasisTags(std::vector<std::string> &basis_tags);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
