@@ -12,3 +12,5 @@ file(COPY meshes/square-circle.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/poi
 file(COPY meshes/square-triangle.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/meshes)
 file(COPY meshes/square-star.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/meshes)
 file(COPY meshes/square-square.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/meshes)
+
+file(COPY poisson.sample.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
