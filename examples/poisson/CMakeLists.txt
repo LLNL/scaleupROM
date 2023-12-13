@@ -15,6 +15,7 @@ file(COPY meshes/square-square.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/poi
 
 file(COPY poisson.sample.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
 file(COPY poisson.sample.2d.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
+file(COPY poisson.sample.random.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
 file(COPY config/sample.config-01.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/config)
 file(COPY config/sample.config-02.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/config)
 file(COPY config/sample.config-03.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/config)
