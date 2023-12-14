@@ -20,3 +20,6 @@ file(COPY config/sample.config-01.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/po
 file(COPY config/sample.config-02.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/config)
 file(COPY config/sample.config-03.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/config)
 file(COPY config/sample.config-04.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson/config)
+
+file(COPY poisson.train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
+file(COPY poisson.train.dom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)

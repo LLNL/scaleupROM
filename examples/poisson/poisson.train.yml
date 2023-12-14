@@ -1,0 +1,68 @@
+main:
+  mode: train_rom
+  solver: poisson
+
+mesh:
+  type: component-wise
+  uniform_refinement: 2
+  component-wise:
+    global_config: "config/2x2_config.h5"
+    components:
+      - name: "empty"
+        file: "meshes/square.mesh"
+      - name: "square-circle"
+        file: "meshes/square-circle.mesh"
+      - name: "square-square"
+        file: "meshes/square-square.mesh"
+      - name: "square-triangle"
+        file: "meshes/square-triangle.mesh"
+      - name: "square-star"
+        file: "meshes/square-star.mesh"
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+visualization:
+  enabled: false
+
+parameterized_problem:
+  name: poisson0
+
+single_run:
+  poisson0:
+    k: 2.5
+
+sample_generation:
+  type: base
+  file_path:
+    prefix: "poisson0"
+  parameters:
+    - key: single_run/poisson0/k
+      type: double
+      sample_size: 3
+      minimum: 2.0
+      maximum: 3.0
+
+basis:
+  prefix: "poisson0"
+  number_of_basis: 3
+  tags:
+    - name: "empty"
+    - name: "square-circle"
+    - name: "square-square"
+    - name: "square-star"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+
+model_reduction:
+  rom_handler_type: mfem
+  # individual/universal
+  subdomain_training: universal
