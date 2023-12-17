@@ -23,3 +23,5 @@ file(COPY config/sample.config-04.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/po
 
 file(COPY poisson.train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
 file(COPY poisson.train.dom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
+
+file(COPY poisson.build.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
