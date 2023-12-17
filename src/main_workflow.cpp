@@ -199,13 +199,17 @@ void BuildROM(MPI_Comm comm)
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
-   test->Assemble();
    
    ROMHandler *rom = test->GetROMHandler();
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
    ROMBuildingLevel save_operator = rom->SaveOperator();
+
+   // NOTE(kevin): global operator required only for global rom operator.
+   if (save_operator == ROMBuildingLevel::GLOBAL)
+      test->Assemble();
+
    switch (topol_mode)
    {
       case TopologyHandlerMode::SUBMESH:
