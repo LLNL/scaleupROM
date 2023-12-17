@@ -1,6 +1,5 @@
 main:
-  mode: build_rom
-  use_rom: true
+  mode: single_run
   solver: poisson
 
 mesh:
@@ -38,16 +37,30 @@ parameterized_problem:
 
 single_run:
   poisson0:
-    k: 2.5
+    k: 2.12
+
+sample_generation:
+  type: base
+  file_path:
+    prefix: "poisson0"
+  parameters:
+    - key: single_run/poisson0/k
+      type: double
+      sample_size: 5
+      minimum: 2.0
+      maximum: 2.2
 
 basis:
   prefix: "poisson0"
-  number_of_basis: 3
+  number_of_basis: 5
   tags:
     - name: "empty"
     - name: "square-circle"
     - name: "square-square"
     - name: "square-star"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
   visualization:
     enabled: true
     prefix: "poisson0_basis"
@@ -57,5 +70,9 @@ model_reduction:
   # individual/universal
   subdomain_training: universal
   save_operator:
-    level: global
+    level: component
     prefix: rom_oper
+  compare_solution:
+    enabled: true
+  linear_solver_type: direct
+  linear_system_type: spd

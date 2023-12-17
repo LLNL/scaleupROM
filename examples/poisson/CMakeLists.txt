@@ -25,3 +25,5 @@ file(COPY poisson.train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
 file(COPY poisson.train.dom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
 
 file(COPY poisson.build.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
+
+file(COPY poisson.full.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/poisson)
