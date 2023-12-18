@@ -30,12 +30,8 @@ enum ROMBuildingLevel
    NUM_BLD_LVL
 };
 
-// enum ProjectionMode
-// {
-//    GALERKIN,
-//    LSPG,
-//    NUM_PROJMODE
-// };
+const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler);
+const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler);
 
 class ROMHandler
 {
@@ -92,7 +88,8 @@ protected:
 
    void ParseInputs();
 public:
-   ROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+   ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
+              const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~ROMHandler();
 
@@ -144,10 +141,6 @@ public:
    virtual void LoadOperator(BlockMatrix *input_mat)
    { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
 
-   const std::string GetBasisTagForComponent(const int &comp_idx);
-   const std::string GetBasisTag(const int &subdomain_index);
-   void GetBasisTags(std::vector<std::string> &basis_tags);
-
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
    { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
 
@@ -188,7 +181,8 @@ protected:
    mfem::BlockVector *reduced_sol = NULL;
 
 public:
-   MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+   MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
+                  const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
 
    virtual ~MFEMROMHandler();
 

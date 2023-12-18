@@ -100,7 +100,6 @@ void GenerateSamples(MPI_Comm comm)
       sample_generator->SetSampleParams(s);
 
       test = InitSolver();
-      if (!test->UseRom()) mfem_error("ROM must be enabled for sample generation!\n");
       test->InitVariables();
 
       problem->SetSingleRun();
@@ -164,6 +163,8 @@ void TrainROM(MPI_Comm comm)
          filename += "_snapshot";
          file_list.push_back(filename);
       }
+      if (file_list.size() > 1)
+         mfem_error("TrainROM - CAROM::BasisGenerator cannot take multiple snapshot files, shamefully.\n");
 
       sample_generator->FormReducedBasis(basis_prefix, basis_tag, file_list, num_basis);
    }  // for (int p = 0; p < basis_list.size(); p++)
@@ -198,13 +199,17 @@ void BuildROM(MPI_Comm comm)
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
-   test->Assemble();
    
    ROMHandler *rom = test->GetROMHandler();
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
    ROMBuildingLevel save_operator = rom->SaveOperator();
+
+   // NOTE(kevin): global operator required only for global rom operator.
+   if (save_operator == ROMBuildingLevel::GLOBAL)
+      test->Assemble();
+
    switch (topol_mode)
    {
       case TopologyHandlerMode::SUBMESH:

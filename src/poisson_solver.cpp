@@ -343,7 +343,6 @@ void PoissonSolver::AssembleInterfaceMatrixes()
 
 void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
@@ -368,7 +367,6 @@ void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 
 void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
@@ -400,7 +398,6 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   const TrainMode train_mode = rom_handler->GetTrainMode();
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 

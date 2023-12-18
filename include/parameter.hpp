@@ -47,6 +47,8 @@ public:
    virtual void SetRandomParam(InputParser &parser);
 };
 
+// TODO(kevin): technically we can extract IntegerParam from FilenameParam,
+//              and let FilenameParam inherit from it.
 class FilenameParam : public Parameter
 {
 protected:

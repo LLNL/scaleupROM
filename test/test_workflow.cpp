@@ -207,7 +207,9 @@ TEST(Stokes_Workflow, BaseIndividualTest)
       config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
    
    config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["main"]["use_rom"] = false;
    GenerateSamples(MPI_COMM_WORLD);
+   config.dict_["main"]["use_rom"] = true;
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
@@ -240,7 +242,9 @@ TEST(Stokes_Workflow, BaseUniversalTest)
    config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
    
    config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["main"]["use_rom"] = false;
    GenerateSamples(MPI_COMM_WORLD);
+   config.dict_["main"]["use_rom"] = true;
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
@@ -270,7 +274,9 @@ TEST(Stokes_Workflow, MFEMIndividualTest)
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
    config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["main"]["use_rom"] = false;
    GenerateSamples(MPI_COMM_WORLD);
+   config.dict_["main"]["use_rom"] = true;
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
@@ -309,7 +315,9 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
    
    config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["main"]["use_rom"] = false;
    GenerateSamples(MPI_COMM_WORLD);
+   config.dict_["main"]["use_rom"] = true;
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
@@ -335,7 +343,9 @@ TEST(Stokes_Workflow, ComponentWiseTest)
    printf("\nSample Generation \n\n");
    
    config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["main"]["use_rom"] = false;
    GenerateSamples(MPI_COMM_WORLD);
+   config.dict_["main"]["use_rom"] = true;
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);

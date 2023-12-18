@@ -85,6 +85,7 @@ protected:
 
    // rom variables.
    ROMHandler *rom_handler = NULL;
+   TrainMode train_mode = NUM_TRAINMODE;
    bool use_rom = false;
 
    // Used for bottom-up building, only with ComponentTopologyHandler.
@@ -113,6 +114,7 @@ public:
    const int GetDiscretizationOrder() const { return order; }
    const bool UseRom() const { return use_rom; }
    ROMHandler* GetROMHandler() const { return rom_handler; }
+   const TrainMode GetTrainMode() { return train_mode; }
    const bool IsVisualizationSaved() const { return save_visual; }
    const std::string GetSolutionFilePrefix() const { return sol_prefix; }
    const std::string GetVisualizationPrefix() const { return visual_prefix; }
@@ -205,6 +207,8 @@ public:
    void CopySolution(BlockVector *input_sol);
 
    void InitROMHandler();
+   void GetBasisTags(std::vector<std::string> &basis_tags);
+
    virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
    void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;

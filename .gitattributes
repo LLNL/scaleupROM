@@ -1,0 +1,11 @@
+examples/poisson/meshes/test.2x2.mesh filter=lfs diff=lfs merge=lfs -text
+examples/poisson/meshes/square-circle.mesh filter=lfs diff=lfs merge=lfs -text
+examples/poisson/meshes/square-square.mesh filter=lfs diff=lfs merge=lfs -text
+examples/poisson/meshes/square-star.mesh filter=lfs diff=lfs merge=lfs -text
+examples/poisson/meshes/square-triangle.mesh filter=lfs diff=lfs merge=lfs -text
+examples/poisson/meshes/square.mesh filter=lfs diff=lfs merge=lfs -text
+examples/poisson/config/2x2_config.h5 filter=lfs diff=lfs merge=lfs -text
+examples/poisson/config/sample.config-02.h5 filter=lfs diff=lfs merge=lfs -text
+examples/poisson/config/sample.config-03.h5 filter=lfs diff=lfs merge=lfs -text
+examples/poisson/config/sample.config-04.h5 filter=lfs diff=lfs merge=lfs -text
+examples/poisson/config/sample.config-01.h5 filter=lfs diff=lfs merge=lfs -text

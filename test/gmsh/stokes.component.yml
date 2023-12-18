@@ -88,7 +88,7 @@ model_reduction:
     prefix: "test.rom_elem"
   compare_solution:
     enabled: true
-  solver_type: minres
+  linear_solver_type: minres
 
 manufactured_solution:
   baseline_refinement: 1
