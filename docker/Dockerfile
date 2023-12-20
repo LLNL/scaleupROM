@@ -39,9 +39,9 @@ ENV MFEM_INCLUDES=${MFEM_DIR}
 WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/jbeder/yaml-cpp.git
 WORKDIR ./yaml-cpp/lib
-RUN cmake .. -DYAML_BUILD_SHARED_LIBS=on && make
-WORKDIR $LIB_DIR/yaml-cpp/include/yaml-cpp
-RUN sudo ln -s ./ yaml-cpp
+RUN cmake .. -DYAML_BUILD_SHARED_LIBS=on && make && sudo make install
+# WORKDIR $LIB_DIR/yaml-cpp/include/yaml-cpp
+# RUN sudo ln -s ./ yaml-cpp
 
 # flags for libROM cmake
 ENV YAML_DIR=$LIB_DIR/yaml-cpp

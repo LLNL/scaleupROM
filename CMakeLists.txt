@@ -84,8 +84,9 @@ find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
 find_path(MUMPS_INCLUDES dmumps_c.h "$ENV{MUMPS_DIR}/include")
 
 # yaml-cpp library
-find_library(YAML yaml-cpp HINTS "$ENV{YAML_DIR}/lib")
-find_path(YAML_INCLUDES yaml.h HINTS "$ENV{YAML_DIR}/include/yaml-cpp")
+find_package(yaml-cpp REQUIRED)
+# find_library(YAML yaml-cpp HINTS "$ENV{YAML_DIR}/lib")
+# find_path(YAML_INCLUDES yaml.h HINTS "$ENV{YAML_DIR}/include/yaml-cpp")
 
 # libROM
 find_library(LIBROM libROM.so HINTS "$ENV{LIBROM_DIR}/build/lib")
@@ -100,7 +101,6 @@ include_directories(
   ${HDF5_C_INCLUDE_DIRS}
   ${MPI_C_INCLUDE_DIRS}
   ${MFEM_C_INCLUDE_DIRS}
-  ${YAML_INCLUDES}
   ${LIBROM_INCLUDES}
 )
 link_libraries(
@@ -118,7 +118,7 @@ link_libraries(
   ${PARMETIS}
   ${METIS}
   ${MUMPS}
-  ${YAML}
+  yaml-cpp::yaml-cpp
   GTest::GTest
   ${LIBROM}
 )
