@@ -70,37 +70,30 @@ void DoubleParam::SetRandomParam(InputParser &parser)
 }
 
 /*
-   FilenameParam
+   IntegerParam
 */
 
-FilenameParam::FilenameParam(const std::string &input_key, YAML::Node option)
+IntegerParam::IntegerParam(const std::string &input_key, YAML::Node option)
    : Parameter(input_key),
-     format(config.GetRequiredOptionFromDict<std::string>("format", option)),
      minval(config.GetRequiredOptionFromDict<int>("minimum", option)),
      maxval(config.GetRequiredOptionFromDict<int>("maximum", option))
-   //   zero_pad(config.GetOptionFromDict<int>("zero_pad", 8, option))
 {}
 
-void FilenameParam::SetParam(const int &param_index, InputParser &parser)
+void IntegerParam::SetParam(const int &param_index, InputParser &parser)
 {
-   std::string filename = GetFilename(param_index);
+   int val = GetInteger(param_index);
 
-   parser.SetOption<std::string>(key, filename);
+   parser.SetOption<int>(key, val);
 }
 
-void FilenameParam::SetRandomParam(InputParser &parser)
+void IntegerParam::SetRandomParam(InputParser &parser)
 {
-   double range = static_cast<double>(maxval - minval + 1);
-   double realval = static_cast<double>(minval) + range * UniformRandom();
-   int val = std::floor(realval);
-   if (val > maxval) val = maxval;
+   int val = GetRandomInteger();
 
-   std::string filename = string_format(format, val);
-
-   parser.SetOption<std::string>(key, filename);
+   parser.SetOption<int>(key, val);
 }
 
-const std::string FilenameParam::GetFilename(const int &param_index)
+const int IntegerParam::GetInteger(const int &param_index)
 {
    assert(size > 0);
    assert((param_index >= 0) && (param_index < size));
@@ -110,5 +103,37 @@ const std::string FilenameParam::GetFilename(const int &param_index)
    int dp = (maxval - minval) / Np;
    val = minval + param_index * dp;
 
-   return string_format(format, val);
+   return val;
+}
+
+const int IntegerParam::GetRandomInteger()
+{
+   int val = UniformRandom(minval, maxval);
+
+   return val;
+}
+
+/*
+   FilenameParam
+*/
+
+FilenameParam::FilenameParam(const std::string &input_key, YAML::Node option)
+   : IntegerParam(input_key, option),
+     format(config.GetRequiredOptionFromDict<std::string>("format", option))
+{}
+
+void FilenameParam::SetParam(const int &param_index, InputParser &parser)
+{
+   int val = GetInteger(param_index);
+   std::string filename = string_format(format, val);
+
+   parser.SetOption<std::string>(key, filename);
+}
+
+void FilenameParam::SetRandomParam(InputParser &parser)
+{
+   int val = GetRandomInteger();
+   std::string filename = string_format(format, val);
+
+   parser.SetOption<std::string>(key, filename);
 }

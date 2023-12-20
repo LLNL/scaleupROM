@@ -164,7 +164,7 @@ void TrainROM(MPI_Comm comm)
          file_list.push_back(filename);
       }
       if (file_list.size() > 1)
-         mfem_error("TrainROM - CAROM::BasisGenerator cannot take multiple snapshot files, shamefully.\n");
+         mfem_warning("TrainROM - CAROM::BasisGenerator may not take multiple snapshot files.\n");
 
       sample_generator->FormReducedBasis(basis_prefix, basis_tag, file_list, num_basis);
    }  // for (int p = 0; p < basis_list.size(); p++)

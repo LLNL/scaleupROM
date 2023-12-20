@@ -47,24 +47,35 @@ public:
    virtual void SetRandomParam(InputParser &parser);
 };
 
-// TODO(kevin): technically we can extract IntegerParam from FilenameParam,
-//              and let FilenameParam inherit from it.
-class FilenameParam : public Parameter
+class IntegerParam : public Parameter
 {
 protected:
    int minval = -1;
    int maxval = -1;
+
+   const int GetInteger(const int &param_index);
+   const int GetRandomInteger();
+public:
+   IntegerParam(const std::string &input_key, YAML::Node option);
+   virtual ~IntegerParam() {}
+
+   virtual void SetParam(const int &param_index, InputParser &parser);
+   virtual void SetRandomParam(InputParser &parser);
+
+   virtual void SetMaximumSize() { SetSize(maxval - minval); }
+};
+
+class FilenameParam : public IntegerParam
+{
+protected:
    std::string format = "";
 
 public:
    FilenameParam(const std::string &input_key, YAML::Node option);
    virtual ~FilenameParam() {}
 
-   virtual void SetParam(const int &param_index, InputParser &parser);
-   virtual void SetRandomParam(InputParser &parser);
-
-   virtual const std::string GetFilename(const int &param_index);
-   virtual void SetMaximumSize() { SetSize(maxval - minval); }
+   virtual void SetParam(const int &param_index, InputParser &parser) override;
+   virtual void SetRandomParam(InputParser &parser) override;
 };
 
 #endif
