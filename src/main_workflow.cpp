@@ -157,6 +157,13 @@ void TrainROM(MPI_Comm comm)
       std::vector<std::string> file_list =
          config.GetOptionFromDict<std::vector<std::string>>(
             "snapshot_files", std::vector<std::string>(0), basis_list[p]);
+      YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_list[p]);
+      if (snapshot_format)
+      {
+         FilenameParam snapshot_param("", snapshot_format);
+         snapshot_param.ParseFilenames(file_list);
+      }
+
       if (file_list.size() == 0)
       {
          std::string filename = sample_generator->GetBaseFilename(sample_generator->GetSamplePrefix(), basis_tag);

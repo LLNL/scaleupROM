@@ -76,6 +76,7 @@ public:
 
    virtual void SetParam(const int &param_index, InputParser &parser) override;
    virtual void SetRandomParam(InputParser &parser) override;
+   void ParseFilenames(std::vector<std::string> &filenames);
 };
 
 #endif

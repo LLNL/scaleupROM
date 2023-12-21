@@ -137,3 +137,10 @@ void FilenameParam::SetRandomParam(InputParser &parser)
 
    parser.SetOption<std::string>(key, filename);
 }
+
+void FilenameParam::ParseFilenames(std::vector<std::string> &filenames)
+{
+   for (int k = minval; k <= maxval; k++)
+      filenames.push_back(string_format(format, k));
+   return;
+}
