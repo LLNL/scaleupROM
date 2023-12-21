@@ -5,7 +5,7 @@
 #ifndef INPUT_PARSER_HPP
 #define INPUT_PARSER_HPP
 
-#include "yaml.h"
+#include "yaml-cpp/yaml.h"
 #include "mfem.hpp"
 
 using namespace mfem;
