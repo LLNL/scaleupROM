@@ -38,21 +38,46 @@ endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 option(BUILD_SKETCHES "Build sketch files" OFF)
 
 # # Define variables for use in generating a configure file
-# if(GTEST_FOUND)
-#   set(CAROM_HAS_GTEST 1)
-# endif(GTEST_FOUND)
+set(LIB_DIR "" CACHE PATH "User-defined path to the directory that contains all the prerequisites.")
+set(MFEM_DIR "" CACHE PATH "User-defined path to mfem build.")
+set(HYPRE_DIR "" CACHE PATH "User-defined path to hypre.")
+set(METIS_DIR "" CACHE PATH "User-defined path to metis installation.")
+set(PARMETIS_DIR "" CACHE PATH "User-defined path to parmetis installtion.")
+set(MUMPS_DIR "" CACHE PATH "User-defined path to mumps.")
+set(YAML_DIR "" CACHE PATH "User-defined path to yaml-cpp installation.")
+set(LIBROM_DIR "" CACHE PATH "User-defined path to libROM source.")
 
-# if(BLAS_FOUND)
-#   set(CAROM_HAVE_BLAS 1)
-# endif(BLAS_FOUND)
+# If LIB_DIR is specified and prerequisite path is not specified,
+# then set a default path within LIB_DIR.
+if (NOT (LIB_DIR STREQUAL ""))
+  if (MFEM_DIR STREQUAL "")
+    set(MFEM_DIR "${LIB_DIR}/mfem/build")
+  endif()
 
-# if(LAPACK_FOUND)
-#   set(CAROM_HAVE_LAPACK 1)
-# endif(LAPACK_FOUND)
+  if (HYPRE_DIR STREQUAL "")
+    set(HYPRE_DIR "${LIB_DIR}/hypre")
+  endif()
 
-# if(HDF5_FOUND)
-#   set(CAROM_HAVE_HDF5 1)
-# endif(HDF5_FOUND)
+  if (METIS_DIR STREQUAL "")
+    set(METIS_DIR "${LIB_DIR}/metis-install")
+  endif()
+
+  if (PARMETIS_DIR STREQUAL "")
+    set(PARMETIS_DIR "${LIB_DIR}/parmetis-install")
+  endif()
+
+  if (MUMPS_DIR STREQUAL "")
+    set(MUMPS_DIR "${LIB_DIR}/mumps")
+  endif()
+
+  if (YAML_DIR STREQUAL "")
+    set(YAML_DIR "${LIB_DIR}/yaml-cpp-install")
+  endif()
+
+  if (LIBROM_DIR STREQUAL "")
+    set(LIBROM_DIR "${LIB_DIR}/libROM")
+  endif()
+endif()
 
 # List minimum version requirements for dependencies where possible to make
 # packaging easier later.
@@ -68,7 +93,7 @@ find_package(ZLIB 1.2.3 REQUIRED)
 
 find_package(Doxygen 1.8.5)
 
-find_package(GTest 1.6.0 REQUIRED)
+find_package(GTest 1.6.0)
 
 find_program(GMSH gmsh)
 
@@ -84,7 +109,7 @@ find_path(PARMETIS_INCLUDES metis.h "${METIS_DIR}/include" "${PARMETIS_DIR}/meti
 find_path(MUMPS_INCLUDES dmumps_c.h "${MUMPS_DIR}/include" "${MUMPS_DIR}/build/local/include" "$ENV{MUMPS_DIR}/include" "$ENV{MUMPS_DIR}/build/local/include")
 
 # yaml-cpp library
-find_package(yaml-cpp REQUIRED)
+find_package(yaml-cpp REQUIRED HINTS "${YAML_DIR}" "$ENV{YAML_DIR}")
 # find_library(YAML yaml-cpp HINTS "$ENV{YAML_DIR}/lib")
 # find_path(YAML_INCLUDES yaml.h HINTS "$ENV{YAML_DIR}/include/yaml-cpp")
 
@@ -119,7 +144,6 @@ link_libraries(
   ${METIS}
   ${MUMPS}
   yaml-cpp::yaml-cpp
-  GTest::GTest
   ${LIBROM}
 )
 
@@ -217,7 +241,10 @@ add_library(scaleupROMObj OBJECT ${scaleupROMObj_SOURCES})
 
 add_subdirectory(bin)
 add_subdirectory(utils)
-add_subdirectory(test)
+if (GTEST_FOUND)
+  link_libraries(GTest::GTest)
+  add_subdirectory(test)
+endif()
 add_subdirectory(examples)
 if(BUILD_SKETCHES)
   add_subdirectory(sketches)
