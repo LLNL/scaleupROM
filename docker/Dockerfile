@@ -35,7 +35,6 @@ RUN sudo -E make -j 16
 RUN sudo ln -s . include && sudo ln -s . lib
 
 ENV MFEM_DIR=$LIB_DIR/mfem/build
-ENV MFEM_INCLUDES=${MFEM_DIR}
 
 # install yaml-cpp
 WORKDIR $LIB_DIR
@@ -51,10 +50,8 @@ ENV YAML_DIR=$LIB_DIR/yaml-cpp
 # install libROM for scaleupROM
 WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/LLNL/libROM.git
-WORKDIR ./libROM
-# some minor revisions needed for scaleupROM, not merged yet into master branch.
-RUN sudo git pull
-WORKDIR ./build
+WORKDIR ./libROM/build
+# libROM is using the MFEM without MUMPS right now.
 RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=${USE_MFEM} -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
 RUN sudo make -j 16
 

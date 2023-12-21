@@ -73,15 +73,15 @@ find_package(GTest 1.6.0 REQUIRED)
 find_program(GMSH gmsh)
 
 # MFEM is required.
-find_library(MFEM mfem "$ENV{MFEM_DIR}/lib")
-find_library(HYPRE HYPRE "$ENV{HYPRE_DIR}/lib")
-find_library(PARMETIS parmetis "$ENV{PARMETIS_DIR}/lib")
-find_library(METIS metis "$ENV{METIS_DIR}/lib")
-find_library(MUMPS dmumps "$ENV{MUMPS_DIR}/lib")
-find_path(MFEM_INCLUDES mfem.hpp "$ENV{MFEM_DIR}/include")
-find_path(HYPRE_INCLUDES HYPRE.h "$ENV{HYPRE_DIR}/include")
-find_path(PARMETIS_INCLUDES metis.h "$ENV{PARMETIS_DIR}/metis/include")
-find_path(MUMPS_INCLUDES dmumps_c.h "$ENV{MUMPS_DIR}/include")
+find_library(MFEM mfem "${MFEM_DIR}" "${MFEM_DIR}/build" "${MFEM_DIR}/lib" "${MFEM_DIR}/build/lib" "$ENV{MFEM_DIR}" "$ENV{MFEM_DIR}/build" "$ENV{MFEM_DIR}/lib" "$ENV{MFEM_DIR}/build/lib")
+find_library(HYPRE HYPRE "${HYPRE_DIR}/lib" "${HYPRE_DIR}/src/hypre/lib" "$ENV{HYPRE_DIR}/lib" "$ENV{HYPRE_DIR}/src/hypre/lib")
+find_library(PARMETIS parmetis "${PARMETIS_DIR}/lib" "$ENV{PARMETIS_DIR}/lib")
+find_library(METIS metis "${METIS_DIR}/lib" "$ENV{METIS_DIR}/lib")
+find_library(MUMPS dmumps "${MUMPS_DIR}/lib" "${MUMPS_DIR}/build/local/lib" "$ENV{MUMPS_DIR}/lib" "$ENV{MUMPS_DIR}/build/local/lib")
+find_path(MFEM_INCLUDES mfem.hpp "${MFEM_DIR}" "${MFEM_DIR}/build" "${MFEM_DIR}/include" "${MFEM_DIR}/build/include" "$ENV{MFEM_DIR}" "$ENV{MFEM_DIR}/build" "$ENV{MFEM_DIR}/include" "$ENV{MFEM_DIR}/build/include")
+find_path(HYPRE_INCLUDES HYPRE.h "${HYPRE_DIR}/include" "${HYPRE_DIR}/src/hypre/include" "$ENV{HYPRE_DIR}/include" "$ENV{HYPRE_DIR}/src/hypre/include")
+find_path(PARMETIS_INCLUDES metis.h "${METIS_DIR}/include" "${PARMETIS_DIR}/metis/include" "$ENV{METIS_DIR}/include"  "$ENV{PARMETIS_DIR}/metis/include")
+find_path(MUMPS_INCLUDES dmumps_c.h "${MUMPS_DIR}/include" "${MUMPS_DIR}/build/local/include" "$ENV{MUMPS_DIR}/include" "$ENV{MUMPS_DIR}/build/local/include")
 
 # yaml-cpp library
 find_package(yaml-cpp REQUIRED)
@@ -89,8 +89,8 @@ find_package(yaml-cpp REQUIRED)
 # find_path(YAML_INCLUDES yaml.h HINTS "$ENV{YAML_DIR}/include/yaml-cpp")
 
 # libROM
-find_library(LIBROM libROM.so HINTS "$ENV{LIBROM_DIR}/build/lib")
-find_path(LIBROM_INCLUDES librom.h HINTS "$ENV{LIBROM_DIR}/lib")
+find_library(LIBROM libROM.so HINTS "${LIBROM_DIR}/build/lib" "$ENV{LIBROM_DIR}/build/lib")
+find_path(LIBROM_INCLUDES librom.h HINTS "${LIBROM_DIR}/lib" "$ENV{LIBROM_DIR}/lib")
 
 include_directories(
   include
