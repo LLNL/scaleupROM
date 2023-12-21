@@ -13,8 +13,10 @@ WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/scivision/mumps.git
 WORKDIR ./mumps
 RUN sudo git checkout v5.6.2.1
+RUN sudo wget -O cmake/FindMETIS.cmake https://github.com/LLNL/scaleupROM/raw/install/dependencies/FindMETIS.cmake
+# RUN sudo sed -i 's/if(parallel IN_LIST METIS_FIND_COMPONENTS)/if("parallel" IN_LIST METIS_FIND_COMPONENTS)/g' cmake/FindMETIS.cmake
+
 # RUN sudo sed -i 's/option(CMAKE_TLS_VERIFY "Verify TLS certificates" ON)/option(CMAKE_TLS_VERIFY "Verify TLS certificates" OFF)/g' options.cmake
-RUN sudo sed -i 's/if(parallel IN_LIST METIS_FIND_COMPONENTS)/if("parallel" IN_LIST METIS_FIND_COMPONENTS)/g' cmake/FindMETIS.cmake
 # # RUN sudo sed -i 's/TLS_VERIFY true/TLS_VERIFY false/g' cmake/mumps_src.cmake
 # RUN sudo sed -i '/NAMES parmetis/a PATHS "$ENV{PARMETIS_DIR}/lib"' cmake/FindMETIS.cmake
 # RUN sudo sed -i '/NAMES metis/a PATHS "$ENV{METIS_DIR}/lib"' cmake/FindMETIS.cmake
