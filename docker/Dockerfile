@@ -5,20 +5,22 @@ FROM ghcr.io/llnl/librom/librom_env:latest
 WORKDIR $LIB_DIR
 WORKDIR parmetis-4.0.3
 RUN sudo make install
+WORKDIR metis
+RUN sudo make config && sudo make && sudo make install
 
 # install mumps
 WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/scivision/mumps.git
 WORKDIR ./mumps
 RUN sudo git checkout v5.6.2.1
-RUN sudo sed -i 's/option(CMAKE_TLS_VERIFY "Verify TLS certificates" ON)/option(CMAKE_TLS_VERIFY "Verify TLS certificates" OFF)/g' options.cmake
-# RUN sudo sed -i 's/TLS_VERIFY true/TLS_VERIFY false/g' cmake/mumps_src.cmake
+# RUN sudo sed -i 's/option(CMAKE_TLS_VERIFY "Verify TLS certificates" ON)/option(CMAKE_TLS_VERIFY "Verify TLS certificates" OFF)/g' options.cmake
 RUN sudo sed -i 's/if(parallel IN_LIST METIS_FIND_COMPONENTS)/if("parallel" IN_LIST METIS_FIND_COMPONENTS)/g' cmake/FindMETIS.cmake
-RUN sudo sed -i '/NAMES parmetis/a PATHS "$ENV{PARMETIS_DIR}/lib"' cmake/FindMETIS.cmake
-RUN sudo sed -i '/NAMES metis/a PATHS "$ENV{METIS_DIR}/lib"' cmake/FindMETIS.cmake
-RUN sudo sed -i 's/set(metis_inc parmetis.h)/set(metis_inc metis.h)/g' cmake/FindMETIS.cmake
-RUN sudo sed -i '/NAMES ${metis_inc}/a PATHS "$ENV{PARMETIS_DIR}/metis/include"' cmake/FindMETIS.cmake
-RUN sudo -E cmake -B build -Dparmetis=YES -Dparallel=YES && sudo -E cmake --build build
+# # RUN sudo sed -i 's/TLS_VERIFY true/TLS_VERIFY false/g' cmake/mumps_src.cmake
+# RUN sudo sed -i '/NAMES parmetis/a PATHS "$ENV{PARMETIS_DIR}/lib"' cmake/FindMETIS.cmake
+# RUN sudo sed -i '/NAMES metis/a PATHS "$ENV{METIS_DIR}/lib"' cmake/FindMETIS.cmake
+# RUN sudo sed -i 's/set(metis_inc parmetis.h)/set(metis_inc metis.h)/g' cmake/FindMETIS.cmake
+# RUN sudo sed -i '/NAMES ${metis_inc}/a PATHS "$ENV{PARMETIS_DIR}/metis/include"' cmake/FindMETIS.cmake
+RUN sudo -E cmake -B build -Dparmetis=YES -Dparallel=YES -DCMAKE_TLS_VERIFY=OFF && sudo -E cmake --build build
 WORKDIR $LIB_DIR/MUMPS_5.2.0
 RUN sudo ln -s $LIB_DIR/mumps/build/_deps/mumps-src/include ./include && sudo ln -s $LIB_DIR/mumps/build ./lib
 
