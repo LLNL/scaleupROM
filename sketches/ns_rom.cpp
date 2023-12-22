@@ -1022,6 +1022,8 @@ int main(int argc, char *argv[])
          for (int d = 0; d < rom_sv->dim(); d++)
             printf("%.3E\t", rom_sv->item(d));
          printf("\n");
+         std::string sv_file = filename + "_sv.txt";
+         CAROM::PrintVector(*rom_sv, sv_file);
       }
       break;
       case (Mode::BUILD):
@@ -1388,10 +1390,6 @@ int main(int argc, char *argv[])
          }
 
          oper.SetupProblem();
-         oper.Solve();
-         const double fom_mult = oper.GetAvgMultTime();
-         const double fom_jac = oper.GetAvgGradTime();
-         const double fom_solve = oper.GetSolveTime();
 
          DenseMatrix basis, u_basis, ubasis, pbasis, basisM;
          if (wgt_basis)
@@ -1454,6 +1452,8 @@ int main(int argc, char *argv[])
             mfem::RtAP(basisM, *linear_term, basis, lin_rom);
          else
             mfem::RtAP(basis, *linear_term, basis, lin_rom);
+
+         PrintMatrix(*linear_term, filename+"_linop.txt");
 
          u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
 
@@ -1615,6 +1615,12 @@ int main(int argc, char *argv[])
          GridFunction *p_rom = new GridFunction;
          u_rom->MakeRef(ufes, sol, 0);
          p_rom->MakeRef(pfes, sol, ufes->GetVSize());
+
+         // FOM solve.
+         oper.Solve();
+         const double fom_mult = oper.GetAvgMultTime();
+         const double fom_jac = oper.GetAvgGradTime();
+         const double fom_solve = oper.GetSolveTime();
 
          // 12. Create the grid functions u and p. Compute the L2 error norms.
          GridFunction *u = oper.GetVelocityGridFunction();
