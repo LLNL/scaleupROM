@@ -24,7 +24,7 @@ static double nu = 0.1;
 static double zeta = 1.0;
 static bool direct_solve = true;
 
-enum Mode { MMS, SAMPLE, BUILD, COMPARE, NUM_MODE };
+enum Mode { MMS, SAMPLE, BUILD, COMPARE, PROJECT, NUM_MODE };
 enum RomMode { TENSOR, TENSOR2, EQP, NUM_ROMMODE };
 
 // Define the analytical solution and forcing terms / boundary conditions
@@ -838,6 +838,7 @@ int main(int argc, char *argv[])
    assert(!pres_dbc);
    if (!strcmp(mode_str, "mms"))             mode = Mode::MMS;
    else if (!strcmp(mode_str, "sample"))     mode = Mode::SAMPLE;
+   else if (!strcmp(mode_str, "project"))     mode = Mode::PROJECT;
    else if (!strcmp(mode_str, "build"))     mode = Mode::BUILD;
    else if (!strcmp(mode_str, "compare"))    mode = Mode::COMPARE;
    else
@@ -1024,6 +1025,77 @@ int main(int argc, char *argv[])
          printf("\n");
          std::string sv_file = filename + "_sv.txt";
          CAROM::PrintVector(*rom_sv, sv_file);
+      }
+      break;
+      case (Mode::PROJECT):
+      {
+         assert(nsample > 0);
+         assert(num_basis > 0);
+         if (wgt_basis)
+            mfem_error("not implemented for weighted basis!\n");
+
+         MixedBilinearFormDGExtension S(ufes, pfes);
+         ConstantCoefficient minus_one(-1.0);
+         S.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+         S.Assemble();
+         S.Finalize();
+         PrintMatrix(S.SpMat(), filename + "_div_op.txt");
+
+         DenseMatrix basis;
+         CAROM::BasisReader basis_reader(filename);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         CAROM::CopyMatrix(*carom_basis, basis);
+
+         const int fom_vdofs = oper.Height();
+
+         std::string res_filename = filename + "_res";
+         std::string proj_res_filename = filename + "_proj_res";
+         CAROM::Options option(fom_vdofs, nsample, 1, false);
+         CAROM::BasisGenerator sol_snapshot(option, false, filename + "_sol");
+         CAROM::BasisGenerator proj_sol_snapshot(option, false, filename + "_proj_sol");
+         CAROM::BasisGenerator residual_snapshot(option, false, res_filename);
+         CAROM::BasisGenerator proj_residual_snapshot(option, false, proj_res_filename);
+
+         for (int s = 0; s < nsample; s++)
+         {
+            for (int d = 0; d < problem::u0.Size(); d++)
+            {
+               problem::u0(d) = 2.0 * UniformRandom() - 1.0;
+               problem::du(d) = 0.1 * (2.0 * UniformRandom() - 1.0);
+               problem::offsets(d) = UniformRandom();
+
+               for (int d2 = 0; d2 < problem::u0.Size(); d2++)
+                  problem::k(d, d2) = 0.5 * (2.0 * UniformRandom() - 1.0);
+            }
+
+            SteadyNavierStokes fom(mesh, order, nu, zeta, use_dg, pres_dbc);
+            fom.SetupProblem();
+            bool converged = fom.Solve();
+            assert(converged);
+
+            BlockVector *fom_sol = fom.GetSolution();
+            BlockVector *fom_rhs = fom.GetRHS();
+            Vector tmp1(num_basis), fom_proj(fom_sol->Size()), fom_res(fom_sol->Size());
+            basis.MultTranspose(*fom_sol, tmp1);
+            basis.Mult(tmp1, fom_proj);
+
+            fom.Mult(fom_proj, fom_res);
+            fom_res -= (*fom_rhs);
+
+            Vector proj_res(fom_sol->Size());
+            basis.MultTranspose(fom_res, tmp1);
+            basis.Mult(tmp1, proj_res);
+
+            sol_snapshot.takeSample(fom_sol->GetData(), 0.0, 0.01);
+            proj_sol_snapshot.takeSample(fom_proj.GetData(), 0.0, 0.01);
+            residual_snapshot.takeSample(fom_res.GetData(), 0.0, 0.01);
+            proj_residual_snapshot.takeSample(proj_res.GetData(), 0.0, 0.01);
+         }
+
+         sol_snapshot.writeSnapshot();
+         proj_sol_snapshot.writeSnapshot();
+         residual_snapshot.writeSnapshot();
+         proj_residual_snapshot.writeSnapshot();
       }
       break;
       case (Mode::BUILD):
