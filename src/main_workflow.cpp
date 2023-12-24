@@ -113,7 +113,9 @@ void GenerateSamples(MPI_Comm comm)
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
-      test->Solve();
+      bool converged = test->Solve();
+      if (!converged)
+         mfem_error("A sample solution fails to converge!\n");
       test->SaveSolution(sol_file);
       test->SaveVisualization();
 

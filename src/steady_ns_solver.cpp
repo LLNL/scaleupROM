@@ -481,7 +481,7 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
       subdomain_tensors[m] = comp_tensors[rom_handler->GetBasisIndexForSubdomain(m)];
 }
 
-void SteadyNSSolver::Solve()
+bool SteadyNSSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
@@ -551,6 +551,7 @@ void SteadyNSSolver::Solve()
    newton_solver->SetMaxIter(maxIter);
 
    newton_solver->Mult(rhs_byvar, sol_byvar);
+   bool converged = newton_solver->GetConverged();
 
    // orthogonalize the pressure.
    if (!pres_dbc)
@@ -563,6 +564,8 @@ void SteadyNSSolver::Solve()
    }
 
    SortBySubdomains(sol_byvar, *U);
+
+   return converged;
 }
 
 void SteadyNSSolver::ProjectOperatorOnReducedBasis()
