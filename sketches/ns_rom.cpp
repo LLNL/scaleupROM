@@ -1034,10 +1034,30 @@ int main(int argc, char *argv[])
          if (wgt_basis)
             mfem_error("not implemented for weighted basis!\n");
 
-         MixedBilinearFormDGExtension S(ufes, pfes);
+         double sigma = -1.0, kappa = (order+2) * (order+2);
+         ConstantCoefficient nu_coeff(nu), zeta_coeff(zeta);
          ConstantCoefficient minus_one(-1.0);
+         const IntegrationRule *ir = oper.GetNonlinearIntRule();
+
+         BilinearForm M(ufes);
+         NonlinearForm H(ufes);
+         MixedBilinearFormDGExtension S(ufes, pfes);
+
+         M.AddDomainIntegrator(new VectorDiffusionIntegrator(nu_coeff));
+         if (use_dg)
+            M.AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(nu_coeff, sigma, kappa));
+
          S.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+         if (use_dg)
+            S.AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+
+         auto nl_integ = new VectorConvectionTrilinearFormIntegrator(zeta_coeff);
+         nl_integ->SetIntRule(ir);
+         H.AddDomainIntegrator(nl_integ);
+
+         M.Assemble();
          S.Assemble();
+         M.Finalize();
          S.Finalize();
          PrintMatrix(S.SpMat(), filename + "_div_op.txt");
 
@@ -1079,17 +1099,71 @@ int main(int argc, char *argv[])
             basis.MultTranspose(*fom_sol, tmp1);
             basis.Mult(tmp1, fom_proj);
 
-            fom.Mult(fom_proj, fom_res);
-            fom_res -= (*fom_rhs);
+            {
+               Vector x_u(fom_proj.GetData(), M.Height()), x_p(fom_proj.GetData()+M.Height(), S.Height());
+               Vector y_u(fom_res.GetData(), M.Height()), y_p(fom_res.GetData()+M.Height(), S.Height());
+
+               H.Mult(x_u, y_u);
+               M.AddMult(x_u, y_u);
+               S.AddMultTranspose(x_p, y_u);
+               S.Mult(x_u, y_p);
+            }
+            // fom.Mult(fom_proj, fom_res);
+            // fom_res -= (*fom_rhs);
 
             Vector proj_res(fom_sol->Size());
             basis.MultTranspose(fom_res, tmp1);
             basis.Mult(tmp1, proj_res);
 
+            int udim = fom_sol->GetBlock(0).Size();
+            int pdim = fom_sol->GetBlock(1).Size();
+            Vector fomsol_div(pdim), projsol_div(pdim), res_div(pdim), projres_div(pdim);
+            S.Mult(fom_sol->GetBlock(0), fomsol_div);
+            tmp1.MakeRef(fom_proj, 0, udim);
+            S.Mult(tmp1, projsol_div);
+            tmp1.MakeRef(fom_res, 0, udim);
+            S.Mult(tmp1, res_div);
+            tmp1.MakeRef(proj_res, 0, udim);
+            S.Mult(tmp1, projres_div);
+
             sol_snapshot.takeSample(fom_sol->GetData(), 0.0, 0.01);
             proj_sol_snapshot.takeSample(fom_proj.GetData(), 0.0, 0.01);
             residual_snapshot.takeSample(fom_res.GetData(), 0.0, 0.01);
             proj_residual_snapshot.takeSample(proj_res.GetData(), 0.0, 0.01);
+
+            Array<GridFunction *> ugf(4), pgf(4), divgf(4);
+            for (int k = 0; k < 4; k++) ugf[k] = new GridFunction;
+            for (int k = 0; k < 4; k++) pgf[k] = new GridFunction;
+            for (int k = 0; k < 4; k++) divgf[k] = new GridFunction;
+            ugf[0]->MakeRef(ufes, fom_sol->GetBlock(0), 0);
+            pgf[0]->MakeRef(pfes, fom_sol->GetBlock(1), 0);
+            divgf[0]->MakeRef(pfes, fomsol_div, 0);
+            ugf[1]->MakeRef(ufes, fom_proj, 0);
+            pgf[1]->MakeRef(pfes, fom_proj, fom_sol->GetBlock(0).Size());
+            divgf[1]->MakeRef(pfes, projsol_div, 0);
+            ugf[2]->MakeRef(ufes, fom_res, 0);
+            pgf[2]->MakeRef(pfes, fom_res, fom_sol->GetBlock(0).Size());
+            divgf[2]->MakeRef(pfes, res_div, 0);
+            ugf[3]->MakeRef(ufes, proj_res, 0);
+            pgf[3]->MakeRef(pfes, proj_res, fom_sol->GetBlock(0).Size());
+            divgf[3]->MakeRef(pfes, projres_div, 0);
+
+            std::vector<std::string> suffix(0);
+            suffix.push_back("_fomsol");
+            suffix.push_back("_projsol");
+            suffix.push_back("_fomres");
+            suffix.push_back("_projres");
+
+            // 15. Save data in the ParaView format
+            ParaViewDataCollection paraview_dc("ns_project_paraview_"+std::to_string(s), mesh);
+            paraview_dc.SetLevelsOfDetail(max(3,order+1));
+            for (int k = 0; k < 4; k++)
+            {
+               paraview_dc.RegisterField("u"+suffix[k], ugf[k]);
+               paraview_dc.RegisterField("p"+suffix[k], pgf[k]);
+               paraview_dc.RegisterField("div"+suffix[k], divgf[k]);
+            }
+            paraview_dc.Save();
          }
 
          sol_snapshot.writeSnapshot();
