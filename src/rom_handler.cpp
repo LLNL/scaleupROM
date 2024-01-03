@@ -698,7 +698,22 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
-   (*reduced_sol) = 0.0;
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   if (use_restart)
+   {
+      for (int i = 0; i < numSub; i++)
+      {
+         assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
+
+         DenseMatrix* basis_i;
+         GetBasisOnSubdomain(i, basis_i);
+
+         // Project from a FOM solution
+         basis_i->MultTranspose(U->GetBlock(i).GetData(), reduced_sol->GetBlock(i).GetData());
+      }
+   }
+   else
+      (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);

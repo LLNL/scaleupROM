@@ -613,6 +613,14 @@ void SteadyNSSolver::SolveROM()
    for (int m = 0; m < numSub; m++) assert(subdomain_tensors[m]);
 
    BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file;
+   if (use_restart)
+   {
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+      LoadSolution(restart_file);
+   }
+
    // NOTE(kevin): currently assumes direct solve.
    SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
    rom_handler->NonlinearSolve(rom_oper, &U_domain);
