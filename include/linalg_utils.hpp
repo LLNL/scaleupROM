@@ -114,13 +114,13 @@ public:
       height = op.Height();
       width = op.Width();
 
-      res.SetSize(height);
+      resvec.SetSize(height);
    }
 
    virtual void Mult(const Vector &rhs, Vector &sol) const;
 
 private:
-   mutable Vector res;
+   mutable Vector resvec;
    mutable Vector sol1, g, xi, xi1, h;
 
    double Objective(const Vector &rhs, const Vector &sol) const;

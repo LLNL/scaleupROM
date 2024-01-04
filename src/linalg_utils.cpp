@@ -589,22 +589,24 @@ void TensorAddScaledMultTranspose(const DenseTensor &tensor, const double w, con
 double CGOptimizer::Objective(const Vector &rhs, const Vector &sol) const
 {
    assert(oper);
-   oper->Mult(sol, res);
-   res -= rhs;
-   return (res * res);
+   resvec = 0.0;
+   oper->Mult(sol, resvec);
+   resvec -= rhs;
+   return (resvec * resvec);
 }
 
 void CGOptimizer::Gradient(const Vector &rhs, const Vector &sol, Vector &grad) const
 {
    assert(oper);
    grad.SetSize(sol.Size());
+   resvec = 0.0;
    grad = 0.0;
 
-   oper->Mult(sol, res);
-   res -= rhs;
-   res *= 2.0;
+   oper->Mult(sol, resvec);
+   resvec -= rhs;
+   resvec *= 2.0;
    Operator *jac = &(oper->GetGradient(sol));
-   jac->MultTranspose(res, grad);
+   jac->MultTranspose(resvec, grad);
    return;
 }
 
@@ -620,7 +622,7 @@ double CGOptimizer::Brent(const Vector &rhs, const Vector &xi, Vector &sol, doub
    J_brak[0] = Objective(rhs, sol);
    add(sol, b0, xi, sol1); // sol1 = sol + b0 * xi;
    double J1 = Objective(rhs, sol1);
-   while (J1 > J_brak[1])
+   while (J1 > J_brak[0])
    {
       b0 /= golden_ratio;
       add(sol, b0, xi, sol1); // sol1 = sol + b0 * xi;
@@ -696,6 +698,7 @@ void CGOptimizer::Mult(const Vector &rhs, Vector &sol) const
 
    double Jmin = Objective(rhs, sol);
    double res0 = sqrt(Jmin);
+   printf("Initial iteration: ||r|| = %.4E\n", res0);
 
    Gradient(rhs, sol, g);
 
