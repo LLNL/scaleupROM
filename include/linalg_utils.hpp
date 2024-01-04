@@ -93,6 +93,42 @@ void TensorAddMultTranspose(const DenseTensor &tensor, const Vector &x, const in
 // axis 1: M_{ki} += w * T_{ijk} * x_j
 void TensorAddScaledMultTranspose(const DenseTensor &tensor, const double w, const Vector &x, const int axis, DenseMatrix &M);
 
+class CGOptimizer : public OptimizationSolver
+{
+protected:
+   const double golden_ratio = 0.5 * (1.0 + sqrt(5.0));
+   const double Cr = 1.0 - 1. / golden_ratio;
+   const double ib = 0.1;
+   const double eps = 1.0e-14;
+
+   const int N_mnbrak = 1e4;
+   const int N_para = 1e4;
+
+public:
+   CGOptimizer() : OptimizationSolver() {}
+   virtual ~CGOptimizer() {}
+
+   virtual void SetOperator(const Operator &op) override
+   {
+      oper = &op;
+      height = op.Height();
+      width = op.Width();
+
+      res.SetSize(height);
+   }
+
+   virtual void Mult(const Vector &rhs, Vector &sol) const;
+
+private:
+   mutable Vector res;
+   mutable Vector sol1, g, xi, xi1, h;
+
+   double Objective(const Vector &rhs, const Vector &sol) const;
+   void Gradient(const Vector &rhs, const Vector &sol, Vector &grad) const;
+
+   double Brent(const Vector &rhs, const Vector &xi, Vector &sol, double b0 = 1e-1, double lin_tol = 1e-2) const;
+};
+
 }
 
 #endif
