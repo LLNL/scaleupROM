@@ -746,15 +746,33 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
       J_solver = iter_solver;
    }
 
-   NewtonSolver newton_solver;
-   newton_solver.SetSolver(*J_solver);
-   newton_solver.SetOperator(oper);
-   newton_solver.SetPrintLevel(print_level); // print Newton iterations
-   newton_solver.SetRelTol(rtol);
-   newton_solver.SetAbsTol(atol);
-   newton_solver.SetMaxIter(maxIter);
+   std::string nlin_solver = config.GetOption<std::string>("model_reduction/nonlinear_solver_type", "newton");
 
-   newton_solver.Mult(*reduced_rhs, *reduced_sol);
+   if (nlin_solver == "newton")
+   {
+      NewtonSolver newton_solver;
+      newton_solver.SetSolver(*J_solver);
+      newton_solver.SetOperator(oper);
+      newton_solver.SetPrintLevel(print_level); // print Newton iterations
+      newton_solver.SetRelTol(rtol);
+      newton_solver.SetAbsTol(atol);
+      newton_solver.SetMaxIter(maxIter);
+
+      newton_solver.Mult(*reduced_rhs, *reduced_sol);
+   }
+   else if (nlin_solver == "cg")
+   {
+      CGOptimizer optim;
+      optim.SetOperator(oper);
+      optim.SetPrintLevel(print_level); // print Newton iterations
+      optim.SetRelTol(rtol);
+      optim.SetAbsTol(atol);
+      optim.SetMaxIter(maxIter);
+
+      optim.Mult(*reduced_rhs, *reduced_sol);
+   }
+   else
+      mfem_error("MFEMROMHandler::NonlinearSolve- Unknown ROM nonlinear solver type!\n");
 
    for (int i = 0; i < numSub; i++)
    {
