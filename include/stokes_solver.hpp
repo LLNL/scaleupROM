@@ -197,12 +197,11 @@ public:
    // to ensure incompressibility for the problems with all velocity dirichlet bc.
    void SetComplementaryFlux(const Array<bool> nz_dbcs);
 
-private:
    // NOTE: Block Matrix does not own the offsets,
    // and will access to invalid memory if the offsets variable is destroyed.
    BlockMatrix* FormBlockMatrix(SparseMatrix* const m, SparseMatrix* const b, SparseMatrix* const bt,
                                 Array<int> &row_offsets, Array<int> &col_offsets);
-
+private:
    double ComputeBEFlux(const FiniteElement &el, ElementTransformation &Tr, VectorCoefficient &ud);
    double ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr, Coefficient &Q);
    void ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr,

@@ -8,7 +8,7 @@
 // #include "input_parser.hpp"
 // #include "hdf5_utils.hpp"
 // #include "linalg_utils.hpp"
-// #include "dg_bilinear.hpp"
+#include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
 #include "etc.hpp"
 
@@ -414,6 +414,221 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       rom_handler->GetBasis(c, basis);
       comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
    }  // for (int c = 0; c < num_comp; c++)
+
+   comp_mats_m.SetSize(num_comp);
+   comp_mats_b.SetSize(num_comp);
+   comp_mats_bt.SetSize(num_comp);
+   comp_mats_m = NULL;
+   comp_mats_b = NULL;
+   comp_mats_bt = NULL;
+   for (int c = 0; c < num_comp; c++)
+   {
+      const int fidx = c * num_var;
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+
+      BilinearForm m_comp(fes_comp[fidx]);
+      MixedBilinearFormDGExtension b_comp(fes_comp[fidx], fes_comp[fidx+1]);
+
+      m_comp.AddDomainIntegrator(new VectorDiffusionIntegrator(*nu_coeff));
+      if (full_dg)
+         m_comp.AddInteriorFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+
+      b_comp.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+      if (full_dg)
+         b_comp.AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+
+      m_comp.Assemble();
+      b_comp.Assemble();
+      m_comp.Finalize();      
+      b_comp.Finalize();
+
+      SparseMatrix *m_mat = &(m_comp.SpMat());
+      SparseMatrix *b_mat = &(b_comp.SpMat());
+      SparseMatrix *bt_mat = Transpose(*b_mat);
+
+      SparseMatrix m_zero(m_mat->NumRows(), m_mat->NumCols());
+      SparseMatrix b_zero(b_mat->NumRows(), b_mat->NumCols());
+      SparseMatrix bt_zero(bt_mat->NumRows(), bt_mat->NumCols());
+      m_zero.Finalize();
+      b_zero.Finalize();
+      bt_zero.Finalize();
+
+      Array<int> dummy1, dummy2;
+      BlockMatrix *sys_comp;
+      sys_comp = FormBlockMatrix(m_mat, &b_zero, &bt_zero, dummy1, dummy2);
+      comp_mats_m[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+      delete sys_comp;
+      sys_comp = FormBlockMatrix(&m_zero, b_mat, &bt_zero, dummy1, dummy2);
+      comp_mats_b[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+      delete sys_comp;
+      sys_comp = FormBlockMatrix(&m_zero, &b_zero, bt_mat, dummy1, dummy2);
+      comp_mats_bt[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+      delete sys_comp;
+
+      delete bt_mat;
+   }
+}
+
+void SteadyNSSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   StokesSolver::BuildBdrROMElement(fes_comp);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   bdr_mats_m.SetSize(num_comp);
+   bdr_mats_b.SetSize(num_comp);
+   bdr_mats_bt.SetSize(num_comp);
+   for (int c = 0; c < num_comp; c++)
+   {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      bdr_mats_m[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats_m[c]) = NULL;
+      bdr_mats_b[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats_b[c]) = NULL;
+      bdr_mats_bt[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats_bt[c]) = NULL;
+   }
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      const int fidx = c * num_var;
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      Array<SparseMatrix *> *bdr_mats_m_c = bdr_mats_m[c];
+      Array<SparseMatrix *> *bdr_mats_b_c = bdr_mats_b[c];
+      Array<SparseMatrix *> *bdr_mats_bt_c = bdr_mats_bt[c];
+
+      for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+      {
+         Array<int> bdr_marker(comp->bdr_attributes.Max());
+         bdr_marker = 0;
+         bdr_marker[comp->bdr_attributes[b] - 1] = 1;
+
+         BilinearForm m_comp(fes_comp[fidx]);
+         MixedBilinearFormDGExtension b_comp(fes_comp[fidx], fes_comp[fidx+1]);
+
+         m_comp.AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), bdr_marker);
+         b_comp.AddBdrFaceIntegrator(new DGNormalFluxIntegrator, bdr_marker);
+
+         m_comp.Assemble();
+         b_comp.Assemble();
+         m_comp.Finalize();      
+         b_comp.Finalize();
+
+         SparseMatrix *m_mat = &(m_comp.SpMat());
+         SparseMatrix *b_mat = &(b_comp.SpMat());
+         SparseMatrix *bt_mat = Transpose(*b_mat);
+
+         SparseMatrix m_zero(m_mat->NumRows(), m_mat->NumCols());
+         SparseMatrix b_zero(b_mat->NumRows(), b_mat->NumCols());
+         SparseMatrix bt_zero(bt_mat->NumRows(), bt_mat->NumCols());
+         m_zero.Finalize();
+         b_zero.Finalize();
+         bt_zero.Finalize();
+
+         Array<int> dummy1, dummy2;
+         BlockMatrix *sys_comp;
+         sys_comp = FormBlockMatrix(m_mat, &b_zero, &bt_zero, dummy1, dummy2);
+         (*bdr_mats_m_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+         delete sys_comp;
+         sys_comp = FormBlockMatrix(&m_zero, b_mat, &bt_zero, dummy1, dummy2);
+         (*bdr_mats_b_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+         delete sys_comp;
+         sys_comp = FormBlockMatrix(&m_zero, &b_zero, bt_mat, dummy1, dummy2);
+         (*bdr_mats_bt_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+         delete sys_comp;
+
+         delete bt_mat;
+      }
+   }
+}
+
+void SteadyNSSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
+{
+   StokesSolver::BuildInterfaceROMElement(fes_comp);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   Array<FiniteElementSpace *> ufes_comp(num_comp), pfes_comp(num_comp);
+   for (int c = 0; c < num_comp; c++)
+   {
+      ufes_comp[c] = fes_comp[c * num_var];
+      pfes_comp[c] = fes_comp[c * num_var + 1];
+   }
+
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+   port_mats_m.SetSize(num_ref_ports);
+   port_mats_b.SetSize(num_ref_ports);
+   port_mats_bt.SetSize(num_ref_ports);
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      port_mats_m[p] = new Array2D<SparseMatrix *>(2,2);
+      port_mats_b[p] = new Array2D<SparseMatrix *>(2,2);
+      port_mats_bt[p] = new Array2D<SparseMatrix *>(2,2);
+      (*port_mats_m[p]) = NULL;
+      (*port_mats_b[p]) = NULL;
+      (*port_mats_bt[p]) = NULL;
+   }
+
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      int c1, c2;
+      topol_handler->GetComponentPair(p, c1, c2);
+
+      Array<int> c_idx(2);
+      c_idx[0] = c1; c_idx[1] = c2;
+
+      Array2D<SparseMatrix *> m_mats_p(2,2), b_mats_p(2,2), bt_mats_p(2,2);
+      m_mats_p = NULL;
+      b_mats_p = NULL;
+      bt_mats_p = NULL;
+
+      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
+      // Need to use two copied instances.
+      m_itf->AssembleInterfaceMatrixAtPort(p, ufes_comp, m_mats_p);
+      b_itf->AssembleInterfaceMatrixAtPort(p, ufes_comp, pfes_comp, b_mats_p);
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+            // NOTE: the index also should be transposed.
+            bt_mats_p(j, i) = Transpose(*b_mats_p(i, j));
+
+      Array2D<SparseMatrix *> m_zero(2,2), b_zero(2,2), bt_zero(2,2);
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            m_zero(i, j) = new SparseMatrix(m_mats_p(i, j)->NumRows(), m_mats_p(i, j)->NumCols());
+            b_zero(i, j) = new SparseMatrix(b_mats_p(i, j)->NumRows(), b_mats_p(i, j)->NumCols());
+            bt_zero(i, j) = new SparseMatrix(bt_mats_p(i, j)->NumRows(), bt_mats_p(i, j)->NumCols());
+            m_zero(i, j)->Finalize();
+            b_zero(i, j)->Finalize();
+            bt_zero(i, j)->Finalize();
+         }
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            Array<int> dummy1, dummy2;
+            BlockMatrix *tmp_mat;
+            tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_zero(i,j), bt_zero(i,j), dummy1, dummy2);
+            (*port_mats_m[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat);
+            delete tmp_mat;
+            tmp_mat = FormBlockMatrix(m_zero(i,j), b_mats_p(i,j), bt_zero(i,j), dummy1, dummy2);
+            (*port_mats_b[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat);
+            delete tmp_mat;
+            tmp_mat = FormBlockMatrix(m_zero(i,j), b_zero(i,j), bt_mats_p(i,j), dummy1, dummy2);
+            (*port_mats_bt[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat);
+            delete tmp_mat;
+         }
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            delete m_mats_p(i, j);
+            delete b_mats_p(i, j);
+            delete bt_mats_p(i, j);
+            delete m_zero(i, j);
+            delete b_zero(i, j);
+            delete bt_zero(i, j);
+         }
+   }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
 void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
@@ -438,12 +653,80 @@ void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
 
       hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
 
+      hdf5_utils::WriteSparseMatrix(comp_grp_id, "domain_m", comp_mats_m[c]);
+      hdf5_utils::WriteSparseMatrix(comp_grp_id, "domain_b", comp_mats_b[c]);
+      hdf5_utils::WriteSparseMatrix(comp_grp_id, "domain_bt", comp_mats_bt[c]);
+
       errf = H5Gclose(comp_grp_id);
       assert(errf >= 0);
    }  // for (int c = 0; c < num_comp; c++)
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
+}
+
+void SteadyNSSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx)
+{
+   MultiBlockSolver::SaveBdrROMElement(comp_grp_id, comp_idx);
+   assert(comp_grp_id >= 0);
+   herr_t errf;
+   hid_t bdr_grp_id;
+   bdr_grp_id = H5Gopen2(comp_grp_id, "boundary", H5P_DEFAULT);
+   assert(bdr_grp_id >= 0);
+
+   const int num_bdr = bdr_mats[comp_idx]->Size();
+   
+   Array<SparseMatrix *> *bdr_mat_m = bdr_mats_m[comp_idx];
+   Array<SparseMatrix *> *bdr_mat_b = bdr_mats_b[comp_idx];
+   Array<SparseMatrix *> *bdr_mat_bt = bdr_mats_bt[comp_idx];
+   for (int b = 0; b < num_bdr; b++)
+   {
+      hdf5_utils::WriteSparseMatrix(bdr_grp_id, "m" + std::to_string(b), (*bdr_mat_m)[b]);
+      hdf5_utils::WriteSparseMatrix(bdr_grp_id, "b" + std::to_string(b), (*bdr_mat_b)[b]);
+      hdf5_utils::WriteSparseMatrix(bdr_grp_id, "bt" + std::to_string(b), (*bdr_mat_bt)[b]);
+   }
+
+   errf = H5Gclose(bdr_grp_id);
+   assert(errf >= 0);
+   return;
+}
+
+void SteadyNSSolver::SaveInterfaceROMElement(hid_t &file_id)
+{
+   MultiBlockSolver::SaveInterfaceROMElement(file_id);
+   assert(file_id >= 0);
+   herr_t errf;
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   const int num_ref_ports = topol_handler->GetNumRefPorts();
+   
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      hid_t port_grp_id;
+      port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
+      assert(port_grp_id >= 0);
+
+      Array2D<SparseMatrix *> *port_mat_m = port_mats_m[p];
+      Array2D<SparseMatrix *> *port_mat_b = port_mats_b[p];
+      Array2D<SparseMatrix *> *port_mat_bt = port_mats_bt[p];
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            std::string dset_name = std::to_string(i) + std::to_string(j);
+            hdf5_utils::WriteSparseMatrix(port_grp_id, "m" + dset_name, (*port_mat_m)(i,j));
+            hdf5_utils::WriteSparseMatrix(port_grp_id, "b" + dset_name, (*port_mat_b)(i,j));
+            hdf5_utils::WriteSparseMatrix(port_grp_id, "bt" + dset_name, (*port_mat_bt)(i,j));
+         }
+      
+      errf = H5Gclose(port_grp_id);
+      assert(errf >= 0);
+   }  // for (int p = 0; p < num_ref_ports; p++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+   return;
 }
 
 void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
@@ -453,6 +736,27 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
    comp_tensors = NULL;
+
+   comp_mats_m.SetSize(num_comp);
+   comp_mats_b.SetSize(num_comp);
+   comp_mats_bt.SetSize(num_comp);
+   comp_mats_m = NULL;
+   comp_mats_b = NULL;
+   comp_mats_bt = NULL;
+
+   bdr_mats_m.SetSize(num_comp);
+   bdr_mats_b.SetSize(num_comp);
+   bdr_mats_bt.SetSize(num_comp);
+   for (int c = 0; c < num_comp; c++)
+   {
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      bdr_mats_m[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats_m[c]) = NULL;
+      bdr_mats_b[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats_b[c]) = NULL;
+      bdr_mats_bt[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
+      (*bdr_mats_bt[c]) = NULL;
+   }
 
    hid_t grp_id;
    herr_t errf;
@@ -468,6 +772,12 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
       comp_tensors[c] = new DenseTensor;
       hdf5_utils::ReadDataset(comp_grp_id, "tensor", *comp_tensors[c]);
 
+      comp_mats_m[c] = hdf5_utils::ReadSparseMatrix(comp_grp_id, "domain_m");
+      comp_mats_b[c] = hdf5_utils::ReadSparseMatrix(comp_grp_id, "domain_b");
+      comp_mats_bt[c] = hdf5_utils::ReadSparseMatrix(comp_grp_id, "domain_bt");
+
+      LoadBdrROMElement2(comp_grp_id, c);
+
       errf = H5Gclose(comp_grp_id);
       assert(errf >= 0);
    }  // for (int c = 0; c < num_comp; c++)
@@ -479,6 +789,89 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
    subdomain_tensors = NULL;
    for (int m = 0; m < numSub; m++)
       subdomain_tensors[m] = comp_tensors[rom_handler->GetBasisIndexForSubdomain(m)];
+}
+
+void SteadyNSSolver::LoadBdrROMElement2(hid_t &comp_grp_id, const int &comp_idx)
+{
+   assert(comp_grp_id >= 0);
+   herr_t errf;
+   hid_t bdr_grp_id;
+   bdr_grp_id = H5Gopen2(comp_grp_id, "boundary", H5P_DEFAULT);
+   assert(bdr_grp_id >= 0);
+
+   int num_bdr;
+   hdf5_utils::ReadAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
+
+   Mesh *comp = topol_handler->GetComponentMesh(comp_idx);
+   assert(num_bdr == comp->bdr_attributes.Size());
+   assert(num_bdr = bdr_mats_m[comp_idx]->Size());
+   assert(num_bdr = bdr_mats_b[comp_idx]->Size());
+   assert(num_bdr = bdr_mats_bt[comp_idx]->Size());
+
+   Array<SparseMatrix *> *bdr_mat_m = bdr_mats_m[comp_idx];
+   Array<SparseMatrix *> *bdr_mat_b = bdr_mats_b[comp_idx];
+   Array<SparseMatrix *> *bdr_mat_bt = bdr_mats_bt[comp_idx];
+   for (int b = 0; b < num_bdr; b++)
+   {
+      (*bdr_mat_m)[b] = hdf5_utils::ReadSparseMatrix(bdr_grp_id, "m" + std::to_string(b));
+      (*bdr_mat_b)[b] = hdf5_utils::ReadSparseMatrix(bdr_grp_id, "b" + std::to_string(b));
+      (*bdr_mat_bt)[b] = hdf5_utils::ReadSparseMatrix(bdr_grp_id, "bt" + std::to_string(b));
+   }
+
+   errf = H5Gclose(bdr_grp_id);
+   assert(errf >= 0);
+   return;
+}
+
+void SteadyNSSolver::LoadInterfaceROMElement(hid_t &file_id)
+{
+   MultiBlockSolver::LoadInterfaceROMElement(file_id);
+   assert(file_id >= 0);
+   herr_t errf;
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   int num_ref_ports;
+   hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
+   assert(num_ref_ports == topol_handler->GetNumRefPorts());
+   port_mats_m.SetSize(num_ref_ports);
+   port_mats_b.SetSize(num_ref_ports);
+   port_mats_bt.SetSize(num_ref_ports);
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      port_mats_m[p] = new Array2D<SparseMatrix *>(2,2);
+      port_mats_b[p] = new Array2D<SparseMatrix *>(2,2);
+      port_mats_bt[p] = new Array2D<SparseMatrix *>(2,2);
+      (*port_mats_m[p]) = NULL;
+      (*port_mats_b[p]) = NULL;
+      (*port_mats_bt[p]) = NULL;
+   }
+
+   for (int p = 0; p < num_ref_ports; p++)
+   {
+      hid_t port_grp_id;
+      port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
+      assert(port_grp_id >= 0);
+
+      Array2D<SparseMatrix *> *port_mat_m = port_mats_m[p];
+      Array2D<SparseMatrix *> *port_mat_b = port_mats_b[p];
+      Array2D<SparseMatrix *> *port_mat_bt = port_mats_bt[p];
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            std::string dset_name = std::to_string(i) + std::to_string(j);
+            (*port_mat_m)(i,j) = hdf5_utils::ReadSparseMatrix(port_grp_id, "m" + dset_name);
+            (*port_mat_b)(i,j) = hdf5_utils::ReadSparseMatrix(port_grp_id, "b" + dset_name);
+            (*port_mat_bt)(i,j) = hdf5_utils::ReadSparseMatrix(port_grp_id, "bt" + dset_name);
+         }
+      
+      errf = H5Gclose(port_grp_id);
+      assert(errf >= 0);
+   }  // for (int p = 0; p < num_ref_ports; p++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
 }
 
 bool SteadyNSSolver::Solve()

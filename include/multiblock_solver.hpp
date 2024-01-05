@@ -183,15 +183,15 @@ public:
    // Save ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
    virtual void SaveCompBdrROMElement(hid_t &file_id);
-   void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   void SaveInterfaceROMElement(hid_t &file_id);
+   virtual void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   virtual void SaveInterfaceROMElement(hid_t &file_id);
 
    void LoadROMElements(const std::string &filename);
    // Load ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
    virtual void LoadCompBdrROMElement(hid_t &file_id);
-   void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   void LoadInterfaceROMElement(hid_t &file_id);
+   virtual void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
+   virtual void LoadInterfaceROMElement(hid_t &file_id);
 
    void AssembleROM();
 

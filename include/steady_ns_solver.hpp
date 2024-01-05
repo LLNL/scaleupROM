@@ -107,6 +107,12 @@ protected:
    GMRESSolver *J_gmres = NULL;
    NewtonSolver *newton_solver = NULL;
 
+   // debugging purpose.
+   // ROM projection of each matrix block.
+   Array<SparseMatrix *> comp_mats_m, comp_mats_b, comp_mats_bt;     // Size(num_components);
+   Array<Array<SparseMatrix *> *> bdr_mats_m, bdr_mats_b, bdr_mats_bt;
+   Array<Array2D<SparseMatrix *> *> port_mats_m, port_mats_b, port_mats_bt;   // reference ports.
+
 public:
    SteadyNSSolver();
 
@@ -126,10 +132,14 @@ public:
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
-   // virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
-   // virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
    virtual void SaveCompBdrROMElement(hid_t &file_id) override;
+   virtual void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx) override;
+   virtual void SaveInterfaceROMElement(hid_t &file_id) override;
    virtual void LoadCompBdrROMElement(hid_t &file_id) override;
+   void LoadBdrROMElement2(hid_t &comp_grp_id, const int &comp_idx);
+   virtual void LoadInterfaceROMElement(hid_t &file_id) override;
 
    virtual bool Solve();
 
