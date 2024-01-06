@@ -211,6 +211,8 @@ void SteadyNSTensorROM::MultComponent(const Vector &x) const
           res_m_bdr(x.Size()), res_b_bdr(x.Size()), res_bt_bdr(x.Size()),
           res_m_itf(x.Size()), res_b_itf(x.Size()), res_bt_itf(x.Size()),
           res_u(x.Size()), res_p(x.Size()), res_u_bdr(x.Size()), res_p_bdr(x.Size()), total(x.Size());
+   Vector res_mm(x.Size()), res_btt(x.Size());
+   res_mm = 0.0; res_btt = 0.0;
    res_m = 0.0; res_b = 0.0; res_bt = 0.0;
    res_m_bdr = 0.0; res_b_bdr = 0.0; res_bt_bdr = 0.0;
    res_m_itf = 0.0; res_b_itf = 0.0; res_bt_itf = 0.0;
@@ -235,12 +237,12 @@ void SteadyNSTensorROM::MultComponent(const Vector &x) const
    }
 
    res_u_bdr = res_m_bdr;
-   res_u_bdr += res_bt_bdr;
    res_u_bdr -= *f_rom;
    res_p_bdr = res_b_bdr;
    res_p_bdr -= *g_rom;
 
    res_u = res_u_bdr;
+   res_u += res_bt_bdr;
    res_u += res_m; res_u += res_bt;
    res_u += res_m_itf; res_u += res_bt_itf;
 
@@ -260,6 +262,19 @@ void SteadyNSTensorROM::MultComponent(const Vector &x) const
    printf("%.4E\t%.4E\t%.4E\t%.4E\t%.4E\n",
           sqrt(res_u_bdr*res_u_bdr), sqrt(res_p_bdr*res_p_bdr),
           sqrt(res_u*res_u), sqrt(res_p*res_p), sqrt(total*total));
+
+   res_mm = res_m_bdr; res_mm -= *f_rom; res_mm += res_m; res_mm += res_m_itf;
+   res_btt = res_bt_bdr; res_btt += res_bt; res_btt += res_bt_itf;
+   res_u -= res_mm; res_u -= res_btt;
+   printf("%10s\t%10s\t%s\n", "res_mm", "res_btt", "res_u - res_mm - res_btt");
+   printf("%.4E\t%.4E\t%.4E\n", sqrt(res_mm*res_mm), sqrt(res_btt*res_btt), sqrt(res_u*res_u));
+   res_u += res_mm; res_u += res_btt;
+   res_mm += res_btt;
+   printf("res_mm + res_btt: %.4E\n", sqrt(res_mm * res_mm));
+   printf("res_u: %.4E\n", sqrt(res_u * res_u));
+   res_mm -= res_u;
+   printf("res_u - res_u2: %.4E\n", sqrt(res_mm * res_mm));
+
 }
 
 /*
