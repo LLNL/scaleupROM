@@ -193,7 +193,7 @@ public:
    virtual void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
    virtual void LoadInterfaceROMElement(hid_t &file_id);
 
-   void AssembleROM();
+   virtual void AssembleROM();
 
    virtual bool Solve() = 0;
 

@@ -169,6 +169,8 @@ void SteadyNSTensorROM::Mult(const Vector &x, Vector &y) const
 
       TensorAddScaledContract(*hs[m], 1.0, x_comp, x_comp, y_comp);
    }
+
+   MultComponent(x);
 }
 
 Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
@@ -198,6 +200,66 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
    }
    else
       return *jac_mono;
+}
+
+void SteadyNSTensorROM::MultComponent(const Vector &x) const
+{
+   bool operator_loaded = romMat_m && romMat_b && romMat_bt && romMat_m_bdr && romMat_b_bdr && romMat_bt_bdr && romMat_m_itf && romMat_b_itf && romMat_bt_itf;
+   if (!operator_loaded) return;
+
+   Vector res_m(x.Size()), res_b(x.Size()), res_bt(x.Size()),
+          res_m_bdr(x.Size()), res_b_bdr(x.Size()), res_bt_bdr(x.Size()),
+          res_m_itf(x.Size()), res_b_itf(x.Size()), res_bt_itf(x.Size()),
+          res_u(x.Size()), res_p(x.Size()), res_u_bdr(x.Size()), res_p_bdr(x.Size()), total(x.Size());
+   res_m = 0.0; res_b = 0.0; res_bt = 0.0;
+   res_m_bdr = 0.0; res_b_bdr = 0.0; res_bt_bdr = 0.0;
+   res_m_itf = 0.0; res_b_itf = 0.0; res_bt_itf = 0.0;
+   res_u = 0.0; res_p = 0.0, res_u_bdr = 0.0; res_p_bdr = 0.0, total = 0.0;
+   
+   romMat_m->Mult(x, res_m);
+   romMat_b->Mult(x, res_b);
+   romMat_bt->Mult(x, res_bt);
+   romMat_m_bdr->Mult(x, res_m_bdr);
+   romMat_b_bdr->Mult(x, res_b_bdr);
+   romMat_bt_bdr->Mult(x, res_bt_bdr);
+   romMat_m_itf->Mult(x, res_m_itf);
+   romMat_b_itf->Mult(x, res_b_itf);
+   romMat_bt_itf->Mult(x, res_bt_itf);
+
+   for (int m = 0; m < hs.Size(); m++)
+   {
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+      y_comp.MakeRef(res_m, block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+
+      TensorAddScaledContract(*hs[m], 1.0, x_comp, x_comp, y_comp);
+   }
+
+   res_u_bdr = res_m_bdr;
+   res_u_bdr += res_bt_bdr;
+   res_u_bdr -= *f_rom;
+   res_p_bdr = res_b_bdr;
+   res_p_bdr -= *g_rom;
+
+   res_u = res_u_bdr;
+   res_u += res_m; res_u += res_bt;
+   res_u += res_m_itf; res_u += res_bt_itf;
+
+   res_p = res_p_bdr;
+   res_p += res_b; res_u += res_b_itf;
+
+   total = res_u; total += res_p;
+   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
+          "m_dom", "b_dom", "bt_dom", "m_bdr", "b_bdr", "bt_bdr", "m_itf", "b_itf", "bt_itf", "f_rom", "g_rom");
+   printf("%.4E\t%.4E\t%.4E\t%.4E\t%.4E\t%.4E\t%.4E\t%.4E\t%.4E\t%.4E\t%.4E\n",
+          sqrt(res_m*res_m), sqrt(res_b*res_b), sqrt(res_bt*res_bt),
+          sqrt(res_m_bdr*res_m_bdr), sqrt(res_b_bdr*res_b_bdr), sqrt(res_bt_bdr*res_bt_bdr),
+          sqrt(res_m_itf*res_m_itf), sqrt(res_b_itf*res_b_itf), sqrt(res_bt_itf*res_bt_itf),
+          sqrt((*f_rom)*(*f_rom)), sqrt((*g_rom)*(*g_rom)));
+   printf("%10s\t%10s\t%10s\t%10s\t%10s\n",
+          "res_u_bdr", "res_p_bdr", "res_u", "res_p", "total");
+   printf("%.4E\t%.4E\t%.4E\t%.4E\t%.4E\n",
+          sqrt(res_u_bdr*res_u_bdr), sqrt(res_p_bdr*res_p_bdr),
+          sqrt(res_u*res_u), sqrt(res_p*res_p), sqrt(total*total));
 }
 
 /*
@@ -244,6 +306,18 @@ SteadyNSSolver::~SteadyNSSolver()
       if (rom_handler->SaveOperator() != ROMBuildingLevel::COMPONENT)
          DeletePointers(subdomain_tensors);
    }
+
+   delete romMat_m;
+   delete romMat_b;
+   delete romMat_bt;
+   delete romMat_m_bdr;
+   delete romMat_b_bdr;
+   delete romMat_bt_bdr;
+   delete romMat_m_itf;
+   delete romMat_b_itf;
+   delete romMat_bt_itf;
+   delete f_rom;
+   delete g_rom;
 }
 
 void SteadyNSSolver::InitVariables()
@@ -874,6 +948,109 @@ void SteadyNSSolver::LoadInterfaceROMElement(hid_t &file_id)
    assert(errf >= 0);
 }
 
+void SteadyNSSolver::AssembleROM()
+{
+   MultiBlockSolver::AssembleROM();
+
+   const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
+   romMat_m = new BlockMatrix(*rom_block_offsets);
+   romMat_b = new BlockMatrix(*rom_block_offsets);
+   romMat_bt = new BlockMatrix(*rom_block_offsets);
+   romMat_m_bdr = new BlockMatrix(*rom_block_offsets);
+   romMat_b_bdr = new BlockMatrix(*rom_block_offsets);
+   romMat_bt_bdr = new BlockMatrix(*rom_block_offsets);
+   romMat_m_itf = new BlockMatrix(*rom_block_offsets);
+   romMat_b_itf = new BlockMatrix(*rom_block_offsets);
+   romMat_bt_itf = new BlockMatrix(*rom_block_offsets);
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+      {
+         const int ci = topol_handler->GetMeshType(i);
+         const int cj = topol_handler->GetMeshType(j);
+         int num_basis_i = rom_handler->GetNumBasis(ci);
+         int num_basis_j = rom_handler->GetNumBasis(cj);
+
+         romMat_m->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_b->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_bt->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_m_bdr->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_b_bdr->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_bt_bdr->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_m_itf->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_b_itf->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+         romMat_bt_itf->SetBlock(i, j, new SparseMatrix(num_basis_i, num_basis_j));
+      }
+
+   // component domain matrix.
+   for (int m = 0; m < numSub; m++)
+   {
+      int c_type = topol_handler->GetMeshType(m);
+      int num_basis = rom_handler->GetNumBasis(c_type);
+
+      romMat_m->GetBlock(m,m) += *(comp_mats_m[c_type]);
+      romMat_b->GetBlock(m,m) += *(comp_mats_b[c_type]);
+      romMat_bt->GetBlock(m,m) += *(comp_mats_bt[c_type]);
+
+      // boundary matrixes of each component.
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+      Array<SparseMatrix *> *bdr_mat_m = bdr_mats_m[c_type];
+      Array<SparseMatrix *> *bdr_mat_b = bdr_mats_b[c_type];
+      Array<SparseMatrix *> *bdr_mat_bt = bdr_mats_bt[c_type];
+
+      for (int b = 0; b < bdr_c2g->Size(); b++)
+      {
+         int global_idx = global_bdr_attributes.Find((*bdr_c2g)[b]);
+         if (global_idx < 0) continue;
+         if (!BCExistsOnBdr(global_idx)) continue;
+
+         romMat_m_bdr->GetBlock(m,m) += *(*bdr_mat_m)[b];
+         romMat_b_bdr->GetBlock(m,m) += *(*bdr_mat_b)[b];
+         romMat_bt_bdr->GetBlock(m,m) += *(*bdr_mat_bt)[b];
+      }
+   }
+
+   // interface matrixes.
+   for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+   {
+      const PortInfo *pInfo = topol_handler->GetPortInfo(p);
+      const int p_type = topol_handler->GetPortType(p);
+      Array2D<SparseMatrix *> *port_mat_m = port_mats_m[p_type];
+      Array2D<SparseMatrix *> *port_mat_b = port_mats_b[p_type];
+      Array2D<SparseMatrix *> *port_mat_bt = port_mats_bt[p_type];
+
+      const int m1 = pInfo->Mesh1;
+      const int m2 = pInfo->Mesh2;
+      const int c1 = topol_handler->GetMeshType(m1);
+      const int c2 = topol_handler->GetMeshType(m2);
+      const int num_basis1 = rom_handler->GetNumBasis(c1);
+      const int num_basis2 = rom_handler->GetNumBasis(c2);
+
+      Array<int> midx(2), num_basis(2);
+      midx[0] = m1;
+      midx[1] = m2;
+      num_basis[0] = num_basis1;
+      num_basis[1] = num_basis2;
+
+      for (int i = 0; i < 2; i++)
+         for (int j = 0; j < 2; j++)
+         {
+            romMat_m_itf->GetBlock(midx[i], midx[j]) += *((*port_mat_m)(i, j));
+            romMat_b_itf->GetBlock(midx[i], midx[j]) += *((*port_mat_b)(i, j));
+            romMat_bt_itf->GetBlock(midx[i], midx[j]) += *((*port_mat_bt)(i, j));
+         }
+   }
+
+   romMat_m->Finalize();
+   romMat_b->Finalize();
+   romMat_bt->Finalize();
+   romMat_m_bdr->Finalize();
+   romMat_b_bdr->Finalize();
+   romMat_bt_bdr->Finalize();
+   romMat_m_itf->Finalize();
+   romMat_b_itf->Finalize();
+   romMat_bt_itf->Finalize();
+}
+
 bool SteadyNSSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
@@ -1000,6 +1177,41 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
    }
 }
 
+void SteadyNSSolver::ProjectRHSOnReducedBasis()
+{
+   MultiBlockSolver::ProjectRHSOnReducedBasis();
+
+   f_rom = new BlockVector(*(rom_handler->GetBlockOffsets()));
+   g_rom = new BlockVector(*(rom_handler->GetBlockOffsets()));
+   (*f_rom) = 0.0;
+   (*g_rom) = 0.0;
+
+   BlockVector RHS_domain(RHS->GetData(), var_offsets); // View vector for RHS.
+
+   // Each basis is applied to the same column blocks.
+   Vector *from_block, *grom_block;
+   DenseMatrix* basis_i;
+   Array<int> offsets(3);
+   offsets[0] = 0;
+   for (int i = 0; i < numSub; i++)
+   {
+      offsets[1] = u_offsets[i+1] - u_offsets[i];
+      offsets[2] = p_offsets[i+1] - p_offsets[i];
+      offsets.PartialSum();
+
+      rom_handler->GetBasisOnSubdomain(i, basis_i);
+      from_block = &(f_rom->GetBlock(i));
+      grom_block = &(g_rom->GetBlock(i));
+      for (int c = 0; c < basis_i->NumCols(); c++)
+      {
+         BlockVector col(basis_i->GetColumn(c), offsets);
+
+         (*from_block)[c] += (col.GetBlock(0) * RHS_domain.GetBlock(0 + num_var * i));
+         (*grom_block)[c] += (col.GetBlock(1) * RHS_domain.GetBlock(1 + num_var * i));
+      }
+   }
+}
+
 void SteadyNSSolver::SolveROM()
 {
    assert(subdomain_tensors.Size() == numSub);
@@ -1016,6 +1228,17 @@ void SteadyNSSolver::SolveROM()
 
    // NOTE(kevin): currently assumes direct solve.
    SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
+   rom_oper.romMat_m = romMat_m;
+   rom_oper.romMat_b = romMat_b;
+   rom_oper.romMat_bt = romMat_bt;
+   rom_oper.romMat_m_bdr = romMat_m_bdr;
+   rom_oper.romMat_b_bdr = romMat_b_bdr;
+   rom_oper.romMat_bt_bdr = romMat_bt_bdr;
+   rom_oper.romMat_m_itf = romMat_m_itf;
+   rom_oper.romMat_b_itf = romMat_b_itf;
+   rom_oper.romMat_bt_itf = romMat_bt_itf;
+   rom_oper.f_rom = f_rom;
+   rom_oper.g_rom = g_rom;
    rom_handler->NonlinearSolve(rom_oper, &U_domain);
 }
 

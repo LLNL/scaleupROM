@@ -51,6 +51,12 @@ public:
 // A proxy Operator used for ROM Newton Solver.
 class SteadyNSTensorROM : public Operator
 {
+public:
+   BlockMatrix *romMat_m, *romMat_b, *romMat_bt,
+               *romMat_m_bdr, *romMat_b_bdr, *romMat_bt_bdr,
+               *romMat_m_itf, *romMat_b_itf, *romMat_bt_itf;
+   Vector *f_rom, *g_rom;
+
 protected:
    bool direct_solve;
 
@@ -72,6 +78,8 @@ public:
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;
+
+   void MultComponent(const Vector &x) const;
 };
 
 class SteadyNSSolver : public StokesSolver
@@ -112,6 +120,10 @@ protected:
    Array<SparseMatrix *> comp_mats_m, comp_mats_b, comp_mats_bt;     // Size(num_components);
    Array<Array<SparseMatrix *> *> bdr_mats_m, bdr_mats_b, bdr_mats_bt;
    Array<Array2D<SparseMatrix *> *> port_mats_m, port_mats_b, port_mats_bt;   // reference ports.
+   BlockMatrix *romMat_m = NULL, *romMat_b = NULL, *romMat_bt = NULL,
+               *romMat_m_bdr = NULL, *romMat_b_bdr = NULL, *romMat_bt_bdr = NULL,
+               *romMat_m_itf = NULL, *romMat_b_itf = NULL, *romMat_bt_itf = NULL;
+   BlockVector *f_rom = NULL, *g_rom = NULL;
 
 public:
    SteadyNSSolver();
@@ -141,9 +153,12 @@ public:
    void LoadBdrROMElement2(hid_t &comp_grp_id, const int &comp_idx);
    virtual void LoadInterfaceROMElement(hid_t &file_id) override;
 
+   virtual void AssembleROM() override;
+
    virtual bool Solve();
 
    virtual void ProjectOperatorOnReducedBasis();
+   virtual void ProjectRHSOnReducedBasis() override;
 
    virtual void SolveROM() override;
 
