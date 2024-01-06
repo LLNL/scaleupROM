@@ -889,6 +889,8 @@ int main(int argc, char *argv[])
    SteadyNavierStokes oper(mesh, order, nu, zeta, use_dg, pres_dbc);
    FiniteElementSpace *ufes = oper.GetUfes();
    FiniteElementSpace *pfes = oper.GetPfes();
+   const int udim = ufes->GetTrueVSize();
+   const int pdim = pfes->GetTrueVSize();
    const double pres_wgt = static_cast<double>(ufes->GetTrueVSize() / dim) / static_cast<double>(pfes->GetTrueVSize());
 
    switch (mode)
@@ -960,9 +962,14 @@ int main(int argc, char *argv[])
          const int fom_vdofs = oper.Height();
 
          CAROM::Options option(fom_vdofs, nsample, 1, false);
+         CAROM::Options u_option(udim, nsample, 1, false);
+         CAROM::Options p_option(pdim, nsample, 1, false);
          CAROM::BasisGenerator snapshot_generator(option, false, filename);
+         CAROM::BasisGenerator u_snapshot_generator(u_option, false, filename);
+         CAROM::BasisGenerator p_snapshot_generator(p_option, false, filename);
 
-         for (int s = 0; s < nsample; s++)
+         int s = 0;
+         while (s < nsample)
          {
             if (random_sample)
             {
@@ -992,17 +999,18 @@ int main(int argc, char *argv[])
             bool converged = temp.Solve();
             if (!converged)
             {
-               SteadyNavierStokes helper(mesh, order, 2.0 * nu, zeta, use_dg, pres_dbc);
-               helper.SetupProblem();
-               bool helper_converged = helper.Solve();
-               assert(helper_converged);
-               
-               temp.SetSolution(*(helper.GetSolution()));
-               converged = temp.Solve();
-               assert(converged);
+               if (random_sample)
+               {
+                  mfem_warning("Failed to converge in sampling. Collecting another sample.\n");
+                  continue;
+               }
+               else
+                  mfem_error("Failed to converge in sampling!\n");
             }
 
             snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
+            u_snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
+            p_snapshot_generator.takeSample(temp.GetSolution()->GetData() + udim, 0.0, 0.01);
 
             // GridFunction *u = temp.GetVelocityGridFunction();
             // GridFunction *p = temp.GetPressureGridFunction();
@@ -1013,17 +1021,39 @@ int main(int argc, char *argv[])
             // paraview_dc.RegisterField("velocity", u);
             // paraview_dc.RegisterField("pressure", p);
             // paraview_dc.Save();
-         }
+
+            s++;
+         }  // while (s < nsample)
 
          snapshot_generator.writeSnapshot();
-         snapshot_generator.endSamples();
+         u_snapshot_generator.writeSnapshot();
+         p_snapshot_generator.writeSnapshot();
 
+         snapshot_generator.endSamples();
          const CAROM::Vector *rom_sv = snapshot_generator.getSingularValues();
          printf("Singular values: ");
          for (int d = 0; d < rom_sv->dim(); d++)
             printf("%.3E\t", rom_sv->item(d));
          printf("\n");
          std::string sv_file = filename + "_sv.txt";
+         CAROM::PrintVector(*rom_sv, sv_file);
+
+         u_snapshot_generator.endSamples();
+         rom_sv = u_snapshot_generator.getSingularValues();
+         printf("Velocity Singular values: ");
+         for (int d = 0; d < rom_sv->dim(); d++)
+            printf("%.3E\t", rom_sv->item(d));
+         printf("\n");
+         sv_file = filename + "_vel_sv.txt";
+         CAROM::PrintVector(*rom_sv, sv_file);
+
+         p_snapshot_generator.endSamples();
+         rom_sv = p_snapshot_generator.getSingularValues();
+         printf("Pressure Singular values: ");
+         for (int d = 0; d < rom_sv->dim(); d++)
+            printf("%.3E\t", rom_sv->item(d));
+         printf("\n");
+         sv_file = filename + "_pres_sv.txt";
          CAROM::PrintVector(*rom_sv, sv_file);
       }
       break;
@@ -1115,8 +1145,6 @@ int main(int argc, char *argv[])
             basis.MultTranspose(fom_res, tmp1);
             basis.Mult(tmp1, proj_res);
 
-            int udim = fom_sol->GetBlock(0).Size();
-            int pdim = fom_sol->GetBlock(1).Size();
             Vector fomsol_div(pdim), projsol_div(pdim), res_div(pdim), projres_div(pdim);
             S.Mult(fom_sol->GetBlock(0), fomsol_div);
             tmp1.MakeRef(fom_proj, 0, udim);
