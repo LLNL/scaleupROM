@@ -25,7 +25,7 @@ static double zeta = 1.0;
 static bool direct_solve = true;
 
 enum Mode { MMS, SAMPLE, BUILD, COMPARE, PROJECT, NUM_MODE };
-enum RomMode { TENSOR, TENSOR2, EQP, NUM_ROMMODE };
+enum RomMode { TENSOR, TENSOR2, TENSOR3, EQP, NUM_ROMMODE };
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -846,16 +846,14 @@ int main(int argc, char *argv[])
       mfem_error("Unknown mode!\n");
    }
 
-   if (!strcmp(rom_mode_str, "tensor"))          rom_mode = RomMode::TENSOR;
-   else if (!strcmp(rom_mode_str, "tensor2"))    rom_mode = RomMode::TENSOR2;
+   if (!strcmp(rom_mode_str, "tensor"))          rom_mode = RomMode::TENSOR;  // vel-pres unified basis
+   else if (!strcmp(rom_mode_str, "tensor2"))    rom_mode = RomMode::TENSOR2; // vel/pres separated basis
+   else if (!strcmp(rom_mode_str, "tensor3"))    rom_mode = RomMode::TENSOR3; // vel-only basis
    else if (!strcmp(rom_mode_str, "eqp"))        rom_mode = RomMode::EQP;
-   else
-   {
-      if (!(rom_mode == RomMode::TENSOR) && !(rom_mode == RomMode::EQP))
-         mfem_error("Unknown mode!\n");
-   }
+   else if (!(rom_mode == RomMode::TENSOR))
+      mfem_error("Unknown mode!\n");
 
-   if (wgt_basis && (rom_mode == RomMode::TENSOR2))
+   if (wgt_basis && (rom_mode != RomMode::TENSOR))
       mfem_error("TENSOR2 does not support weighted basis!\n");
 
    if (!random_sample)
@@ -1297,7 +1295,7 @@ int main(int argc, char *argv[])
 
          delete nlin_rom;
       }  // if (rom_mode == RomMode::TENSOR)
-      else if (rom_mode == RomMode::TENSOR2)
+      else if ((rom_mode == RomMode::TENSOR2) || (rom_mode == RomMode::TENSOR3))
       {
          DenseMatrix ubasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
@@ -1577,6 +1575,19 @@ int main(int argc, char *argv[])
          basis.SetSubMatrix(uridx, ucidx, ubasis);
          basis.SetSubMatrix(pridx, pcidx, pbasis);
       }  // if (rom_mode == RomMode::TENSOR2)
+      else if (rom_mode == RomMode::TENSOR3)
+      {
+         CAROM::BasisReader ubasis_reader(filename + "_vel");
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+         CAROM::CopyMatrix(*carom_ubasis, ubasis);
+
+         basis.SetSize(ubasis.NumRows() + pdim, ubasis.NumCols());
+         Array<int> uridx(ubasis.NumRows()), ucidx(ubasis.NumCols());
+         for (int k = 0; k < ubasis.NumRows(); k++) uridx[k] = k;
+         for (int k = 0; k < ubasis.NumCols(); k++) ucidx[k] = k;
+         basis = 0.0;
+         basis.SetSubMatrix(uridx, ucidx, ubasis);
+      }  // if (rom_mode == RomMode::TENSOR3)
       else
       {
          CAROM::BasisReader basis_reader(filename);
@@ -1601,7 +1612,7 @@ int main(int argc, char *argv[])
       TensorROM *tenrom = NULL;
       EQPROM *eqprom = NULL;
 
-      if (rom_mode == RomMode::TENSOR)
+      if ((rom_mode == RomMode::TENSOR) || (rom_mode == RomMode::TENSOR3))
       {
          nlin_rom = new DenseTensor;
          {  // load the sample from a hdf5 file.
@@ -1620,7 +1631,7 @@ int main(int argc, char *argv[])
 
          tenrom = new TensorROM(lin_rom, *nlin_rom);
          rom_oper = tenrom;
-      }  // if (rom_mode == RomMode::TENSOR)
+      }  // if ((rom_mode == RomMode::TENSOR) || (rom_mode == RomMode::TENSOR3))
       else if (rom_mode == RomMode::TENSOR2)
       {
          nlin_rom = new DenseTensor;
@@ -1728,6 +1739,7 @@ int main(int argc, char *argv[])
       {
          case RomMode::TENSOR:
          case RomMode::TENSOR2:
+         case RomMode::TENSOR3:
          {
             rom_mult = tenrom->GetAvgMultTime();
             rom_jac = tenrom->GetAvgGradTime();
@@ -1826,7 +1838,7 @@ int main(int argc, char *argv[])
          std::string ustr = "u_basis" + std::to_string(k);
          paraview_dc.RegisterField(ustr.c_str(), basisgf_u[k]);
 
-         if (rom_mode != RomMode::TENSOR2)
+         if ((rom_mode != RomMode::TENSOR2) || (rom_mode != RomMode::TENSOR3))
          {
             basisgf_p[k] = new GridFunction(pfes);
             basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
