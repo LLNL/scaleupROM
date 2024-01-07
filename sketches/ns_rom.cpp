@@ -965,8 +965,8 @@ int main(int argc, char *argv[])
          CAROM::Options u_option(udim, nsample, 1, false);
          CAROM::Options p_option(pdim, nsample, 1, false);
          CAROM::BasisGenerator snapshot_generator(option, false, filename);
-         CAROM::BasisGenerator u_snapshot_generator(u_option, false, filename);
-         CAROM::BasisGenerator p_snapshot_generator(p_option, false, filename);
+         CAROM::BasisGenerator u_snapshot_generator(u_option, false, filename + "_vel");
+         CAROM::BasisGenerator p_snapshot_generator(p_option, false, filename + "_pres");
 
          int s = 0;
          while (s < nsample)
