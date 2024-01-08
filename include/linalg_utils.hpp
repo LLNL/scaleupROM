@@ -44,6 +44,9 @@ void PrintVector(const CAROM::Vector &vec,
 
 namespace mfem
 {
+
+void GramSchmidt(DenseMatrix& mat);
+
 // Compute Rt * A * P
 void RtAP(DenseMatrix& R,
         const Operator& A,

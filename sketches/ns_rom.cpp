@@ -25,7 +25,7 @@ static double zeta = 1.0;
 static bool direct_solve = true;
 
 enum Mode { MMS, SAMPLE, BUILD, COMPARE, PROJECT, NUM_MODE };
-enum RomMode { TENSOR, TENSOR2, TENSOR3, EQP, NUM_ROMMODE };
+enum RomMode { TENSOR, TENSOR2, TENSOR3, TENSOR4, EQP, NUM_ROMMODE };
 
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
@@ -784,6 +784,7 @@ int main(int argc, char *argv[])
    int nsample = -1;
    int num_basis = -1;
    int num_pbasis = -1;
+   int num_psupreme = -1;  // number of pressure supremizer.
    double eqp_tol = 1.0e-5;
    bool precompute = false;
    const char *compare_output_file = "result.h5";
@@ -817,6 +818,8 @@ int main(int argc, char *argv[])
                   "Number of basis for ROM. For TENSOR2, number of basis for velocity.");
    args.AddOption(&num_pbasis, "-npb", "--npbasis",
                   "Number of pressure basis for ROM. Used only for TENSOR2.");
+   args.AddOption(&num_psupreme, "-nps", "--npsupreme",
+                  "Number of pressure basis for ROM. Used only for TENSOR4.");
    args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
                   "Use direct or iterative solver.");
    args.AddOption(&eqp_tol, "-et", "--eqp-tolerance",
@@ -849,6 +852,7 @@ int main(int argc, char *argv[])
    if (!strcmp(rom_mode_str, "tensor"))          rom_mode = RomMode::TENSOR;  // vel-pres unified basis
    else if (!strcmp(rom_mode_str, "tensor2"))    rom_mode = RomMode::TENSOR2; // vel/pres separated basis
    else if (!strcmp(rom_mode_str, "tensor3"))    rom_mode = RomMode::TENSOR3; // vel-only basis
+   else if (!strcmp(rom_mode_str, "tensor4"))    rom_mode = RomMode::TENSOR4; // vel/pres seprated, augmented with supremizer
    else if (!strcmp(rom_mode_str, "eqp"))        rom_mode = RomMode::EQP;
    else if (!(rom_mode == RomMode::TENSOR))
       mfem_error("Unknown mode!\n");
@@ -1317,7 +1321,86 @@ int main(int argc, char *argv[])
             assert(errf >= 0);
          }
 
-      }  // if (rom_mode == RomMode::TENSOR2)
+      }  // if ((rom_mode == RomMode::TENSOR2) || (rom_mode == RomMode::TENSOR3))
+      else if (rom_mode == RomMode::TENSOR4)
+      {
+         assert(num_psupreme >= 0);
+
+         DenseMatrix ubasis, pbasis;
+         CAROM::BasisReader ubasis_reader(filename + "_vel");
+         CAROM::BasisReader pbasis_reader(filename + "_pres");
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         CAROM::CopyMatrix(*carom_ubasis, ubasis);
+         CAROM::CopyMatrix(*carom_pbasis, pbasis);
+
+         basis.SetSize(ubasis.NumRows(), num_basis + num_psupreme);
+
+         // Copy the standard u basis first.
+         Array<int> uridx(ubasis.NumRows()), ucidx(ubasis.NumCols());
+         for (int k = 0; k < ubasis.NumRows(); k++) uridx[k] = k;
+         for (int k = 0; k < ubasis.NumCols(); k++) ucidx[k] = k;
+         basis = 0.0;
+         basis.SetSubMatrix(uridx, ucidx, ubasis);
+
+         // Supremizer operator. Not factorizing with mass matrix yet.
+         MixedBilinearFormDGExtension S(ufes, pfes);
+         ConstantCoefficient minus_one(-1.0);
+         S.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+         if (use_dg)
+            S.AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+         S.Assemble();
+         S.Finalize();
+
+         DenseMatrix supreme(ubasis.NumRows(), num_psupreme);
+         Vector pvec, svec;
+         for (int i = 0; i < num_psupreme; i++)
+         {
+            pbasis.GetColumnReference(i, pvec);
+            supreme.GetColumnReference(i, svec);
+            // basis.GetColumnReference(num_basis + i, svec);
+            S.MultTranspose(pvec, svec);
+         }
+
+         // Orthonormalize over supremizer only for now.
+         GramSchmidt(supreme);
+
+         // Copy the supremizer.
+         ucidx.SetSize(num_psupreme);
+         for (int k = 0; k < num_psupreme; k++) ucidx[k] = num_basis + k;
+         basis.SetSubMatrix(uridx, ucidx, supreme);
+
+         DenseTensor *nlin_rom = oper.GetReducedTensor(basis);
+
+         {  // save the supremizer-enriched vel basis to a hdf5 file.
+            std::string tensor_file = filename + "_velsup.h5";
+
+            hid_t file_id;
+            herr_t errf = 0;
+            file_id = H5Fcreate(tensor_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+            assert(file_id >= 0);
+
+            hdf5_utils::WriteDataset(file_id, "basis", basis);
+
+            errf = H5Fclose(file_id);
+            assert(errf >= 0);
+         }
+         {  // save the tensor to a hdf5 file.
+            std::string tensor_file = filename + "_tensor.h5";
+
+            hid_t file_id;
+            herr_t errf = 0;
+            file_id = H5Fcreate(tensor_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+            assert(file_id >= 0);
+
+            hdf5_utils::WriteDataset(file_id, "tensor", *nlin_rom);
+
+            errf = H5Fclose(file_id);
+            assert(errf >= 0);
+         }
+
+         delete nlin_rom;
+      }  // if (rom_mode == RomMode::TENSOR4)
       else if (rom_mode == RomMode::EQP)
       {
          const int fom_vdofs = oper.Height();
@@ -1588,6 +1671,38 @@ int main(int argc, char *argv[])
          basis = 0.0;
          basis.SetSubMatrix(uridx, ucidx, ubasis);
       }  // if (rom_mode == RomMode::TENSOR3)
+      else if (rom_mode == RomMode::TENSOR4)
+      {
+         assert(num_psupreme >= 0);
+
+         {  // load the supremizer-enriched velocity basis from a hdf5 file.
+            std::string tensor_file = filename + "_velsup.h5";
+
+            hid_t file_id;
+            herr_t errf = 0;
+            file_id = H5Fopen(tensor_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+            assert(file_id >= 0);
+
+            hdf5_utils::ReadDataset(file_id, "basis", ubasis);
+
+            errf = H5Fclose(file_id);
+            assert(errf >= 0);
+         }
+
+         CAROM::BasisReader pbasis_reader(filename + "_pres");
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         CAROM::CopyMatrix(*carom_pbasis, pbasis);
+
+         basis.SetSize(ubasis.NumRows() + pbasis.NumRows(), ubasis.NumCols() + pbasis.NumCols());
+         Array<int> uridx(ubasis.NumRows()), ucidx(ubasis.NumCols()), pridx(pbasis.NumRows()), pcidx(pbasis.NumCols());
+         for (int k = 0; k < ubasis.NumRows(); k++) uridx[k] = k;
+         for (int k = 0; k < ubasis.NumCols(); k++) ucidx[k] = k;
+         for (int k = 0; k < pbasis.NumRows(); k++) pridx[k] = k + ubasis.NumRows();
+         for (int k = 0; k < pbasis.NumCols(); k++) pcidx[k] = k + ubasis.NumCols();
+         basis = 0.0;
+         basis.SetSubMatrix(uridx, ucidx, ubasis);
+         basis.SetSubMatrix(pridx, pcidx, pbasis);
+      }  // if (rom_mode == RomMode::TENSOR4)
       else
       {
          CAROM::BasisReader basis_reader(filename);
@@ -1632,7 +1747,7 @@ int main(int argc, char *argv[])
          tenrom = new TensorROM(lin_rom, *nlin_rom);
          rom_oper = tenrom;
       }  // if ((rom_mode == RomMode::TENSOR) || (rom_mode == RomMode::TENSOR3))
-      else if (rom_mode == RomMode::TENSOR2)
+      else if ((rom_mode == RomMode::TENSOR2) || (rom_mode == RomMode::TENSOR4))
       {
          nlin_rom = new DenseTensor;
          {  // load the sample from a hdf5 file.
@@ -1691,12 +1806,7 @@ int main(int argc, char *argv[])
       else
          mfem_error("ROM Mode is not set!");
       
-      Vector rom_rhs(num_basis), rom_sol(num_basis);
-      if (rom_mode == RomMode::TENSOR2)
-      {
-         rom_rhs.SetSize(num_basis + num_pbasis);
-         rom_sol.SetSize(num_basis + num_pbasis);
-      }
+      Vector rom_rhs(basis.NumCols()), rom_sol(basis.NumCols());
       basis.MultTranspose((*oper.GetRHS()), rom_rhs);
       rom_sol = 0.0;
 
@@ -1740,6 +1850,7 @@ int main(int argc, char *argv[])
          case RomMode::TENSOR:
          case RomMode::TENSOR2:
          case RomMode::TENSOR3:
+         case RomMode::TENSOR4:
          {
             rom_mult = tenrom->GetAvgMultTime();
             rom_jac = tenrom->GetAvgGradTime();
@@ -1831,6 +1942,7 @@ int main(int argc, char *argv[])
       paraview_dc.RegisterField("vel_error", u_error);
       paraview_dc.RegisterField("pres_error", p_error);
       Array<GridFunction *> basisgf_u(num_basis), basisgf_p(num_basis);
+      basisgf_u = NULL; basisgf_p = NULL;
       for (int k = 0; k < num_basis; k++)
       {
          basisgf_u[k] = new GridFunction(ufes);
@@ -1838,7 +1950,7 @@ int main(int argc, char *argv[])
          std::string ustr = "u_basis" + std::to_string(k);
          paraview_dc.RegisterField(ustr.c_str(), basisgf_u[k]);
 
-         if ((rom_mode != RomMode::TENSOR2) || (rom_mode != RomMode::TENSOR3))
+         if (rom_mode == RomMode::TENSOR)
          {
             basisgf_p[k] = new GridFunction(pfes);
             basisgf_p[k]->MakeRef(pfes, basis.GetColumn(k) + ufes->GetVSize());
@@ -1846,7 +1958,7 @@ int main(int argc, char *argv[])
             paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
          }
       }
-      if (rom_mode == RomMode::TENSOR2)
+      if ((rom_mode == RomMode::TENSOR2) || (rom_mode == RomMode::TENSOR4))
       {
          basisgf_p.SetSize(num_pbasis);
          for (int k = 0; k < num_pbasis; k++)
@@ -1855,6 +1967,16 @@ int main(int argc, char *argv[])
             basisgf_p[k]->MakeRef(pfes, pbasis.GetColumn(k));
             std::string pstr = "p_basis" + std::to_string(k);
             paraview_dc.RegisterField(pstr.c_str(), basisgf_p[k]);
+         }
+      }
+      if (rom_mode == RomMode::TENSOR4)
+      {
+         for (int k = 0; k < num_psupreme; k++)
+         {
+            basisgf_u.Append(new GridFunction(ufes));
+            basisgf_u.Last()->MakeRef(ufes, basis.GetColumn(num_basis + k));
+            std::string ustr = "u_supreme" + std::to_string(k);
+            paraview_dc.RegisterField(ustr.c_str(), basisgf_u.Last());
          }
       }
 
@@ -1888,12 +2010,11 @@ int main(int argc, char *argv[])
          assert(errf >= 0);
       }
 
-      for (int k = 0; k < num_basis; k++)
+      for (int k = 0; k < basisgf_u.Size(); k++)
       {
          delete basisgf_u[k];
       }
-      int tmp = (rom_mode == RomMode::TENSOR2) ? num_pbasis : num_basis;
-      for (int k = 0; k < tmp; k++)
+      for (int k = 0; k < basisgf_p.Size(); k++)
       {
          delete basisgf_p[k];
       }

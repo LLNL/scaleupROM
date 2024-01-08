@@ -134,6 +134,25 @@ void PrintVector(const CAROM::Vector &vec,
 namespace mfem
 {
 
+void GramSchmidt(DenseMatrix& mat)
+{
+   const int num_row = mat.NumCols();
+   const int num_col = mat.NumCols();
+   Vector vec_c, tmp;
+   for (int c = 0; c < num_col; c++)
+   {
+      mat.GetColumnReference(c, vec_c);
+
+      for (int i = 0; i < c; i++)
+      {
+         mat.GetColumnReference(i, tmp);
+         vec_c.Add(-(tmp * vec_c), tmp);
+      }
+
+      vec_c /= sqrt(vec_c * vec_c);
+   }
+}
+
 void RtAP(DenseMatrix& R,
          const Operator& A,
          DenseMatrix& P,
