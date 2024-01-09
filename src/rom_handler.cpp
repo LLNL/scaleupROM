@@ -15,6 +15,19 @@ using namespace std;
 namespace mfem
 {
 
+const TrainMode SetTrainMode()
+{
+   TrainMode train_mode = TrainMode::NUM_TRAINMODE;
+
+   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
+   if (train_mode_str == "individual")       train_mode = TrainMode::INDIVIDUAL;
+   else if (train_mode_str == "universal")   train_mode = TrainMode::UNIVERSAL;
+   else
+      mfem_error("Unknown subdomain training mode!\n");
+
+   return train_mode;
+}
+
 const std::string GetBasisTagForComponent(
    const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler)
 {

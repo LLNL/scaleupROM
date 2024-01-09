@@ -87,6 +87,7 @@ protected:
    ROMHandler *rom_handler = NULL;
    TrainMode train_mode = NUM_TRAINMODE;
    bool use_rom = false;
+   bool separate_variable_basis = false;
 
    // Used for bottom-up building, only with ComponentTopologyHandler.
    // For now, assumes ROM basis represents the entire vector solution.

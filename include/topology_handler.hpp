@@ -51,7 +51,7 @@ struct TopologyData {
    Array<int> *global_bdr_attributes = NULL;
 };
 
-const TopologyHandlerMode GetTopologyHandlerMode();
+const TopologyHandlerMode SetTopologyHandlerMode();
 
 class TopologyHandler
 {

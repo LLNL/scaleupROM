@@ -8,7 +8,7 @@
 using namespace std;
 using namespace mfem;
 
-const TopologyHandlerMode GetTopologyHandlerMode()
+const TopologyHandlerMode SetTopologyHandlerMode()
 {
    TopologyHandlerMode topol_mode = NUM_TOPOL_MODE;
 

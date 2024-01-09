@@ -86,7 +86,7 @@ MultiBlockSolver::~MultiBlockSolver()
 
 void MultiBlockSolver::ParseInputs()
 {
-   topol_mode = GetTopologyHandlerMode();
+   topol_mode = SetTopologyHandlerMode();
 
    order = config.GetOption<int>("discretization/order", 1);
    full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
@@ -118,11 +118,7 @@ void MultiBlockSolver::ParseInputs()
    // rom inputs.
    use_rom = config.GetOption<bool>("main/use_rom", false);
 
-   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
-   if (train_mode_str == "individual")       train_mode = TrainMode::INDIVIDUAL;
-   else if (train_mode_str == "universal")   train_mode = TrainMode::UNIVERSAL;
-   else
-      mfem_error("Unknown subdomain training mode!\n");
+   train_mode = SetTrainMode();
 
    // save solution if single run.
    save_sol = config.GetOption<bool>("save_solution/enabled", false);
@@ -755,7 +751,7 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
 void MultiBlockSolver::InitROMHandler()
 {
    std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
-   bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
+   separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    Array<int> rom_vdim;
    if (separate_variable_basis)

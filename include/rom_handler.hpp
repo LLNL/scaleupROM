@@ -30,6 +30,8 @@ enum ROMBuildingLevel
    NUM_BLD_LVL
 };
 
+const TrainMode SetTrainMode();
+
 const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler);
 const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler);
 

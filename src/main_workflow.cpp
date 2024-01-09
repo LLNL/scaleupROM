@@ -161,7 +161,8 @@ void TrainROM(MPI_Comm comm)
 {
    SampleGenerator *sample_generator = InitSampleGenerator(comm);
 
-   TopologyHandlerMode topol_mode = GetTopologyHandlerMode();
+   TopologyHandlerMode topol_mode = SetTopologyHandlerMode();
+   TrainMode train_mode = SetTrainMode();
 
    YAML::Node basis_list = config.FindNode("basis/tags");
    if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
