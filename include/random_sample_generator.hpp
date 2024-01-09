@@ -16,6 +16,8 @@ public:
 
    virtual ~RandomSampleGenerator() {}
 
+   virtual SampleGeneratorType GetType() override { return RANDOM; }
+
    // RandomSampleGenerator has the same sampling size for all parameters, equal to total samples.
    // const Array<int> GetSampleSizes() { return sampling_sizes; }
 

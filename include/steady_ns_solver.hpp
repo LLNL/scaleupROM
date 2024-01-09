@@ -131,7 +131,7 @@ public:
    virtual void SaveCompBdrROMElement(hid_t &file_id) override;
    virtual void LoadCompBdrROMElement(hid_t &file_id) override;
 
-   virtual void Solve();
+   virtual bool Solve();
 
    virtual void ProjectOperatorOnReducedBasis();
 

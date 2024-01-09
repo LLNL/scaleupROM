@@ -677,8 +677,11 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
-void StokesSolver::Solve()
+bool StokesSolver::Solve()
 {
+   // If using direct solver, returns always true.
+   bool converged = true;
+
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
@@ -753,6 +756,7 @@ void StokesSolver::Solve()
          solver.SetPreconditioner(*systemPrec);
       solver.SetPrintLevel(print_level);
       solver.Mult(rhs_byvar, sol_byvar);
+      converged = solver.GetConverged();
 
       if (use_amg)
       {
@@ -775,6 +779,8 @@ void StokesSolver::Solve()
    }
 
    SortBySubdomains(sol_byvar, *U);
+
+   return converged;
 }
 
 void StokesSolver::Solve_obsolete()

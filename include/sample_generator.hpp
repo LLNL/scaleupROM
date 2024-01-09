@@ -12,6 +12,13 @@
 
 using namespace mfem;
 
+enum SampleGeneratorType
+{
+   BASE,
+   RANDOM,
+   NUM_SAMPLE_GEN_TYPE
+};
+
 class SampleGenerator
 {
 protected:
@@ -50,6 +57,8 @@ public:
    SampleGenerator(MPI_Comm comm);
 
    virtual ~SampleGenerator();
+
+   virtual SampleGeneratorType GetType() { return BASE; }
 
    const int GetNumSampleParams() { return num_sampling_params; }
    const Array<int> GetSampleSizes() { return sampling_sizes; }

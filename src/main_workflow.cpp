@@ -89,10 +89,12 @@ void GenerateSamples(MPI_Comm comm)
    YAML::Node dict0 = YAML::Clone(config.dict_);
    ParameterizedProblem *problem = InitParameterizedProblem();
    SampleGenerator *sample_generator = InitSampleGenerator(comm);
+   SampleGeneratorType sample_gen_type = sample_generator->GetType();
    sample_generator->SetParamSpaceSizes();
    MultiBlockSolver *test = NULL;
 
-   for (int s = 0; s < sample_generator->GetTotalSampleSize(); s++)
+   int s = 0;
+   while (s < sample_generator->GetTotalSampleSize())
    {
       if (!sample_generator->IsMyJob(s)) continue;
 
@@ -113,7 +115,22 @@ void GenerateSamples(MPI_Comm comm)
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
-      test->Solve();
+
+      bool converged = test->Solve();
+      if (!converged)
+      {
+         // If deterministic, terminate the sampling here.
+         if (sample_gen_type == BASE)
+            mfem_error("A sample solution fails to converge!\n");
+         else if (sample_gen_type == RANDOM)
+         {
+            // if random, try another sample.
+            mfem_warning("A sample solution failed to converge. Trying another sample.\n");
+            delete test;
+            continue;
+         }
+      }
+         
       test->SaveSolution(sol_file);
       test->SaveVisualization();
 
@@ -129,6 +146,8 @@ void GenerateSamples(MPI_Comm comm)
 
       delete U_snapshots;
       delete test;
+
+      s++;
    }
    sample_generator->WriteSnapshots();
 

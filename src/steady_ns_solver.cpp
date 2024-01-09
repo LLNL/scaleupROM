@@ -481,7 +481,7 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
       subdomain_tensors[m] = comp_tensors[rom_handler->GetBasisIndexForSubdomain(m)];
 }
 
-void SteadyNSSolver::Solve()
+bool SteadyNSSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
@@ -551,6 +551,7 @@ void SteadyNSSolver::Solve()
    newton_solver->SetMaxIter(maxIter);
 
    newton_solver->Mult(rhs_byvar, sol_byvar);
+   bool converged = newton_solver->GetConverged();
 
    // orthogonalize the pressure.
    if (!pres_dbc)
@@ -563,6 +564,8 @@ void SteadyNSSolver::Solve()
    }
 
    SortBySubdomains(sol_byvar, *U);
+
+   return converged;
 }
 
 void SteadyNSSolver::ProjectOperatorOnReducedBasis()
@@ -610,6 +613,14 @@ void SteadyNSSolver::SolveROM()
    for (int m = 0; m < numSub; m++) assert(subdomain_tensors[m]);
 
    BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file;
+   if (use_restart)
+   {
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+      LoadSolution(restart_file);
+   }
+
    // NOTE(kevin): currently assumes direct solve.
    SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
    rom_handler->NonlinearSolve(rom_oper, &U_domain);

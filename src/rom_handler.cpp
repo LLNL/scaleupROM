@@ -698,7 +698,22 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
-   (*reduced_sol) = 0.0;
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   if (use_restart)
+   {
+      for (int i = 0; i < numSub; i++)
+      {
+         assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
+
+         DenseMatrix* basis_i;
+         GetBasisOnSubdomain(i, basis_i);
+
+         // Project from a FOM solution
+         basis_i->MultTranspose(U->GetBlock(i).GetData(), reduced_sol->GetBlock(i).GetData());
+      }
+   }
+   else
+      (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
@@ -731,15 +746,33 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
       J_solver = iter_solver;
    }
 
-   NewtonSolver newton_solver;
-   newton_solver.SetSolver(*J_solver);
-   newton_solver.SetOperator(oper);
-   newton_solver.SetPrintLevel(print_level); // print Newton iterations
-   newton_solver.SetRelTol(rtol);
-   newton_solver.SetAbsTol(atol);
-   newton_solver.SetMaxIter(maxIter);
+   std::string nlin_solver = config.GetOption<std::string>("model_reduction/nonlinear_solver_type", "newton");
 
-   newton_solver.Mult(*reduced_rhs, *reduced_sol);
+   if (nlin_solver == "newton")
+   {
+      NewtonSolver newton_solver;
+      newton_solver.SetSolver(*J_solver);
+      newton_solver.SetOperator(oper);
+      newton_solver.SetPrintLevel(print_level); // print Newton iterations
+      newton_solver.SetRelTol(rtol);
+      newton_solver.SetAbsTol(atol);
+      newton_solver.SetMaxIter(maxIter);
+
+      newton_solver.Mult(*reduced_rhs, *reduced_sol);
+   }
+   else if (nlin_solver == "cg")
+   {
+      CGOptimizer optim;
+      optim.SetOperator(oper);
+      optim.SetPrintLevel(print_level); // print Newton iterations
+      optim.SetRelTol(rtol);
+      optim.SetAbsTol(atol);
+      optim.SetMaxIter(maxIter);
+
+      optim.Mult(*reduced_rhs, *reduced_sol);
+   }
+   else
+      mfem_error("MFEMROMHandler::NonlinearSolve- Unknown ROM nonlinear solver type!\n");
 
    for (int i = 0; i < numSub; i++)
    {
