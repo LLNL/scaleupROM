@@ -86,20 +86,7 @@ MultiBlockSolver::~MultiBlockSolver()
 
 void MultiBlockSolver::ParseInputs()
 {
-   std::string topol_str = config.GetOption<std::string>("mesh/type", "submesh");
-   if (topol_str == "submesh")
-   {
-      topol_mode = TopologyHandlerMode::SUBMESH;
-   }
-   else if (topol_str == "component-wise")
-   {
-      topol_mode = TopologyHandlerMode::COMPONENT;
-   }
-   else
-   {
-      printf("%s\n", topol_str.c_str());
-      mfem_error("Unknown topology handler mode!\n");
-   }
+   topol_mode = GetTopologyHandlerMode();
 
    order = config.GetOption<int>("discretization/order", 1);
    full_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
