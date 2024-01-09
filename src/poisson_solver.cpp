@@ -431,8 +431,11 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
-void PoissonSolver::Solve()
+bool PoissonSolver::Solve()
 {
+   // If using direct solver, returns always true.
+   bool converged = true;
+
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
@@ -488,6 +491,7 @@ void PoissonSolver::Solve()
       solver->Mult(*RHS, *U);
       // test.Stop();
       // printf("test: %f seconds.\n", test.RealTime());
+      converged = solver->GetConverged();
 
       // delete the created objects.
       if (use_amg)
@@ -500,6 +504,8 @@ void PoissonSolver::Solve()
       }
       delete solver;
    }
+
+   return converged;
 }
 
 void PoissonSolver::ProjectOperatorOnReducedBasis()

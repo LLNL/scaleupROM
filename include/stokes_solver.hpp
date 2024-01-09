@@ -185,7 +185,7 @@ public:
    virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
    virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
-   virtual void Solve();
+   virtual bool Solve();
    virtual void Solve_obsolete();
 
    virtual void ProjectOperatorOnReducedBasis();

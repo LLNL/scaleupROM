@@ -134,6 +134,25 @@ void PrintVector(const CAROM::Vector &vec,
 namespace mfem
 {
 
+void GramSchmidt(DenseMatrix& mat)
+{
+   const int num_row = mat.NumCols();
+   const int num_col = mat.NumCols();
+   Vector vec_c, tmp;
+   for (int c = 0; c < num_col; c++)
+   {
+      mat.GetColumnReference(c, vec_c);
+
+      for (int i = 0; i < c; i++)
+      {
+         mat.GetColumnReference(i, tmp);
+         vec_c.Add(-(tmp * vec_c), tmp);
+      }
+
+      vec_c /= sqrt(vec_c * vec_c);
+   }
+}
+
 void RtAP(DenseMatrix& R,
          const Operator& A,
          DenseMatrix& P,
@@ -581,6 +600,170 @@ void TensorAddScaledMultTranspose(const DenseTensor &tensor, const double w, con
             tdata += stride;
          }
       }
+   }
+
+   return;
+}
+
+double CGOptimizer::Objective(const Vector &rhs, const Vector &sol) const
+{
+   assert(oper);
+   resvec = 0.0;
+   oper->Mult(sol, resvec);
+   resvec -= rhs;
+   return (resvec * resvec);
+}
+
+void CGOptimizer::Gradient(const Vector &rhs, const Vector &sol, Vector &grad) const
+{
+   assert(oper);
+   grad.SetSize(sol.Size());
+   resvec = 0.0;
+   grad = 0.0;
+
+   oper->Mult(sol, resvec);
+   resvec -= rhs;
+   resvec *= 2.0;
+   Operator *jac = &(oper->GetGradient(sol));
+   jac->MultTranspose(resvec, grad);
+   return;
+}
+
+double CGOptimizer::Brent(const Vector &rhs, const Vector &xi, Vector &sol, double b0, double lin_tol) const
+{
+   sol1.SetSize(sol.Size());
+
+   // initial bracket
+   Vector step(N_mnbrak+1), J_brak(N_mnbrak);
+   step = 0.0;
+   J_brak = 0.0;
+
+   J_brak[0] = Objective(rhs, sol);
+   add(sol, b0, xi, sol1); // sol1 = sol + b0 * xi;
+   double J1 = Objective(rhs, sol1);
+   while (J1 > J_brak[0])
+   {
+      b0 /= golden_ratio;
+      add(sol, b0, xi, sol1); // sol1 = sol + b0 * xi;
+      J1 = Objective(rhs, sol1);
+   }
+
+   double amp = b0;
+   double a, b, c, fa, fb, fc;
+   for (int j = 1; j < N_mnbrak+1; j++)
+   {
+      add(sol, amp, xi, sol1); // sol1 = sol + amp * xi;
+      step[j] = amp;
+      J_brak[j] = Objective(rhs, sol1);
+      
+      if (J_brak[j] > J_brak[j-1])
+      {
+         a = step[j-2]; b = step[j-1]; c = step[j];
+         fa = J_brak[j-2]; fb = J_brak[j-1]; fc = J_brak[j];
+         break;
+      }
+      else
+         amp *= golden_ratio;
+   }
+
+   assert ((a >= 0) && (b > a) && (c > b));
+   Array<double> x_arr(4), J_arr(4);
+
+   // parabolic estimation
+   for (int j = 0; j < N_para; j++)
+   {
+      if ( (c-a) < b * lin_tol + eps ) break;
+      
+      double b_new = b - 0.5 * ( pow(b-a, 2) * (fb-fc) - pow(b-c, 2) * (fb-fa) ) / ( (b-a) * (fb-fc) - (b-c) * (fb-fa) );
+      if ((b_new > c) || (b_new < a) || (abs(log10((c-b) / (b-a))) > 1.0))
+         if ( b > 0.5 * (a+c) )
+            b_new = b - Cr * (b-a);
+         else
+            b_new = b + Cr * (c-b);
+      
+      add(sol, b_new, xi, sol1); // sol1 = sol + b_new * xi;
+      double fbx = Objective(rhs, sol1);
+      
+      x_arr[0] = a; x_arr[3] = c;
+      J_arr[0] = fa; J_arr[3] = fc;
+      if (b_new > b)
+      {
+         x_arr[1] = b; x_arr[2] = b_new;
+         J_arr[1] = fb, J_arr[2] = fbx;
+      }
+      else
+      {
+         x_arr[1] = b_new; x_arr[2] = b;
+         J_arr[1] = fbx, J_arr[2] = fb;
+      }
+
+      fb = J_arr.Min();
+      int idx = J_arr.Find(fb); assert(idx > 0);
+      fa = J_arr[idx-1]; fc = J_arr[idx+1];
+      a = x_arr[idx-1]; b = x_arr[idx]; c = x_arr[idx+1];
+   }
+   
+   sol.Add(b, xi); // sol += b * xi;
+
+   return b;
+}
+
+void CGOptimizer::Mult(const Vector &rhs, Vector &sol) const
+{
+   g.SetSize(sol.Size());
+   xi.SetSize(sol.Size());
+   xi1.SetSize(sol.Size());
+   h.SetSize(sol.Size());
+
+   double Jmin = Objective(rhs, sol);
+   double res0 = sqrt(Jmin);
+   printf("Initial iteration: ||r|| = %.4E\n", res0);
+
+   Gradient(rhs, sol, g);
+
+   g *= -1.0; xi = g; h = g;
+   double gg0 = g * g;
+
+   double b0 = ib / sqrt(gg0);
+
+   double gg, gg1, dgg, dgg1, res;
+   double gamma, gamma_FR;
+   for (int j = 0; j < max_iter; j++)
+   {
+      // sol is updated within Brent.
+      b0 = Brent(rhs, xi, sol, b0);
+
+      // evaluate one more time to obtain sub-objective functional.
+      Jmin = Objective(rhs, sol);
+      
+      Gradient(rhs, sol, xi);
+      gg = g * g;
+      
+      add(xi, g, xi1);
+      dgg = xi1 * xi;
+      dgg1 = xi * xi;
+      gg1 = g * xi;
+      
+      res = sqrt(Jmin);
+      printf("Iter %d: ||r|| = %.4E, ||r|| / ||r0|| = %.4E\n", j, res, res / res0);
+      if ((res < abs_tol) || (res / res0 < rel_tol))
+      {
+         converged = true;
+         printf("CG minimization finished.");
+         break;
+      }
+         
+      gamma = dgg / gg;
+      gamma_FR = dgg1 / gg;
+      if (j > 0)
+         if (gamma < -gamma_FR)
+            gamma = -gamma_FR;
+         else if (gamma > gamma_FR)
+            gamma = gamma_FR;
+      
+      g.Set(-1.0, xi);
+      add(g, gamma, h, xi);
+      h = xi;
    }
 
    return;
