@@ -41,8 +41,9 @@ protected:
 // public:
    int numSub = -1;          // number of subdomains.
    int udim = -1;            // solution dimension.
-   int num_var = -1;         // number of variables for which linear subspace method is applied.
-   int num_basis_sets = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
+   int num_var = -1;         // number of variables for which POD is performed.
+
+   int num_rom_comp_blocks = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
    Array<int> vdim;          // dimension of each variable.
    Array<int> fom_num_vdofs;
 
@@ -98,7 +99,7 @@ public:
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
-   const int GetNumBasisSets() { return num_basis_sets; }
+   const int GetNumROMComponentBlocks() { return num_rom_comp_blocks; }
    const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }

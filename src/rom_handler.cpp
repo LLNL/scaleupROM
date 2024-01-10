@@ -130,12 +130,12 @@ void ROMHandler::ParseInputs()
    {
       case TrainMode::INDIVIDUAL:
       {
-         num_basis_sets = numSub;
+         num_rom_comp_blocks = numSub;
       }
       break;
       case TrainMode::UNIVERSAL:
       {
-         num_basis_sets = topol_handler->GetNumComponents();
+         num_rom_comp_blocks = topol_handler->GetNumComponents();
       }
       break;
       default:
@@ -144,7 +144,7 @@ void ROMHandler::ParseInputs()
    }
    
    const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
-   num_basis.SetSize(num_basis_sets);
+   num_basis.SetSize(num_rom_comp_blocks);
    num_basis = num_basis_default;
    assert(num_basis.Size() > 0);
 
@@ -152,7 +152,7 @@ void ROMHandler::ParseInputs()
    if ((!basis_list) && (num_basis_default <= 0))
       mfem_error("ROMHandler - cannot find the basis tag list, nor default number of basis is not set!\n");
 
-   for (int c = 0; c < num_basis_sets; c++)
+   for (int c = 0; c < num_rom_comp_blocks; c++)
    {
       std::string basis_tag = GetBasisTagForComponent(c, train_mode, topol_handler);
 
@@ -187,7 +187,7 @@ void ROMHandler::ParseInputs()
 // {
 //    std::string basis_name, basis_tag;
    
-//    for (int c = 0; c < num_basis_sets; c++)
+//    for (int c = 0; c < num_rom_comp_blocks; c++)
 //    {
 //       int basis_dim = -1;
 //       switch (train_mode)
@@ -222,7 +222,7 @@ void ROMHandler::ParseInputs()
 
 //       delete basis_generator;
 //       delete rom_options;
-//    }  // for (int c = 0; c < num_basis_sets; c++)
+//    }  // for (int c = 0; c < num_rom_comp_blocks; c++)
 // }
 
 void ROMHandler::LoadReducedBasis()
@@ -232,8 +232,8 @@ void ROMHandler::LoadReducedBasis()
    std::string basis_name;
    int numRowRB, numColumnRB;
 
-   carom_spatialbasis.SetSize(num_basis_sets);
-   for (int k = 0; k < num_basis_sets; k++)
+   carom_spatialbasis.SetSize(num_rom_comp_blocks);
+   for (int k = 0; k < num_rom_comp_blocks; k++)
    {
       basis_name = basis_prefix + "_" + GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name);
@@ -268,8 +268,8 @@ int ROMHandler::GetBasisIndexForSubdomain(const int &subdomain_index)
 
 void ROMHandler::GetBasis(const int &basis_index, const CAROM::Matrix* &basis)
 {
-   assert(num_basis_sets > 0);
-   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+   assert(num_rom_comp_blocks > 0);
+   assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
 
    basis = carom_spatialbasis[basis_index];
 }
@@ -399,8 +399,8 @@ void ROMHandler::Solve(BlockVector* U)
 void ROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat)
 {
    assert(proj_mat != NULL);
-   assert((i >= 0) && (i < num_basis_sets));
-   assert((j >= 0) && (j < num_basis_sets));
+   assert((i >= 0) && (i < num_rom_comp_blocks));
+   assert((j >= 0) && (j < num_rom_comp_blocks));
    // assert(mat->Finalized());
    assert(basis_loaded);
    
@@ -522,8 +522,8 @@ void MFEMROMHandler::LoadReducedBasis()
 
 void MFEMROMHandler::GetBasis(const int &basis_index, DenseMatrix* &basis)
 {
-   assert(num_basis_sets > 0);
-   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+   assert(num_rom_comp_blocks > 0);
+   assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
 
    basis = spatialbasis[basis_index];
 }
@@ -801,8 +801,8 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
 
 SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
 {
-   assert((i >= 0) && (i < num_basis_sets));
-   assert((j >= 0) && (j < num_basis_sets));
+   assert((i >= 0) && (i < num_rom_comp_blocks));
+   assert((j >= 0) && (j < num_rom_comp_blocks));
    // assert(mat->Finalized());
    assert(basis_loaded);
    
@@ -868,7 +868,7 @@ void MFEMROMHandler::SaveBasisVisualization(
    if (train_mode == TrainMode::UNIVERSAL)
       visual_prefix += "_universal";
 
-   for (int c = 0; c < num_basis_sets; c++)
+   for (int c = 0; c < num_rom_comp_blocks; c++)
    {
       std::string file_prefix = visual_prefix;
       file_prefix += "_" + std::to_string(c);
