@@ -42,8 +42,8 @@ protected:
    int numSub = -1;          // number of subdomains.
    int udim = -1;            // solution dimension.
    int num_var = -1;         // number of variables for which POD is performed.
-
-   int num_rom_comp_blocks = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
+   int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
+   int num_rom_comp_blocks = -1;  // number of ROM component blocks.
    Array<int> vdim;          // dimension of each variable.
    Array<int> fom_num_vdofs;
 
@@ -67,7 +67,7 @@ protected:
    TopologyHandler *topol_handler = NULL;
 
    // rom variables.
-   Array<int> num_basis;    // number of columns in a basis set
+   Array<int> comp_num_basis;    // number of columns in the basis for a component
    Array<const CAROM::Matrix*> carom_spatialbasis;
    bool basis_loaded;
    bool operator_loaded;
@@ -100,7 +100,7 @@ public:
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
    const int GetNumROMComponentBlocks() { return num_rom_comp_blocks; }
-   const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
+   const int GetComponentNumBasis(const int &basis_idx) { return comp_num_basis[basis_idx]; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
