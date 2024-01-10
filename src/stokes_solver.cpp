@@ -25,9 +25,11 @@ StokesSolver::StokesSolver()
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (uorder + 1) * (uorder + 1));
    
+   var_names = GetVariableNames();
+   num_var = var_names.size();
+
    // solution dimension is determined by initialization.
    udim = dim + 1;
-   num_var = 2;
    vdim.SetSize(num_var);
    vdim[0] = dim;
    vdim[1] = 1;
@@ -55,10 +57,6 @@ StokesSolver::StokesSolver()
       fes[m * num_var] = ufes[m];
       fes[m * num_var + 1] = pfes[m];
    }
-
-   var_names.resize(num_var);
-   var_names[0] = "vel";
-   var_names[1] = "pres";
 }
 
 StokesSolver::~StokesSolver()

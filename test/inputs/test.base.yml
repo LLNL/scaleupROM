@@ -2,6 +2,7 @@ main:
 #mode: run_example/sample_generation/build_rom/single_run
   mode: single_run
   use_rom: true
+  solver: poisson
 
 mesh:
   filename: meshes/test.2x2.mesh

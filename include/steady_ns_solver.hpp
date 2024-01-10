@@ -112,6 +112,8 @@ public:
 
    virtual ~SteadyNSSolver();
 
+   using StokesSolver::GetVariableNames;
+
    virtual void InitVariables();
 
    virtual void BuildOperators() override;

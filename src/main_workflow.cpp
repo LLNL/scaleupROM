@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "main_workflow.hpp"
+#include "component_topology_handler.hpp"
 #include "multiblock_solver.hpp"
 #include "poisson_solver.hpp"
 #include "stokes_solver.hpp"
@@ -47,7 +48,7 @@ void RunExample()
 
 MultiBlockSolver* InitSolver()
 {
-   std::string solver_type = config.GetOption<std::string>("main/solver", "poisson");
+   std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    MultiBlockSolver *solver = NULL;
    if (solver_type == "poisson")       { solver = new PoissonSolver; }
    else if (solver_type == "stokes")   { solver = new StokesSolver; }
@@ -81,6 +82,67 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm)
    }
 
    return generator;
+}
+
+std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, const TrainMode &train_mode, bool separate_variable_basis)
+{
+   std::vector<std::string> basis_tags(0);
+
+   std::vector<std::string> component_list(0);
+   if (train_mode == TrainMode::INDIVIDUAL)
+   {
+      TopologyHandler *topol_handler;
+      if (topol_mode == TopologyHandlerMode::SUBMESH)          topol_handler = new SubMeshTopologyHandler();
+      else if (topol_mode == TopologyHandlerMode::COMPONENT)   topol_handler = new ComponentTopologyHandler();
+      else
+         mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
+
+      for (int c = 0; c < topol_handler->GetNumSubdomains(); c++)
+         component_list.push_back("dom" + std::to_string(c));
+
+      delete topol_handler;
+   }
+   else  // if (train_mode == TrainMode::UNIVERSAL)
+   {
+      if (topol_mode == TopologyHandlerMode::SUBMESH)
+      {
+         component_list.push_back("comp0");
+      }
+      else if (topol_mode == TopologyHandlerMode::COMPONENT)
+      {
+         YAML::Node component_dict = config.FindNode("mesh/component-wise/components");
+         assert(component_dict);
+         for (int p = 0; p < component_dict.size(); p++)
+         component_list.push_back(config.GetRequiredOptionFromDict<std::string>("name", component_dict[p]));
+      }
+      else
+         mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
+   }  // if (train_mode == TrainMode::UNIVERSAL)
+
+   std::vector<std::string> var_list(0);
+   if (separate_variable_basis)
+   {
+      std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
+      if (solver_type == "poisson")          var_list = PoissonSolver::GetVariableNames();
+      else if (solver_type == "stokes")      var_list = StokesSolver::GetVariableNames();
+      else if (solver_type == "steady-ns")   var_list = SteadyNSSolver::GetVariableNames();
+      else
+      {
+         printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
+         exit(-1);
+      }
+   }
+
+   for (int c = 0; c < component_list.size(); c++)
+   {
+      if (separate_variable_basis)
+         for (int v = 0; v < var_list.size(); v++)
+            basis_tags.push_back(component_list[c] + "_" + var_list[v]);
+      else
+         basis_tags.push_back(component_list[c]);
+   }
+
+   return basis_tags;
 }
 
 void GenerateSamples(MPI_Comm comm)
@@ -163,52 +225,70 @@ void TrainROM(MPI_Comm comm)
 
    TopologyHandlerMode topol_mode = SetTopologyHandlerMode();
    TrainMode train_mode = SetTrainMode();
+   bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
+   // Find the all required basis tags.
+   std::vector<std::string> basis_tags = GetGlobalBasisTagList(topol_mode, train_mode, separate_variable_basis);
+
+   // tag-specific optional inputs.
    YAML::Node basis_list = config.FindNode("basis/tags");
-   if (!basis_list) mfem_error("TrainROM - cannot find the basis tag list!\n");
 
    std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
    const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
 
-   for (int p = 0; p < basis_list.size(); p++)
+   // loop over the required basis tag list.
+   for (int p = 0; p < basis_tags.size(); p++)
    {
-      std::string basis_tag = config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]);
-      const int num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[p]);
+      std::vector<std::string> file_list(0);
+      int num_basis;
+
+      // if optional inputs are specified, parse them first.
+      if (basis_list)
+      {
+         // Find if additional inputs are specified for basis_tags[p].
+         int idx = -1;
+         for (int k = 0; k < basis_list.size(); k++)
+            if (basis_tags[p] == config.GetOptionFromDict<std::string>("name", "", basis_list[k]))
+            {
+               idx = k;
+               break;
+            }
+         
+         // If basis_tags[p] has additional inputs, parse them.
+         if (idx >= 0)
+         {
+            // parse tag-specific number of basis.
+            num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[idx]);
+
+            // parse the sample snapshot file list.
+            file_list = config.GetOptionFromDict<std::vector<std::string>>(
+                        "snapshot_files", std::vector<std::string>(0), basis_list[idx]);
+            YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_list[idx]);
+            if (snapshot_format)
+            {
+               FilenameParam snapshot_param("", snapshot_format);
+               snapshot_param.ParseFilenames(file_list);
+            }
+         }  // if (idx >= 0)
+      }
+      else
+         // if additional inputs are not specified, use default number of basis.
+         num_basis = num_basis_default;
+
       assert(num_basis > 0);
 
-      std::vector<std::string> file_list =
-         config.GetOptionFromDict<std::vector<std::string>>(
-            "snapshot_files", std::vector<std::string>(0), basis_list[p]);
-      YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_list[p]);
-      if (snapshot_format)
-      {
-         FilenameParam snapshot_param("", snapshot_format);
-         snapshot_param.ParseFilenames(file_list);
-      }
-
+      // if additional inputs are not specified for snapshot files, set default snapshot file name.
       if (file_list.size() == 0)
       {
-         std::string filename = sample_generator->GetBaseFilename(sample_generator->GetSamplePrefix(), basis_tag);
+         std::string filename = sample_generator->GetBaseFilename(sample_generator->GetSamplePrefix(), basis_tags[p]);
          filename += "_snapshot";
          file_list.push_back(filename);
       }
-      if (file_list.size() > 1)
-         mfem_warning("TrainROM - CAROM::BasisGenerator may not take multiple snapshot files.\n");
 
-      sample_generator->FormReducedBasis(basis_prefix, basis_tag, file_list, num_basis);
-   }  // for (int p = 0; p < basis_list.size(); p++)
+      sample_generator->FormReducedBasis(basis_prefix, basis_tags[p], file_list, num_basis);
+   }  // for (int p = 0; p < basis_tags.size(); p++)
 
    delete sample_generator;
-
-   // MultiBlockSolver *test = NULL;
-
-   // test = InitSolver();
-   // if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
-   // test->InitVariables();
-   
-   // test->FormReducedBasis();
-
-   // delete test;
 }
 
 void BuildROM(MPI_Comm comm)

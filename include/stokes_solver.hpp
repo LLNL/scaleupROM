@@ -144,6 +144,14 @@ public:
 
    virtual ~StokesSolver();
 
+   static const std::vector<std::string> GetVariableNames()
+   {
+      std::vector<std::string> varnames(2);
+      varnames[0] = "vel";
+      varnames[1] = "pres";
+      return varnames;
+   }
+
    GridFunction* GetVelGridFunction(const int k) const { return vels[k]; }
    GridFunction* GetPresGridFunction(const int k) const { return ps[k]; }
    const int GetVelFEOrder() const { return uorder; }

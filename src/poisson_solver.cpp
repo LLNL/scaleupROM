@@ -16,9 +16,11 @@ PoissonSolver::PoissonSolver()
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
  
+   var_names = GetVariableNames();
+   num_var = var_names.size();
+
    // solution dimension is determined by initialization.
    udim = 1;
-   num_var = 1;
    vdim.SetSize(num_var);
    vdim = 1;
 
@@ -37,9 +39,6 @@ PoissonSolver::PoissonSolver()
    for (int m = 0; m < numSub; m++) {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
-
-   var_names.resize(num_var);
-   var_names[0] = "solution";
 }
 
 PoissonSolver::~PoissonSolver()
