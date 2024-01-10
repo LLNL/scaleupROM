@@ -66,7 +66,7 @@ protected:
    // topology handler
    TopologyHandler *topol_handler = NULL;
 
-   // rom variables.
+   // component rom variables.
    /*
       number of columns in the basis for a reference component.
       For i-th reference component and j-th variable,
@@ -74,10 +74,18 @@ protected:
    */
    Array<int> comp_num_basis;
    Array<const CAROM::Matrix*> carom_comp_basis;
+   Array<int> rom_comp_block_offsets;
    bool basis_loaded;
    bool operator_loaded;
 
-   // SparseMatrix *romMat;
+   // domain rom variables.
+   /*
+      offset for the global domain ROM blocks.
+      For i-th subdomain and j-th variable,
+         index = i * num_var + j
+   */
+   Array<int> num_basis;
+   Array<const CAROM::Matrix*> carom_basis; // This is only the pointers to carom_comp_basis. no need of deleting.
    Array<int> rom_block_offsets;
    
    CAROM::Vector *reduced_rhs = NULL;
@@ -173,8 +181,11 @@ protected:
    } linsol_type;
    MUMPSSolver::MatType mat_type;
 
-   // rom variables.
-   Array<DenseMatrix*> spatialbasis;
+   // component rom variables.
+   Array<DenseMatrix*> comp_basis;
+
+   // domain rom variables.
+   Array<DenseMatrix*> basis; // This is only the pointers to comp_basis. no need of deleting.
 
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;

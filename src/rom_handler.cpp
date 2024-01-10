@@ -495,7 +495,7 @@ MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *in
 
 MFEMROMHandler::~MFEMROMHandler()
 {
-   DeletePointers(spatialbasis);
+   DeletePointers(comp_basis);
    delete romMat;
    delete romMat_mono;
    delete reduced_rhs;
@@ -508,13 +508,13 @@ void MFEMROMHandler::LoadReducedBasis()
 {
    ROMHandler::LoadReducedBasis();
 
-   spatialbasis.SetSize(carom_comp_basis.Size());
-   spatialbasis = NULL;
-   for (int k = 0; k < spatialbasis.Size(); k++)
+   comp_basis.SetSize(carom_comp_basis.Size());
+   comp_basis = NULL;
+   for (int k = 0; k < comp_basis.Size(); k++)
    {
       assert(carom_comp_basis[k] != NULL);
-      spatialbasis[k] = new DenseMatrix(carom_comp_basis[k]->numRows(), carom_comp_basis[k]->numColumns());
-      CAROM::CopyMatrix(*carom_comp_basis[k], *spatialbasis[k]);
+      comp_basis[k] = new DenseMatrix(carom_comp_basis[k]->numRows(), carom_comp_basis[k]->numColumns());
+      CAROM::CopyMatrix(*carom_comp_basis[k], *comp_basis[k]);
    }
 
    basis_loaded = true;
@@ -525,7 +525,7 @@ void MFEMROMHandler::GetBasis(const int &basis_index, DenseMatrix* &basis)
    assert(num_rom_comp_blocks > 0);
    assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
 
-   basis = spatialbasis[basis_index];
+   basis = comp_basis[basis_index];
 }
 
 void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
@@ -896,7 +896,7 @@ void MFEMROMHandler::SaveBasisVisualization(
          for (int v = 0, idx = midx * num_var; v < num_var; v++, idx++, vidx++)
             var_offsets[vidx] = fes[idx]->GetVSize();
       var_offsets.PartialSum();
-      BlockVector basis_view(spatialbasis[c]->GetData(), var_offsets);
+      BlockVector basis_view(comp_basis[c]->GetData(), var_offsets);
 
       Array<GridFunction*> basis_gf(comp_num_basis[c] * num_var);
       basis_gf = NULL;
