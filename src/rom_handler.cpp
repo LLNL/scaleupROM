@@ -73,13 +73,13 @@ ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topo
    : train_mode(train_mode_),
      topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
-     vdim(input_vdim),
+     fom_vdim(input_vdim),
      fom_num_vdofs(input_num_vdofs),
      basis_loaded(false),
      operator_loaded(false)
 {
-   num_var = vdim.Size();
-   udim = vdim.Sum();
+   num_var = fom_vdim.Size();
+   udim = fom_vdim.Sum();
    assert(fom_num_vdofs.Size() == (num_var * numSub));
 
    ParseInputs();
