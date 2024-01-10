@@ -43,7 +43,7 @@ protected:
    int udim = -1;            // solution dimension.
    int num_var = -1;         // number of variables for which POD is performed.
    int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
-   int num_rom_comp_blocks = -1;  // number of ROM component blocks.
+   int num_rom_comp_blocks = -1;  // number of ROM reference component blocks.
    Array<int> vdim;          // dimension of each variable.
    Array<int> fom_num_vdofs;
 
@@ -67,8 +67,13 @@ protected:
    TopologyHandler *topol_handler = NULL;
 
    // rom variables.
-   Array<int> comp_num_basis;    // number of columns in the basis for a component
-   Array<const CAROM::Matrix*> carom_spatialbasis;
+   /*
+      number of columns in the basis for a reference component.
+      For i-th reference component and j-th variable,
+         index = i * num_var + j
+   */
+   Array<int> comp_num_basis;
+   Array<const CAROM::Matrix*> carom_comp_basis;
    bool basis_loaded;
    bool operator_loaded;
 

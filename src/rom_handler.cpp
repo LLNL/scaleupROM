@@ -232,15 +232,15 @@ void ROMHandler::LoadReducedBasis()
    std::string basis_name;
    int numRowRB, numColumnRB;
 
-   carom_spatialbasis.SetSize(num_rom_comp_blocks);
+   carom_comp_basis.SetSize(num_rom_comp_blocks);
    for (int k = 0; k < num_rom_comp_blocks; k++)
    {
       basis_name = basis_prefix + "_" + GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name);
 
-      carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, comp_num_basis[k]);
-      numRowRB = carom_spatialbasis[k]->numRows();
-      numColumnRB = carom_spatialbasis[k]->numColumns();
+      carom_comp_basis[k] = basis_reader->getSpatialBasis(0.0, comp_num_basis[k]);
+      numRowRB = carom_comp_basis[k]->numRows();
+      numColumnRB = carom_comp_basis[k]->numColumns();
       printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
 
       delete basis_reader;
@@ -271,7 +271,7 @@ void ROMHandler::GetBasis(const int &basis_index, const CAROM::Matrix* &basis)
    assert(num_rom_comp_blocks > 0);
    assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
 
-   basis = carom_spatialbasis[basis_index];
+   basis = carom_comp_basis[basis_index];
 }
 
 void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis)
@@ -508,13 +508,13 @@ void MFEMROMHandler::LoadReducedBasis()
 {
    ROMHandler::LoadReducedBasis();
 
-   spatialbasis.SetSize(carom_spatialbasis.Size());
+   spatialbasis.SetSize(carom_comp_basis.Size());
    spatialbasis = NULL;
    for (int k = 0; k < spatialbasis.Size(); k++)
    {
-      assert(carom_spatialbasis[k] != NULL);
-      spatialbasis[k] = new DenseMatrix(carom_spatialbasis[k]->numRows(), carom_spatialbasis[k]->numColumns());
-      CAROM::CopyMatrix(*carom_spatialbasis[k], *spatialbasis[k]);
+      assert(carom_comp_basis[k] != NULL);
+      spatialbasis[k] = new DenseMatrix(carom_comp_basis[k]->numRows(), carom_comp_basis[k]->numColumns());
+      CAROM::CopyMatrix(*carom_comp_basis[k], *spatialbasis[k]);
    }
 
    basis_loaded = true;
