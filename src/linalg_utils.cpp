@@ -178,7 +178,15 @@ void RtAP(DenseMatrix& R,
       }
 }
 
-SparseMatrix* RtAP(DenseMatrix& R,
+DenseMatrix* DenseRtAP(DenseMatrix& R,
+   const Operator& A, DenseMatrix& P)
+{
+   DenseMatrix *mat = new DenseMatrix;
+   RtAP(R, A, P, *mat);
+   return mat;
+}
+
+SparseMatrix* SparseRtAP(DenseMatrix& R,
    const Operator& A, DenseMatrix& P)
 {
    assert(R.NumRows() == A.NumRows());

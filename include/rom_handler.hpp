@@ -126,13 +126,15 @@ public:
 
    int GetBasisIndexForSubdomain(const int &subdomain_index);
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) = 0;
+   virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis) = 0;
    virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) = 0;
    virtual void SetBlockSizes();
 
    // P_i^T * mat * P_j
    virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat) = 0;
-   // virtual void ProjectToRefBasis(const Array<int> &ridxs, const Array<int> &pidxs, const Array2D<Operator*> &mats, Array2D<CAROM::Matrix *> &rom_mats);
-   // virtual void DomainRTAP(const Array<int> &ridxs, const Array<int> &pidxs, const Array2D<Operator*> &mats, Array2D<CAROM::Matrix *> &rom_mats);
+   virtual SparseMatrix* ProjectToDomainBasis(const int &i, const int &j, const Operator *mat) = 0;
+   virtual void ProjectToRefBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
 
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats) = 0;
    virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec) = 0;
@@ -170,7 +172,7 @@ protected:
    Array<DenseMatrix*> ref_basis;
 
    // domain rom variables.
-   Array<DenseMatrix*> basis; // This is only the pointers to ref_basis. no need of deleting.
+   Array<DenseMatrix*> dom_basis; // This is only the pointers to ref_basis. no need of deleting.
 
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;
@@ -195,7 +197,14 @@ public:
    
    virtual void LoadReducedBasis();
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) override;
+   virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) override;
+
+   // P_i^T * mat * P_j
+   virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat);
+   virtual SparseMatrix* ProjectToDomainBasis(const int &i, const int &j, const Operator *mat);
+   virtual void ProjectToRefBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
 
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
@@ -203,9 +212,6 @@ public:
    { ProjectVectorOnReducedBasis(RHS, reduced_rhs); }
    virtual void Solve(BlockVector* U);
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
-   
-   // P_i^T * mat * P_j
-   virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(BlockMatrix *input_mat);

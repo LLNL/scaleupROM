@@ -329,12 +329,12 @@ void MFEMROMHandler::LoadReducedBasis()
       CAROM::CopyMatrix(*carom_ref_basis[k], *ref_basis[k]);
    }
 
-   basis.SetSize(num_rom_blocks);
+   dom_basis.SetSize(num_rom_blocks);
    for (int k = 0; k < num_rom_blocks; k++)
    {
       if (train_mode == TrainMode::INDIVIDUAL)
       {
-         basis[k] = ref_basis[k];
+         dom_basis[k] = ref_basis[k];
          continue;
       }
 
@@ -342,7 +342,7 @@ void MFEMROMHandler::LoadReducedBasis()
       int c = topol_handler->GetMeshType(m);
       int v = (separate_variable) ? k % num_var : 0;
       int idx = (separate_variable) ? c * num_var + v : c;
-      basis[k] = ref_basis[idx];
+      dom_basis[k] = ref_basis[idx];
    }
 
    basis_loaded = true;
@@ -354,6 +354,14 @@ void MFEMROMHandler::GetReferenceBasis(const int &basis_index, DenseMatrix* &bas
    assert((basis_index >= 0) && (basis_index < num_rom_ref_blocks));
 
    basis = ref_basis[basis_index];
+}
+
+void MFEMROMHandler::GetDomainBasis(const int &basis_index, DenseMatrix* &basis)
+{
+   assert(basis_loaded);
+   assert((basis_index >= 0) && (basis_index < num_rom_blocks));
+
+   basis = dom_basis[basis_index];
 }
 
 void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
@@ -641,7 +649,62 @@ SparseMatrix* MFEMROMHandler::ProjectToRefBasis(const int &i, const int &j, cons
    assert(basis_i->NumRows() == mat->Height());
    assert(basis_j->NumRows() == mat->Width());
 
-   return mfem::RtAP(*basis_i, *mat, *basis_j);
+   return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+}
+
+SparseMatrix* MFEMROMHandler::ProjectToDomainBasis(const int &i, const int &j, const Operator *mat)
+{
+   assert((i >= 0) && (i < num_rom_blocks));
+   assert((j >= 0) && (j < num_rom_blocks));
+   // assert(mat->Finalized());
+   assert(basis_loaded);
+   
+   DenseMatrix *basis_i, *basis_j;
+   GetDomainBasis(i, basis_i);
+   GetDomainBasis(j, basis_j);
+
+   assert(basis_i->NumRows() == mat->Height());
+   assert(basis_j->NumRows() == mat->Width());
+
+   return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+}
+
+void MFEMROMHandler::ProjectToRefBasis(
+   const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert(basis_loaded);
+   assert((idx_i.Min() >= 0) && (idx_i.Max() < num_rom_ref_blocks));
+   assert((idx_j.Min() >= 0) && (idx_j.Max() < num_rom_ref_blocks));
+   assert(idx_i.Size() == mats.NumRows());
+   assert(idx_j.Size() == mats.NumCols());
+
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         if (rom_mats(i, j)) delete rom_mats(i, j);
+   
+   rom_mats.SetSize(mats.NumRows(), mats.NumCols());
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         rom_mats(i, j) = ProjectToRefBasis(idx_i[i], idx_j[j], mats(i, j));
+}
+
+void MFEMROMHandler::ProjectToDomainBasis(
+   const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert(basis_loaded);
+   assert((idx_i.Min() >= 0) && (idx_i.Max() < num_rom_blocks));
+   assert((idx_j.Min() >= 0) && (idx_j.Max() < num_rom_blocks));
+   assert(idx_i.Size() == mats.NumRows());
+   assert(idx_j.Size() == mats.NumCols());
+
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         if (rom_mats(i, j)) delete rom_mats(i, j);
+   
+   rom_mats.SetSize(mats.NumRows(), mats.NumCols());
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         rom_mats(i, j) = ProjectToDomainBasis(idx_i[i], idx_j[j], mats(i, j));
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)

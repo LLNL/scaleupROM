@@ -52,9 +52,12 @@ void RtAP(DenseMatrix& R,
         const Operator& A,
         DenseMatrix& P,
         DenseMatrix& RAP);
-SparseMatrix* RtAP(DenseMatrix& R,
-                   const Operator& A,
-                   DenseMatrix& P);
+DenseMatrix* DenseRtAP(DenseMatrix& R,
+                       const Operator& A,
+                       DenseMatrix& P);
+SparseMatrix* SparseRtAP(DenseMatrix& R,
+                        const Operator& A,
+                        DenseMatrix& P);
 
 template<typename T>
 void PrintMatrix(const T &mat,
