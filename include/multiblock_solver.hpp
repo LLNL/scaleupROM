@@ -84,7 +84,7 @@ protected:
    Array<GridFunction *> global_us_visual;
 
    // rom variables.
-   ROMHandler *rom_handler = NULL;
+   ROMHandlerBase *rom_handler = NULL;
    TrainMode train_mode = NUM_TRAINMODE;
    bool use_rom = false;
    bool separate_variable_basis = false;
@@ -114,7 +114,7 @@ public:
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() const { return order; }
    const bool UseRom() const { return use_rom; }
-   ROMHandler* GetROMHandler() const { return rom_handler; }
+   ROMHandlerBase* GetROMHandler() const { return rom_handler; }
    const TrainMode GetTrainMode() { return train_mode; }
    const bool IsVisualizationSaved() const { return save_visual; }
    const std::string GetSolutionFilePrefix() const { return sol_prefix; }

@@ -309,7 +309,7 @@ void BuildROM(MPI_Comm comm)
    test->BuildOperators();
    test->SetupBCOperators();
    
-   ROMHandler *rom = test->GetROMHandler();
+   ROMHandlerBase *rom = test->GetROMHandler();
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
@@ -394,7 +394,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    double fom_assemble = -1.0, fom_solve = -1.0;
    double error = -1.0;
 
-   ROMHandler *rom = NULL;
+   ROMHandlerBase *rom = NULL;
    if (test->UseRom())
    {
       rom = test->GetROMHandler();
@@ -551,7 +551,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
       if (save_reduced_sol)
       {
-         ROMHandler *rom = test->GetROMHandler();
+         ROMHandlerBase *rom = test->GetROMHandler();
          rom->SaveReducedSolution("rom_reduced_sol.txt");
 
          // use ROMHandler::reduced_rhs as a temporary variable.

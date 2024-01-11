@@ -751,20 +751,22 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
 
 void MultiBlockSolver::InitROMHandler()
 {
-   std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
+   // std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
 
-   if (rom_handler_str == "base")
-   {
-      rom_handler = new ROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-   }
-   else if (rom_handler_str == "mfem")
-   {
-      rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-   }
-   else
-   {
-      mfem_error("Unknown ROM handler type!\n");
-   }
+   rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
+
+   // if (rom_handler_str == "base")
+   // {
+   //    rom_handler = new ROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
+   // }
+   // else if (rom_handler_str == "mfem")
+   // {
+   //    rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
+   // }
+   // else
+   // {
+   //    mfem_error("Unknown ROM handler type!\n");
+   // }
 }
 
 void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
