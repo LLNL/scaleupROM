@@ -126,29 +126,29 @@ void ROMHandlerBase::ParseInputs()
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
 
    num_rom_blocks = numSub;
-   if (train_mode == TrainMode::INDIVIDUAL)        num_rom_comp_blocks = numSub;
-   else if (train_mode == TrainMode::UNIVERSAL)    num_rom_comp_blocks = topol_handler->GetNumComponents();
+   if (train_mode == TrainMode::INDIVIDUAL)        num_rom_ref_blocks = numSub;
+   else if (train_mode == TrainMode::UNIVERSAL)    num_rom_ref_blocks = topol_handler->GetNumComponents();
    else
       mfem_error("ROMHandler - subdomain training mode is not set!\n");
 
-   num_rom_comp = num_rom_comp_blocks;
+   num_rom_comp = num_rom_ref_blocks;
 
    if (separate_variable)
    {
-      num_rom_comp_blocks *= num_var;
+      num_rom_ref_blocks *= num_var;
       num_rom_blocks *= num_var;
    }
    
-   const int comp_num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
-   comp_num_basis.SetSize(num_rom_comp_blocks);
-   comp_num_basis = comp_num_basis_default;
-   assert(comp_num_basis.Size() > 0);
+   const int num_ref_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
+   num_ref_basis.SetSize(num_rom_ref_blocks);
+   num_ref_basis = num_ref_basis_default;
+   assert(num_ref_basis.Size() > 0);
 
    YAML::Node basis_list = config.FindNode("basis/tags");
-   if ((!basis_list) && (comp_num_basis_default <= 0))
+   if ((!basis_list) && (num_ref_basis_default <= 0))
       mfem_error("ROMHandler - cannot find the basis tag list, nor default number of basis is not set!\n");
 
-   for (int b = 0; b < num_rom_comp_blocks; b++)
+   for (int b = 0; b < num_rom_ref_blocks; b++)
    {
       std::string basis_tag;
       if (separate_variable)
@@ -156,17 +156,17 @@ void ROMHandlerBase::ParseInputs()
       else
          basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler);
 
-      comp_num_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", comp_num_basis_default, basis_list);
+      num_ref_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", num_ref_basis_default, basis_list);
 
-      if (comp_num_basis[b] < 0)
+      if (num_ref_basis[b] < 0)
       {
          printf("Cannot find the number of basis for %s!\n", basis_tag.c_str());
          mfem_error("Or specify the default number of basis!\n");
       }
    }
    
-   for (int k = 0; k < comp_num_basis.Size(); k++)
-      assert(comp_num_basis[k] > 0);
+   for (int k = 0; k < num_ref_basis.Size(); k++)
+      assert(num_ref_basis[k] > 0);
 
    max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
@@ -183,8 +183,8 @@ void ROMHandlerBase::LoadReducedBasis()
    std::string basis_name;
    int numRowRB, numColumnRB;
 
-   carom_comp_basis.SetSize(num_rom_comp_blocks);
-   for (int k = 0; k < num_rom_comp_blocks; k++)
+   carom_ref_basis.SetSize(num_rom_ref_blocks);
+   for (int k = 0; k < num_rom_ref_blocks; k++)
    {
       basis_name = basis_prefix + "_";
       if (separate_variable)
@@ -193,9 +193,9 @@ void ROMHandlerBase::LoadReducedBasis()
          basis_name += GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name);
 
-      carom_comp_basis[k] = basis_reader->getSpatialBasis(0.0, comp_num_basis[k]);
-      numRowRB = carom_comp_basis[k]->numRows();
-      numColumnRB = carom_comp_basis[k]->numColumns();
+      carom_ref_basis[k] = basis_reader->getSpatialBasis(0.0, num_ref_basis[k]);
+      numRowRB = carom_ref_basis[k]->numRows();
+      numColumnRB = carom_ref_basis[k]->numColumns();
       printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
 
       delete basis_reader;
@@ -206,7 +206,7 @@ void ROMHandlerBase::LoadReducedBasis()
    {
       if (train_mode == TrainMode::INDIVIDUAL)
       {
-         carom_basis[k] = carom_comp_basis[k];
+         carom_basis[k] = carom_ref_basis[k];
          continue;
       }
 
@@ -214,7 +214,7 @@ void ROMHandlerBase::LoadReducedBasis()
       int c = topol_handler->GetMeshType(m);
       int v = (separate_variable) ? k % num_var : 0;
       int idx = (separate_variable) ? c * num_var + v : c;
-      carom_basis[k] = carom_comp_basis[idx];
+      carom_basis[k] = carom_ref_basis[idx];
    }
 
    basis_loaded = true;
@@ -240,7 +240,7 @@ int ROMHandlerBase::GetBasisIndexForSubdomain(const int &subdomain_index)
 void ROMHandlerBase::SetBlockSizes()
 {
    rom_block_offsets.SetSize(num_rom_blocks+1);
-   rom_comp_block_offsets.SetSize(num_rom_comp_blocks+1);
+   rom_comp_block_offsets.SetSize(num_rom_ref_blocks+1);
    rom_block_offsets = 0;
    rom_comp_block_offsets = 0;
 
@@ -248,24 +248,24 @@ void ROMHandlerBase::SetBlockSizes()
    {
       for (int c = 0, idx = 0; c < num_rom_comp; c++)
          for (int v = 0; v < num_var; v++, idx++)
-            rom_comp_block_offsets[idx+1] = comp_num_basis[idx];
+            rom_comp_block_offsets[idx+1] = num_ref_basis[idx];
 
       for (int k = 0, idx = 0; k < numSub; k++)
       {
          int c = topol_handler->GetMeshType(k);
          for (int v = 0; v < num_var; v++, idx++)
-            rom_block_offsets[idx+1] = comp_num_basis[c * num_var + v];
+            rom_block_offsets[idx+1] = num_ref_basis[c * num_var + v];
       }
    }
    else
    {
       for (int c = 0; c < num_rom_comp; c++)
-         rom_comp_block_offsets[c+1] = comp_num_basis[c];
+         rom_comp_block_offsets[c+1] = num_ref_basis[c];
 
       for (int k = 0; k < numSub; k++)
       {
          int c = topol_handler->GetMeshType(k);
-         rom_block_offsets[k+1] = comp_num_basis[c];
+         rom_block_offsets[k+1] = num_ref_basis[c];
       }
    }
 
@@ -307,7 +307,7 @@ MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *in
 
 MFEMROMHandler::~MFEMROMHandler()
 {
-   DeletePointers(comp_basis);
+   DeletePointers(ref_basis);
    delete romMat;
    delete romMat_mono;
    delete reduced_rhs;
@@ -320,13 +320,13 @@ void MFEMROMHandler::LoadReducedBasis()
 {
    ROMHandlerBase::LoadReducedBasis();
 
-   comp_basis.SetSize(carom_comp_basis.Size());
-   comp_basis = NULL;
-   for (int k = 0; k < comp_basis.Size(); k++)
+   ref_basis.SetSize(carom_ref_basis.Size());
+   ref_basis = NULL;
+   for (int k = 0; k < ref_basis.Size(); k++)
    {
-      assert(carom_comp_basis[k] != NULL);
-      comp_basis[k] = new DenseMatrix(carom_comp_basis[k]->numRows(), carom_comp_basis[k]->numColumns());
-      CAROM::CopyMatrix(*carom_comp_basis[k], *comp_basis[k]);
+      assert(carom_ref_basis[k] != NULL);
+      ref_basis[k] = new DenseMatrix(carom_ref_basis[k]->numRows(), carom_ref_basis[k]->numColumns());
+      CAROM::CopyMatrix(*carom_ref_basis[k], *ref_basis[k]);
    }
 
    basis.SetSize(num_rom_blocks);
@@ -334,7 +334,7 @@ void MFEMROMHandler::LoadReducedBasis()
    {
       if (train_mode == TrainMode::INDIVIDUAL)
       {
-         basis[k] = comp_basis[k];
+         basis[k] = ref_basis[k];
          continue;
       }
 
@@ -342,7 +342,7 @@ void MFEMROMHandler::LoadReducedBasis()
       int c = topol_handler->GetMeshType(m);
       int v = (separate_variable) ? k % num_var : 0;
       int idx = (separate_variable) ? c * num_var + v : c;
-      basis[k] = comp_basis[idx];
+      basis[k] = ref_basis[idx];
    }
 
    basis_loaded = true;
@@ -350,10 +350,10 @@ void MFEMROMHandler::LoadReducedBasis()
 
 void MFEMROMHandler::GetReferenceBasis(const int &basis_index, DenseMatrix* &basis)
 {
-   assert(num_rom_comp_blocks > 0);
-   assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
+   assert(num_rom_ref_blocks > 0);
+   assert((basis_index >= 0) && (basis_index < num_rom_ref_blocks));
 
-   basis = comp_basis[basis_index];
+   basis = ref_basis[basis_index];
 }
 
 void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
@@ -373,16 +373,16 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
 
    // This is pretty much the same as Assemble().
    // Each basis is applied to the same column blocks.
-   int comp_num_basis_i, comp_num_basis_j;
+   int num_ref_basis_i, num_ref_basis_j;
    int basis_i, basis_j;
    for (int i = 0; i < numSub; i++)
    {
-      comp_num_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
+      num_ref_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
       basis_i = GetBasisIndexForSubdomain(i);
 
       for (int j = 0; j < numSub; j++)
       {
-         comp_num_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
+         num_ref_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
          basis_j = GetBasisIndexForSubdomain(j);
          
          SparseMatrix *elemmat = ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j));
@@ -629,17 +629,17 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
 
 SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
 {
-   assert((i >= 0) && (i < num_rom_comp_blocks));
-   assert((j >= 0) && (j < num_rom_comp_blocks));
+   assert((i >= 0) && (i < num_rom_ref_blocks));
+   assert((j >= 0) && (j < num_rom_ref_blocks));
    // assert(mat->Finalized());
    assert(basis_loaded);
    
    DenseMatrix *basis_i, *basis_j;
-   int comp_num_basis_i, comp_num_basis_j;
+   int num_ref_basis_i, num_ref_basis_j;
    GetReferenceBasis(i, basis_i);
-   comp_num_basis_i = basis_i->NumCols();
+   num_ref_basis_i = basis_i->NumCols();
    GetReferenceBasis(j, basis_j);
-   comp_num_basis_j = basis_j->NumCols();
+   num_ref_basis_j = basis_j->NumCols();
 
    return mfem::RtAP(*basis_i, *mat, *basis_j);
 }
@@ -696,7 +696,7 @@ void MFEMROMHandler::SaveBasisVisualization(
    if (train_mode == TrainMode::UNIVERSAL)
       visual_prefix += "_universal";
 
-   for (int c = 0; c < num_rom_comp_blocks; c++)
+   for (int c = 0; c < num_rom_ref_blocks; c++)
    {
       std::string file_prefix = visual_prefix;
       file_prefix += "_" + std::to_string(c);
@@ -718,17 +718,17 @@ void MFEMROMHandler::SaveBasisVisualization(
       const int order = fes[midx * num_var]->FEColl()->GetOrder();
       ParaViewDataCollection coll = ParaViewDataCollection(file_prefix.c_str(), mesh);
 
-      Array<int> var_offsets(comp_num_basis[c] * num_var + 1);
+      Array<int> var_offsets(num_ref_basis[c] * num_var + 1);
       var_offsets[0] = 0;
-      for (int k = 0, vidx = 1; k < comp_num_basis[c]; k++)
+      for (int k = 0, vidx = 1; k < num_ref_basis[c]; k++)
          for (int v = 0, idx = midx * num_var; v < num_var; v++, idx++, vidx++)
             var_offsets[vidx] = fes[idx]->GetVSize();
       var_offsets.PartialSum();
-      BlockVector basis_view(comp_basis[c]->GetData(), var_offsets);
+      BlockVector basis_view(ref_basis[c]->GetData(), var_offsets);
 
-      Array<GridFunction*> basis_gf(comp_num_basis[c] * num_var);
+      Array<GridFunction*> basis_gf(num_ref_basis[c] * num_var);
       basis_gf = NULL;
-      for (int k = 0, idx = 0; k < comp_num_basis[c]; k++)
+      for (int k = 0, idx = 0; k < num_ref_basis[c]; k++)
       {
          for (int v = 0, fidx = midx * num_var; v < num_var; v++, idx++, fidx++)
          {

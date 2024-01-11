@@ -42,7 +42,7 @@ protected:
    int numSub = -1;          // number of subdomains.
    int num_var = -1;         // number of variables for which POD is performed.
    int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
-   int num_rom_comp_blocks = -1;  // number of ROM reference component blocks.
+   int num_rom_ref_blocks = -1;  // number of ROM reference component blocks.
    int num_rom_comp = -1;     // number of ROM reference components.
    std::vector<std::string> fom_var_names;          // dimension of each variable.
    Array<int> fom_var_offsets;
@@ -74,8 +74,8 @@ protected:
       For i-th reference component and j-th variable,
          index = i * num_var + j
    */
-   Array<int> comp_num_basis;
-   Array<const CAROM::Matrix*> carom_comp_basis;
+   Array<int> num_ref_basis;
+   Array<const CAROM::Matrix*> carom_ref_basis;
    Array<int> rom_comp_block_offsets;
    bool basis_loaded;
    bool operator_loaded;
@@ -87,7 +87,7 @@ protected:
          index = i * num_var + j
    */
    Array<int> num_basis;
-   Array<const CAROM::Matrix*> carom_basis; // This is only the pointers to carom_comp_basis. no need of deleting.
+   Array<const CAROM::Matrix*> carom_basis; // This is only the pointers to carom_ref_basis. no need of deleting.
    Array<int> rom_block_offsets;
    
    CAROM::Vector *reduced_rhs = NULL;
@@ -111,8 +111,8 @@ public:
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
-   const int GetNumROMComponentBlocks() { return num_rom_comp_blocks; }
-   const int GetComponentNumBasis(const int &basis_idx) { return comp_num_basis[basis_idx]; }
+   const int GetNumROMRefBlocks() { return num_rom_ref_blocks; }
+   const int GetComponentNumBasis(const int &basis_idx) { return num_ref_basis[basis_idx]; }
    const ROMBuildingLevel SaveOperator() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
@@ -166,10 +166,10 @@ protected:
    MUMPSSolver::MatType mat_type;
 
    // component rom variables.
-   Array<DenseMatrix*> comp_basis;
+   Array<DenseMatrix*> ref_basis;
 
    // domain rom variables.
-   Array<DenseMatrix*> basis; // This is only the pointers to comp_basis. no need of deleting.
+   Array<DenseMatrix*> basis; // This is only the pointers to ref_basis. no need of deleting.
 
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;
