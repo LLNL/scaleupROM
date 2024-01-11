@@ -245,6 +245,22 @@ void ROMHandler::LoadReducedBasis()
       delete basis_reader;
    }
 
+   carom_basis.SetSize(num_rom_blocks);
+   for (int k = 0; k < num_rom_blocks; k++)
+   {
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         carom_basis[k] = carom_comp_basis[k];
+         continue;
+      }
+
+      int m = (separate_variable) ? k / num_var : k;
+      int c = topol_handler->GetMeshType(m);
+      int v = (separate_variable) ? k % num_var : 0;
+      int idx = (separate_variable) ? c * num_var + v : c;
+      carom_basis[k] = carom_comp_basis[idx];
+   }
+
    basis_loaded = true;
 }
 
@@ -536,6 +552,22 @@ void MFEMROMHandler::LoadReducedBasis()
       assert(carom_comp_basis[k] != NULL);
       comp_basis[k] = new DenseMatrix(carom_comp_basis[k]->numRows(), carom_comp_basis[k]->numColumns());
       CAROM::CopyMatrix(*carom_comp_basis[k], *comp_basis[k]);
+   }
+
+   basis.SetSize(num_rom_blocks);
+   for (int k = 0; k < num_rom_blocks; k++)
+   {
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         basis[k] = comp_basis[k];
+         continue;
+      }
+
+      int m = (separate_variable) ? k / num_var : k;
+      int c = topol_handler->GetMeshType(m);
+      int v = (separate_variable) ? k % num_var : 0;
+      int idx = (separate_variable) ? c * num_var + v : c;
+      basis[k] = comp_basis[idx];
    }
 
    basis_loaded = true;
