@@ -44,6 +44,7 @@ protected:
    int num_var = -1;         // number of variables for which POD is performed.
    int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
    int num_rom_comp_blocks = -1;  // number of ROM reference component blocks.
+   int num_rom_comp = -1;     // number of ROM reference components.
    Array<int> fom_vdim;          // dimension of each variable.
    Array<int> fom_var_offsets;
    Array<int> fom_num_vdofs;

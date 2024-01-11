@@ -128,6 +128,8 @@ void ROMHandler::ParseInputs()
    else
       mfem_error("ROMHandler - subdomain training mode is not set!\n");
 
+   num_rom_comp = num_rom_comp_blocks;
+
    if (separate_variable)
    {
       num_rom_comp_blocks *= num_var;
@@ -311,16 +313,38 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 
 void ROMHandler::SetBlockSizes()
 {
-   // TODO: non-uniform subdomain cases.
-   rom_block_offsets.SetSize(numSub+1);
+   rom_block_offsets.SetSize(num_rom_blocks+1);
+   rom_comp_block_offsets.SetSize(num_rom_comp_blocks+1);
    rom_block_offsets = 0;
+   rom_comp_block_offsets = 0;
 
-   for (int k = 1; k <= numSub; k++)
+   if (separate_variable)
    {
-      int c = topol_handler->GetMeshType(k-1);
-      rom_block_offsets[k] = comp_num_basis[c];
+      for (int c = 0, idx = 0; c < num_rom_comp; c++)
+         for (int v = 0; v < num_var; v++, idx++)
+            rom_comp_block_offsets[idx+1] = comp_num_basis[idx];
+
+      for (int k = 0, idx = 0; k < numSub; k++)
+      {
+         int c = topol_handler->GetMeshType(k);
+         for (int v = 0; v < num_var; v++, idx++)
+            rom_block_offsets[idx+1] = comp_num_basis[c * num_var + v];
+      }
    }
+   else
+   {
+      for (int c = 0; c < num_rom_comp; c++)
+         rom_comp_block_offsets[c+1] = comp_num_basis[c];
+
+      for (int k = 0; k < numSub; k++)
+      {
+         int c = topol_handler->GetMeshType(k);
+         rom_block_offsets[k+1] = comp_num_basis[c];
+      }
+   }
+
    rom_block_offsets.PartialSum();
+   rom_comp_block_offsets.PartialSum();
 }
 
 void ROMHandler::AllocROMMat()
