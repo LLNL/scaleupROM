@@ -281,7 +281,7 @@ int ROMHandler::GetBasisIndexForSubdomain(const int &subdomain_index)
    return idx;
 }
 
-void ROMHandler::GetBasis(const int &basis_index, const CAROM::Matrix* &basis)
+void ROMHandler::GetReferenceBasis(const int &basis_index, const CAROM::Matrix* &basis)
 {
    assert(num_rom_comp_blocks > 0);
    assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
@@ -294,7 +294,7 @@ void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Ma
    assert(basis_loaded);
 
    int idx = GetBasisIndexForSubdomain(subdomain_index);
-   GetBasis(idx, basis);
+   GetReferenceBasis(idx, basis);
    return;
 }
 
@@ -443,9 +443,9 @@ void ROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const
    
    const CAROM::Matrix *basis_i, *basis_j;
    int comp_num_basis_i, comp_num_basis_j;
-   GetBasis(i, basis_i);
+   GetReferenceBasis(i, basis_i);
    comp_num_basis_i = basis_i->numColumns();
-   GetBasis(j, basis_j);
+   GetReferenceBasis(j, basis_j);
    comp_num_basis_j = basis_j->numColumns();
 
    // TODO: multi-component case.
@@ -573,7 +573,7 @@ void MFEMROMHandler::LoadReducedBasis()
    basis_loaded = true;
 }
 
-void MFEMROMHandler::GetBasis(const int &basis_index, DenseMatrix* &basis)
+void MFEMROMHandler::GetReferenceBasis(const int &basis_index, DenseMatrix* &basis)
 {
    assert(num_rom_comp_blocks > 0);
    assert((basis_index >= 0) && (basis_index < num_rom_comp_blocks));
@@ -586,7 +586,7 @@ void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix
    assert(basis_loaded);
 
    int idx = GetBasisIndexForSubdomain(subdomain_index);
-   GetBasis(idx, basis);
+   GetReferenceBasis(idx, basis);
 }
 
 void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
@@ -861,9 +861,9 @@ SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const 
    
    DenseMatrix *basis_i, *basis_j;
    int comp_num_basis_i, comp_num_basis_j;
-   GetBasis(i, basis_i);
+   GetReferenceBasis(i, basis_i);
    comp_num_basis_i = basis_i->NumCols();
-   GetBasis(j, basis_j);
+   GetReferenceBasis(j, basis_j);
    comp_num_basis_j = basis_j->NumCols();
 
    return mfem::RtAP(*basis_i, *mat, *basis_j);

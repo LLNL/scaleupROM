@@ -130,9 +130,9 @@ public:
    virtual void LoadReducedBasis();
 
    int GetBasisIndexForSubdomain(const int &subdomain_index);
-   void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
+   void GetReferenceBasis(const int &basis_index, const CAROM::Matrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
-   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis)
+   virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis)
    { mfem_error("ROMHandler::GetBasis only supports CAROM::Matrix! Use MFEMROMHandler.\n"); }
    virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
    { mfem_error("ROMHandler::GetBasis only supports CAROM::Matrix! Use MFEMROMHandler.\n"); }
@@ -213,7 +213,7 @@ public:
    // cannot do const GridFunction* due to librom function definitions.
    // virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis) override;
+   virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) override;
    virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) override;
    // virtual void AllocROMMat();  // allocate matrixes for rom.
    // TODO: extension to nonlinear operators.

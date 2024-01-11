@@ -411,7 +411,7 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
-      rom_handler->GetBasis(c, basis);
+      rom_handler->GetReferenceBasis(c, basis);
       comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
    }  // for (int c = 0; c < num_comp; c++)
 }
