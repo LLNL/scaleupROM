@@ -117,6 +117,7 @@ void MultiBlockSolver::ParseInputs()
 
    // rom inputs.
    use_rom = config.GetOption<bool>("main/use_rom", false);
+   separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    train_mode = SetTrainMode();
 
@@ -751,15 +752,14 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
 void MultiBlockSolver::InitROMHandler()
 {
    std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
-   separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    if (rom_handler_str == "base")
    {
-      rom_handler = new ROMHandler(train_mode, topol_handler, vdim, var_offsets, separate_variable_basis);
+      rom_handler = new ROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
    }
    else if (rom_handler_str == "mfem")
    {
-      rom_handler = new MFEMROMHandler(train_mode, topol_handler, vdim, var_offsets, separate_variable_basis);
+      rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
    }
    else
    {
@@ -769,16 +769,29 @@ void MultiBlockSolver::InitROMHandler()
 
 void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
 {
-   // TODO: support variable-separate basis case.
-   basis_tags.resize(numSub);
-   for (int m = 0; m < numSub; m++)
-      basis_tags[m] = GetBasisTag(m, train_mode, topol_handler);
+   if (separate_variable_basis)
+   {
+      basis_tags.resize(numSub * num_var);
+      for (int m = 0, idx = 0; m < numSub; m++)
+         for (int v = 0; v < num_var; v++, idx++)
+            basis_tags[idx] = GetBasisTag(m, train_mode, topol_handler, var_names[v]);
+   }
+   else
+   {
+      basis_tags.resize(numSub);
+      for (int m = 0; m < numSub; m++)
+         basis_tags[m] = GetBasisTag(m, train_mode, topol_handler);
+   }
 }
 
 void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags)
 {
-   // TODO: get offsets set by rom_handler.
-   U_snapshots = new BlockVector(U->GetData(), domain_offsets); // View vector for U.
+   // View vector for U.
+   if (separate_variable_basis)
+      U_snapshots = new BlockVector(U->GetData(), var_offsets); 
+   else
+      U_snapshots = new BlockVector(U->GetData(), domain_offsets);
+
    GetBasisTags(basis_tags);
    assert(U_snapshots->NumBlocks() == basis_tags.size());
 }

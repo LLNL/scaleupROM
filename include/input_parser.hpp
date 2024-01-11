@@ -143,6 +143,26 @@ public:
    void SetOption(const std::string &keys, const T &value)
    { SetOptionInDict<T>(keys, value, dict_); }
 
+   template<class LT, class RT>
+   const RT LookUpFromDict(const std::string &lkey, const LT &lval, const std::string &rkey, const RT &rval_default, YAML::Node input_dict)
+   {
+      RT rval = rval_default;
+      if (input_dict.size() == 0)
+         return rval;
+
+      for (int k = 0; k < input_dict.size(); k++)
+      {
+         YAML::Node lval_node = FindNodeFromDict(lkey, input_dict[k]);
+         if (lval_node && (lval_node.as<LT>() == lval))
+         {
+            rval = GetOptionFromDict<RT>(rkey, rval_default, input_dict[k]);
+            break;
+         }
+      }
+
+      return rval;
+   }
+
 private:
    void OverwriteOption(const std::string &forced_input);
 

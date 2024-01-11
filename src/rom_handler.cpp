@@ -29,35 +29,39 @@ const TrainMode SetTrainMode()
 }
 
 const std::string GetBasisTagForComponent(
-   const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler)
+   const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name)
 {
+   std::string tag;
    switch (train_mode)
    {
-      case (INDIVIDUAL):   { return "dom" + std::to_string(comp_idx); break; }
-      case (UNIVERSAL):    { return topol_handler->GetComponentName(comp_idx); break; }
+      case (INDIVIDUAL):   { tag = "dom" + std::to_string(comp_idx); break; }
+      case (UNIVERSAL):    { tag = topol_handler->GetComponentName(comp_idx); break; }
       default:
       {
          mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
          break;
       }
    }
-   return "";
+   if (var_name != "")
+      tag += "_" + var_name;
+   return tag;
 }
 
 const std::string GetBasisTag(
-   const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler)
+   const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name)
 {
+   std::string tag;
    switch (train_mode)
    {
       case (INDIVIDUAL):
       {
-         return "dom" + std::to_string(subdomain_index);
+         tag = "dom" + std::to_string(subdomain_index);
          break;
       }
       case (UNIVERSAL):
       {
          int c_type = topol_handler->GetMeshType(subdomain_index);
-         return topol_handler->GetComponentName(c_type);
+         tag = topol_handler->GetComponentName(c_type);
          break;
       }
       default:
@@ -66,21 +70,22 @@ const std::string GetBasisTag(
          break;
       }
    }
-   return "";
+   if (var_name != "")
+      tag += "_" + var_name;
+   return tag;
 }
 
-ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_var_offsets, const bool separate_variable_basis)
+ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis)
    : train_mode(train_mode_),
      topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
-     fom_vdim(input_vdim),
+     fom_var_names(var_names),
      fom_var_offsets(input_var_offsets),
      basis_loaded(false),
      operator_loaded(false),
      separate_variable(separate_variable_basis)
 {
-   num_var = fom_vdim.Size();
-   udim = fom_vdim.Sum();
+   num_var = fom_var_names.size();
 
    fom_num_vdofs.SetSize(numSub);
    for (int m = 0, idx = 0; m < numSub; m++)
@@ -145,20 +150,17 @@ void ROMHandler::ParseInputs()
    if ((!basis_list) && (comp_num_basis_default <= 0))
       mfem_error("ROMHandler - cannot find the basis tag list, nor default number of basis is not set!\n");
 
-   for (int c = 0; c < num_rom_comp_blocks; c++)
+   for (int b = 0; b < num_rom_comp_blocks; b++)
    {
-      std::string basis_tag = GetBasisTagForComponent(c, train_mode, topol_handler);
+      std::string basis_tag;
+      if (separate_variable)
+         basis_tag = GetBasisTagForComponent(b / num_var, train_mode, topol_handler, fom_var_names[b % num_var]);
+      else
+         basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler);
 
-      // Not so sure we need to explicitly list out all the needed basis tags here.
-      for (int p = 0; p < basis_list.size(); p++)
-         if (basis_tag == config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]))
-         {
-            const int nb = config.GetOptionFromDict<int>("number_of_basis", comp_num_basis_default, basis_list[p]);
-            comp_num_basis[c] = nb;
-            break;
-         }
-      
-      if (comp_num_basis[c] < 0)
+      comp_num_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", comp_num_basis_default, basis_list);
+
+      if (comp_num_basis[b] < 0)
       {
          printf("Cannot find the number of basis for %s!\n", basis_tag.c_str());
          mfem_error("Or specify the default number of basis!\n");
@@ -228,7 +230,11 @@ void ROMHandler::LoadReducedBasis()
    carom_comp_basis.SetSize(num_rom_comp_blocks);
    for (int k = 0; k < num_rom_comp_blocks; k++)
    {
-      basis_name = basis_prefix + "_" + GetBasisTagForComponent(k, train_mode, topol_handler);
+      basis_name = basis_prefix + "_";
+      if (separate_variable)
+         basis_name += GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
+      else
+         basis_name += GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name);
 
       carom_comp_basis[k] = basis_reader->getSpatialBasis(0.0, comp_num_basis[k]);
@@ -478,8 +484,8 @@ void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_var_offsets, bool separate_variable_basis)
-   : ROMHandler(train_mode_, input_topol, input_vdim, input_var_offsets, separate_variable_basis)
+MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis)
+   : ROMHandler(train_mode_, input_topol, input_var_offsets, var_names, separate_variable_basis)
 {
    romMat = new BlockMatrix(rom_block_offsets);
    romMat->owns_blocks = true;

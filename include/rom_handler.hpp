@@ -32,20 +32,19 @@ enum ROMBuildingLevel
 
 const TrainMode SetTrainMode();
 
-const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler);
-const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler);
+const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
+const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
 
 class ROMHandler
 {
 protected:
 // public:
    int numSub = -1;          // number of subdomains.
-   int udim = -1;            // solution dimension.
    int num_var = -1;         // number of variables for which POD is performed.
    int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
    int num_rom_comp_blocks = -1;  // number of ROM reference component blocks.
    int num_rom_comp = -1;     // number of ROM reference components.
-   Array<int> fom_vdim;          // dimension of each variable.
+   std::vector<std::string> fom_var_names;          // dimension of each variable.
    Array<int> fom_var_offsets;
    Array<int> fom_num_vdofs;
 
@@ -108,7 +107,7 @@ protected:
    void ParseInputs();
 public:
    ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-              const Array<int> &input_vdim, const Array<int> &input_var_offsets, const bool separate_variable_basis);
+              const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis);
 
    virtual ~ROMHandler();
 
@@ -204,7 +203,7 @@ protected:
 
 public:
    MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-                  const Array<int> &input_vdim, const Array<int> &input_var_offsets, const bool separate_variable_basis);
+                  const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis);
 
    virtual ~MFEMROMHandler();
 
