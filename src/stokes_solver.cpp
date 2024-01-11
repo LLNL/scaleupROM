@@ -554,7 +554,7 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       Array<int> dummy1, dummy2;
       BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
 
-      comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+      comp_mats[c] = rom_handler->ProjectToRefBasis(c, c, sys_comp);
 
       delete bt_mat;
       delete sys_comp;
@@ -604,7 +604,7 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          Array<int> dummy1, dummy2;
          BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
 
-         (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+         (*bdr_mats_c)[b] = rom_handler->ProjectToRefBasis(c, c, sys_comp);
 
          delete bt_mat;
          delete sys_comp;
@@ -661,7 +661,7 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
             Array<int> dummy1, dummy2;
             BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
                                                    dummy1, dummy2);
-            (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat);
+            (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], tmp_mat);
             delete tmp_mat;
          }
 

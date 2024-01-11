@@ -360,7 +360,7 @@ void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       a_comp.Assemble();
       a_comp.Finalize();
 
-      comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
+      comp_mats[c] = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
    }
 }
 
@@ -389,7 +389,7 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          a_comp.Assemble();
          a_comp.Finalize();
 
-         (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
+         (*bdr_mats_c)[b] = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
       }
    }
 }
@@ -423,7 +423,7 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-            (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j));
+            (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], spmats(i,j));
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++) delete spmats(i, j);

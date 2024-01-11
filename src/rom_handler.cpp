@@ -385,7 +385,7 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
          num_ref_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
          basis_j = GetBasisIndexForSubdomain(j);
          
-         SparseMatrix *elemmat = ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j));
+         SparseMatrix *elemmat = ProjectToRefBasis(basis_i, basis_j, mats(i,j));
          romMat->SetBlock(i, j, elemmat);
       }
    }  // for (int j = 0; j < numSub; j++)
@@ -627,7 +627,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    }
 }
 
-SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
+SparseMatrix* MFEMROMHandler::ProjectToRefBasis(const int &i, const int &j, const Operator *mat)
 {
    assert((i >= 0) && (i < num_rom_ref_blocks));
    assert((j >= 0) && (j < num_rom_ref_blocks));
@@ -635,11 +635,11 @@ SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const 
    assert(basis_loaded);
    
    DenseMatrix *basis_i, *basis_j;
-   int num_ref_basis_i, num_ref_basis_j;
    GetReferenceBasis(i, basis_i);
-   num_ref_basis_i = basis_i->NumCols();
    GetReferenceBasis(j, basis_j);
-   num_ref_basis_j = basis_j->NumCols();
+
+   assert(basis_i->NumRows() == mat->Height());
+   assert(basis_j->NumRows() == mat->Width());
 
    return mfem::RtAP(*basis_i, *mat, *basis_j);
 }

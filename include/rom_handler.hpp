@@ -129,7 +129,9 @@ public:
    virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) = 0;
    virtual void SetBlockSizes();
 
-   // virtual void ReferenceRTAP(const Array<int> &ridxs, const Array<int> &pidxs, const Array2D<Operator*> &mats, Array2D<CAROM::Matrix *> &rom_mats);
+   // P_i^T * mat * P_j
+   virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat) = 0;
+   // virtual void ProjectToRefBasis(const Array<int> &ridxs, const Array<int> &pidxs, const Array2D<Operator*> &mats, Array2D<CAROM::Matrix *> &rom_mats);
    // virtual void DomainRTAP(const Array<int> &ridxs, const Array<int> &pidxs, const Array2D<Operator*> &mats, Array2D<CAROM::Matrix *> &rom_mats);
 
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats) = 0;
@@ -139,8 +141,7 @@ public:
    virtual void Solve(BlockVector* U) = 0;
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;
 
-   // P_i^T * mat * P_j
-   virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat) = 0;
+   
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
    virtual void LoadOperator(BlockMatrix *input_mat) = 0;
@@ -204,7 +205,7 @@ public:
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
    
    // P_i^T * mat * P_j
-   virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat);
+   virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat);
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(BlockMatrix *input_mat);
