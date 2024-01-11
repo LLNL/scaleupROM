@@ -69,18 +69,26 @@ const std::string GetBasisTag(
    return "";
 }
 
-ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_var_offsets, const bool separate_variable_basis)
    : train_mode(train_mode_),
      topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
      fom_vdim(input_vdim),
-     fom_num_vdofs(input_num_vdofs),
+     fom_var_offsets(input_var_offsets),
      basis_loaded(false),
-     operator_loaded(false)
+     operator_loaded(false),
+     separate_variable(separate_variable_basis)
 {
    num_var = fom_vdim.Size();
    udim = fom_vdim.Sum();
-   assert(fom_num_vdofs.Size() == (num_var * numSub));
+
+   fom_num_vdofs.SetSize(numSub);
+   for (int m = 0, idx = 0; m < numSub; m++)
+   {
+      fom_num_vdofs[m] = 0;
+      for (int v = 0; v < num_var; v++, idx++)
+         fom_num_vdofs[m] += fom_var_offsets[idx+1] - fom_var_offsets[idx];
+   }
 
    ParseInputs();
 
@@ -105,42 +113,25 @@ void ROMHandler::ParseInputs()
    basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
-   if (save_op_str == "none")
-   {
-      save_operator = ROMBuildingLevel::NONE;
-   }
+   if (save_op_str == "none")             save_operator = ROMBuildingLevel::NONE;
+   else if (save_op_str == "global")      save_operator = ROMBuildingLevel::GLOBAL;
+   else if (save_op_str == "component")   save_operator = ROMBuildingLevel::COMPONENT;
    else
-   {
-      operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
-      if (save_op_str == "global")
-      {
-         save_operator = ROMBuildingLevel::GLOBAL;
-      }
-      else if (save_op_str == "component")
-      {
-         save_operator = ROMBuildingLevel::COMPONENT;
-      }
-      else
-      {
-         mfem_error("Unknown ROM building level!\n");
-      }
-   }
+      mfem_error("Unknown ROM building level!\n");
 
-   switch (train_mode)
+   if (save_operator != ROMBuildingLevel::NONE)
+      operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
+
+   num_rom_blocks = numSub;
+   if (train_mode == TrainMode::INDIVIDUAL)        num_rom_comp_blocks = numSub;
+   else if (train_mode == TrainMode::UNIVERSAL)    num_rom_comp_blocks = topol_handler->GetNumComponents();
+   else
+      mfem_error("ROMHandler - subdomain training mode is not set!\n");
+
+   if (separate_variable)
    {
-      case TrainMode::INDIVIDUAL:
-      {
-         num_rom_comp_blocks = numSub;
-      }
-      break;
-      case TrainMode::UNIVERSAL:
-      {
-         num_rom_comp_blocks = topol_handler->GetNumComponents();
-      }
-      break;
-      default:
-         mfem_error("ROMHandler - subdomain training mode is not set!\n");
-      break;
+      num_rom_comp_blocks *= num_var;
+      num_rom_blocks *= num_var;
    }
    
    const int comp_num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
@@ -463,8 +454,8 @@ void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
-   : ROMHandler(train_mode_, input_topol, input_vdim, input_num_vdofs)
+MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_var_offsets, bool separate_variable_basis)
+   : ROMHandler(train_mode_, input_topol, input_vdim, input_var_offsets, separate_variable_basis)
 {
    romMat = new BlockMatrix(rom_block_offsets);
    romMat->owns_blocks = true;

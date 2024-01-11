@@ -753,22 +753,13 @@ void MultiBlockSolver::InitROMHandler()
    std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
    separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
-   Array<int> rom_vdim;
-   if (separate_variable_basis)
-      rom_vdim = vdim;
-   else
-   {
-      rom_vdim.SetSize(1);
-      rom_vdim = vdim.Sum();
-   }
-
    if (rom_handler_str == "base")
    {
-      rom_handler = new ROMHandler(train_mode, topol_handler, rom_vdim, num_vdofs);
+      rom_handler = new ROMHandler(train_mode, topol_handler, vdim, var_offsets, separate_variable_basis);
    }
    else if (rom_handler_str == "mfem")
    {
-      rom_handler = new MFEMROMHandler(train_mode, topol_handler, rom_vdim, num_vdofs);
+      rom_handler = new MFEMROMHandler(train_mode, topol_handler, vdim, var_offsets, separate_variable_basis);
    }
    else
    {

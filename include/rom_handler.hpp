@@ -45,6 +45,7 @@ protected:
    int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
    int num_rom_comp_blocks = -1;  // number of ROM reference component blocks.
    Array<int> fom_vdim;          // dimension of each variable.
+   Array<int> fom_var_offsets;
    Array<int> fom_num_vdofs;
 
    // rom options.
@@ -55,6 +56,7 @@ protected:
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
    TrainMode train_mode = NUM_TRAINMODE;
    bool nonlinear_mode = false;
+   bool separate_variable = false;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
@@ -105,7 +107,7 @@ protected:
    void ParseInputs();
 public:
    ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-              const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+              const Array<int> &input_vdim, const Array<int> &input_var_offsets, const bool separate_variable_basis);
 
    virtual ~ROMHandler();
 
@@ -201,7 +203,7 @@ protected:
 
 public:
    MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-                  const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+                  const Array<int> &input_vdim, const Array<int> &input_var_offsets, const bool separate_variable_basis);
 
    virtual ~MFEMROMHandler();
 
