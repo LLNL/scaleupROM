@@ -136,14 +136,18 @@ public:
    virtual void ProjectToRefBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
 
+   virtual void ProjectComponentToRefBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectComponentToDomainBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectInterfaceToRefBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats) = 0;
    virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec) = 0;
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) = 0;
 
    virtual void Solve(BlockVector* U) = 0;
-   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;
-
-   
+   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
 
    virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
    virtual void LoadOperator(BlockMatrix *input_mat) = 0;
@@ -205,6 +209,12 @@ public:
    virtual SparseMatrix* ProjectToDomainBasis(const int &i, const int &j, const Operator *mat);
    virtual void ProjectToRefBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+
+   virtual void ProjectComponentToRefBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectComponentToDomainBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectInterfaceToRefBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
 
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
    virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);

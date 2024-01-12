@@ -649,7 +649,10 @@ SparseMatrix* MFEMROMHandler::ProjectToRefBasis(const int &i, const int &j, cons
    assert(basis_i->NumRows() == mat->Height());
    assert(basis_j->NumRows() == mat->Width());
 
-   return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+   if (mat)
+      return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+   else
+      return new SparseMatrix(basis_i->NumCols(), basis_j->NumCols());
 }
 
 SparseMatrix* MFEMROMHandler::ProjectToDomainBasis(const int &i, const int &j, const Operator *mat)
@@ -666,7 +669,10 @@ SparseMatrix* MFEMROMHandler::ProjectToDomainBasis(const int &i, const int &j, c
    assert(basis_i->NumRows() == mat->Height());
    assert(basis_j->NumRows() == mat->Width());
 
-   return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+   if (mat)
+      return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+   else
+      return new SparseMatrix(basis_i->NumCols(), basis_j->NumCols());
 }
 
 void MFEMROMHandler::ProjectToRefBasis(
@@ -678,6 +684,7 @@ void MFEMROMHandler::ProjectToRefBasis(
    assert(idx_i.Size() == mats.NumRows());
    assert(idx_j.Size() == mats.NumCols());
 
+   /* Clean up existing rom_mats */
    for (int i = 0; i < rom_mats.NumRows(); i++)
       for (int j = 0; j < rom_mats.NumCols(); j++)
          if (rom_mats(i, j)) delete rom_mats(i, j);
@@ -697,6 +704,7 @@ void MFEMROMHandler::ProjectToDomainBasis(
    assert(idx_i.Size() == mats.NumRows());
    assert(idx_j.Size() == mats.NumCols());
 
+   /* Clean up existing rom_mats */
    for (int i = 0; i < rom_mats.NumRows(); i++)
       for (int j = 0; j < rom_mats.NumCols(); j++)
          if (rom_mats(i, j)) delete rom_mats(i, j);
@@ -705,6 +713,104 @@ void MFEMROMHandler::ProjectToDomainBasis(
    for (int i = 0; i < rom_mats.NumRows(); i++)
       for (int j = 0; j < rom_mats.NumCols(); j++)
          rom_mats(i, j) = ProjectToDomainBasis(idx_i[i], idx_j[j], mats(i, j));
+}
+
+void MFEMROMHandler::ProjectComponentToRefBasis(
+   const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? num_var : 1;
+   Array<int> idx(size);
+   idx = c;
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] *= num_var;
+         idx[v] += v;
+      }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToRefBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectComponentToDomainBasis(
+   const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? num_var : 1;
+   Array<int> idx(size);
+   idx = c;
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] *= num_var;
+         idx[v] += v;
+      }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToDomainBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectInterfaceToRefBasis(
+   const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? 2 * num_var : 2;
+   Array<int> idx(size);
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] = c1 * num_var + v;
+         idx[v + num_var] = c2 * num_var + v;
+      }
+   else
+   {
+      idx[0] = c1;
+      idx[1] = c2;
+   }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToRefBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectInterfaceToDomainBasis(
+   const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? 2 * num_var : 2;
+   Array<int> idx(size);
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] = c1 * num_var + v;
+         idx[v + num_var] = c2 * num_var + v;
+      }
+   else
+   {
+      idx[0] = c1;
+      idx[1] = c2;
+   }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToDomainBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectVariableToDomainBasis(
+   const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert(separate_variable);
+
+   int size = numSub;
+   Array<int> idx_i(size), idx_j(size);
+   for (int m = 0; m < numSub; m++)
+   {
+      idx_i[m] = m * num_var + vi;
+      idx_j[m] = m * num_var + vj;
+   }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToDomainBasis(idx_i, idx_j, mats, rom_mats);
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
