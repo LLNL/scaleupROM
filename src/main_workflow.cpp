@@ -246,30 +246,26 @@ void TrainROM(MPI_Comm comm)
       if (basis_list)
       {
          // Find if additional inputs are specified for basis_tags[p].
-         int idx = -1;
-         for (int k = 0; k < basis_list.size(); k++)
-            if (basis_tags[p] == config.GetOptionFromDict<std::string>("name", "", basis_list[k]))
-            {
-               idx = k;
-               break;
-            }
+         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[p], basis_list);
          
          // If basis_tags[p] has additional inputs, parse them.
-         if (idx >= 0)
+         if (basis_tag_input)
          {
             // parse tag-specific number of basis.
-            num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[idx]);
+            num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_tag_input);
 
             // parse the sample snapshot file list.
             file_list = config.GetOptionFromDict<std::vector<std::string>>(
-                        "snapshot_files", std::vector<std::string>(0), basis_list[idx]);
-            YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_list[idx]);
+                        "snapshot_files", std::vector<std::string>(0), basis_tag_input);
+            YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_tag_input);
             if (snapshot_format)
             {
                FilenameParam snapshot_param("", snapshot_format);
                snapshot_param.ParseFilenames(file_list);
             }
-         }  // if (idx >= 0)
+         }  // if (basis_tag_input)
+         else
+            num_basis = num_basis_default;
       }
       else
          // if additional inputs are not specified, use default number of basis.

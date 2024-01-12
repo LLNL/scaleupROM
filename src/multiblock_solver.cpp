@@ -800,8 +800,16 @@ void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<s
 
 void MultiBlockSolver::ProjectRHSOnReducedBasis()
 {
-   BlockVector RHS_domain(RHS->GetData(), domain_offsets); // View vector for RHS.
-   rom_handler->ProjectRHSOnReducedBasis(&RHS_domain);
+   // View vector for RHS.
+   BlockVector *RHS_domain = NULL;
+   if (separate_variable_basis)
+      RHS_domain = new BlockVector(RHS->GetData(), var_offsets); 
+   else
+      RHS_domain = new BlockVector(RHS->GetData(), domain_offsets);
+      
+   rom_handler->ProjectRHSOnReducedBasis(RHS_domain);
+
+   delete RHS_domain;
 }
 
 void MultiBlockSolver::SolveROM()

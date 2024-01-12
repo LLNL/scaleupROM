@@ -12,6 +12,17 @@ using namespace mfem;
 int main(int argc, char *argv[])
 {
    MPI_Init(&argc, &argv);
+   YAML::Node new_node;
+   if (new_node)
+      printf("Newly created node is considered true.\n");
+   else
+      printf("Newly created node is considered false.\n");
+
+   if (new_node["none"])
+      printf("non-existing key from a newly created node is considered true.\n");
+   else
+      printf("non-existing key from a newly created node is considered false.\n");
+
    YAML::Node test = YAML::LoadFile("test.yaml");
    config = InputParser("test.yaml");
 
