@@ -313,7 +313,7 @@ void BuildROM(MPI_Comm comm)
    rom->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
-   ROMBuildingLevel save_operator = rom->SaveOperator();
+   ROMBuildingLevel save_operator = rom->GetBuildingLevel();
 
    // NOTE(kevin): global operator required only for global rom operator.
    if (save_operator == ROMBuildingLevel::GLOBAL)
@@ -335,6 +335,7 @@ void BuildROM(MPI_Comm comm)
       case ROMBuildingLevel::GLOBAL:
       {
          test->ProjectOperatorOnReducedBasis();
+         test->SaveROMOperator();
          break;
       }
       case ROMBuildingLevel::NONE:
@@ -393,7 +394,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    if (test->UseRom())
    {
       printf("ROM with ");
-      ROMBuildingLevel save_operator = rom->SaveOperator();
+      ROMBuildingLevel save_operator = rom->GetBuildingLevel();
       TopologyHandlerMode topol_mode = test->GetTopologyMode();
 
       if (topol_mode == TopologyHandlerMode::SUBMESH)

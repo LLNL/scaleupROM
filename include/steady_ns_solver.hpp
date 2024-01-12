@@ -124,6 +124,7 @@ public:
 
    virtual void Assemble();
 
+   virtual void SaveROMOperator(const std::string input_prefix="");
    virtual void LoadROMOperatorFromFile(const std::string input_prefix="");
 
    // Component-wise assembly

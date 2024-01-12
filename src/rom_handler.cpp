@@ -385,20 +385,29 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
    romMat_mono = romMat->CreateMonolithic();
 
    if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
+}
 
-   if (save_operator == ROMBuildingLevel::GLOBAL)
-   {
-      std::string filename = operator_prefix + ".h5";
-      hid_t file_id;
-      herr_t errf = 0;
-      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-      assert(file_id >= 0);
+void MFEMROMHandler::SaveOperator(const std::string input_prefix)
+{
+   assert(save_operator == ROMBuildingLevel::GLOBAL);
+   assert(operator_loaded && romMat);
 
-      hdf5_utils::WriteBlockMatrix(file_id, "ROM_matrix", romMat);
+   std::string filename;
+   if (input_prefix == "")
+      filename = operator_prefix;
+   else
+      filename = input_prefix;
+   filename += ".h5";
 
-      errf = H5Fclose(file_id);
-      assert(errf >= 0);
-   }
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   hdf5_utils::WriteBlockMatrix(file_id, "ROM_matrix", romMat);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
 }
 
 void MFEMROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, BlockVector*& rom_vec)

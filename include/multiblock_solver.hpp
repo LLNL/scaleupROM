@@ -167,6 +167,8 @@ public:
    virtual void AssembleInterfaceMatrixes() = 0;
 
    // Global ROM operator Loading.
+   virtual void SaveROMOperator(const std::string input_prefix="")
+   { rom_handler->SaveOperator(input_prefix); }
    virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
    { rom_handler->LoadOperatorFromFile(input_prefix); }
 

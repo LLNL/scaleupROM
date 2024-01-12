@@ -118,7 +118,7 @@ public:
    const TrainMode GetTrainMode() { return train_mode; }
    const int GetNumROMRefBlocks() { return num_rom_ref_blocks; }
    const int GetComponentNumBasis(const int &basis_idx) { return num_ref_basis[basis_idx]; }
-   const ROMBuildingLevel SaveOperator() { return save_operator; }
+   const ROMBuildingLevel GetBuildingLevel() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
@@ -155,6 +155,7 @@ public:
    virtual void Solve(BlockVector* U) = 0;
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
 
+   virtual void SaveOperator(const std::string input_prefix="") = 0;
    virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
    virtual void LoadOperator(BlockMatrix *input_mat) = 0;
 
@@ -230,6 +231,7 @@ public:
    virtual void Solve(BlockVector* U);
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
 
+   virtual void SaveOperator(const std::string input_prefix="");
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void LoadOperator(BlockMatrix *input_mat);
 

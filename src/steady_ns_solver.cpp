@@ -241,7 +241,7 @@ SteadyNSSolver::~SteadyNSSolver()
    if (use_rom)
    {
       DeletePointers(comp_tensors);
-      if (rom_handler->SaveOperator() != ROMBuildingLevel::COMPONENT)
+      if (rom_handler->GetBuildingLevel() != ROMBuildingLevel::COMPONENT)
          DeletePointers(subdomain_tensors);
    }
 }
@@ -362,9 +362,35 @@ void SteadyNSSolver::Assemble()
    // nonlinear operator?
 }
 
+void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
+{
+   MultiBlockSolver::SaveROMOperator(input_prefix);
+
+   std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
+   assert(FileExists(filename));
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   hid_t grp_id;
+   grp_id = H5Gcreate(file_id, "ROM_tensors", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   for (int m = 0; m < numSub; m++)
+      hdf5_utils::WriteDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+}
+
 void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
 {
-   assert(rom_handler->SaveOperator() == ROMBuildingLevel::GLOBAL);
+   assert(rom_handler->GetBuildingLevel() == ROMBuildingLevel::GLOBAL);
 
    rom_handler->LoadOperatorFromFile(input_prefix);
    
@@ -580,30 +606,6 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
    {
       rom_handler->GetBasisOnSubdomain(m, basis);
       subdomain_tensors[m] = GetReducedTensor(basis, ufes[m]);
-   }
-
-   if (rom_handler->SaveOperator() == ROMBuildingLevel::GLOBAL)
-   {
-      std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
-      assert(FileExists(filename));
-
-      hid_t file_id;
-      herr_t errf = 0;
-      file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
-      assert(file_id >= 0);
-
-      hid_t grp_id;
-      grp_id = H5Gcreate(file_id, "ROM_tensors", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(grp_id >= 0);
-
-      for (int m = 0; m < numSub; m++)
-         hdf5_utils::WriteDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
-
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
-
-      errf = H5Fclose(file_id);
-      assert(errf >= 0);
    }
 }
 
