@@ -87,8 +87,13 @@ protected:
          index = i * num_var + j
    */
    Array<int> num_basis;
-   Array<const CAROM::Matrix*> carom_basis; // This is only the pointers to carom_ref_basis. no need of deleting.
    Array<int> rom_block_offsets;
+   /*
+      the global domain ROM blocks with index order switched.
+      For i-th subdomain and j-th variable,
+         index = j * num_var + i
+   */
+   Array<int> rom_varblock_offsets;
    
    CAROM::Vector *reduced_rhs = NULL;
    CAROM::Vector *reduced_sol = NULL;

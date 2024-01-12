@@ -201,22 +201,6 @@ void ROMHandlerBase::LoadReducedBasis()
       delete basis_reader;
    }
 
-   carom_basis.SetSize(num_rom_blocks);
-   for (int k = 0; k < num_rom_blocks; k++)
-   {
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         carom_basis[k] = carom_ref_basis[k];
-         continue;
-      }
-
-      int m = (separate_variable) ? k / num_var : k;
-      int c = topol_handler->GetMeshType(m);
-      int v = (separate_variable) ? k % num_var : 0;
-      int idx = (separate_variable) ? c * num_var + v : c;
-      carom_basis[k] = carom_ref_basis[idx];
-   }
-
    basis_loaded = true;
 }
 
@@ -240,8 +224,11 @@ int ROMHandlerBase::GetBasisIndexForSubdomain(const int &subdomain_index)
 void ROMHandlerBase::SetBlockSizes()
 {
    rom_block_offsets.SetSize(num_rom_blocks+1);
+   rom_varblock_offsets.SetSize(num_rom_blocks+1);
    rom_comp_block_offsets.SetSize(num_rom_ref_blocks+1);
+   
    rom_block_offsets = 0;
+   rom_varblock_offsets = 0;
    rom_comp_block_offsets = 0;
 
    if (separate_variable)
@@ -254,7 +241,10 @@ void ROMHandlerBase::SetBlockSizes()
       {
          int c = topol_handler->GetMeshType(k);
          for (int v = 0; v < num_var; v++, idx++)
+         {
             rom_block_offsets[idx+1] = num_ref_basis[c * num_var + v];
+            rom_varblock_offsets[1 + k + v * numSub] = num_ref_basis[c * num_var + v];
+         }
       }
    }
    else
@@ -267,10 +257,12 @@ void ROMHandlerBase::SetBlockSizes()
          int c = topol_handler->GetMeshType(k);
          rom_block_offsets[k+1] = num_ref_basis[c];
       }
+      rom_varblock_offsets = rom_block_offsets;
    }
 
    rom_block_offsets.PartialSum();
    rom_comp_block_offsets.PartialSum();
+   rom_varblock_offsets.PartialSum();
 }
 
 /*

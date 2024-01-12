@@ -319,42 +319,30 @@ void BuildROM(MPI_Comm comm)
    if (save_operator == ROMBuildingLevel::GLOBAL)
       test->Assemble();
 
-   switch (topol_mode)
+   switch (save_operator)
    {
-      case TopologyHandlerMode::SUBMESH:
+      case ROMBuildingLevel::COMPONENT:
       {
-         if (save_operator == ROMBuildingLevel::GLOBAL)
-            test->ProjectOperatorOnReducedBasis();
-         else if (save_operator == ROMBuildingLevel::COMPONENT)
-            mfem_error("Unsupported rom building level!\n");
-         break;
-      }  // case TopologyHandlerMode::SUBMESH:
-      case TopologyHandlerMode::COMPONENT:
-      {
-         switch (save_operator)
-         {
-            case ROMBuildingLevel::COMPONENT:
-            {
-               test->AllocateROMElements();
-               test->BuildROMElements();
-               std::string filename = rom->GetOperatorPrefix() + ".h5";
-               test->SaveROMElements(filename);
-               break;
-            }
-            case ROMBuildingLevel::GLOBAL:
-            {
-               test->ProjectOperatorOnReducedBasis();
-               break;
-            }
-         }  // switch (save_operator)
-         break;
-      }  // case TopologyHandlerMode::COMPONENT:
-      default:
-      {
-         mfem_error("Unknown TopologyHandler Mode!\n");
+         if (topol_mode == TopologyHandlerMode::SUBMESH)
+            mfem_error("Submesh does not support component rom building level!\n");
+
+         test->AllocateROMElements();
+         test->BuildROMElements();
+         std::string filename = rom->GetOperatorPrefix() + ".h5";
+         test->SaveROMElements(filename);
          break;
       }
-   }  // switch (topol_mode)
+      case ROMBuildingLevel::GLOBAL:
+      {
+         test->ProjectOperatorOnReducedBasis();
+         break;
+      }
+      case ROMBuildingLevel::NONE:
+      {
+         printf("BuildROM - ROM building level is set to none. No ROM is saved.\n");
+         break;
+      }
+   }  // switch (save_operator)
 
    test->SaveBasisVisualization();
 
@@ -407,75 +395,44 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       printf("ROM with ");
       ROMBuildingLevel save_operator = rom->SaveOperator();
       TopologyHandlerMode topol_mode = test->GetTopologyMode();
-      switch (topol_mode)
+
+      if (topol_mode == TopologyHandlerMode::SUBMESH)
+         printf("using SubMesh topology.\n");
+      else if (topol_mode == TopologyHandlerMode::COMPONENT)
+         printf("using Component-wise topology.\n");
+      else
+         mfem_error("Unknown TopologyHandler Mode!\n");
+
+      switch (save_operator)
       {
-         case TopologyHandlerMode::SUBMESH:
+         case ROMBuildingLevel::COMPONENT:
          {
-            printf("SubMesh Topology - ");
-            switch (save_operator)
-            {
-               case ROMBuildingLevel::GLOBAL:
-               {
-                  printf("loading operator file.. ");
-                  test->LoadROMOperatorFromFile();
-                  break;
-               }
-               case ROMBuildingLevel::NONE:
-               {
-                  printf("building operator file all the way from FOM.. ");
-                  test->BuildDomainOperators();
-                  test->SetupDomainBCOperators();
-                  test->AssembleOperator();
-                  test->ProjectOperatorOnReducedBasis();
-                  break;
-               }
-               default:
-               {
-                  mfem_error("Unsupported rom building level!\n");
-                  break;
-               }
-            }
-            break;
-         }  // case TopologyHandlerMode::SUBMESH:
-         case TopologyHandlerMode::COMPONENT:
-         {
-            printf("Component-wise Topology - ");
-            // TODO: bottom-up assembly.
-            switch (save_operator)
-            {
-               case ROMBuildingLevel::COMPONENT:
-               {
-                  printf("loading component operator file.. ");
-                  test->AllocateROMElements();
-                  std::string filename = rom->GetOperatorPrefix() + ".h5";
-                  test->LoadROMElements(filename);
-                  test->AssembleROM();
-                  break;
-               }
-               case ROMBuildingLevel::GLOBAL:
-               {
-                  printf("loading global operator file.. ");
-                  test->LoadROMOperatorFromFile();
-                  break;
-               }
-               case ROMBuildingLevel::NONE:
-               {
-                  printf("building operator file all the way from FOM.. ");
-                  test->BuildDomainOperators();
-                  test->SetupDomainBCOperators();
-                  test->AssembleOperator();
-                  test->ProjectOperatorOnReducedBasis();
-                  break;
-               }
-            }
-            break;
-         }  // case TopologyHandlerMode::COMPONENT:
-         default:
-         {
-            mfem_error("Unknown TopologyHandler Mode!\n");
+            if (topol_mode == TopologyHandlerMode::SUBMESH)
+               mfem_error("Submesh does not support component rom building level!\n");
+
+            printf("Loading component operator file.. ");
+            test->AllocateROMElements();
+            std::string filename = rom->GetOperatorPrefix() + ".h5";
+            test->LoadROMElements(filename);
+            test->AssembleROM();
             break;
          }
-      }  // switch (topol_mode)
+         case ROMBuildingLevel::GLOBAL:
+         {
+            printf("Loading global operator file.. ");
+            test->LoadROMOperatorFromFile();
+            break;
+         }
+         case ROMBuildingLevel::NONE:
+         {
+            printf("Building operator file all the way from FOM.. ");
+            test->BuildDomainOperators();
+            test->SetupDomainBCOperators();
+            test->AssembleOperator();
+            test->ProjectOperatorOnReducedBasis();
+            break;
+         }
+      }
       printf("Done!\n");
 
       printf("Projecting RHS to ROM.. ");
