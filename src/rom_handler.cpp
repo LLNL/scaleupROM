@@ -374,29 +374,18 @@ void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix
 
 void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
-   assert(mats.NumRows() == numSub);
-   assert(mats.NumCols() == numSub);
+   assert(mats.NumRows() == num_rom_blocks);
+   assert(mats.NumCols() == num_rom_blocks);
+   assert(romMat->NumRowBlocks() == num_rom_blocks);
+   assert(romMat->NumColBlocks() == num_rom_blocks);
 
    if (!basis_loaded) LoadReducedBasis();
 
-   // This is pretty much the same as Assemble().
-   // Each basis is applied to the same column blocks.
-   int num_ref_basis_i, num_ref_basis_j;
-   int basis_i, basis_j;
-   for (int i = 0; i < numSub; i++)
-   {
-      num_ref_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
-      basis_i = GetBasisIndexForSubdomain(i);
-
-      for (int j = 0; j < numSub; j++)
-      {
-         num_ref_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
-         basis_j = GetBasisIndexForSubdomain(j);
-         
-         SparseMatrix *elemmat = ProjectToRefBasis(basis_i, basis_j, mats(i,j));
-         romMat->SetBlock(i, j, elemmat);
-      }
-   }  // for (int j = 0; j < numSub; j++)
+   Array2D<SparseMatrix *> rom_mats;
+   ProjectGlobalToDomainBasis(mats, rom_mats);
+   for (int i = 0; i < num_rom_blocks; i++)
+      for (int j = 0; j < num_rom_blocks; j++)
+         romMat->SetBlock(i, j, rom_mats(i, j));
 
    romMat->Finalize();
    operator_loaded = true;
@@ -811,6 +800,16 @@ void MFEMROMHandler::ProjectVariableToDomainBasis(
    assert((mats.NumRows() == size) && (mats.NumCols() == size));
 
    ProjectToDomainBasis(idx_i, idx_j, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert((mats.NumRows() == num_rom_blocks) && (mats.NumCols() == num_rom_blocks));
+
+   Array<int> idx(num_rom_blocks);
+   for (int k = 0; k < num_rom_blocks; k++) idx[k] = k;
+
+   ProjectToDomainBasis(idx, idx, mats, rom_mats);
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
