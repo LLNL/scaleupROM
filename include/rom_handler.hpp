@@ -123,6 +123,7 @@ public:
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
+   const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
    virtual SparseMatrix* GetOperator() = 0;
    const bool GetNonlinearMode() { return nonlinear_mode; }
    void SetNonlinearMode(const bool nl_mode) { nonlinear_mode = nl_mode; }

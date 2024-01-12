@@ -197,6 +197,8 @@ public:
    virtual void Solve_obsolete();
 
    virtual void ProjectOperatorOnReducedBasis();
+   virtual void ProjectOperatorOnSeparateBasis();
+   virtual void ProjectOperatorOnUnifiedBasis();
 
    void SanityCheckOnCoeffs();
 

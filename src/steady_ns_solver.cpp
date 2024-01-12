@@ -604,7 +604,8 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
    DenseMatrix *basis = NULL;
    for (int m = 0; m < numSub; m++)
    {
-      rom_handler->GetBasisOnSubdomain(m, basis);
+      int idx = (separate_variable_basis) ? m * num_var : m;
+      rom_handler->GetDomainBasis(idx, basis);
       subdomain_tensors[m] = GetReducedTensor(basis, ufes[m]);
    }
 }

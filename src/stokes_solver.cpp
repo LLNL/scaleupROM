@@ -908,6 +908,14 @@ void StokesSolver::Solve_obsolete()
 
 void StokesSolver::ProjectOperatorOnReducedBasis()
 {
+   if (separate_variable_basis)
+      ProjectOperatorOnSeparateBasis();
+   else
+      ProjectOperatorOnUnifiedBasis();
+}
+
+void StokesSolver::ProjectOperatorOnUnifiedBasis()
+{
    Array2D<Operator *> tmp(numSub, numSub);
    Array2D<SparseMatrix *> bt_mats(numSub, numSub);
    // NOTE: BlockMatrix offsets are indeed used for its Mult() in ProjectOperatorOnReducedBasis below.
@@ -927,14 +935,41 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
          
    rom_handler->ProjectOperatorOnReducedBasis(tmp);
 
-   for (int i = 0; i < bt_mats.NumRows(); i++)
-      for (int j = 0; j < bt_mats.NumCols(); j++)
+   DeletePointers(bt_mats);
+   DeletePointers(tmp);
+   DeletePointers(ioffsets);
+   DeletePointers(joffsets);
+}
+
+void StokesSolver::ProjectOperatorOnSeparateBasis()
+{
+   Array2D<Operator *> m_tmp(numSub, numSub), b_tmp(numSub, numSub), bt_tmp(numSub, numSub);
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
       {
-         delete bt_mats(i, j);
-         delete tmp(i, j);
-         delete ioffsets(i, j);
-         delete joffsets(i, j);
+         m_tmp(i, j) = m_mats(i, j);
+         b_tmp(i, j) = b_mats(i, j);
+         bt_tmp(i, j) = Transpose(*b_mats(j, i));
       }
+   Array2D<SparseMatrix *> m_roms, b_roms, bt_roms;
+
+   rom_handler->ProjectVariableToDomainBasis(0, 0, m_tmp, m_roms);
+   rom_handler->ProjectVariableToDomainBasis(1, 0, b_tmp, b_roms);
+   rom_handler->ProjectVariableToDomainBasis(0, 1, bt_tmp, bt_roms);
+
+   const Array<int> *varblock_offsets = rom_handler->GetVarBlockOffsets();
+   BlockMatrix *romMat = new BlockMatrix(*varblock_offsets);
+   romMat->owns_blocks = true;
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+      {
+         romMat->SetBlock(i, j, m_roms(i, j));
+         romMat->SetBlock(i + numSub, j, b_roms(i, j));
+         romMat->SetBlock(i, j + numSub, bt_roms(i, j));
+      }
+   rom_handler->SetRomMat(romMat);
+
+   DeletePointers(bt_tmp);
 }
 
 void StokesSolver::SanityCheckOnCoeffs()
