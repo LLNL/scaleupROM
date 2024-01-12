@@ -405,24 +405,47 @@ void MFEMROMHandler::SaveOperator(const std::string input_prefix)
    assert(errf >= 0);
 }
 
-void MFEMROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, BlockVector*& rom_vec)
+void MFEMROMHandler::ProjectToRefBasis(const int &i, const Vector &vec, Vector &rom_vec)
 {
-   assert(vec->NumBlocks() == numSub);
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_ref_blocks));
+   DenseMatrix* basis_i;
+
+   GetReferenceBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->MultTranspose(vec, rom_vec);
+}
+
+void MFEMROMHandler::ProjectToDomainBasis(const int &i, const Vector &vec, Vector &rom_vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_blocks));
+   DenseMatrix* basis_i;
+
+   GetDomainBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->MultTranspose(vec, rom_vec);
+}
+
+void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVector*& rom_vec)
+{
+   assert(vec->NumBlocks() == num_rom_blocks);
    // reset rom_vec if initiated a priori.
    if (rom_vec) delete rom_vec;
 
-   rom_vec = new BlockVector(rom_block_offsets);
+   if (separate_variable)
+      rom_vec = new BlockVector(rom_varblock_offsets);
+   else
+      rom_vec = new BlockVector(rom_block_offsets);
 
-   if (!basis_loaded) LoadReducedBasis();
-
-   // Each basis is applied to the same column blocks.
-   for (int i = 0; i < numSub; i++)
+   for (int i = 0; i < num_rom_blocks; i++)
    {
-      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-      DenseMatrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-      basis_i->MultTranspose(vec->GetBlock(i).GetData(), rom_vec->GetBlock(i).GetData());
+      int idx = (separate_variable) ? (i % num_var) * numSub + (i / num_var) : i;
+      ProjectToDomainBasis(i, vec->GetBlock(i), rom_vec->GetBlock(idx));
    }
 }
 

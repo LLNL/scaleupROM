@@ -148,9 +148,11 @@ public:
    virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
-
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats) = 0;
-   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec) = 0;
+
+   virtual void ProjectToRefBasis(const int &i, const Vector &vec, Vector &rom_vec) = 0;
+   virtual void ProjectToDomainBasis(const int &i, const Vector &vec, Vector &rom_vec) = 0;
+   virtual void ProjectGlobalToDomainBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec) = 0;
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) = 0;
 
    virtual void Solve(BlockVector* U) = 0;
@@ -224,11 +226,14 @@ public:
    virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
-
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
-   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
+
+   virtual void ProjectToRefBasis(const int &i, const Vector &vec, Vector &rom_vec);
+   virtual void ProjectToDomainBasis(const int &i, const Vector &vec, Vector &rom_vec);
+   virtual void ProjectGlobalToDomainBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) override
-   { ProjectVectorOnReducedBasis(RHS, reduced_rhs); }
+   { ProjectGlobalToDomainBasis(RHS, reduced_rhs); }
+   
    virtual void Solve(BlockVector* U);
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
 
