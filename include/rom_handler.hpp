@@ -157,7 +157,7 @@ public:
 
    virtual void SaveOperator(const std::string input_prefix="") = 0;
    virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
-   virtual void LoadOperator(BlockMatrix *input_mat) = 0;
+   virtual void SetRomMat(BlockMatrix *input_mat) = 0;
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names) = 0;
 
@@ -233,7 +233,7 @@ public:
 
    virtual void SaveOperator(const std::string input_prefix="");
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(BlockMatrix *input_mat);
+   virtual void SetRomMat(BlockMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
 

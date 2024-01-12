@@ -588,7 +588,7 @@ void MultiBlockSolver::AssembleROM()
    }
 
    romMat->Finalize();
-   rom_handler->LoadOperator(romMat);
+   rom_handler->SetRomMat(romMat);
 }
 
 void MultiBlockSolver::InitVisualization(const std::string& output_path)

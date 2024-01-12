@@ -370,8 +370,7 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
    assert(mats.NumCols() == num_rom_blocks);
    assert(romMat->NumRowBlocks() == num_rom_blocks);
    assert(romMat->NumColBlocks() == num_rom_blocks);
-
-   if (!basis_loaded) LoadReducedBasis();
+   assert(basis_loaded);
 
    Array2D<SparseMatrix *> rom_mats;
    ProjectGlobalToDomainBasis(mats, rom_mats);
@@ -380,11 +379,7 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
          romMat->SetBlock(i, j, rom_mats(i, j));
 
    romMat->Finalize();
-   operator_loaded = true;
-
-   romMat_mono = romMat->CreateMonolithic();
-
-   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
+   SetRomMat(romMat);
 }
 
 void MFEMROMHandler::SaveOperator(const std::string input_prefix)
@@ -832,22 +827,23 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    assert(file_id >= 0);   
 
    romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
-   romMat_mono = romMat->CreateMonolithic();
+   SetRomMat(romMat);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
-
-   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
-
-   operator_loaded = true;
 }
 
-void MFEMROMHandler::LoadOperator(BlockMatrix *input_mat)
+void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
 {
-   delete romMat;
+   if (romMat != input_mat)
+   {
+      delete romMat;
+      romMat = input_mat;
+   }
+
    delete romMat_mono;
-   romMat = input_mat;
    romMat_mono = romMat->CreateMonolithic();
+
    if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
    operator_loaded = true;
 }
