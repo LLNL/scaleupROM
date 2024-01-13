@@ -906,6 +906,49 @@ void StokesSolver::Solve_obsolete()
    }
 }
 
+void StokesSolver::LoadReducedBasis()
+{
+   MultiBlockSolver::LoadReducedBasis();
+
+   /* Load supremizer basis and append it to velocity basis */
+   if (separate_variable_basis)
+      LoadSupremizer();
+}
+
+void StokesSolver::LoadSupremizer()
+{
+   assert(separate_variable_basis);
+   assert(rom_handler->BasisLoaded());
+
+   std::string basis_prefix = rom_handler->GetBasisPrefix();
+
+   Array<int> num_ref_supreme, num_supreme;
+   rom_handler->ParseSupremizerInput(num_ref_supreme, num_supreme);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
+   DenseMatrix supreme;
+   for (int m = 0; m < size; m++)
+   {
+      // Load the supremizer basis.
+      std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      {
+         hid_t file_id;
+         herr_t errf = 0;
+         std::string filename(basis_prefix + basis_tag + ".h5");
+         file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+         assert(file_id >= 0);
+
+         hdf5_utils::ReadDataset(file_id, "supremizer_basis", supreme);
+
+         errf = H5Fclose(file_id);
+         assert(errf >= 0);
+      }
+
+      rom_handler->AppendReferenceBasis(m * num_var, supreme);
+   }
+}
+
 void StokesSolver::ProjectOperatorOnReducedBasis()
 {
    if (separate_variable_basis)

@@ -190,6 +190,8 @@ public:
    virtual bool Solve();
    virtual void Solve_obsolete();
 
+   virtual void LoadReducedBasis() override;
+
    virtual void ProjectOperatorOnReducedBasis();
    virtual void ProjectOperatorOnSeparateBasis();
    virtual void ProjectOperatorOnUnifiedBasis();
@@ -204,6 +206,8 @@ public:
    void EnrichSupremizer();
 
 private:
+   void LoadSupremizer();
+   
    // NOTE: Block Matrix does not own the offsets,
    // and will access to invalid memory if the offsets variable is destroyed.
    BlockMatrix* FormBlockMatrix(SparseMatrix* const m, SparseMatrix* const b, SparseMatrix* const bt,

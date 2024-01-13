@@ -305,7 +305,8 @@ void AuxiliaryTrainROM(MPI_Comm comm)
       if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
 
       solver->InitVariables();
-      solver->LoadReducedBasis();
+      // This time needs to be ROMHandler, in order not to run StokesSolver::LoadSupremizer.
+      solver->GetROMHandler()->LoadReducedBasis();
 
       solver->EnrichSupremizer();
 

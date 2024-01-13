@@ -291,6 +291,8 @@ void ROMHandlerBase::SetBlockSizes()
       rom_varblock_offsets = rom_block_offsets;
    }
 
+   rom_block_offsets.GetSubArray(1, num_rom_blocks, num_basis);
+
    rom_block_offsets.PartialSum();
    rom_comp_block_offsets.PartialSum();
    rom_varblock_offsets.PartialSum();
@@ -480,13 +482,54 @@ void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVec
    }
 }
 
+void MFEMROMHandler::LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_ref_blocks));
+   DenseMatrix* basis_i;
+
+   GetReferenceBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->Mult(rom_vec, vec);
+}
+
+void MFEMROMHandler::LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_blocks));
+   DenseMatrix* basis_i;
+
+   GetDomainBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->Mult(rom_vec, vec);
+}
+
+void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
+{
+   assert(rom_vec.NumBlocks() == num_rom_blocks);
+   assert(vec.NumBlocks() == num_rom_blocks);
+
+   for (int i = 0; i < num_rom_blocks; i++)
+   {
+      int idx = (separate_variable) ? (i % num_var) * numSub + (i / num_var) : i;
+      LiftUpFromDomainBasis(i, rom_vec.GetBlock(idx), vec.GetBlock(i));
+   }
+}
+
 void MFEMROMHandler::Solve(BlockVector* U)
 {
-   assert(U->NumBlocks() == numSub);
+   assert(U->NumBlocks() == num_rom_blocks);
    assert(operator_loaded);
 
    printf("Solve ROM.\n");
-   reduced_sol = new BlockVector(rom_block_offsets);
+   if (separate_variable)
+      reduced_sol = new BlockVector(rom_varblock_offsets);
+   else
+      reduced_sol = new BlockVector(rom_block_offsets);
    (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
@@ -568,16 +611,8 @@ void MFEMROMHandler::Solve(BlockVector* U)
       delete solver;
    }
 
-   for (int i = 0; i < numSub; i++)
-   {
-      assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-      DenseMatrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-
-      // 23. reconstruct FOM state
-      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
-   }
+   // 23. reconstruct FOM state
+   LiftUpGlobal(*reduced_sol, *U);
 }
 
 void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec)
@@ -880,7 +915,10 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
    assert(file_id >= 0);   
 
-   romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
+   if (separate_variable)
+      romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_varblock_offsets);
+   else
+      romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
    SetRomMat(romMat);
 
    errf = H5Fclose(file_id);
@@ -1018,6 +1056,30 @@ void MFEMROMHandler::SetupDirectSolver()
    mumps = new MUMPSSolver();
    mumps->SetMatrixSymType(mat_type);
    mumps->SetOperator(*romMat_hypre);
+}
+
+void MFEMROMHandler::AppendReferenceBasis(const int &idx, const DenseMatrix &mat)
+{
+   assert(basis_loaded);
+   assert((idx >= 0) && (idx < num_rom_ref_blocks));
+   assert(ref_basis[idx]->NumRows() == mat.NumRows());
+   assert(ref_basis[idx]->NumCols() == num_ref_basis[idx]);
+
+   DenseMatrix tmp(*ref_basis[idx]);
+
+   int add_col = mat.NumCols();
+   // NOTE(kevin): expanding a DenseMatrix does not preserve its data.
+   ref_basis[idx]->SetSize(ref_basis[idx]->NumRows(), num_ref_basis[idx] + add_col);
+   ref_basis[idx]->SetSubMatrix(0, 0, tmp);
+   ref_basis[idx]->SetSubMatrix(0, num_ref_basis[idx], mat);
+
+   num_ref_basis[idx] += add_col;
+
+   // Reset the block offsets and domain num_basis.
+   SetBlockSizes();
+
+   printf("spatial basis-%d dimension updated: %d x %d\n",
+          idx, ref_basis[idx]->NumRows(), ref_basis[idx]->NumCols());
 }
 
 // void MFEMROMHandler::GetBlockSparsity(

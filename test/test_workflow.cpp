@@ -229,6 +229,7 @@ TEST(Stokes_Workflow, MFEMGlobalSeparateTest)
    config.dict_["model_reduction"]["separate_variable_basis"] = true;
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+   config.dict_["model_reduction"]["linear_solver_type"] = "minres";
 
    config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;

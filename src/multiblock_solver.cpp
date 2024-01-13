@@ -813,8 +813,14 @@ void MultiBlockSolver::ProjectRHSOnReducedBasis()
 
 void MultiBlockSolver::SolveROM()
 {
-   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
-   rom_handler->Solve(&U_domain);
+   // View vector for U.
+   BlockVector *U_domain = NULL;
+   if (separate_variable_basis)
+      U_domain = new BlockVector(U->GetData(), var_offsets); 
+   else
+      U_domain = new BlockVector(U->GetData(), domain_offsets);
+   
+   rom_handler->Solve(U_domain);
 }
 
 void MultiBlockSolver::ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm)

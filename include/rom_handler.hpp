@@ -159,6 +159,10 @@ public:
    virtual void ProjectGlobalToDomainBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec) = 0;
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) = 0;
 
+   virtual void LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec) = 0;
+   virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec) = 0;
+   virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec) = 0;
+
    virtual void Solve(BlockVector* U) = 0;
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
 
@@ -170,6 +174,8 @@ public:
 
    virtual void SaveReducedSolution(const std::string &filename) = 0;
    virtual void SaveReducedRHS(const std::string &filename) = 0;
+
+   virtual void AppendReferenceBasis(const int &idx, const DenseMatrix &mat) = 0;
 };
 
 class MFEMROMHandler : public ROMHandlerBase
@@ -237,6 +243,10 @@ public:
    virtual void ProjectGlobalToDomainBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) override
    { ProjectGlobalToDomainBasis(RHS, reduced_rhs); }
+
+   virtual void LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec);
+   virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec);
+   virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec);
    
    virtual void Solve(BlockVector* U);
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
@@ -251,6 +261,8 @@ public:
    { PrintVector(*reduced_sol, filename); }
    virtual void SaveReducedRHS(const std::string &filename) override
    { PrintVector(*reduced_rhs, filename); }
+
+   virtual void AppendReferenceBasis(const int &idx, const DenseMatrix &mat);
 
 private:
    IterativeSolver* SetIterativeSolver(const MFEMROMHandler::SolverType &linsol_type_, const std::string &prec_type);
