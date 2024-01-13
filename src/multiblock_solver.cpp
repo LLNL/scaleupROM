@@ -224,7 +224,6 @@ void MultiBlockSolver::SetupBCVariables()
 
 void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes)
 {
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(fec.Size() == num_var);
    assert(vdim.Size() == num_var);
 
@@ -536,7 +535,7 @@ void MultiBlockSolver::AssembleROM()
    for (int m = 0; m < numSub; m++)
    {
       int c_type = topol_handler->GetMeshType(m);
-      int num_basis = rom_handler->GetComponentNumBasis(c_type);
+      int num_basis = rom_handler->GetRefNumBasis(c_type);
 
       if (romMat->IsZeroBlock(m, m))
          romMat->SetBlock(m, m, new SparseMatrix(num_basis));
@@ -568,8 +567,8 @@ void MultiBlockSolver::AssembleROM()
       const int m2 = pInfo->Mesh2;
       const int c1 = topol_handler->GetMeshType(m1);
       const int c2 = topol_handler->GetMeshType(m2);
-      const int num_basis1 = rom_handler->GetComponentNumBasis(c1);
-      const int num_basis2 = rom_handler->GetComponentNumBasis(c2);
+      const int num_basis1 = rom_handler->GetRefNumBasis(c1);
+      const int num_basis2 = rom_handler->GetRefNumBasis(c2);
 
       Array<int> midx(2), num_basis(2);
       midx[0] = m1;

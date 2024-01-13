@@ -176,6 +176,37 @@ void ROMHandlerBase::ParseInputs()
    save_basis_visual = config.GetOption<bool>("basis/visualization/enabled", false);
 }
 
+void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme)
+{
+   assert(separate_variable);
+   assert(num_var == 2); // assume vel-pres system only for now.
+
+   num_ref_supreme.SetSize(num_rom_comp);
+   num_supreme.SetSize(numSub);
+
+   YAML::Node basis_list = config.FindNode("basis/tags");
+
+   std::string basis_tag;
+   for (int b = 0; b < num_rom_comp; b++)
+   {
+      basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler, fom_var_names[1]);
+
+      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag, "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
+   }
+
+   if (train_mode == TrainMode::INDIVIDUAL)
+   {
+      num_supreme = num_ref_supreme;
+      return;
+   }
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int c = topol_handler->GetMeshType(m);
+      num_supreme[m] = num_ref_supreme[c];
+   }
+}
+
 void ROMHandlerBase::LoadReducedBasis()
 {
    if (basis_loaded) return;
