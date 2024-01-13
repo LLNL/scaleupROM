@@ -305,8 +305,7 @@ void AuxiliaryTrainROM(MPI_Comm comm)
       if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
 
       solver->InitVariables();
-      ROMHandlerBase *rom = solver->GetROMHandler();
-      rom->LoadReducedBasis();
+      solver->LoadReducedBasis();
 
       solver->EnrichSupremizer();
 
@@ -335,11 +334,10 @@ void BuildROM(MPI_Comm comm)
    test->BuildOperators();
    test->SetupBCOperators();
    
-   ROMHandlerBase *rom = test->GetROMHandler();
-   rom->LoadReducedBasis();
+   test->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
-   ROMBuildingLevel save_operator = rom->GetBuildingLevel();
+   ROMBuildingLevel save_operator = test->GetROMHandler()->GetBuildingLevel();
 
    // NOTE(kevin): global operator required only for global rom operator.
    if (save_operator == ROMBuildingLevel::GLOBAL)
@@ -354,7 +352,7 @@ void BuildROM(MPI_Comm comm)
 
          test->AllocateROMElements();
          test->BuildROMElements();
-         std::string filename = rom->GetOperatorPrefix() + ".h5";
+         std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
          test->SaveROMElements(filename);
          break;
       }
@@ -413,7 +411,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    if (test->UseRom())
    {
       rom = test->GetROMHandler();
-      rom->LoadReducedBasis();
+      test->LoadReducedBasis();
    }
 
    solveTimer.Start();

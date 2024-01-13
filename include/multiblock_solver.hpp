@@ -213,7 +213,7 @@ public:
    void GetBasisTags(std::vector<std::string> &basis_tags);
 
    virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
-   void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
+   virtual void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
    virtual void ProjectRHSOnReducedBasis();
    virtual void SolveROM();
