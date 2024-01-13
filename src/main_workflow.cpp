@@ -285,6 +285,36 @@ void TrainROM(MPI_Comm comm)
    }  // for (int p = 0; p < basis_tags.size(); p++)
 
    delete sample_generator;
+
+   AuxiliaryTrainROM(comm);
+}
+
+void AuxiliaryTrainROM(MPI_Comm comm)
+{
+   std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
+   bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
+
+   /* Supremizer enrichment */
+   if ((separate_variable_basis) && ((solver_type == "stokes") || (solver_type == "steady-ns")))
+   {
+      ParameterizedProblem *problem = InitParameterizedProblem();
+      StokesSolver *solver = NULL;
+      if (solver_type == "stokes")           { solver = new StokesSolver; }
+      else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
+
+      if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
+
+      solver->InitVariables();
+      ROMHandlerBase *rom = solver->GetROMHandler();
+      rom->LoadReducedBasis();
+
+      solver->EnrichSupremizer();
+
+      delete problem;
+      delete solver;
+   }
+
+   // TODO: EQP weight optimization procedure.
 }
 
 void BuildROM(MPI_Comm comm)
