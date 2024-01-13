@@ -951,68 +951,42 @@ void StokesSolver::LoadSupremizer()
 
 void StokesSolver::ProjectOperatorOnReducedBasis()
 {
-   if (separate_variable_basis)
-      ProjectOperatorOnSeparateBasis();
-   else
-      ProjectOperatorOnUnifiedBasis();
-}
+   const int size = (separate_variable_basis) ? numSub * num_var : numSub;
 
-void StokesSolver::ProjectOperatorOnUnifiedBasis()
-{
-   Array2D<Operator *> tmp(numSub, numSub);
+   Array2D<Operator *> tmp(size, size);
    Array2D<SparseMatrix *> bt_mats(numSub, numSub);
    // NOTE: BlockMatrix offsets are indeed used for its Mult() in ProjectOperatorOnReducedBasis below.
    // Offsets should be stored for multi-component case, until ProjectOperatorOnReducedBasis is done.
    Array2D<Array<int> *> ioffsets(numSub, numSub), joffsets(numSub, numSub);
-   for (int i = 0; i < tmp.NumRows(); i++)
-      for (int j = 0; j < tmp.NumCols(); j++)
+   tmp = NULL; ioffsets = NULL; joffsets = NULL;
+
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
       {
          // NOTE: the index also should be transposed.
          bt_mats(i, j) = Transpose(*b_mats(j, i));
 
-         ioffsets(i, j) = new Array<int>;
-         joffsets(i, j) = new Array<int>;
-         tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j),
-                                    *(ioffsets(i,j)), *(joffsets(i,j)));
+         if (separate_variable_basis)
+         {
+            tmp(i * num_var, j * num_var) = m_mats(i, j);
+            tmp(i * num_var + 1, j * num_var) = b_mats(i, j);
+            tmp(i * num_var, j * num_var + 1) = bt_mats(i, j);
+         }
+         else
+         {
+            ioffsets(i, j) = new Array<int>;
+            joffsets(i, j) = new Array<int>;
+            tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j),
+                                       *(ioffsets(i,j)), *(joffsets(i,j)));
+         }  
       }
          
    rom_handler->ProjectOperatorOnReducedBasis(tmp);
 
    DeletePointers(bt_mats);
-   DeletePointers(tmp);
+   if (!separate_variable_basis) DeletePointers(tmp);
    DeletePointers(ioffsets);
    DeletePointers(joffsets);
-}
-
-void StokesSolver::ProjectOperatorOnSeparateBasis()
-{
-   Array2D<Operator *> m_tmp(numSub, numSub), b_tmp(numSub, numSub), bt_tmp(numSub, numSub);
-   for (int i = 0; i < numSub; i++)
-      for (int j = 0; j < numSub; j++)
-      {
-         m_tmp(i, j) = m_mats(i, j);
-         b_tmp(i, j) = b_mats(i, j);
-         bt_tmp(i, j) = Transpose(*b_mats(j, i));
-      }
-   Array2D<SparseMatrix *> m_roms, b_roms, bt_roms;
-
-   rom_handler->ProjectVariableToDomainBasis(0, 0, m_tmp, m_roms);
-   rom_handler->ProjectVariableToDomainBasis(1, 0, b_tmp, b_roms);
-   rom_handler->ProjectVariableToDomainBasis(0, 1, bt_tmp, bt_roms);
-
-   const Array<int> *varblock_offsets = rom_handler->GetVarBlockOffsets();
-   BlockMatrix *romMat = new BlockMatrix(*varblock_offsets);
-   romMat->owns_blocks = true;
-   for (int i = 0; i < numSub; i++)
-      for (int j = 0; j < numSub; j++)
-      {
-         romMat->SetBlock(i, j, m_roms(i, j));
-         romMat->SetBlock(i + numSub, j, b_roms(i, j));
-         romMat->SetBlock(i, j + numSub, bt_roms(i, j));
-      }
-   rom_handler->SetRomMat(romMat);
-
-   DeletePointers(bt_tmp);
 }
 
 void StokesSolver::SanityCheckOnCoeffs()

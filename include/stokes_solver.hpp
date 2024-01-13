@@ -193,8 +193,6 @@ public:
    virtual void LoadReducedBasis() override;
 
    virtual void ProjectOperatorOnReducedBasis();
-   virtual void ProjectOperatorOnSeparateBasis();
-   virtual void ProjectOperatorOnUnifiedBasis();
 
    void SanityCheckOnCoeffs();
 

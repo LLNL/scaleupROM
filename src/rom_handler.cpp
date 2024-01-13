@@ -470,16 +470,10 @@ void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVec
    // reset rom_vec if initiated a priori.
    if (rom_vec) delete rom_vec;
 
-   if (separate_variable)
-      rom_vec = new BlockVector(rom_varblock_offsets);
-   else
-      rom_vec = new BlockVector(rom_block_offsets);
+   rom_vec = new BlockVector(rom_block_offsets);
 
    for (int i = 0; i < num_rom_blocks; i++)
-   {
-      int idx = (separate_variable) ? (i % num_var) * numSub + (i / num_var) : i;
-      ProjectToDomainBasis(i, vec->GetBlock(i), rom_vec->GetBlock(idx));
-   }
+      ProjectToDomainBasis(i, vec->GetBlock(i), rom_vec->GetBlock(i));
 }
 
 void MFEMROMHandler::LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec)
@@ -514,10 +508,7 @@ void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
    assert(vec.NumBlocks() == num_rom_blocks);
 
    for (int i = 0; i < num_rom_blocks; i++)
-   {
-      int idx = (separate_variable) ? (i % num_var) * numSub + (i / num_var) : i;
-      LiftUpFromDomainBasis(i, rom_vec.GetBlock(idx), vec.GetBlock(i));
-   }
+      LiftUpFromDomainBasis(i, rom_vec.GetBlock(i), vec.GetBlock(i));
 }
 
 void MFEMROMHandler::Solve(BlockVector* U)
@@ -526,10 +517,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
    assert(operator_loaded);
 
    printf("Solve ROM.\n");
-   if (separate_variable)
-      reduced_sol = new BlockVector(rom_varblock_offsets);
-   else
-      reduced_sol = new BlockVector(rom_block_offsets);
+   reduced_sol = new BlockVector(rom_block_offsets);
    (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
@@ -740,12 +728,13 @@ SparseMatrix* MFEMROMHandler::ProjectToDomainBasis(const int &i, const int &j, c
    GetDomainBasis(i, basis_i);
    GetDomainBasis(j, basis_j);
 
-   assert(basis_i->NumRows() == mat->Height());
-   assert(basis_j->NumRows() == mat->Width());
-
    if (mat)
+   {
+      assert(basis_i->NumRows() == mat->Height());
+      assert(basis_j->NumRows() == mat->Width());
       return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
-   else
+   }
+   else 
       return new SparseMatrix(basis_i->NumCols(), basis_j->NumCols());
 }
 
@@ -915,10 +904,7 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
    assert(file_id >= 0);   
 
-   if (separate_variable)
-      romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_varblock_offsets);
-   else
-      romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
+   romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
    SetRomMat(romMat);
 
    errf = H5Fclose(file_id);
