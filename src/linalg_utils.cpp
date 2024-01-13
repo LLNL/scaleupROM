@@ -136,12 +136,41 @@ namespace mfem
 
 void GramSchmidt(DenseMatrix& mat)
 {
-   const int num_row = mat.NumCols();
+   const int num_row = mat.NumRows();
    const int num_col = mat.NumCols();
    Vector vec_c, tmp;
    for (int c = 0; c < num_col; c++)
    {
       mat.GetColumnReference(c, vec_c);
+
+      for (int i = 0; i < c; i++)
+      {
+         mat.GetColumnReference(i, tmp);
+         vec_c.Add(-(tmp * vec_c), tmp);
+      }
+
+      vec_c /= sqrt(vec_c * vec_c);
+   }
+}
+
+void Orthonormalize(DenseMatrix& mat1, DenseMatrix& mat)
+{
+   const int num_row = mat.NumRows();
+   const int num_col = mat.NumCols();
+   const int num_col1 = mat1.NumCols();
+   assert(num_row == mat1.NumRows());
+
+   Vector vec_c, tmp;
+   for (int c = 0; c < num_col; c++)
+   {
+      mat.GetColumnReference(c, vec_c);
+
+      /* we don't assume mat1 is normalized. */
+      for (int i = 0; i < num_col1; i++)
+      {
+         mat1.GetColumnReference(i, tmp);
+         vec_c.Add(-(tmp * vec_c) / (tmp * tmp), tmp);
+      }
 
       for (int i = 0; i < c; i++)
       {

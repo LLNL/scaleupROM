@@ -47,6 +47,9 @@ namespace mfem
 
 void GramSchmidt(DenseMatrix& mat);
 
+/* Orthonormalize mat over mat1 and itself. */
+void Orthonormalize(DenseMatrix& mat1, DenseMatrix& mat);
+
 // Compute Rt * A * P
 void RtAP(DenseMatrix& R,
         const Operator& A,
