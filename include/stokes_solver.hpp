@@ -133,12 +133,6 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
-   // // Used for bottom-up building, only with ComponentTopologyHandler.
-   // Array<DenseMatrix *> comp_mats;
-   // // boundary condition is enforced via forcing term.
-   // Array<Array<DenseMatrix *> *> bdr_mats;
-   // Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
-
 public:
    StokesSolver();
 
@@ -206,6 +200,8 @@ public:
 
    // to ensure incompressibility for the problems with all velocity dirichlet bc.
    void SetComplementaryFlux(const Array<bool> nz_dbcs);
+
+   void EnrichSupremizer();
 
 private:
    // NOTE: Block Matrix does not own the offsets,

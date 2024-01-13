@@ -1203,6 +1203,85 @@ void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
    
 }
 
+void StokesSolver::EnrichSupremizer()
+{
+   assert(separate_variable_basis);
+   assert(rom_handler->BasisLoaded());
+
+   Array<FiniteElementSpace *> comp_fes;
+   FiniteElementSpace *ufes_comp, *pfes_comp;
+   DenseMatrix *pbasis, *ubasis, *tmp, *supreme;
+   Vector pvec, uvec;
+
+   std::string basis_prefix = rom_handler->GetBasisPrefix();
+
+   if (train_mode == TrainMode::UNIVERSAL)
+      GetComponentFESpaces(comp_fes);
+
+   Array<int> num_ref_supreme, num_supreme;
+   rom_handler->ParseSupremizerInput(num_ref_supreme, num_supreme);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
+   for (int m = 0; m < size; m++)
+   {
+      // Load pressure ROM basis.
+      rom_handler->GetReferenceBasis(m * num_var, ubasis);
+      rom_handler->GetReferenceBasis(m * num_var + 1, pbasis);
+
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         ufes_comp = ufes[m];
+         pfes_comp = pfes[m];
+      }
+      else
+      {
+         ufes_comp = comp_fes[m * num_var];
+         pfes_comp = comp_fes[m * num_var + 1];
+      }
+      
+      // Divergence operator.
+      MixedBilinearFormDGExtension b_comp(ufes_comp, pfes_comp);
+      b_comp.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+      if (full_dg)
+         b_comp.AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+      b_comp.Assemble();
+      b_comp.Finalize();
+
+      int num_basis = rom_handler->GetRefNumBasis(m * num_var);
+      assert(num_basis == ubasis->NumCols());
+      supreme = new DenseMatrix(ubasis->NumRows(), num_ref_supreme[m]);
+      for (int k = 0; k < num_ref_supreme[m]; k++)
+      {
+         pbasis->GetColumnReference(k, pvec);
+         supreme->GetColumnReference(k, uvec);
+         b_comp.MultTranspose(pvec, uvec);
+      }
+
+      // Orthonormalize supreme over ubasis and itself.
+      Orthonormalize(*ubasis, *supreme);
+
+      // Save the supremizer basis.
+      std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      {
+         hid_t file_id;
+         herr_t errf = 0;
+         std::string filename(basis_prefix + basis_tag + ".h5");
+         file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+         assert(file_id >= 0);
+
+         hdf5_utils::WriteDataset(file_id, "supremizer_basis", *supreme);
+
+         errf = H5Fclose(file_id);
+         assert(errf >= 0);
+      }
+
+      delete supreme;
+   }
+
+   DeletePointers(comp_fes);
+}
+
 double StokesSolver::ComputeBEFlux(
    const FiniteElement &el, ElementTransformation &Tr,
    VectorCoefficient &ud)
