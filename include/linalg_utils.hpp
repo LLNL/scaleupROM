@@ -7,6 +7,7 @@
 
 #include "mfem.hpp"
 #include "librom.h"
+#include "etc.hpp"
 
 using namespace mfem;
 
@@ -44,6 +45,59 @@ void PrintVector(const CAROM::Vector &vec,
 
 namespace mfem
 {
+
+struct MatrixBlocks
+{
+   int nrows;
+   int ncols;
+   Array2D<SparseMatrix *> blocks;
+
+   MatrixBlocks() : nrows(0), ncols(0), blocks(0, 0) {}
+   MatrixBlocks(const int nrows_, const int ncols_)
+      : nrows(nrows_), ncols(ncols_), blocks(nrows_, ncols_)
+   { blocks = NULL; }
+   MatrixBlocks(const Array2D<SparseMatrix *> &mats)
+   { *this = mats; }
+
+   ~MatrixBlocks() { DeletePointers(blocks); }
+
+   SparseMatrix* operator()(const int i, const int j) const
+   {
+      assert((i >= 0) && (i < nrows));
+      assert((j >= 0) && (j < ncols));
+      return blocks(i, j);
+   }
+
+   // MatrixBlocks has the ownership. no copy assignment.
+   MatrixBlocks& operator=(const Array2D<SparseMatrix *> &mats)
+   {
+printf("operator= const Array2D<SparseMatrix *>.\n");
+      nrows = mats.NumRows();
+      ncols = mats.NumCols();
+      blocks = mats;
+
+      return *this;
+   }
+
+   // Copy assignment.
+   MatrixBlocks& operator=(const MatrixBlocks &matblock)
+   {
+printf("operator= const MatrixBlocks.\n");
+      if (this == &matblock) return *this;
+      DeletePointers(blocks);
+
+      nrows = matblock.nrows;
+      ncols = matblock.ncols;
+      blocks.SetSize(nrows, ncols);
+      blocks = NULL;
+
+      for (int i = 0; i < nrows; i++)
+         for (int j = 0; j < ncols; j++)
+            if (matblock(i, j)) blocks(i, j) = new SparseMatrix(*matblock(i, j));
+
+      return *this;
+   }
+};
 
 void GramSchmidt(DenseMatrix& mat);
 
