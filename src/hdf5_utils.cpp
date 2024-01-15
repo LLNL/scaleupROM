@@ -241,7 +241,7 @@ BlockMatrix* ReadBlockMatrix(hid_t &source, std::string matrix_name,
    assert(grp_id >= 0);
 
    Array<int> size, row_offsets, col_offsets;
-   Array2D<int> zero_blocks;
+   Array2D<bool> zero_blocks;
    ReadDataset(grp_id, "size", size);
    ReadDataset(grp_id, "row_offsets", row_offsets);
    ReadDataset(grp_id, "col_offsets", col_offsets);
@@ -305,7 +305,7 @@ void WriteBlockMatrix(hid_t &source, std::string matrix_name, BlockMatrix* mat)
    WriteDataset(grp_id, "row_offsets", row_offsets);
    WriteDataset(grp_id, "col_offsets", col_offsets);
 
-   Array2D<int> zero_blocks(size[0], size[1]);
+   Array2D<bool> zero_blocks(size[0], size[1]);
    for (int i = 0; i < size[0]; i++)
       for (int j = 0; j < size[1]; j++)
          zero_blocks(i, j) = (mat->IsZeroBlock(i, j) || (mat->GetBlock(i,j).NumNonZeroElems() == 0));
@@ -415,6 +415,67 @@ void WriteDataset(hid_t &source, std::string dataset, const DenseTensor &value)
    assert(errf >= 0);
 
    errf = H5Dclose(dset_id);
+   assert(errf >= 0);
+}
+
+void ReadDataset(hid_t &source, std::string dataset, MatrixBlocks &value)
+{
+   herr_t errf = 0;
+   hid_t grp_id;
+   grp_id = H5Gopen2(source, dataset.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   int nrows, ncols;
+   ReadAttribute(grp_id, "nrows", nrows);
+   ReadAttribute(grp_id, "ncols", ncols);
+   value.SetSize(nrows, ncols);
+
+   Array2D<bool> zero_blocks;
+   ReadDataset(grp_id, "zero_blocks", zero_blocks);
+   assert(zero_blocks.NumRows() == nrows);
+   assert(zero_blocks.NumCols() == ncols);
+
+   std::string block_name;
+   for (int i = 0; i < nrows; i++)
+      for (int j = 0; j < ncols; j++)
+      {
+         if (zero_blocks(i, j)) continue;
+
+         block_name = "block_" + std::to_string(i) + "_" + std::to_string(j);  
+         value.blocks(i, j) = ReadSparseMatrix(grp_id, block_name);
+      }
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+}
+
+void WriteDataset(hid_t &source, std::string dataset, const MatrixBlocks &value)
+{
+   herr_t errf = 0;
+   hid_t grp_id;
+   grp_id = H5Gcreate(source, dataset.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   WriteAttribute(grp_id, "nrows", value.nrows);
+   WriteAttribute(grp_id, "ncols", value.ncols);
+
+   Array2D<bool> zero_blocks(value.nrows, value.ncols);
+   for (int i = 0; i < value.nrows; i++)
+      for (int j = 0; j < value.ncols; j++)
+         zero_blocks(i, j) = (value.blocks(i, j) || (value.blocks(i, j)->NumNonZeroElems() == 0));
+   WriteDataset(grp_id, "zero_blocks", zero_blocks);
+
+   std::string block_name;
+   for (int i = 0; i < value.nrows; i++)
+      for (int j = 0; j < value.ncols; j++)
+      {
+         block_name = "block_" + std::to_string(i) + "_" + std::to_string(j);
+         if (zero_blocks(i, j)) continue;
+
+         WriteSparseMatrix(grp_id, block_name, value.blocks(i, j));
+      }
+
+   errf = H5Gclose(grp_id);
    assert(errf >= 0);
 }
 

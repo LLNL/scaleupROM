@@ -61,6 +61,17 @@ struct MatrixBlocks
 
    ~MatrixBlocks() { DeletePointers(blocks); }
 
+   void SetSize(const int w, const int h)
+   {
+      for (int i = 0; i < nrows; i++)
+         for (int j = 0; j < ncols; j++)
+            if (blocks(i, j)) delete blocks(i, j);
+
+      nrows = w; ncols = h;
+      blocks.SetSize(w, h);
+      blocks = NULL;
+   }
+
    SparseMatrix* operator()(const int i, const int j) const
    {
       assert((i >= 0) && (i < nrows));

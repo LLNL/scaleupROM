@@ -7,6 +7,7 @@
 
 #include "mfem.hpp"
 #include "hdf5.h"
+#include "linalg_utils.hpp"
 
 using namespace mfem;
 
@@ -15,6 +16,7 @@ namespace hdf5_utils
 
 inline hid_t GetType(int) { return (H5T_NATIVE_INT); }
 inline hid_t GetType(double) { return (H5T_NATIVE_DOUBLE); }
+inline hid_t GetType(bool) { return (H5T_NATIVE_HBOOL); }
 
 hid_t GetNativeType(hid_t type);
 
@@ -168,6 +170,9 @@ void WriteDataset(hid_t &source, std::string dataset, const DenseMatrix &value);
 
 void ReadDataset(hid_t &source, std::string dataset, DenseTensor &value);
 void WriteDataset(hid_t &source, std::string dataset, const DenseTensor &value);
+
+void ReadDataset(hid_t &source, std::string dataset, MatrixBlocks &value);
+void WriteDataset(hid_t &source, std::string dataset, const MatrixBlocks &value);
 
 inline bool pathExists(hid_t id, const std::string& path)
 {
