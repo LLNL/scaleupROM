@@ -53,6 +53,10 @@ class SteadyNSTensorROM : public Operator
 {
 protected:
    bool direct_solve;
+   bool separate_variable;
+
+   const int num_var = 2;
+   int numSub = -1;
 
    Array<int> block_offsets;
    Array<Array<int> *> block_idxs;

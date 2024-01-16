@@ -608,24 +608,13 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
 void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec)
 {
-   assert(U->NumBlocks() == numSub);
+   assert(U->NumBlocks() == num_rom_blocks);
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    if (use_restart)
-   {
-      for (int i = 0; i < numSub; i++)
-      {
-         assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-         DenseMatrix* basis_i;
-         GetBasisOnSubdomain(i, basis_i);
-
-         // Project from a FOM solution
-         basis_i->MultTranspose(U->GetBlock(i).GetData(), reduced_sol->GetBlock(i).GetData());
-      }
-   }
+      ProjectGlobalToDomainBasis(U, reduced_sol);
    else
       (*reduced_sol) = 0.0;
 
@@ -688,16 +677,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    else
       mfem_error("MFEMROMHandler::NonlinearSolve- Unknown ROM nonlinear solver type!\n");
 
-   for (int i = 0; i < numSub; i++)
-   {
-      assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-      DenseMatrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-
-      // 23. reconstruct FOM state
-      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
-   }
+   LiftUpGlobal(*reduced_sol, *U);
 }
 
 SparseMatrix* MFEMROMHandler::ProjectToRefBasis(const int &i, const int &j, const Operator *mat)

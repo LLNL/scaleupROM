@@ -73,6 +73,14 @@ basis:
       number_of_basis: 2
     - name: "circle"
       number_of_basis: 4
+    - name: "empty_vel"
+      number_of_basis: 2
+    - name: "circle_vel"
+      number_of_basis: 4
+    - name: "empty_pres"
+      number_of_basis: 2
+    - name: "circle_pres"
+      number_of_basis: 4
   svd:
     save_spectrum: true
     update_right_sv: false
