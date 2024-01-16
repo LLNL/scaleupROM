@@ -526,6 +526,7 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 
    assert(nu_coeff);
 
+   int num_blocks = (separate_variable_basis) ? num_var: 1;
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
@@ -551,13 +552,22 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       SparseMatrix *b_mat = &(b_comp.SpMat());
       SparseMatrix *bt_mat = Transpose(*b_mat);
 
-      Array<int> dummy1, dummy2;
-      BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
-
-      comp_mats[c] = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+      comp_mats[c]->SetSize(num_blocks, num_blocks);
+      if (separate_variable_basis)
+      {
+         (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
+         (*comp_mats[c])(1, 0) = rom_handler->ProjectToRefBasis(fidx+1, fidx, b_mat);
+         (*comp_mats[c])(0, 1) = rom_handler->ProjectToRefBasis(fidx, fidx+1, bt_mat);
+      }
+      else
+      {
+         Array<int> dummy1, dummy2;
+         BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
+         (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+         delete sys_comp;
+      }
 
       delete bt_mat;
-      delete sys_comp;
    }
 }
 
@@ -573,12 +583,12 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 
    assert(nu_coeff);
 
+   int num_blocks = (separate_variable_basis) ? num_var: 1;
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
       Mesh *comp = topol_handler->GetComponentMesh(c);
       assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-      Array<SparseMatrix *> *bdr_mats_c = bdr_mats[c];
 
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
       {
@@ -601,13 +611,23 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          SparseMatrix *b_mat = &(b_comp.SpMat());
          SparseMatrix *bt_mat = Transpose(*b_mat);
 
-         Array<int> dummy1, dummy2;
-         BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
-
-         (*bdr_mats_c)[b] = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+         MatrixBlocks *bdr_mat = (*bdr_mats[c])[b];
+         bdr_mat->SetSize(num_blocks, num_blocks);
+         if (separate_variable_basis)
+         {
+            (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
+            (*bdr_mat)(1, 0) = rom_handler->ProjectToRefBasis(fidx+1, fidx, b_mat);
+            (*bdr_mat)(0, 1) = rom_handler->ProjectToRefBasis(fidx, fidx+1, bt_mat);
+         }
+         else
+         {
+            Array<int> dummy1, dummy2;
+            BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
+            (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+            delete sys_comp;
+         }
 
          delete bt_mat;
-         delete sys_comp;
       }
    }
 }
@@ -627,18 +647,22 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
       pfes_comp[c] = fes_comp[c * num_var + 1];
    }
 
+   int num_blocks = (separate_variable_basis) ? 2 * num_var: 2;
+
    const int num_ref_ports = topol_handler->GetNumRefPorts();
    assert(port_mats.Size() == num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
    {
-      assert(port_mats[p]->NumRows() == 2);
-      assert(port_mats[p]->NumCols() == 2);
-
       int c1, c2;
       topol_handler->GetComponentPair(p, c1, c2);
 
       Array<int> c_idx(2);
       c_idx[0] = c1; c_idx[1] = c2;
+      if (separate_variable_basis)
+      {
+         c_idx[0] *= num_var;
+         c_idx[1] *= num_var;
+      }
 
       Array2D<SparseMatrix *> m_mats_p(2,2), b_mats_p(2,2), bt_mats_p(2,2);
       m_mats_p = NULL;
@@ -655,23 +679,28 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
             // NOTE: the index also should be transposed.
             bt_mats_p(j, i) = Transpose(*b_mats_p(i, j));
 
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-         {
-            Array<int> dummy1, dummy2;
-            BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
-                                                   dummy1, dummy2);
-            (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], tmp_mat);
-            delete tmp_mat;
-         }
+      port_mats[p]->SetSize(num_blocks, num_blocks);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-         {
-            delete m_mats_p(i, j);
-            delete b_mats_p(i, j);
-            delete bt_mats_p(i, j);
-         }
+            if (separate_variable_basis)
+            {
+               (*port_mats[p])(i * num_var, j * num_var) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], m_mats_p(i, j));
+               (*port_mats[p])(i * num_var + 1, j * num_var) = rom_handler->ProjectToRefBasis(c_idx[i] + 1, c_idx[j], b_mats_p(i, j));
+               (*port_mats[p])(i * num_var, j * num_var + 1) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j] + 1, bt_mats_p(i, j));
+            }
+            else
+            {
+               Array<int> dummy1, dummy2;
+               BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
+                                                      dummy1, dummy2);
+               (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], tmp_mat);
+               delete tmp_mat;
+            }
+
+      DeletePointers(m_mats_p);
+      DeletePointers(b_mats_p);
+      DeletePointers(bt_mats_p);
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
 

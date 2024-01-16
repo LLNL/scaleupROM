@@ -322,6 +322,38 @@ TEST(Stokes_Workflow, ComponentWiseWithDirectSolve)
    return;
 }
 
+TEST(Stokes_Workflow, ComponentGlobalSeparateVariable)
+{
+   config = InputParser("inputs/stokes.component.yml");
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["model_reduction"]["linear_solver_type"] = "direct";
+   config.dict_["model_reduction"]["linear_system_type"] = "sid";
+   config.dict_["model_reduction"]["save_operator"]["level"] = "global";
+
+   printf("\nSample Generation \n\n");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
 TEST(SteadyNS_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/steady_ns.base.yml");

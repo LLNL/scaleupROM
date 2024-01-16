@@ -63,25 +63,16 @@ MultiBlockSolver::~MultiBlockSolver()
    delete rom_handler;
    delete topol_handler;
 
-   for (int c = 0; c < comp_mats.Size(); c++)
-      delete comp_mats[c];
+   DeletePointers(comp_mats);
 
    for (int c = 0; c < bdr_mats.Size(); c++)
    {
-      for (int b = 0; b < bdr_mats[c]->Size(); b++)
-         delete (*bdr_mats[c])[b];
+      DeletePointers((*bdr_mats[c]));
 
       delete bdr_mats[c];
    }
 
-   for (int p = 0; p < port_mats.Size(); p++)
-   {
-      for (int i = 0; i < port_mats[p]->NumRows(); i++)
-         for (int j = 0; j < port_mats[p]->NumCols(); j++)
-            delete (*port_mats[p])(i,j);
-
-      delete port_mats[p];
-   }
+   DeletePointers(port_mats);
 }
 
 void MultiBlockSolver::ParseInputs()
@@ -249,21 +240,21 @@ void MultiBlockSolver::AllocateROMElements()
    const int num_ref_ports = topol_handler->GetNumRefPorts();
 
    comp_mats.SetSize(num_comp);
-   comp_mats = NULL;
+   const int block_size = (separate_variable_basis) ? num_var : 1;
+   for (int c = 0; c < num_comp; c++)
+      comp_mats[c] = new MatrixBlocks(block_size, block_size);
 
    bdr_mats.SetSize(num_comp);
    for (int c = 0; c < num_comp; c++)
    {
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      bdr_mats[c] = new Array<SparseMatrix *>(comp->bdr_attributes.Size());
-      (*bdr_mats[c]) = NULL;
+      bdr_mats[c] = new Array<MatrixBlocks *>(comp->bdr_attributes.Size());
+      for (int b = 0; b < bdr_mats[c]->Size(); b++)
+         (*bdr_mats[c])[b] = new MatrixBlocks(block_size, block_size);
    }
    port_mats.SetSize(num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
-   {
-      port_mats[p] = new Array2D<SparseMatrix *>(2,2);
-      (*port_mats[p]) = NULL;
-   }
+      port_mats[p] = new MatrixBlocks(2 * block_size, 2 * block_size);
 }
 
 void MultiBlockSolver::BuildROMElements()
@@ -330,7 +321,7 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
       comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
-      hdf5_utils::WriteSparseMatrix(comp_grp_id, "domain", comp_mats[c]);
+      hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp_mats[c]);
 
       // boundaries are saved for each component group.
       SaveBdrROMElement(comp_grp_id, c);
@@ -358,9 +349,9 @@ void MultiBlockSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
 
    hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
    
-   Array<SparseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
+   Array<MatrixBlocks *> *bdr_mat_c = bdr_mats[comp_idx];
    for (int b = 0; b < num_bdr; b++)
-      hdf5_utils::WriteSparseMatrix(bdr_grp_id, std::to_string(b), (*bdr_mat_c)[b]);
+      hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *((*bdr_mat_c)[b]));
 
    errf = H5Gclose(bdr_grp_id);
    assert(errf >= 0);
@@ -381,25 +372,7 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
    hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
    
    for (int p = 0; p < num_ref_ports; p++)
-   {
-      assert(port_mats[p]->NumRows() == 2);
-      assert(port_mats[p]->NumCols() == 2);
-
-      hid_t port_grp_id;
-      port_grp_id = H5Gcreate(grp_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(port_grp_id >= 0);
-
-      Array2D<SparseMatrix *> *port_mat = port_mats[p];
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-         {
-            std::string dset_name = std::to_string(i) + std::to_string(j);
-            hdf5_utils::WriteSparseMatrix(port_grp_id, dset_name, (*port_mat)(i,j));
-         }
-      
-      errf = H5Gclose(port_grp_id);
-      assert(errf >= 0);
-   }  // for (int p = 0; p < num_ref_ports; p++)
+      hdf5_utils::WriteDataset(grp_id, std::to_string(p), *port_mats[p]);
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
@@ -448,7 +421,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
       comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
-      comp_mats[c] = hdf5_utils::ReadSparseMatrix(comp_grp_id, "domain");
+      hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp_mats[c]);
 
       // boundary
       LoadBdrROMElement(comp_grp_id, c);
@@ -476,9 +449,9 @@ void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
    assert(num_bdr == comp->bdr_attributes.Size());
    assert(num_bdr = bdr_mats[comp_idx]->Size());
 
-   Array<SparseMatrix *> *bdr_mat_c = bdr_mats[comp_idx];
+   Array<MatrixBlocks *> *bdr_mat_c = bdr_mats[comp_idx];
    for (int b = 0; b < num_bdr; b++)
-      (*bdr_mat_c)[b] = hdf5_utils::ReadSparseMatrix(bdr_grp_id, std::to_string(b));
+      hdf5_utils::ReadDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
 
    errf = H5Gclose(bdr_grp_id);
    assert(errf >= 0);
@@ -499,25 +472,7 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
    assert(port_mats.Size() == num_ref_ports);
 
    for (int p = 0; p < num_ref_ports; p++)
-   {
-      assert(port_mats[p]->NumRows() == 2);
-      assert(port_mats[p]->NumCols() == 2);
-
-      hid_t port_grp_id;
-      port_grp_id = H5Gopen2(grp_id, std::to_string(p).c_str(), H5P_DEFAULT);
-      assert(port_grp_id >= 0);
-
-      Array2D<SparseMatrix *> *port_mat = port_mats[p];
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-         {
-            std::string dset_name = std::to_string(i) + std::to_string(j);
-            (*port_mat)(i,j) = hdf5_utils::ReadSparseMatrix(port_grp_id, dset_name);
-         }
-      
-      errf = H5Gclose(port_grp_id);
-      assert(errf >= 0);
-   }  // for (int p = 0; p < num_ref_ports; p++)
+      hdf5_utils::ReadDataset(grp_id, std::to_string(p), *port_mats[p]);
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
@@ -530,21 +485,29 @@ void MultiBlockSolver::AssembleROM()
 
    const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
    BlockMatrix *romMat = new BlockMatrix(*rom_block_offsets);
+   romMat->owns_blocks = true;
 
    // component domain matrix.
    for (int m = 0; m < numSub; m++)
    {
       int c_type = topol_handler->GetMeshType(m);
-      int num_basis = rom_handler->GetRefNumBasis(c_type);
+      int num_block = 1;
+      int midx0 = m;
+      if (separate_variable_basis)
+      {
+         num_block *= num_var;
+         midx0 *= num_var;
+      }
 
-      if (romMat->IsZeroBlock(m, m))
-         romMat->SetBlock(m, m, new SparseMatrix(num_basis));
+      Array<int> midx(num_block);
+      for (int k = 0; k < num_block; k++)
+         midx[k] = midx0 + k;
 
-      romMat->GetBlock(m,m) += *(comp_mats[c_type]);
+      MatrixBlocks *comp_mat = comp_mats[c_type];
+      AddToBlockMatrix(midx, midx, *comp_mat, *romMat);
 
       // boundary matrixes of each component.
       Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
-      Array<SparseMatrix *> *bdr_mat = bdr_mats[c_type];
 
       for (int b = 0; b < bdr_c2g->Size(); b++)
       {
@@ -552,38 +515,48 @@ void MultiBlockSolver::AssembleROM()
          if (global_idx < 0) continue;
          if (!BCExistsOnBdr(global_idx)) continue;
 
-         romMat->GetBlock(m,m) += *(*bdr_mat)[b];
-      }
-   }
+         MatrixBlocks *bdr_mat = (*bdr_mats[c_type])[b];
+         AddToBlockMatrix(midx, midx, *bdr_mat, *romMat);
+      }  // for (int b = 0; b < bdr_c2g->Size(); b++)
+   }  // for (int m = 0; m < numSub; m++)
 
    // interface matrixes.
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
       const int p_type = topol_handler->GetPortType(p);
-      Array2D<SparseMatrix *> *port_mat = port_mats[p_type];
+      MatrixBlocks *port_mat = port_mats[p_type];
 
       const int m1 = pInfo->Mesh1;
       const int m2 = pInfo->Mesh2;
       const int c1 = topol_handler->GetMeshType(m1);
       const int c2 = topol_handler->GetMeshType(m2);
-      const int num_basis1 = rom_handler->GetRefNumBasis(c1);
-      const int num_basis2 = rom_handler->GetRefNumBasis(c2);
 
-      Array<int> midx(2), num_basis(2);
-      midx[0] = m1;
-      midx[1] = m2;
-      num_basis[0] = num_basis1;
-      num_basis[1] = num_basis2;
+      int num_block = 2;
+      int c1idx0 = c1, c2idx0 = c2;
+      int m1idx0 = m1, m2idx0 = m2;
+      if (separate_variable_basis)
+      {
+         num_block *= num_var;
+         c1idx0 *= num_var;
+         c2idx0 *= num_var;
+         m1idx0 *= num_var;
+         m2idx0 *= num_var;
+      }
 
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-         {
-            if (romMat->IsZeroBlock(midx[i], midx[j]))
-               romMat->SetBlock(midx[i], midx[j],
-                                 new SparseMatrix(num_basis[i], num_basis[j]));
-            romMat->GetBlock(midx[i], midx[j]) += *((*port_mat)(i, j));
-         }
+      Array<int> midx(num_block), num_basis(num_block);
+      for (int k = 0, cidx = c1idx0, m = m1idx0; k < num_block/2; k++, cidx++, m++)
+      {
+         num_basis[k] = rom_handler->GetRefNumBasis(cidx);
+         midx[k] = m;
+      }
+      for (int k = num_block/2, cidx = c2idx0, m = m2idx0; k < num_block; k++, cidx++, m++)
+      {
+         num_basis[k] = rom_handler->GetRefNumBasis(cidx);
+         midx[k] = m;
+      }
+
+      AddToBlockMatrix(midx, midx, *port_mat, *romMat);
    }
 
    romMat->Finalize();
