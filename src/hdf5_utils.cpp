@@ -462,7 +462,7 @@ void WriteDataset(hid_t &source, std::string dataset, const MatrixBlocks &value)
    Array2D<bool> zero_blocks(value.nrows, value.ncols);
    for (int i = 0; i < value.nrows; i++)
       for (int j = 0; j < value.ncols; j++)
-         zero_blocks(i, j) = (value.blocks(i, j) || (value.blocks(i, j)->NumNonZeroElems() == 0));
+         zero_blocks(i, j) = (!(value.blocks(i, j)) || (value.blocks(i, j)->NumNonZeroElems() == 0));
    WriteDataset(grp_id, "zero_blocks", zero_blocks);
 
    std::string block_name;
