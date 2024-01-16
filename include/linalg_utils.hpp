@@ -72,7 +72,14 @@ struct MatrixBlocks
       blocks = NULL;
    }
 
-   SparseMatrix* operator()(const int i, const int j) const
+   SparseMatrix*& operator()(const int i, const int j)
+   {
+      assert((i >= 0) && (i < nrows));
+      assert((j >= 0) && (j < ncols));
+      return blocks(i, j);
+   }
+
+   SparseMatrix const * operator()(const int i, const int j) const
    {
       assert((i >= 0) && (i < nrows));
       assert((j >= 0) && (j < ncols));
@@ -109,6 +116,8 @@ printf("operator= const MatrixBlocks.\n");
       return *this;
    }
 };
+
+void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const MatrixBlocks &mats, BlockMatrix &bmat);
 
 void GramSchmidt(DenseMatrix& mat);
 

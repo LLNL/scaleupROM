@@ -134,6 +134,36 @@ void PrintVector(const CAROM::Vector &vec,
 namespace mfem
 {
 
+void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const MatrixBlocks &mats, BlockMatrix &bmat)
+{
+   assert(bmat.owns_blocks);
+   assert(bmat.NumRowBlocks() >= mats.nrows);
+   assert(bmat.NumColBlocks() >= mats.ncols);
+   assert(ridx.Size() == mats.nrows);
+   assert(cidx.Size() == mats.ncols);
+   assert((ridx.Min() >= 0) && (ridx.Max() < bmat.NumRowBlocks()));
+   assert((cidx.Min() >= 0) && (cidx.Max() < bmat.NumColBlocks()));
+
+   const Array<int> roffsets = bmat.RowOffsets();
+   const Array<int> coffsets = bmat.ColOffsets();
+
+   int rdim, cdim;
+   for (int i = 0; i < ridx.Size(); i++)
+      for (int j = 0; j < cidx.Size(); j++)
+      {
+         if (!mats(i, j)) continue;
+
+         rdim = roffsets[ridx[i]+1] - roffsets[ridx[i]];
+         cdim = coffsets[cidx[j]+1] - coffsets[cidx[j]];
+         assert((mats(i, j)->NumRows() == rdim) && (mats(i, j)->NumCols() == cdim));
+
+         if (bmat.IsZeroBlock(ridx[i], cidx[j]))
+            bmat.SetBlock(ridx[i], cidx[j], new SparseMatrix(*mats(i, j)));
+         else
+            bmat.GetBlock(ridx[i], cidx[j]) += *mats(i, j);
+      }
+}
+
 void GramSchmidt(DenseMatrix& mat)
 {
    const int num_row = mat.NumRows();
