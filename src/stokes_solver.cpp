@@ -25,9 +25,11 @@ StokesSolver::StokesSolver()
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (uorder + 1) * (uorder + 1));
    
+   var_names = GetVariableNames();
+   num_var = var_names.size();
+
    // solution dimension is determined by initialization.
    udim = dim + 1;
-   num_var = 2;
    vdim.SetSize(num_var);
    vdim[0] = dim;
    vdim[1] = 1;
@@ -55,10 +57,6 @@ StokesSolver::StokesSolver()
       fes[m * num_var] = ufes[m];
       fes[m * num_var + 1] = pfes[m];
    }
-
-   var_names.resize(num_var);
-   var_names[0] = "vel";
-   var_names[1] = "pres";
 }
 
 StokesSolver::~StokesSolver()
@@ -528,6 +526,7 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 
    assert(nu_coeff);
 
+   int num_blocks = (separate_variable_basis) ? num_var: 1;
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
@@ -553,13 +552,22 @@ void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       SparseMatrix *b_mat = &(b_comp.SpMat());
       SparseMatrix *bt_mat = Transpose(*b_mat);
 
-      Array<int> dummy1, dummy2;
-      BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
-
-      comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+      comp_mats[c]->SetSize(num_blocks, num_blocks);
+      if (separate_variable_basis)
+      {
+         (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
+         (*comp_mats[c])(1, 0) = rom_handler->ProjectToRefBasis(fidx+1, fidx, b_mat);
+         (*comp_mats[c])(0, 1) = rom_handler->ProjectToRefBasis(fidx, fidx+1, bt_mat);
+      }
+      else
+      {
+         Array<int> dummy1, dummy2;
+         BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
+         (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+         delete sys_comp;
+      }
 
       delete bt_mat;
-      delete sys_comp;
    }
 }
 
@@ -575,12 +583,12 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 
    assert(nu_coeff);
 
+   int num_blocks = (separate_variable_basis) ? num_var: 1;
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
       Mesh *comp = topol_handler->GetComponentMesh(c);
       assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-      Array<SparseMatrix *> *bdr_mats_c = bdr_mats[c];
 
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
       {
@@ -603,13 +611,23 @@ void StokesSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          SparseMatrix *b_mat = &(b_comp.SpMat());
          SparseMatrix *bt_mat = Transpose(*b_mat);
 
-         Array<int> dummy1, dummy2;
-         BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
-
-         (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, sys_comp);
+         MatrixBlocks *bdr_mat = (*bdr_mats[c])[b];
+         bdr_mat->SetSize(num_blocks, num_blocks);
+         if (separate_variable_basis)
+         {
+            (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
+            (*bdr_mat)(1, 0) = rom_handler->ProjectToRefBasis(fidx+1, fidx, b_mat);
+            (*bdr_mat)(0, 1) = rom_handler->ProjectToRefBasis(fidx, fidx+1, bt_mat);
+         }
+         else
+         {
+            Array<int> dummy1, dummy2;
+            BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
+            (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+            delete sys_comp;
+         }
 
          delete bt_mat;
-         delete sys_comp;
       }
    }
 }
@@ -629,18 +647,22 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
       pfes_comp[c] = fes_comp[c * num_var + 1];
    }
 
+   int num_blocks = (separate_variable_basis) ? 2 * num_var: 2;
+
    const int num_ref_ports = topol_handler->GetNumRefPorts();
    assert(port_mats.Size() == num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
    {
-      assert(port_mats[p]->NumRows() == 2);
-      assert(port_mats[p]->NumCols() == 2);
-
       int c1, c2;
       topol_handler->GetComponentPair(p, c1, c2);
 
       Array<int> c_idx(2);
       c_idx[0] = c1; c_idx[1] = c2;
+      if (separate_variable_basis)
+      {
+         c_idx[0] *= num_var;
+         c_idx[1] *= num_var;
+      }
 
       Array2D<SparseMatrix *> m_mats_p(2,2), b_mats_p(2,2), bt_mats_p(2,2);
       m_mats_p = NULL;
@@ -657,23 +679,28 @@ void StokesSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_com
             // NOTE: the index also should be transposed.
             bt_mats_p(j, i) = Transpose(*b_mats_p(i, j));
 
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-         {
-            Array<int> dummy1, dummy2;
-            BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
-                                                   dummy1, dummy2);
-            (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], tmp_mat);
-            delete tmp_mat;
-         }
+      port_mats[p]->SetSize(num_blocks, num_blocks);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-         {
-            delete m_mats_p(i, j);
-            delete b_mats_p(i, j);
-            delete bt_mats_p(i, j);
-         }
+            if (separate_variable_basis)
+            {
+               (*port_mats[p])(i * num_var, j * num_var) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], m_mats_p(i, j));
+               (*port_mats[p])(i * num_var + 1, j * num_var) = rom_handler->ProjectToRefBasis(c_idx[i] + 1, c_idx[j], b_mats_p(i, j));
+               (*port_mats[p])(i * num_var, j * num_var + 1) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j] + 1, bt_mats_p(i, j));
+            }
+            else
+            {
+               Array<int> dummy1, dummy2;
+               BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
+                                                      dummy1, dummy2);
+               (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], tmp_mat);
+               delete tmp_mat;
+            }
+
+      DeletePointers(m_mats_p);
+      DeletePointers(b_mats_p);
+      DeletePointers(bt_mats_p);
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
@@ -908,35 +935,87 @@ void StokesSolver::Solve_obsolete()
    }
 }
 
+void StokesSolver::LoadReducedBasis()
+{
+   MultiBlockSolver::LoadReducedBasis();
+
+   /* Load supremizer basis and append it to velocity basis */
+   if (separate_variable_basis)
+      LoadSupremizer();
+}
+
+void StokesSolver::LoadSupremizer()
+{
+   assert(separate_variable_basis);
+   assert(rom_handler->BasisLoaded());
+
+   std::string basis_prefix = rom_handler->GetBasisPrefix();
+
+   Array<int> num_ref_supreme, num_supreme;
+   rom_handler->ParseSupremizerInput(num_ref_supreme, num_supreme);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
+   DenseMatrix supreme;
+   for (int m = 0; m < size; m++)
+   {
+      // Load the supremizer basis.
+      std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      {
+         hid_t file_id;
+         herr_t errf = 0;
+         std::string filename(basis_prefix + basis_tag + ".h5");
+         file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+         assert(file_id >= 0);
+
+         hdf5_utils::ReadDataset(file_id, "supremizer_basis", supreme);
+
+         errf = H5Fclose(file_id);
+         assert(errf >= 0);
+      }
+
+      rom_handler->AppendReferenceBasis(m * num_var, supreme);
+   }
+}
+
 void StokesSolver::ProjectOperatorOnReducedBasis()
 {
-   Array2D<Operator *> tmp(numSub, numSub);
+   const int size = (separate_variable_basis) ? numSub * num_var : numSub;
+
+   Array2D<Operator *> tmp(size, size);
    Array2D<SparseMatrix *> bt_mats(numSub, numSub);
    // NOTE: BlockMatrix offsets are indeed used for its Mult() in ProjectOperatorOnReducedBasis below.
    // Offsets should be stored for multi-component case, until ProjectOperatorOnReducedBasis is done.
    Array2D<Array<int> *> ioffsets(numSub, numSub), joffsets(numSub, numSub);
-   for (int i = 0; i < tmp.NumRows(); i++)
-      for (int j = 0; j < tmp.NumCols(); j++)
+   tmp = NULL; ioffsets = NULL; joffsets = NULL;
+
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
       {
          // NOTE: the index also should be transposed.
          bt_mats(i, j) = Transpose(*b_mats(j, i));
 
-         ioffsets(i, j) = new Array<int>;
-         joffsets(i, j) = new Array<int>;
-         tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j),
-                                    *(ioffsets(i,j)), *(joffsets(i,j)));
+         if (separate_variable_basis)
+         {
+            tmp(i * num_var, j * num_var) = m_mats(i, j);
+            tmp(i * num_var + 1, j * num_var) = b_mats(i, j);
+            tmp(i * num_var, j * num_var + 1) = bt_mats(i, j);
+         }
+         else
+         {
+            ioffsets(i, j) = new Array<int>;
+            joffsets(i, j) = new Array<int>;
+            tmp(i, j) = FormBlockMatrix(m_mats(i,j), b_mats(i,j), bt_mats(i,j),
+                                       *(ioffsets(i,j)), *(joffsets(i,j)));
+         }  
       }
          
    rom_handler->ProjectOperatorOnReducedBasis(tmp);
 
-   for (int i = 0; i < bt_mats.NumRows(); i++)
-      for (int j = 0; j < bt_mats.NumCols(); j++)
-      {
-         delete bt_mats(i, j);
-         delete tmp(i, j);
-         delete ioffsets(i, j);
-         delete joffsets(i, j);
-      }
+   DeletePointers(bt_mats);
+   if (!separate_variable_basis) DeletePointers(tmp);
+   DeletePointers(ioffsets);
+   DeletePointers(joffsets);
 }
 
 void StokesSolver::SanityCheckOnCoeffs()
@@ -1168,6 +1247,85 @@ void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
       mfem_error("Current boundary setup cannot ensure incompressibility!\nMake sure BC uses function_factory::stokes_problem::flux.\n");
    }
    
+}
+
+void StokesSolver::EnrichSupremizer()
+{
+   assert(separate_variable_basis);
+   assert(rom_handler->BasisLoaded());
+
+   Array<FiniteElementSpace *> comp_fes;
+   FiniteElementSpace *ufes_comp, *pfes_comp;
+   DenseMatrix *pbasis, *ubasis, *tmp, *supreme;
+   Vector pvec, uvec;
+
+   std::string basis_prefix = rom_handler->GetBasisPrefix();
+
+   if (train_mode == TrainMode::UNIVERSAL)
+      GetComponentFESpaces(comp_fes);
+
+   Array<int> num_ref_supreme, num_supreme;
+   rom_handler->ParseSupremizerInput(num_ref_supreme, num_supreme);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
+   for (int m = 0; m < size; m++)
+   {
+      // Load pressure ROM basis.
+      rom_handler->GetReferenceBasis(m * num_var, ubasis);
+      rom_handler->GetReferenceBasis(m * num_var + 1, pbasis);
+
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         ufes_comp = ufes[m];
+         pfes_comp = pfes[m];
+      }
+      else
+      {
+         ufes_comp = comp_fes[m * num_var];
+         pfes_comp = comp_fes[m * num_var + 1];
+      }
+      
+      // Divergence operator.
+      MixedBilinearFormDGExtension b_comp(ufes_comp, pfes_comp);
+      b_comp.AddDomainIntegrator(new VectorDivergenceIntegrator(minus_one));
+      if (full_dg)
+         b_comp.AddInteriorFaceIntegrator(new DGNormalFluxIntegrator);
+      b_comp.Assemble();
+      b_comp.Finalize();
+
+      int num_basis = rom_handler->GetRefNumBasis(m * num_var);
+      assert(num_basis == ubasis->NumCols());
+      supreme = new DenseMatrix(ubasis->NumRows(), num_ref_supreme[m]);
+      for (int k = 0; k < num_ref_supreme[m]; k++)
+      {
+         pbasis->GetColumnReference(k, pvec);
+         supreme->GetColumnReference(k, uvec);
+         b_comp.MultTranspose(pvec, uvec);
+      }
+
+      // Orthonormalize supreme over ubasis and itself.
+      Orthonormalize(*ubasis, *supreme);
+
+      // Save the supremizer basis.
+      std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      {
+         hid_t file_id;
+         herr_t errf = 0;
+         std::string filename(basis_prefix + basis_tag + ".h5");
+         file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+         assert(file_id >= 0);
+
+         hdf5_utils::WriteDataset(file_id, "supremizer_basis", *supreme);
+
+         errf = H5Fclose(file_id);
+         assert(errf >= 0);
+      }
+
+      delete supreme;
+   }
+
+   DeletePointers(comp_fes);
 }
 
 double StokesSolver::ComputeBEFlux(

@@ -8,6 +8,22 @@
 using namespace std;
 using namespace mfem;
 
+const TopologyHandlerMode SetTopologyHandlerMode()
+{
+   TopologyHandlerMode topol_mode = NUM_TOPOL_MODE;
+
+   std::string topol_str = config.GetOption<std::string>("mesh/type", "submesh");
+   if (topol_str == "submesh")               topol_mode = TopologyHandlerMode::SUBMESH;
+   else if (topol_str == "component-wise")   topol_mode = TopologyHandlerMode::COMPONENT;
+   else
+   {
+      printf("%s\n", topol_str.c_str());
+      mfem_error("Unknown TopologyHandlerMode!\n");
+   }
+
+   return topol_mode;
+}
+
 /*
    TopologyHandler Base class
 */

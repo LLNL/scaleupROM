@@ -136,18 +136,22 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 SteadyNSTensorROM::SteadyNSTensorROM(
    SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_)
    : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_),
-     block_offsets(block_offsets_), direct_solve(direct_solve_)
+     numSub(hs_.Size()), block_offsets(block_offsets_), direct_solve(direct_solve_)
 {
+   separate_variable = (block_offsets.Size() == num_var * numSub + 1);
+   assert(separate_variable || (block_offsets.Size() == numSub + 1));
+
    // TODO: this needs to be changed for parallel implementation.
    sys_glob_size = height;
    sys_row_starts[0] = 0;
    sys_row_starts[1] = height;
 
-   block_idxs.SetSize(hs.Size());
-   for (int m = 0; m < hs.Size(); m++)
+   block_idxs.SetSize(numSub);
+   for (int m = 0; m < numSub; m++)
    {
-      block_idxs[m] = new Array<int>(block_offsets[m+1] - block_offsets[m]);
-      for (int k = 0, idx = block_offsets[m]; k < block_idxs[m]->Size(); k++, idx++)
+      int midx = (separate_variable) ? m * num_var : m;
+      block_idxs[m] = new Array<int>(block_offsets[midx+1] - block_offsets[midx]);
+      for (int k = 0, idx = block_offsets[midx]; k < block_idxs[m]->Size(); k++, idx++)
          (*block_idxs[m])[k] = idx;
    }
 }
@@ -162,10 +166,11 @@ void SteadyNSTensorROM::Mult(const Vector &x, Vector &y) const
    y = 0.0;
    linearOp->Mult(x, y);
 
-   for (int m = 0; m < hs.Size(); m++)
+   for (int m = 0; m < numSub; m++)
    {
-      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[m], block_offsets[m+1] - block_offsets[m]);
-      y_comp.MakeRef(y, block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+      int midx = (separate_variable) ? m * num_var : m;
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+      y_comp.MakeRef(y, block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
 
       TensorAddScaledContract(*hs[m], 1.0, x_comp, x_comp, y_comp);
    }
@@ -178,11 +183,12 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
    jac_mono = new SparseMatrix(*linearOp);
    DenseMatrix jac_comp;
 
-   for (int m = 0; m < hs.Size(); m++)
+   for (int m = 0; m < numSub; m++)
    {
-      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[m], block_offsets[m+1] - block_offsets[m]);
+      int midx = (separate_variable) ? m * num_var : m;
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
 
-      jac_comp.SetSize(block_offsets[m+1] - block_offsets[m]);
+      jac_comp.SetSize(block_offsets[midx+1] - block_offsets[midx]);
       jac_comp = 0.0;
       TensorAddMultTranspose(*hs[m], x_comp, 0, jac_comp);
       TensorAddMultTranspose(*hs[m], x_comp, 1, jac_comp);
@@ -224,6 +230,13 @@ SteadyNSSolver::SteadyNSSolver()
       mfem_error("SteadyNSSolver: unknown operator type!\n");
 
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
+
+   /* SteadyNSSolver requires all the meshes to have the same element type. */
+   int num_comp = topol_handler->GetNumComponents();
+   const Element::Type type0 = topol_handler->GetMesh(0)->GetElementType(0);
+   for (int c = 0; c < num_comp; c++)
+      if (type0 != topol_handler->GetMesh(c)->GetElementType(0))
+         mfem_error("SteadyNSSolver requires all meshes to have the same element type!\n");
 }
 
 SteadyNSSolver::~SteadyNSSolver()
@@ -241,7 +254,7 @@ SteadyNSSolver::~SteadyNSSolver()
    if (use_rom)
    {
       DeletePointers(comp_tensors);
-      if (rom_handler->SaveOperator() != ROMBuildingLevel::COMPONENT)
+      if (rom_handler->GetBuildingLevel() != ROMBuildingLevel::COMPONENT)
          DeletePointers(subdomain_tensors);
    }
 }
@@ -362,9 +375,35 @@ void SteadyNSSolver::Assemble()
    // nonlinear operator?
 }
 
+void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
+{
+   MultiBlockSolver::SaveROMOperator(input_prefix);
+
+   std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
+   assert(FileExists(filename));
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   hid_t grp_id;
+   grp_id = H5Gcreate(file_id, "ROM_tensors", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   for (int m = 0; m < numSub; m++)
+      hdf5_utils::WriteDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+}
+
 void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
 {
-   assert(rom_handler->SaveOperator() == ROMBuildingLevel::GLOBAL);
+   assert(rom_handler->GetBuildingLevel() == ROMBuildingLevel::GLOBAL);
 
    rom_handler->LoadOperatorFromFile(input_prefix);
    
@@ -411,7 +450,8 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    for (int c = 0; c < num_comp; c++)
    {
       const int fidx = c * num_var;
-      rom_handler->GetBasis(c, basis);
+      const int cidx = (separate_variable_basis) ? fidx : c;
+      rom_handler->GetReferenceBasis(cidx, basis);
       comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
    }  // for (int c = 0; c < num_comp; c++)
 }
@@ -578,32 +618,9 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
    DenseMatrix *basis = NULL;
    for (int m = 0; m < numSub; m++)
    {
-      rom_handler->GetBasisOnSubdomain(m, basis);
+      int idx = (separate_variable_basis) ? m * num_var : m;
+      rom_handler->GetDomainBasis(idx, basis);
       subdomain_tensors[m] = GetReducedTensor(basis, ufes[m]);
-   }
-
-   if (rom_handler->SaveOperator() == ROMBuildingLevel::GLOBAL)
-   {
-      std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
-      assert(FileExists(filename));
-
-      hid_t file_id;
-      herr_t errf = 0;
-      file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
-      assert(file_id >= 0);
-
-      hid_t grp_id;
-      grp_id = H5Gcreate(file_id, "ROM_tensors", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(grp_id >= 0);
-
-      for (int m = 0; m < numSub; m++)
-         hdf5_utils::WriteDataset(grp_id, "subdomain" + std::to_string(m), *subdomain_tensors[m]);
-
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
-
-      errf = H5Fclose(file_id);
-      assert(errf >= 0);
    }
 }
 
@@ -612,7 +629,13 @@ void SteadyNSSolver::SolveROM()
    assert(subdomain_tensors.Size() == numSub);
    for (int m = 0; m < numSub; m++) assert(subdomain_tensors[m]);
 
-   BlockVector U_domain(U->GetData(), domain_offsets); // View vector for U.
+   // View vector for U.
+   BlockVector *U_domain = NULL;
+   if (separate_variable_basis)
+      U_domain = new BlockVector(U->GetData(), var_offsets);
+   else
+      U_domain = new BlockVector(U->GetData(), domain_offsets);
+
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    std::string restart_file;
    if (use_restart)
@@ -623,7 +646,7 @@ void SteadyNSSolver::SolveROM()
 
    // NOTE(kevin): currently assumes direct solve.
    SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
-   rom_handler->NonlinearSolve(rom_oper, &U_domain);
+   rom_handler->NonlinearSolve(rom_oper, U_domain);
 }
 
 DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)

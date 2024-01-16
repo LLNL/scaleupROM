@@ -19,59 +19,6 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
-TEST(Poisson_Workflow, BaseIndividualTest)
-{
-   config = InputParser("inputs/test.base.yml");
-   for (int k = 0; k < 4; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
-   
-   config.dict_["main"]["mode"] = "sample_generation";
-   GenerateSamples(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
-
-   return;
-}
-
-TEST(Poisson_Workflow, BaseUniversalTest)
-{
-   config = InputParser("inputs/test.base.yml");
-
-   config.dict_["single_run"]["poisson0"]["k"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-   
-   config.dict_["main"]["mode"] = "sample_generation";
-   GenerateSamples(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
-
-   return;
-}
-
 TEST(Poisson_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
@@ -200,69 +147,6 @@ TEST(Poisson_Workflow, ComponentWiseWithDirectSolve)
    return;
 }
 
-TEST(Stokes_Workflow, BaseIndividualTest)
-{
-   config = InputParser("inputs/stokes.base.yml");
-   for (int k = 0; k < 4; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
-   
-   config.dict_["main"]["mode"] = "sample_generation";
-   config.dict_["main"]["use_rom"] = false;
-   GenerateSamples(MPI_COMM_WORLD);
-   config.dict_["main"]["use_rom"] = true;
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < stokes_threshold);
-
-   return;
-}
-
-TEST(Stokes_Workflow, BaseUniversalTest)
-{
-   config = InputParser("inputs/stokes.base.yml");
-
-   config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
-   // Test save/loadSolution as well.
-   config.dict_["save_solution"]["enabled"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
-   
-   config.dict_["main"]["mode"] = "sample_generation";
-   config.dict_["main"]["use_rom"] = false;
-   GenerateSamples(MPI_COMM_WORLD);
-   config.dict_["main"]["use_rom"] = true;
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["save_solution"]["enabled"] = false;
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < stokes_threshold);
-
-   return;
-}
-
 TEST(Stokes_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/stokes.base.yml");
@@ -336,6 +220,49 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    return;
 }
 
+TEST(Stokes_Workflow, MFEMGlobalSeparateTest)
+{
+   config = InputParser("inputs/stokes.base.yml");
+
+   config.dict_["visualization"]["enabled"] = true;
+
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
+   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+   config.dict_["model_reduction"]["linear_solver_type"] = "minres";
+
+   config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
+   config.dict_["model_reduction"]["subdomain_training"] = "universal";
+   config.dict_["basis"]["number_of_basis"] = 4;
+
+   // Test save/loadSolution as well.
+   config.dict_["save_solution"]["enabled"] = true;
+   config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["main"]["use_rom"] = false;
+   GenerateSamples(MPI_COMM_WORLD);
+   config.dict_["main"]["use_rom"] = true;
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["save_solution"]["enabled"] = false;
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
 TEST(Stokes_Workflow, ComponentWiseTest)
 {
    config = InputParser("inputs/stokes.component.yml");
@@ -371,6 +298,37 @@ TEST(Stokes_Workflow, ComponentWiseWithDirectSolve)
    config.dict_["solver"]["direct_solve"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "sid";
+
+   printf("\nSample Generation \n\n");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
+TEST(Stokes_Workflow, ComponentSeparateVariable)
+{
+   config = InputParser("inputs/stokes.component.yml");
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["model_reduction"]["linear_solver_type"] = "direct";
+   config.dict_["model_reduction"]["linear_system_type"] = "us";
 
    printf("\nSample Generation \n\n");
    
@@ -466,6 +424,49 @@ TEST(SteadyNS_Workflow, MFEMUniversalTest)
    return;
 }
 
+TEST(SteadyNS_Workflow, MFEMGlobalUniversalTest)
+{
+   config = InputParser("inputs/steady_ns.base.yml");
+
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["mesh"]["uniform_refinement"] = 2;
+   config.dict_["discretization"]["order"] = 2;
+   config.dict_["visualization"]["enabled"] = true;
+
+   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
+   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
+   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+
+   config.dict_["single_run"]["stokes_channel"]["nu"] = 2.0;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
+   config.dict_["model_reduction"]["subdomain_training"] = "universal";
+   config.dict_["basis"]["number_of_basis"] = 4;
+
+   // Test save/loadSolution as well.
+   config.dict_["save_solution"]["enabled"] = true;
+   config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["save_solution"]["enabled"] = false;
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
 TEST(SteadyNS_Workflow, ComponentWiseTest)
 {
    config = InputParser("inputs/steady_ns.component.yml");
@@ -496,6 +497,36 @@ TEST(SteadyNS_Workflow, ComponentWiseTest)
 TEST(SteadyNS_Workflow, ComponentWiseWithDirectSolve)
 {
    config = InputParser("inputs/stokes.component.yml");
+   config.dict_["model_reduction"]["linear_solver_type"] = "direct";
+   config.dict_["model_reduction"]["linear_system_type"] = "us";
+
+   printf("\nSample Generation \n\n");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
+TEST(SteadyNS_Workflow, ComponentSeparateVariable)
+{
+   config = InputParser("inputs/stokes.component.yml");
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "us";
 

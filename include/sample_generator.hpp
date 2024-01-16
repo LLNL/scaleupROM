@@ -95,14 +95,16 @@ public:
 
    void ReportStatus(const int &sample_idx);
 
+   // Perform SVD over snapshot for basis_tag. Calculate the coverage for ref_num_basis (optional).
    void FormReducedBasis(const std::string &basis_prefix,
                          const std::string &basis_tag,
                          const std::vector<std::string> &file_list,
-                         const int &num_basis);
+                         const int &ref_num_basis = -1);
 
 private:
    const int GetDimFromSnapshots(const std::string &filename);
-   void SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int &num_basis);
+   // Save all singular value spectrum. Calculate the coverage for ref_num_basis (optional).
+   void SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int &ref_num_basis = -1);
 
 };
 

@@ -16,9 +16,11 @@ PoissonSolver::PoissonSolver()
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
  
+   var_names = GetVariableNames();
+   num_var = var_names.size();
+
    // solution dimension is determined by initialization.
    udim = 1;
-   num_var = 1;
    vdim.SetSize(num_var);
    vdim = 1;
 
@@ -37,9 +39,6 @@ PoissonSolver::PoissonSolver()
    for (int m = 0; m < numSub; m++) {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
-
-   var_names.resize(num_var);
-   var_names[0] = "solution";
 }
 
 PoissonSolver::~PoissonSolver()
@@ -361,7 +360,9 @@ void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
       a_comp.Assemble();
       a_comp.Finalize();
 
-      comp_mats[c] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
+      // Poisson equation has only one solution variable.
+      comp_mats[c]->SetSize(1, 1);
+      (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
    }
 }
 
@@ -377,8 +378,8 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
    {
       Mesh *comp = topol_handler->GetComponentMesh(c);
       assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-      Array<SparseMatrix *> *bdr_mats_c = bdr_mats[c];
 
+      MatrixBlocks *bdr_mat;
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
       {
          Array<int> bdr_marker(comp->bdr_attributes.Max());
@@ -390,7 +391,9 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          a_comp.Assemble();
          a_comp.Finalize();
 
-         (*bdr_mats_c)[b] = rom_handler->ProjectOperatorOnReducedBasis(c, c, &(a_comp.SpMat()));
+         bdr_mat = (*bdr_mats[c])[b];
+         bdr_mat->SetSize(1, 1);
+         (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
       }
    }
 }
@@ -405,8 +408,8 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
    assert(port_mats.Size() == num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
    {
-      assert(port_mats[p]->NumRows() == 2);
-      assert(port_mats[p]->NumCols() == 2);
+      assert(port_mats[p]->nrows == 2);
+      assert(port_mats[p]->ncols == 2);
 
       int c1, c2;
       topol_handler->GetComponentPair(p, c1, c2);
@@ -424,7 +427,7 @@ void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-            (*port_mats[p])(i, j) = rom_handler->ProjectOperatorOnReducedBasis(c_idx[i], c_idx[j], spmats(i,j));
+            (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], spmats(i,j));
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++) delete spmats(i, j);

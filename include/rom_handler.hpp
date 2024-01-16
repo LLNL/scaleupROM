@@ -30,18 +30,22 @@ enum ROMBuildingLevel
    NUM_BLD_LVL
 };
 
-const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler);
-const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler);
+const TrainMode SetTrainMode();
 
-class ROMHandler
+const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
+const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
+
+class ROMHandlerBase
 {
 protected:
 // public:
    int numSub = -1;          // number of subdomains.
-   int udim = -1;            // solution dimension.
-   int num_var = -1;         // number of variables for which linear subspace method is applied.
-   int num_basis_sets = -1;  // number of the basis sets. for individual case, ==numSub. for universal case, == number of components.
-   Array<int> vdim;          // dimension of each variable.
+   int num_var = -1;         // number of variables for which POD is performed.
+   int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
+   int num_rom_ref_blocks = -1;  // number of ROM reference component blocks.
+   int num_rom_comp = -1;     // number of ROM reference components.
+   std::vector<std::string> fom_var_names;          // dimension of each variable.
+   Array<int> fom_var_offsets;
    Array<int> fom_num_vdofs;
 
    // rom options.
@@ -52,6 +56,7 @@ protected:
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
    TrainMode train_mode = NUM_TRAINMODE;
    bool nonlinear_mode = false;
+   bool separate_variable = false;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
@@ -63,20 +68,35 @@ protected:
    // topology handler
    TopologyHandler *topol_handler = NULL;
 
-   // rom variables.
-   Array<int> num_basis;    // number of columns in a basis set
-   Array<const CAROM::Matrix*> carom_spatialbasis;
+   // component rom variables.
+   /*
+      number of columns in the basis for a reference component.
+      For i-th reference component and j-th variable,
+         index = i * num_var + j
+   */
+   Array<int> num_ref_basis;
+   Array<const CAROM::Matrix*> carom_ref_basis;
+   Array<int> rom_comp_block_offsets;
    bool basis_loaded;
    bool operator_loaded;
 
-   // SparseMatrix *romMat;
+   // domain rom variables.
+   /*
+      offset for the global domain ROM blocks.
+      For i-th subdomain and j-th variable,
+         index = i * num_var + j
+   */
+   Array<int> num_basis;
    Array<int> rom_block_offsets;
+   /*
+      the global domain ROM blocks with index order switched.
+      For i-th subdomain and j-th variable,
+         index = j * num_var + i
+   */
+   Array<int> rom_varblock_offsets;
    
    CAROM::Vector *reduced_rhs = NULL;
    CAROM::Vector *reduced_sol = NULL;
-
-   Array2D<CAROM::Matrix *> carom_mats;
-   CAROM::Matrix *romMat_inv = NULL;
    
    CAROM::Options* rom_options;
    CAROM::BasisGenerator *basis_generator;
@@ -88,70 +108,77 @@ protected:
 
    void ParseInputs();
 public:
-   ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-              const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+   ROMHandlerBase(const TrainMode &train_mode_, TopologyHandler *input_topol,
+              const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis);
 
-   virtual ~ROMHandler();
+   virtual ~ROMHandlerBase();
 
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
-   const int GetNumBasisSets() { return num_basis_sets; }
-   const int GetNumBasis(const int &basis_idx) { return num_basis[basis_idx]; }
-   const ROMBuildingLevel SaveOperator() { return save_operator; }
+   const int GetNumROMRefBlocks() { return num_rom_ref_blocks; }
+   const int GetRefNumBasis(const int &basis_idx) { return num_ref_basis[basis_idx]; }
+   const ROMBuildingLevel GetBuildingLevel() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
+   const std::string GetBasisPrefix() { return basis_prefix; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
-   virtual SparseMatrix* GetOperator()
-   { mfem_error("ROMHandler::GetOperator is not supported! Use MFEMROMHandler.\n"); return NULL; }
+   const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
+   virtual SparseMatrix* GetOperator() = 0;
    const bool GetNonlinearMode() { return nonlinear_mode; }
    void SetNonlinearMode(const bool nl_mode) { nonlinear_mode = nl_mode; }
 
-   // virtual void FormReducedBasis();
+   /* parse inputs for supremizer. only for Stokes/SteadyNS Solver. */
+   void ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme);
+
    virtual void LoadReducedBasis();
 
    int GetBasisIndexForSubdomain(const int &subdomain_index);
-   void GetBasis(const int &basis_index, const CAROM::Matrix* &basis);
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis);
-   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis)
-   { mfem_error("ROMHandler::GetBasis only supports CAROM::Matrix! Use MFEMROMHandler.\n"); }
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
-   { mfem_error("ROMHandler::GetBasis only supports CAROM::Matrix! Use MFEMROMHandler.\n"); }
+   virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) = 0;
+   virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis) = 0;
+   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) = 0;
    virtual void SetBlockSizes();
-   virtual void AllocROMMat();  // allocate matrixes for rom.
-   // TODO: extension to nonlinear operators.
-   virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
-   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec);
-   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS)
-   {
-      printf("Project RHS on reduced basis.\n");
-      ProjectVectorOnReducedBasis(RHS, reduced_rhs);
-   }
-   virtual void Solve(BlockVector* U);
-   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL)
-   { mfem_error("ROMHandler::NonlinearSolve is not supported! Use MFEMROMHandler.\n"); }
 
    // P_i^T * mat * P_j
-   virtual void ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat);
-   virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
-   { mfem_error("ROMHandler::ProjectOperatorOnReducedBasis(...)\n"); return NULL; }
+   virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat) = 0;
+   virtual SparseMatrix* ProjectToDomainBasis(const int &i, const int &j, const Operator *mat) = 0;
+   virtual void ProjectToRefBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
 
-   virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(BlockMatrix *input_mat)
-   { mfem_error("ROMHandler::LoadOperator is not supported!\n"); }
+   virtual void ProjectComponentToRefBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectComponentToDomainBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectInterfaceToRefBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats) = 0;
 
-   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names)
-   { if (save_basis_visual) mfem_error("Base ROMHandler does not support saving visualization!\n"); }
+   virtual void ProjectToRefBasis(const int &i, const Vector &vec, Vector &rom_vec) = 0;
+   virtual void ProjectToDomainBasis(const int &i, const Vector &vec, Vector &rom_vec) = 0;
+   virtual void ProjectGlobalToDomainBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec) = 0;
+   virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) = 0;
 
-   // virtual void SaveSV(const std::string& prefix, const int& basis_idx);
-   virtual void SaveReducedSolution(const std::string &filename)
-   { CAROM::PrintVector(*reduced_sol, filename); }
-   virtual void SaveReducedRHS(const std::string &filename)
-   { CAROM::PrintVector(*reduced_rhs, filename); }
+   virtual void LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec) = 0;
+   virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec) = 0;
+   virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec) = 0;
+
+   virtual void Solve(BlockVector* U) = 0;
+   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
+
+   virtual void SaveOperator(const std::string input_prefix="") = 0;
+   virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
+   virtual void SetRomMat(BlockMatrix *input_mat) = 0;
+
+   virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names) = 0;
+
+   virtual void SaveReducedSolution(const std::string &filename) = 0;
+   virtual void SaveReducedRHS(const std::string &filename) = 0;
+
+   virtual void AppendReferenceBasis(const int &idx, const DenseMatrix &mat) = 0;
 };
 
-class MFEMROMHandler : public ROMHandler
+class MFEMROMHandler : public ROMHandlerBase
 {
 protected:
    // type for linear system solver.
@@ -165,8 +192,11 @@ protected:
    } linsol_type;
    MUMPSSolver::MatType mat_type;
 
-   // rom variables.
-   Array<DenseMatrix*> spatialbasis;
+   // component rom variables.
+   Array<DenseMatrix*> ref_basis;
+
+   // domain rom variables.
+   Array<DenseMatrix*> dom_basis; // This is only the pointers to ref_basis. no need of deleting.
 
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;
@@ -182,34 +212,48 @@ protected:
 
 public:
    MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-                  const Array<int> &input_vdim, const Array<int> &input_num_vdofs);
+                  const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis);
 
    virtual ~MFEMROMHandler();
 
    virtual SparseMatrix* GetOperator() override
    { assert(romMat_mono); return romMat_mono; }
    
-   // cannot do const GridFunction* due to librom function definitions.
-   // virtual void FormReducedBasis(const int &total_samples);
    virtual void LoadReducedBasis();
-   virtual void GetBasis(const int &basis_index, DenseMatrix* &basis) override;
+   virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) override;
+   virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis);
    virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) override;
-   // virtual void AllocROMMat();  // allocate matrixes for rom.
-   // TODO: extension to nonlinear operators.
+
+   // P_i^T * mat * P_j
+   virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat);
+   virtual SparseMatrix* ProjectToDomainBasis(const int &i, const int &j, const Operator *mat);
+   virtual void ProjectToRefBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+
+   virtual void ProjectComponentToRefBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectComponentToDomainBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectInterfaceToRefBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
-   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec) override
-   { mfem_error("MFEMROMHandler::ProjectVectorOnReducedBasis - base class method is called!\n"); }
-   virtual void ProjectVectorOnReducedBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
+
+   virtual void ProjectToRefBasis(const int &i, const Vector &vec, Vector &rom_vec);
+   virtual void ProjectToDomainBasis(const int &i, const Vector &vec, Vector &rom_vec);
+   virtual void ProjectGlobalToDomainBasis(const BlockVector* vec, mfem::BlockVector*& rom_vec);
    virtual void ProjectRHSOnReducedBasis(const BlockVector* RHS) override
-   { ProjectVectorOnReducedBasis(RHS, reduced_rhs); }
+   { ProjectGlobalToDomainBasis(RHS, reduced_rhs); }
+
+   virtual void LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec);
+   virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec);
+   virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec);
+   
    virtual void Solve(BlockVector* U);
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
-   
-   // P_i^T * mat * P_j
-   virtual SparseMatrix* ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat);
 
+   virtual void SaveOperator(const std::string input_prefix="");
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void LoadOperator(BlockMatrix *input_mat);
+   virtual void SetRomMat(BlockMatrix *input_mat);
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
 
@@ -217,6 +261,8 @@ public:
    { PrintVector(*reduced_sol, filename); }
    virtual void SaveReducedRHS(const std::string &filename) override
    { PrintVector(*reduced_rhs, filename); }
+
+   virtual void AppendReferenceBasis(const int &idx, const DenseMatrix &mat);
 
 private:
    IterativeSolver* SetIterativeSolver(const MFEMROMHandler::SolverType &linsol_type_, const std::string &prec_type);

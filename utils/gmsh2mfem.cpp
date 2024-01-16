@@ -11,6 +11,7 @@ using namespace mfem;
 
 // void pts(int iphi, int t, double x[]);
 // void trans(const Vector &x, Vector &p);
+static int    order_ = 3;
 
 int main(int argc, char *argv[])
 {
@@ -20,6 +21,8 @@ int main(int argc, char *argv[])
    OptionsParser args(argc, argv);
    args.AddOption(&meshFileString, "-m", "--mesh-name",
                   "File name for the output mesh.");
+   args.AddOption(&order_, "-o", "--mesh-order",
+                  "Order (polynomial degree) of the mesh elements.");
 
    args.Parse();
    if (!args.Good())
@@ -31,10 +34,14 @@ int main(int argc, char *argv[])
 
    Mesh mesh(meshFileString);
 
+   // Promote to high order mesh
+   if (order_ > 1)
+      mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
+
    std::string outputFile(meshFileString);
    outputFile += ".mfem";
    ofstream ofs(outputFile.c_str());
-   ofs.precision(15);
+   ofs.precision(8);
    mesh.Print(ofs);
    ofs.close();
 

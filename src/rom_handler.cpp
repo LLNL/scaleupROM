@@ -15,36 +15,53 @@ using namespace std;
 namespace mfem
 {
 
-const std::string GetBasisTagForComponent(
-   const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler)
+const TrainMode SetTrainMode()
 {
+   TrainMode train_mode = TrainMode::NUM_TRAINMODE;
+
+   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
+   if (train_mode_str == "individual")       train_mode = TrainMode::INDIVIDUAL;
+   else if (train_mode_str == "universal")   train_mode = TrainMode::UNIVERSAL;
+   else
+      mfem_error("Unknown subdomain training mode!\n");
+
+   return train_mode;
+}
+
+const std::string GetBasisTagForComponent(
+   const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name)
+{
+   std::string tag;
    switch (train_mode)
    {
-      case (INDIVIDUAL):   { return "dom" + std::to_string(comp_idx); break; }
-      case (UNIVERSAL):    { return topol_handler->GetComponentName(comp_idx); break; }
+      case (INDIVIDUAL):   { tag = "dom" + std::to_string(comp_idx); break; }
+      case (UNIVERSAL):    { tag = topol_handler->GetComponentName(comp_idx); break; }
       default:
       {
          mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
          break;
       }
    }
-   return "";
+   if (var_name != "")
+      tag += "_" + var_name;
+   return tag;
 }
 
 const std::string GetBasisTag(
-   const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler)
+   const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name)
 {
+   std::string tag;
    switch (train_mode)
    {
       case (INDIVIDUAL):
       {
-         return "dom" + std::to_string(subdomain_index);
+         tag = "dom" + std::to_string(subdomain_index);
          break;
       }
       case (UNIVERSAL):
       {
          int c_type = topol_handler->GetMeshType(subdomain_index);
-         return topol_handler->GetComponentName(c_type);
+         tag = topol_handler->GetComponentName(c_type);
          break;
       }
       default:
@@ -53,38 +70,45 @@ const std::string GetBasisTag(
          break;
       }
    }
-   return "";
+   if (var_name != "")
+      tag += "_" + var_name;
+   return tag;
 }
 
-ROMHandler::ROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
+ROMHandlerBase::ROMHandlerBase(
+   const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_var_offsets,
+   const std::vector<std::string> &var_names, const bool separate_variable_basis)
    : train_mode(train_mode_),
      topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
-     vdim(input_vdim),
-     fom_num_vdofs(input_num_vdofs),
+     fom_var_names(var_names),
+     fom_var_offsets(input_var_offsets),
      basis_loaded(false),
-     operator_loaded(false)
+     operator_loaded(false),
+     separate_variable(separate_variable_basis)
 {
-   num_var = vdim.Size();
-   udim = vdim.Sum();
-   assert(fom_num_vdofs.Size() == (num_var * numSub));
+   num_var = fom_var_names.size();
+
+   fom_num_vdofs.SetSize(numSub);
+   for (int m = 0, idx = 0; m < numSub; m++)
+   {
+      fom_num_vdofs[m] = 0;
+      for (int v = 0; v < num_var; v++, idx++)
+         fom_num_vdofs[m] += fom_var_offsets[idx+1] - fom_var_offsets[idx];
+   }
 
    ParseInputs();
 
    SetBlockSizes();
-
-   AllocROMMat();
 }
 
-ROMHandler::~ROMHandler()
+ROMHandlerBase::~ROMHandlerBase()
 {
-   DeletePointers(carom_mats);
    delete reduced_rhs;
    delete reduced_sol;
-   delete romMat_inv;
 }
 
-void ROMHandler::ParseInputs()
+void ROMHandlerBase::ParseInputs()
 {
    assert(numSub > 0);
    assert(topol_handler != NULL);
@@ -92,75 +116,57 @@ void ROMHandler::ParseInputs()
    basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    std::string save_op_str = config.GetOption<std::string>("model_reduction/save_operator/level", "none");
-   if (save_op_str == "none")
-   {
-      save_operator = ROMBuildingLevel::NONE;
-   }
+   if (save_op_str == "none")             save_operator = ROMBuildingLevel::NONE;
+   else if (save_op_str == "global")      save_operator = ROMBuildingLevel::GLOBAL;
+   else if (save_op_str == "component")   save_operator = ROMBuildingLevel::COMPONENT;
    else
-   {
-      operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
-      if (save_op_str == "global")
-      {
-         save_operator = ROMBuildingLevel::GLOBAL;
-      }
-      else if (save_op_str == "component")
-      {
-         save_operator = ROMBuildingLevel::COMPONENT;
-      }
-      else
-      {
-         mfem_error("Unknown ROM building level!\n");
-      }
-   }
+      mfem_error("Unknown ROM building level!\n");
 
-   switch (train_mode)
+   if (save_operator != ROMBuildingLevel::NONE)
+      operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
+
+   num_rom_blocks = numSub;
+   if (train_mode == TrainMode::INDIVIDUAL)        num_rom_ref_blocks = numSub;
+   else if (train_mode == TrainMode::UNIVERSAL)    num_rom_ref_blocks = topol_handler->GetNumComponents();
+   else
+      mfem_error("ROMHandler - subdomain training mode is not set!\n");
+
+   num_rom_comp = num_rom_ref_blocks;
+
+   if (separate_variable)
    {
-      case TrainMode::INDIVIDUAL:
-      {
-         num_basis_sets = numSub;
-      }
-      break;
-      case TrainMode::UNIVERSAL:
-      {
-         num_basis_sets = topol_handler->GetNumComponents();
-      }
-      break;
-      default:
-         mfem_error("ROMHandler - subdomain training mode is not set!\n");
-      break;
+      num_rom_ref_blocks *= num_var;
+      num_rom_blocks *= num_var;
    }
    
-   const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
-   num_basis.SetSize(num_basis_sets);
-   num_basis = num_basis_default;
-   assert(num_basis.Size() > 0);
+   const int num_ref_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
+   num_ref_basis.SetSize(num_rom_ref_blocks);
+   num_ref_basis = num_ref_basis_default;
+   assert(num_ref_basis.Size() > 0);
 
    YAML::Node basis_list = config.FindNode("basis/tags");
-   if ((!basis_list) && (num_basis_default <= 0))
+   if ((!basis_list) && (num_ref_basis_default <= 0))
       mfem_error("ROMHandler - cannot find the basis tag list, nor default number of basis is not set!\n");
 
-   for (int c = 0; c < num_basis_sets; c++)
+   for (int b = 0; b < num_rom_ref_blocks; b++)
    {
-      std::string basis_tag = GetBasisTagForComponent(c, train_mode, topol_handler);
+      std::string basis_tag;
+      if (separate_variable)
+         basis_tag = GetBasisTagForComponent(b / num_var, train_mode, topol_handler, fom_var_names[b % num_var]);
+      else
+         basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler);
 
-      // Not so sure we need to explicitly list out all the needed basis tags here.
-      for (int p = 0; p < basis_list.size(); p++)
-         if (basis_tag == config.GetRequiredOptionFromDict<std::string>("name", basis_list[p]))
-         {
-            const int nb = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_list[p]);
-            num_basis[c] = nb;
-            break;
-         }
-      
-      if (num_basis[c] < 0)
+      num_ref_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", num_ref_basis_default, basis_list);
+
+      if (num_ref_basis[b] < 0)
       {
          printf("Cannot find the number of basis for %s!\n", basis_tag.c_str());
          mfem_error("Or specify the default number of basis!\n");
       }
    }
    
-   for (int k = 0; k < num_basis.Size(); k++)
-      assert(num_basis[k] > 0);
+   for (int k = 0; k < num_ref_basis.Size(); k++)
+      assert(num_ref_basis[k] > 0);
 
    max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
@@ -170,64 +176,57 @@ void ROMHandler::ParseInputs()
    save_basis_visual = config.GetOption<bool>("basis/visualization/enabled", false);
 }
 
-// void ROMHandler::FormReducedBasis()
-// {
-//    std::string basis_name, basis_tag;
-   
-//    for (int c = 0; c < num_basis_sets; c++)
-//    {
-//       int basis_dim = -1;
-//       switch (train_mode)
-//       {
-//          case (INDIVIDUAL):
-//          {
-//             basis_tag = GetBasisTag(c);
-//             basis_dim = fom_num_vdofs[c];
-//             break;
-//          }
-//          case (UNIVERSAL):
-//          {
-//             basis_tag = GetBasisTagForComponent(c);
-//             for (int m = 0; m < numSub; m++)
-//                if (topol_handler->GetMeshType(m) == c)
-//                { basis_dim = fom_num_vdofs[m]; break; }
-//             break;
-//          }
-//       }
-//       basis_name = basis_prefix + "_" + basis_tag;
-//       assert(basis_dim > 0);
+void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme)
+{
+   assert(separate_variable);
+   assert(num_var == 2); // assume vel-pres system only for now.
 
-//       rom_options = new CAROM::Options(basis_dim, max_num_snapshots, 1, update_right_SV);
-//       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, basis_name);
+   num_ref_supreme.SetSize(num_rom_comp);
+   num_supreme.SetSize(numSub);
 
-//       std::string filename = sample_dir + "/" + sample_prefix + "_sample";
-//       filename += "_" + basis_tag + "_snapshot";
-//       basis_generator->loadSamples(filename,"snapshot");
+   YAML::Node basis_list = config.FindNode("basis/tags");
 
-//       basis_generator->endSamples(); // save the merged basis file
-//       SaveSV(basis_name, c);
+   std::string basis_tag;
+   for (int b = 0; b < num_rom_comp; b++)
+   {
+      basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler, fom_var_names[1]);
 
-//       delete basis_generator;
-//       delete rom_options;
-//    }  // for (int c = 0; c < num_basis_sets; c++)
-// }
+      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag, "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
+   }
 
-void ROMHandler::LoadReducedBasis()
+   if (train_mode == TrainMode::INDIVIDUAL)
+   {
+      num_supreme = num_ref_supreme;
+      return;
+   }
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int c = topol_handler->GetMeshType(m);
+      num_supreme[m] = num_ref_supreme[c];
+   }
+}
+
+void ROMHandlerBase::LoadReducedBasis()
 {
    if (basis_loaded) return;
 
    std::string basis_name;
    int numRowRB, numColumnRB;
 
-   carom_spatialbasis.SetSize(num_basis_sets);
-   for (int k = 0; k < num_basis_sets; k++)
+   carom_ref_basis.SetSize(num_rom_ref_blocks);
+   for (int k = 0; k < num_rom_ref_blocks; k++)
    {
-      basis_name = basis_prefix + "_" + GetBasisTagForComponent(k, train_mode, topol_handler);
+      basis_name = basis_prefix + "_";
+      if (separate_variable)
+         basis_name += GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
+      else
+         basis_name += GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name);
 
-      carom_spatialbasis[k] = basis_reader->getSpatialBasis(0.0, num_basis[k]);
-      numRowRB = carom_spatialbasis[k]->numRows();
-      numColumnRB = carom_spatialbasis[k]->numColumns();
+      carom_ref_basis[k] = basis_reader->getSpatialBasis(0.0, num_ref_basis[k]);
+      numRowRB = carom_ref_basis[k]->numRows();
+      numColumnRB = carom_ref_basis[k]->numColumns();
       printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
 
       delete basis_reader;
@@ -236,7 +235,7 @@ void ROMHandler::LoadReducedBasis()
    basis_loaded = true;
 }
 
-int ROMHandler::GetBasisIndexForSubdomain(const int &subdomain_index)
+int ROMHandlerBase::GetBasisIndexForSubdomain(const int &subdomain_index)
 {
    int idx = -1;
    switch (train_mode)
@@ -253,210 +252,61 @@ int ROMHandler::GetBasisIndexForSubdomain(const int &subdomain_index)
    return idx;
 }
 
-void ROMHandler::GetBasis(const int &basis_index, const CAROM::Matrix* &basis)
+void ROMHandlerBase::SetBlockSizes()
 {
-   assert(num_basis_sets > 0);
-   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+   rom_block_offsets.SetSize(num_rom_blocks+1);
+   rom_varblock_offsets.SetSize(num_rom_blocks+1);
+   rom_comp_block_offsets.SetSize(num_rom_ref_blocks+1);
+   
+   rom_block_offsets = 0;
+   rom_varblock_offsets = 0;
+   rom_comp_block_offsets = 0;
 
-   basis = carom_spatialbasis[basis_index];
-}
-
-void ROMHandler::GetBasisOnSubdomain(const int &subdomain_index, const CAROM::Matrix* &basis)
-{
-   assert(basis_loaded);
-
-   int idx = GetBasisIndexForSubdomain(subdomain_index);
-   GetBasis(idx, basis);
-   return;
-}
-
-void ROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
-{
-   printf("Project Operators on reduced basis.\n");
-   assert(mats.NumRows() == numSub);
-   assert(mats.NumCols() == numSub);
-
-   if (!basis_loaded) LoadReducedBasis();
-
-   // Each basis is applied to the same column blocks.
-   // Form inverse matrix
-   for (int i = 0; i < numSub; i++)
+   if (separate_variable)
    {
-      int num_rows = rom_block_offsets[i+1] - rom_block_offsets[i];
-      int basis_i = GetBasisIndexForSubdomain(i);
-      for (int j = 0; j < numSub; j++)
+      for (int c = 0, idx = 0; c < num_rom_comp; c++)
+         for (int v = 0; v < num_var; v++, idx++)
+            rom_comp_block_offsets[idx+1] = num_ref_basis[idx];
+
+      for (int k = 0, idx = 0; k < numSub; k++)
       {
-         int num_cols = rom_block_offsets[j+1] - rom_block_offsets[j];
-         int basis_j = GetBasisIndexForSubdomain(j);
-
-         assert(mats(i,j) != NULL);
-
-         carom_mats(i,j) = new CAROM::Matrix(num_rows, num_cols, false);
-         ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j), carom_mats(i,j));
-
-         CAROM::SetBlock(*carom_mats(i,j), rom_block_offsets[i], rom_block_offsets[i+1],
-                         rom_block_offsets[j], rom_block_offsets[j+1], *romMat_inv);
+         int c = topol_handler->GetMeshType(k);
+         for (int v = 0; v < num_var; v++, idx++)
+         {
+            rom_block_offsets[idx+1] = num_ref_basis[c * num_var + v];
+            rom_varblock_offsets[1 + k + v * numSub] = num_ref_basis[c * num_var + v];
+         }
       }
    }
-
-   romMat_inv->inverse();
-
-   operator_loaded = true;
-   if (save_operator == ROMBuildingLevel::GLOBAL) romMat_inv->write(operator_prefix);
-}
-
-void ROMHandler::SetBlockSizes()
-{
-   // TODO: non-uniform subdomain cases.
-   rom_block_offsets.SetSize(numSub+1);
-   rom_block_offsets = 0;
-
-   for (int k = 1; k <= numSub; k++)
-   {
-      int c = topol_handler->GetMeshType(k-1);
-      rom_block_offsets[k] = num_basis[c];
-   }
-   rom_block_offsets.PartialSum();
-}
-
-void ROMHandler::AllocROMMat()
-{
-   assert(rom_block_offsets.Size() == (numSub+1));
-
-   carom_mats.SetSize(numSub, numSub);
-   carom_mats = NULL;
-   // TODO: parallelization.
-   romMat_inv = new CAROM::Matrix(rom_block_offsets.Last(), rom_block_offsets.Last(), false);
-}
-
-void ROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, CAROM::Vector*& rom_vec)
-{
-   assert(vec->NumBlocks() == numSub);
-   // reset the rom_vec if initiated a priori.
-   if (rom_vec) delete rom_vec;
-
-   rom_vec = new CAROM::Vector(rom_block_offsets.Last(), false);
-
-   if (!basis_loaded) LoadReducedBasis();
-
-   // Each basis is applied to the same column blocks.
-   for (int i = 0; i < numSub; i++)
-   {
-      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-      const CAROM::Matrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-
-      CAROM::Vector block_vec_carom(vec->GetBlock(i).GetData(), vec->GetBlock(i).Size(), true, false);
-      CAROM::Vector *block_reduced_vec = basis_i->transposeMult(&block_vec_carom);
-
-      CAROM::SetBlock(*block_reduced_vec, rom_block_offsets[i], rom_block_offsets[i+1], *rom_vec);
-   }
-}
-
-void ROMHandler::Solve(BlockVector* U)
-{
-   assert(U->NumBlocks() == numSub);
-   assert(operator_loaded);
-
-   printf("Solve ROM.\n");
-
-   reduced_sol = new CAROM::Vector(rom_block_offsets.Last(), false);
-   romMat_inv->mult(*reduced_rhs, *reduced_sol);
-
-   // Each basis is applied to the same column blocks.
-   for (int i = 0; i < numSub; i++)
-   {
-      const CAROM::Matrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-      int c = topol_handler->GetMeshType(i);
-
-      // 23. reconstruct FOM state
-      CAROM::Vector block_reduced_sol(num_basis[c], false);
-      const int offset = rom_block_offsets[i];
-      for (int k = 0; k < num_basis[c]; k++)
-         block_reduced_sol(k) = reduced_sol->item(k + offset);
-
-      // This saves the data automatically to U.
-      CAROM::Vector U_block_carom(U->GetBlock(i).GetData(), U->GetBlock(i).Size(), true, false);
-      basis_i->mult(block_reduced_sol, U_block_carom);
-   }
-}
-
-void ROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat, CAROM::Matrix *proj_mat)
-{
-   assert(proj_mat != NULL);
-   assert((i >= 0) && (i < num_basis_sets));
-   assert((j >= 0) && (j < num_basis_sets));
-   // assert(mat->Finalized());
-   assert(basis_loaded);
-   
-   const CAROM::Matrix *basis_i, *basis_j;
-   int num_basis_i, num_basis_j;
-   GetBasis(i, basis_i);
-   num_basis_i = basis_i->numColumns();
-   GetBasis(j, basis_j);
-   num_basis_j = basis_j->numColumns();
-
-   // TODO: multi-component case.
-   proj_mat->setSize(num_basis_i, num_basis_j);
-   CAROM::ComputeCtAB(*mat, *basis_j, *basis_i, *proj_mat);
-   return;
-}
-
-void ROMHandler::LoadOperatorFromFile(const std::string input_prefix)
-{
-   assert(save_operator == ROMBuildingLevel::GLOBAL);
-
-   std::string prefix;
-   if (input_prefix == "")
-      prefix = operator_prefix;
    else
-      prefix = input_prefix;
+   {
+      for (int c = 0; c < num_rom_comp; c++)
+         rom_comp_block_offsets[c+1] = num_ref_basis[c];
 
-   romMat_inv->read(prefix);
-   operator_loaded = true;
+      for (int k = 0; k < numSub; k++)
+      {
+         int c = topol_handler->GetMeshType(k);
+         rom_block_offsets[k+1] = num_ref_basis[c];
+      }
+      rom_varblock_offsets = rom_block_offsets;
+   }
+
+   rom_block_offsets.GetSubArray(1, num_rom_blocks, num_basis);
+
+   rom_block_offsets.PartialSum();
+   rom_comp_block_offsets.PartialSum();
+   rom_varblock_offsets.PartialSum();
 }
-
-// void ROMHandler::SaveSV(const std::string& prefix, const int& basis_idx)
-// {
-//    if (!save_sv) return;
-//    assert(basis_generator != NULL);
-
-//    const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
-//    printf("Singular values: ");
-//    for (int d = 0; d < rom_sv->dim(); d++)
-//       printf("%.3E\t", rom_sv->item(d));
-//    printf("\n");
-
-//    double coverage = 0.0;
-//    double total = 0.0;
-
-//    for (int d = 0; d < rom_sv->dim(); d++)
-//    {
-//       if (d == num_basis[basis_idx]) coverage = total;
-//       total += rom_sv->item(d);
-//    }
-//    if (rom_sv->dim() == num_basis[basis_idx]) coverage = total;
-//    coverage /= total;
-//    printf("Coverage: %.7f%%\n", coverage * 100.0);
-
-//    // TODO: hdf5 format + parallel case.
-//    std::string filename = prefix + "_sv.txt";
-//    CAROM::PrintVector(*rom_sv, filename);
-// }
 
 /*
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_vdim, const Array<int> &input_num_vdofs)
-   : ROMHandler(train_mode_, input_topol, input_vdim, input_num_vdofs)
+MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis)
+   : ROMHandlerBase(train_mode_, input_topol, input_var_offsets, var_names, separate_variable_basis)
 {
    romMat = new BlockMatrix(rom_block_offsets);
    romMat->owns_blocks = true;
-
-   carom_mats.SetSize(0, 0);
 
    std::string solver_type_str = config.GetOption<std::string>("model_reduction/linear_solver_type", "cg");
    if (solver_type_str == "direct")       linsol_type = MFEMROMHandler::SolverType::DIRECT;
@@ -477,12 +327,15 @@ MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *in
       {
          mfem_error("Unknown ROM linear system type!\n");
       }
+
+      if (mat_type == MUMPSSolver::MatType::SYMMETRIC_INDEFINITE)
+         mfem_warning("MUMPS matrix type SYMMETRIC_INDEFINITE can be unstable, returning inaccurate answer.\n");
    }
 }
 
 MFEMROMHandler::~MFEMROMHandler()
 {
-   DeletePointers(spatialbasis);
+   DeletePointers(ref_basis);
    delete romMat;
    delete romMat_mono;
    delete reduced_rhs;
@@ -493,26 +346,50 @@ MFEMROMHandler::~MFEMROMHandler()
 
 void MFEMROMHandler::LoadReducedBasis()
 {
-   ROMHandler::LoadReducedBasis();
+   ROMHandlerBase::LoadReducedBasis();
 
-   spatialbasis.SetSize(carom_spatialbasis.Size());
-   spatialbasis = NULL;
-   for (int k = 0; k < spatialbasis.Size(); k++)
+   ref_basis.SetSize(carom_ref_basis.Size());
+   ref_basis = NULL;
+   for (int k = 0; k < ref_basis.Size(); k++)
    {
-      assert(carom_spatialbasis[k] != NULL);
-      spatialbasis[k] = new DenseMatrix(carom_spatialbasis[k]->numRows(), carom_spatialbasis[k]->numColumns());
-      CAROM::CopyMatrix(*carom_spatialbasis[k], *spatialbasis[k]);
+      assert(carom_ref_basis[k] != NULL);
+      ref_basis[k] = new DenseMatrix(carom_ref_basis[k]->numRows(), carom_ref_basis[k]->numColumns());
+      CAROM::CopyMatrix(*carom_ref_basis[k], *ref_basis[k]);
+   }
+
+   dom_basis.SetSize(num_rom_blocks);
+   for (int k = 0; k < num_rom_blocks; k++)
+   {
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         dom_basis[k] = ref_basis[k];
+         continue;
+      }
+
+      int m = (separate_variable) ? k / num_var : k;
+      int c = topol_handler->GetMeshType(m);
+      int v = (separate_variable) ? k % num_var : 0;
+      int idx = (separate_variable) ? c * num_var + v : c;
+      dom_basis[k] = ref_basis[idx];
    }
 
    basis_loaded = true;
 }
 
-void MFEMROMHandler::GetBasis(const int &basis_index, DenseMatrix* &basis)
+void MFEMROMHandler::GetReferenceBasis(const int &basis_index, DenseMatrix* &basis)
 {
-   assert(num_basis_sets > 0);
-   assert((basis_index >= 0) && (basis_index < num_basis_sets));
+   assert(num_rom_ref_blocks > 0);
+   assert((basis_index >= 0) && (basis_index < num_rom_ref_blocks));
 
-   basis = spatialbasis[basis_index];
+   basis = ref_basis[basis_index];
+}
+
+void MFEMROMHandler::GetDomainBasis(const int &basis_index, DenseMatrix* &basis)
+{
+   assert(basis_loaded);
+   assert((basis_index >= 0) && (basis_index < num_rom_blocks));
+
+   basis = dom_basis[basis_index];
 }
 
 void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
@@ -520,81 +397,126 @@ void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix
    assert(basis_loaded);
 
    int idx = GetBasisIndexForSubdomain(subdomain_index);
-   GetBasis(idx, basis);
+   GetReferenceBasis(idx, basis);
 }
 
 void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
-   assert(mats.NumRows() == numSub);
-   assert(mats.NumCols() == numSub);
+   assert(mats.NumRows() == num_rom_blocks);
+   assert(mats.NumCols() == num_rom_blocks);
+   assert(romMat->NumRowBlocks() == num_rom_blocks);
+   assert(romMat->NumColBlocks() == num_rom_blocks);
+   assert(basis_loaded);
 
-   if (!basis_loaded) LoadReducedBasis();
-
-   // This is pretty much the same as Assemble().
-   // Each basis is applied to the same column blocks.
-   int num_basis_i, num_basis_j;
-   int basis_i, basis_j;
-   for (int i = 0; i < numSub; i++)
-   {
-      num_basis_i = rom_block_offsets[i+1] - rom_block_offsets[i];
-      basis_i = GetBasisIndexForSubdomain(i);
-
-      for (int j = 0; j < numSub; j++)
-      {
-         num_basis_j = rom_block_offsets[j+1] - rom_block_offsets[j];
-         basis_j = GetBasisIndexForSubdomain(j);
-         
-         SparseMatrix *elemmat = ProjectOperatorOnReducedBasis(basis_i, basis_j, mats(i,j));
-         romMat->SetBlock(i, j, elemmat);
-      }
-   }  // for (int j = 0; j < numSub; j++)
+   Array2D<SparseMatrix *> rom_mats;
+   ProjectGlobalToDomainBasis(mats, rom_mats);
+   for (int i = 0; i < num_rom_blocks; i++)
+      for (int j = 0; j < num_rom_blocks; j++)
+         romMat->SetBlock(i, j, rom_mats(i, j));
 
    romMat->Finalize();
-   operator_loaded = true;
-
-   romMat_mono = romMat->CreateMonolithic();
-
-   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
-
-   if (save_operator == ROMBuildingLevel::GLOBAL)
-   {
-      std::string filename = operator_prefix + ".h5";
-      hid_t file_id;
-      herr_t errf = 0;
-      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-      assert(file_id >= 0);
-
-      hdf5_utils::WriteBlockMatrix(file_id, "ROM_matrix", romMat);
-
-      errf = H5Fclose(file_id);
-      assert(errf >= 0);
-   }
+   SetRomMat(romMat);
 }
 
-void MFEMROMHandler::ProjectVectorOnReducedBasis(const BlockVector* vec, BlockVector*& rom_vec)
+void MFEMROMHandler::SaveOperator(const std::string input_prefix)
 {
-   assert(vec->NumBlocks() == numSub);
+   assert(save_operator == ROMBuildingLevel::GLOBAL);
+   assert(operator_loaded && romMat);
+
+   std::string filename;
+   if (input_prefix == "")
+      filename = operator_prefix;
+   else
+      filename = input_prefix;
+   filename += ".h5";
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   hdf5_utils::WriteBlockMatrix(file_id, "ROM_matrix", romMat);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+}
+
+void MFEMROMHandler::ProjectToRefBasis(const int &i, const Vector &vec, Vector &rom_vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_ref_blocks));
+   DenseMatrix* basis_i;
+
+   GetReferenceBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->MultTranspose(vec, rom_vec);
+}
+
+void MFEMROMHandler::ProjectToDomainBasis(const int &i, const Vector &vec, Vector &rom_vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_blocks));
+   DenseMatrix* basis_i;
+
+   GetDomainBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->MultTranspose(vec, rom_vec);
+}
+
+void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVector*& rom_vec)
+{
+   assert(vec->NumBlocks() == num_rom_blocks);
    // reset rom_vec if initiated a priori.
    if (rom_vec) delete rom_vec;
 
    rom_vec = new BlockVector(rom_block_offsets);
 
-   if (!basis_loaded) LoadReducedBasis();
+   for (int i = 0; i < num_rom_blocks; i++)
+      ProjectToDomainBasis(i, vec->GetBlock(i), rom_vec->GetBlock(i));
+}
 
-   // Each basis is applied to the same column blocks.
-   for (int i = 0; i < numSub; i++)
-   {
-      assert(vec->GetBlock(i).Size() == fom_num_vdofs[i]);
+void MFEMROMHandler::LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_ref_blocks));
+   DenseMatrix* basis_i;
 
-      DenseMatrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-      basis_i->MultTranspose(vec->GetBlock(i).GetData(), rom_vec->GetBlock(i).GetData());
-   }
+   GetReferenceBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->Mult(rom_vec, vec);
+}
+
+void MFEMROMHandler::LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec)
+{
+   assert(basis_loaded);
+   assert((i >= 0) && (i < num_rom_blocks));
+   DenseMatrix* basis_i;
+
+   GetDomainBasis(i, basis_i);
+   assert(vec.Size() == basis_i->NumRows());
+   assert(rom_vec.Size() == basis_i->NumCols());
+
+   basis_i->Mult(rom_vec, vec);
+}
+
+void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
+{
+   assert(rom_vec.NumBlocks() == num_rom_blocks);
+   assert(vec.NumBlocks() == num_rom_blocks);
+
+   for (int i = 0; i < num_rom_blocks; i++)
+      LiftUpFromDomainBasis(i, rom_vec.GetBlock(i), vec.GetBlock(i));
 }
 
 void MFEMROMHandler::Solve(BlockVector* U)
 {
-   assert(U->NumBlocks() == numSub);
+   assert(U->NumBlocks() == num_rom_blocks);
    assert(operator_loaded);
 
    printf("Solve ROM.\n");
@@ -680,38 +602,19 @@ void MFEMROMHandler::Solve(BlockVector* U)
       delete solver;
    }
 
-   for (int i = 0; i < numSub; i++)
-   {
-      assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-      DenseMatrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-
-      // 23. reconstruct FOM state
-      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
-   }
+   // 23. reconstruct FOM state
+   LiftUpGlobal(*reduced_sol, *U);
 }
 
 void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec)
 {
-   assert(U->NumBlocks() == numSub);
+   assert(U->NumBlocks() == num_rom_blocks);
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    if (use_restart)
-   {
-      for (int i = 0; i < numSub; i++)
-      {
-         assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-         DenseMatrix* basis_i;
-         GetBasisOnSubdomain(i, basis_i);
-
-         // Project from a FOM solution
-         basis_i->MultTranspose(U->GetBlock(i).GetData(), reduced_sol->GetBlock(i).GetData());
-      }
-   }
+      ProjectGlobalToDomainBasis(U, reduced_sol);
    else
       (*reduced_sol) = 0.0;
 
@@ -774,33 +677,196 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    else
       mfem_error("MFEMROMHandler::NonlinearSolve- Unknown ROM nonlinear solver type!\n");
 
-   for (int i = 0; i < numSub; i++)
-   {
-      assert(U->GetBlock(i).Size() == fom_num_vdofs[i]);
-
-      DenseMatrix* basis_i;
-      GetBasisOnSubdomain(i, basis_i);
-
-      // 23. reconstruct FOM state
-      basis_i->Mult(reduced_sol->GetBlock(i).GetData(), U->GetBlock(i).GetData());
-   }
+   LiftUpGlobal(*reduced_sol, *U);
 }
 
-SparseMatrix* MFEMROMHandler::ProjectOperatorOnReducedBasis(const int &i, const int &j, const Operator *mat)
+SparseMatrix* MFEMROMHandler::ProjectToRefBasis(const int &i, const int &j, const Operator *mat)
 {
-   assert((i >= 0) && (i < num_basis_sets));
-   assert((j >= 0) && (j < num_basis_sets));
+   assert((i >= 0) && (i < num_rom_ref_blocks));
+   assert((j >= 0) && (j < num_rom_ref_blocks));
    // assert(mat->Finalized());
    assert(basis_loaded);
    
    DenseMatrix *basis_i, *basis_j;
-   int num_basis_i, num_basis_j;
-   GetBasis(i, basis_i);
-   num_basis_i = basis_i->NumCols();
-   GetBasis(j, basis_j);
-   num_basis_j = basis_j->NumCols();
+   GetReferenceBasis(i, basis_i);
+   GetReferenceBasis(j, basis_j);
 
-   return mfem::RtAP(*basis_i, *mat, *basis_j);
+   assert(basis_i->NumRows() == mat->Height());
+   assert(basis_j->NumRows() == mat->Width());
+
+   if (mat)
+      return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+   else
+      return new SparseMatrix(basis_i->NumCols(), basis_j->NumCols());
+}
+
+SparseMatrix* MFEMROMHandler::ProjectToDomainBasis(const int &i, const int &j, const Operator *mat)
+{
+   assert((i >= 0) && (i < num_rom_blocks));
+   assert((j >= 0) && (j < num_rom_blocks));
+   // assert(mat->Finalized());
+   assert(basis_loaded);
+   
+   DenseMatrix *basis_i, *basis_j;
+   GetDomainBasis(i, basis_i);
+   GetDomainBasis(j, basis_j);
+
+   if (mat)
+   {
+      assert(basis_i->NumRows() == mat->Height());
+      assert(basis_j->NumRows() == mat->Width());
+      return mfem::SparseRtAP(*basis_i, *mat, *basis_j);
+   }
+   else 
+      return new SparseMatrix(basis_i->NumCols(), basis_j->NumCols());
+}
+
+void MFEMROMHandler::ProjectToRefBasis(
+   const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert(basis_loaded);
+   assert((idx_i.Min() >= 0) && (idx_i.Max() < num_rom_ref_blocks));
+   assert((idx_j.Min() >= 0) && (idx_j.Max() < num_rom_ref_blocks));
+   assert(idx_i.Size() == mats.NumRows());
+   assert(idx_j.Size() == mats.NumCols());
+
+   /* Clean up existing rom_mats */
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         if (rom_mats(i, j)) delete rom_mats(i, j);
+   
+   rom_mats.SetSize(mats.NumRows(), mats.NumCols());
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         rom_mats(i, j) = ProjectToRefBasis(idx_i[i], idx_j[j], mats(i, j));
+}
+
+void MFEMROMHandler::ProjectToDomainBasis(
+   const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert(basis_loaded);
+   assert((idx_i.Min() >= 0) && (idx_i.Max() < num_rom_blocks));
+   assert((idx_j.Min() >= 0) && (idx_j.Max() < num_rom_blocks));
+   assert(idx_i.Size() == mats.NumRows());
+   assert(idx_j.Size() == mats.NumCols());
+
+   /* Clean up existing rom_mats */
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         if (rom_mats(i, j)) delete rom_mats(i, j);
+   
+   rom_mats.SetSize(mats.NumRows(), mats.NumCols());
+   for (int i = 0; i < rom_mats.NumRows(); i++)
+      for (int j = 0; j < rom_mats.NumCols(); j++)
+         rom_mats(i, j) = ProjectToDomainBasis(idx_i[i], idx_j[j], mats(i, j));
+}
+
+void MFEMROMHandler::ProjectComponentToRefBasis(
+   const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? num_var : 1;
+   Array<int> idx(size);
+   idx = c;
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] *= num_var;
+         idx[v] += v;
+      }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToRefBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectComponentToDomainBasis(
+   const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? num_var : 1;
+   Array<int> idx(size);
+   idx = c;
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] *= num_var;
+         idx[v] += v;
+      }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToDomainBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectInterfaceToRefBasis(
+   const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? 2 * num_var : 2;
+   Array<int> idx(size);
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] = c1 * num_var + v;
+         idx[v + num_var] = c2 * num_var + v;
+      }
+   else
+   {
+      idx[0] = c1;
+      idx[1] = c2;
+   }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToRefBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectInterfaceToDomainBasis(
+   const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   int size = (separate_variable) ? 2 * num_var : 2;
+   Array<int> idx(size);
+   if (separate_variable)
+      for (int v = 0; v < num_var; v++)
+      {
+         idx[v] = c1 * num_var + v;
+         idx[v + num_var] = c2 * num_var + v;
+      }
+   else
+   {
+      idx[0] = c1;
+      idx[1] = c2;
+   }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToDomainBasis(idx, idx, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectVariableToDomainBasis(
+   const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert(separate_variable);
+
+   int size = numSub;
+   Array<int> idx_i(size), idx_j(size);
+   for (int m = 0; m < numSub; m++)
+   {
+      idx_i[m] = m * num_var + vi;
+      idx_j[m] = m * num_var + vj;
+   }
+
+   assert((mats.NumRows() == size) && (mats.NumCols() == size));
+
+   ProjectToDomainBasis(idx_i, idx_j, mats, rom_mats);
+}
+
+void MFEMROMHandler::ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats)
+{
+   assert((mats.NumRows() == num_rom_blocks) && (mats.NumCols() == num_rom_blocks));
+
+   Array<int> idx(num_rom_blocks);
+   for (int k = 0; k < num_rom_blocks; k++) idx[k] = k;
+
+   ProjectToDomainBasis(idx, idx, mats, rom_mats);
 }
 
 void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
@@ -822,22 +888,23 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
    assert(file_id >= 0);   
 
    romMat = hdf5_utils::ReadBlockMatrix(file_id, "ROM_matrix", rom_block_offsets);
-   romMat_mono = romMat->CreateMonolithic();
+   SetRomMat(romMat);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
-
-   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
-
-   operator_loaded = true;
 }
 
-void MFEMROMHandler::LoadOperator(BlockMatrix *input_mat)
+void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
 {
-   delete romMat;
+   if (romMat != input_mat)
+   {
+      delete romMat;
+      romMat = input_mat;
+   }
+
    delete romMat_mono;
-   romMat = input_mat;
    romMat_mono = romMat->CreateMonolithic();
+
    if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
    operator_loaded = true;
 }
@@ -855,7 +922,7 @@ void MFEMROMHandler::SaveBasisVisualization(
    if (train_mode == TrainMode::UNIVERSAL)
       visual_prefix += "_universal";
 
-   for (int c = 0; c < num_basis_sets; c++)
+   for (int c = 0; c < num_rom_ref_blocks; c++)
    {
       std::string file_prefix = visual_prefix;
       file_prefix += "_" + std::to_string(c);
@@ -877,17 +944,17 @@ void MFEMROMHandler::SaveBasisVisualization(
       const int order = fes[midx * num_var]->FEColl()->GetOrder();
       ParaViewDataCollection coll = ParaViewDataCollection(file_prefix.c_str(), mesh);
 
-      Array<int> var_offsets(num_basis[c] * num_var + 1);
+      Array<int> var_offsets(num_ref_basis[c] * num_var + 1);
       var_offsets[0] = 0;
-      for (int k = 0, vidx = 1; k < num_basis[c]; k++)
+      for (int k = 0, vidx = 1; k < num_ref_basis[c]; k++)
          for (int v = 0, idx = midx * num_var; v < num_var; v++, idx++, vidx++)
             var_offsets[vidx] = fes[idx]->GetVSize();
       var_offsets.PartialSum();
-      BlockVector basis_view(spatialbasis[c]->GetData(), var_offsets);
+      BlockVector basis_view(ref_basis[c]->GetData(), var_offsets);
 
-      Array<GridFunction*> basis_gf(num_basis[c] * num_var);
+      Array<GridFunction*> basis_gf(num_ref_basis[c] * num_var);
       basis_gf = NULL;
-      for (int k = 0, idx = 0; k < num_basis[c]; k++)
+      for (int k = 0, idx = 0; k < num_ref_basis[c]; k++)
       {
          for (int v = 0, fidx = midx * num_var; v < num_var; v++, idx++, fidx++)
          {
@@ -958,6 +1025,30 @@ void MFEMROMHandler::SetupDirectSolver()
    mumps = new MUMPSSolver();
    mumps->SetMatrixSymType(mat_type);
    mumps->SetOperator(*romMat_hypre);
+}
+
+void MFEMROMHandler::AppendReferenceBasis(const int &idx, const DenseMatrix &mat)
+{
+   assert(basis_loaded);
+   assert((idx >= 0) && (idx < num_rom_ref_blocks));
+   assert(ref_basis[idx]->NumRows() == mat.NumRows());
+   assert(ref_basis[idx]->NumCols() == num_ref_basis[idx]);
+
+   DenseMatrix tmp(*ref_basis[idx]);
+
+   int add_col = mat.NumCols();
+   // NOTE(kevin): expanding a DenseMatrix does not preserve its data.
+   ref_basis[idx]->SetSize(ref_basis[idx]->NumRows(), num_ref_basis[idx] + add_col);
+   ref_basis[idx]->SetSubMatrix(0, 0, tmp);
+   ref_basis[idx]->SetSubMatrix(0, num_ref_basis[idx], mat);
+
+   num_ref_basis[idx] += add_col;
+
+   // Reset the block offsets and domain num_basis.
+   SetBlockSizes();
+
+   printf("spatial basis-%d dimension updated: %d x %d\n",
+          idx, ref_basis[idx]->NumRows(), ref_basis[idx]->NumCols());
 }
 
 // void MFEMROMHandler::GetBlockSparsity(

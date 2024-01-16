@@ -54,6 +54,13 @@ public:
 
    virtual ~PoissonSolver();
 
+   static const std::vector<std::string> GetVariableNames()
+   {
+      std::vector<std::string> varnames(1);
+      varnames[0] = "solution";
+      return varnames;
+   }
+
    virtual void SetupBCVariables() override;
    virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
    virtual void AddBCFunction(const double &F, const int battr = -1);

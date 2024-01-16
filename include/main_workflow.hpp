@@ -14,11 +14,14 @@ double dbc4(const Vector &);
 void RunExample();
 
 MultiBlockSolver* InitSolver();
-
 SampleGenerator* InitSampleGenerator(MPI_Comm comm);
+std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, const TrainMode &train_mode, bool separate_variable_basis);
+
 void GenerateSamples(MPI_Comm comm);
 void BuildROM(MPI_Comm comm);
 void TrainROM(MPI_Comm comm);
+// supremizer-enrichment, hypre-reduction optimization, etc..
+void AuxiliaryTrainROM(MPI_Comm comm);
 // return relative error if comparing solution.
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
 

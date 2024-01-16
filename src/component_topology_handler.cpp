@@ -119,6 +119,16 @@ void ComponentTopologyHandler::SetupComponents()
       ComponentBdrAttrCheck(components[idx]);
    }
 
+   // Check all component meshes have the same FECollection name.
+   std::string name(components[0]->GetNodalFESpace()->FEColl()->Name());
+   for (int c = 0; c < num_comp; c++)
+      if (name != components[c]->GetNodalFESpace()->FEColl()->Name())
+      {
+         printf("name: %s =/= ", name.c_str());
+         printf("%s\n", components[c]->GetNodalFESpace()->FEColl()->Name());
+         mfem_error("ComponentTopologyHandler: nodal FE collection for all components must be identical!\n");
+      }
+
    for (int c = 0; c < components.Size(); c++) assert(components[c] != NULL);
 
    // Uniform refinement if specified.

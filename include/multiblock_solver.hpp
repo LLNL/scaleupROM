@@ -84,16 +84,17 @@ protected:
    Array<GridFunction *> global_us_visual;
 
    // rom variables.
-   ROMHandler *rom_handler = NULL;
+   ROMHandlerBase *rom_handler = NULL;
    TrainMode train_mode = NUM_TRAINMODE;
    bool use_rom = false;
+   bool separate_variable_basis = false;
 
    // Used for bottom-up building, only with ComponentTopologyHandler.
    // For now, assumes ROM basis represents the entire vector solution.
-   Array<SparseMatrix *> comp_mats;     // Size(num_components);
+   Array<MatrixBlocks *> comp_mats;     // Size(num_components);
    // boundary condition is enforced via forcing term.
-   Array<Array<SparseMatrix *> *> bdr_mats;
-   Array<Array2D<SparseMatrix *> *> port_mats;   // reference ports.
+   Array<Array<MatrixBlocks *> *> bdr_mats;
+   Array<MatrixBlocks *> port_mats;   // reference ports.
    // DenseTensor objects from nonlinear operators
    // will be defined per each derived MultiBlockSolver.
 
@@ -113,7 +114,7 @@ public:
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() const { return order; }
    const bool UseRom() const { return use_rom; }
-   ROMHandler* GetROMHandler() const { return rom_handler; }
+   ROMHandlerBase* GetROMHandler() const { return rom_handler; }
    const TrainMode GetTrainMode() { return train_mode; }
    const bool IsVisualizationSaved() const { return save_visual; }
    const std::string GetSolutionFilePrefix() const { return sol_prefix; }
@@ -166,6 +167,8 @@ public:
    virtual void AssembleInterfaceMatrixes() = 0;
 
    // Global ROM operator Loading.
+   virtual void SaveROMOperator(const std::string input_prefix="")
+   { rom_handler->SaveOperator(input_prefix); }
    virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
    { rom_handler->LoadOperatorFromFile(input_prefix); }
 
@@ -210,7 +213,7 @@ public:
    void GetBasisTags(std::vector<std::string> &basis_tags);
 
    virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
-   void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
+   virtual void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
    virtual void ProjectRHSOnReducedBasis();
    virtual void SolveROM();

@@ -134,14 +134,73 @@ void PrintVector(const CAROM::Vector &vec,
 namespace mfem
 {
 
+void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const MatrixBlocks &mats, BlockMatrix &bmat)
+{
+   assert(bmat.owns_blocks);
+   assert(bmat.NumRowBlocks() >= mats.nrows);
+   assert(bmat.NumColBlocks() >= mats.ncols);
+   assert(ridx.Size() == mats.nrows);
+   assert(cidx.Size() == mats.ncols);
+   assert((ridx.Min() >= 0) && (ridx.Max() < bmat.NumRowBlocks()));
+   assert((cidx.Min() >= 0) && (cidx.Max() < bmat.NumColBlocks()));
+
+   const Array<int> roffsets = bmat.RowOffsets();
+   const Array<int> coffsets = bmat.ColOffsets();
+
+   int rdim, cdim;
+   for (int i = 0; i < ridx.Size(); i++)
+      for (int j = 0; j < cidx.Size(); j++)
+      {
+         if (!mats(i, j)) continue;
+
+         rdim = roffsets[ridx[i]+1] - roffsets[ridx[i]];
+         cdim = coffsets[cidx[j]+1] - coffsets[cidx[j]];
+         assert((mats(i, j)->NumRows() == rdim) && (mats(i, j)->NumCols() == cdim));
+
+         if (bmat.IsZeroBlock(ridx[i], cidx[j]))
+            bmat.SetBlock(ridx[i], cidx[j], new SparseMatrix(rdim, cdim));
+         
+         bmat.GetBlock(ridx[i], cidx[j]) += *mats(i, j);
+      }
+}
+
 void GramSchmidt(DenseMatrix& mat)
 {
-   const int num_row = mat.NumCols();
+   const int num_row = mat.NumRows();
    const int num_col = mat.NumCols();
    Vector vec_c, tmp;
    for (int c = 0; c < num_col; c++)
    {
       mat.GetColumnReference(c, vec_c);
+
+      for (int i = 0; i < c; i++)
+      {
+         mat.GetColumnReference(i, tmp);
+         vec_c.Add(-(tmp * vec_c), tmp);
+      }
+
+      vec_c /= sqrt(vec_c * vec_c);
+   }
+}
+
+void Orthonormalize(DenseMatrix& mat1, DenseMatrix& mat)
+{
+   const int num_row = mat.NumRows();
+   const int num_col = mat.NumCols();
+   const int num_col1 = mat1.NumCols();
+   assert(num_row == mat1.NumRows());
+
+   Vector vec_c, tmp;
+   for (int c = 0; c < num_col; c++)
+   {
+      mat.GetColumnReference(c, vec_c);
+
+      /* we don't assume mat1 is normalized. */
+      for (int i = 0; i < num_col1; i++)
+      {
+         mat1.GetColumnReference(i, tmp);
+         vec_c.Add(-(tmp * vec_c) / (tmp * tmp), tmp);
+      }
 
       for (int i = 0; i < c; i++)
       {
@@ -178,7 +237,15 @@ void RtAP(DenseMatrix& R,
       }
 }
 
-SparseMatrix* RtAP(DenseMatrix& R,
+DenseMatrix* DenseRtAP(DenseMatrix& R,
+   const Operator& A, DenseMatrix& P)
+{
+   DenseMatrix *mat = new DenseMatrix;
+   RtAP(R, A, P, *mat);
+   return mat;
+}
+
+SparseMatrix* SparseRtAP(DenseMatrix& R,
    const Operator& A, DenseMatrix& P)
 {
    assert(R.NumRows() == A.NumRows());

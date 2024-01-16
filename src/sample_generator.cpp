@@ -220,7 +220,7 @@ void SampleGenerator::ReportStatus(const int &sample_idx)
 void SampleGenerator::FormReducedBasis(const std::string &basis_prefix,
                                        const std::string &basis_tag,
                                        const std::vector<std::string> &file_list,
-                                       const int &num_basis)
+                                       const int &ref_num_basis)
 {
    // Get dimension from the first snapshot file.
    const int fom_num_vdof = GetDimFromSnapshots(file_list[0]);
@@ -235,7 +235,7 @@ void SampleGenerator::FormReducedBasis(const std::string &basis_prefix,
       basis_generator->loadSamples(file_list[s], "snapshot");
 
    basis_generator->endSamples(); // save the merged basis file
-   SaveSV(basis_generator, basis_name, num_basis);
+   SaveSV(basis_generator, basis_name, ref_num_basis);
 }
 
 const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
@@ -245,7 +245,7 @@ const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
    return d_basis_reader.getDim("snapshot", 0.0);
 }
 
-void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int& num_basis)
+void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int& ref_num_basis)
 {
    if (!save_sv) return;
    assert(basis_generator != NULL);
@@ -261,10 +261,10 @@ void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::
 
    for (int d = 0; d < rom_sv->dim(); d++)
    {
-      if (d == num_basis) coverage = total;
+      if (d == ref_num_basis) coverage = total;
       total += rom_sv->item(d);
    }
-   if (rom_sv->dim() == num_basis) coverage = total;
+   if (rom_sv->dim() == ref_num_basis) coverage = total;
    coverage /= total;
    printf("Coverage: %.7f%%\n", coverage * 100.0);
 

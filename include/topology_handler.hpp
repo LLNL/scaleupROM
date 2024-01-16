@@ -51,6 +51,8 @@ struct TopologyData {
    Array<int> *global_bdr_attributes = NULL;
 };
 
+const TopologyHandlerMode SetTopologyHandlerMode();
+
 class TopologyHandler
 {
 protected:
@@ -163,6 +165,9 @@ public:
    // access
    virtual Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    virtual Mesh* GetGlobalMesh() { return pmesh; }
+
+   // SubMeshTopologyHandler assumes only one component.
+   virtual Mesh* GetComponentMesh(const int &c) { return GetMesh(0); }
 
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);

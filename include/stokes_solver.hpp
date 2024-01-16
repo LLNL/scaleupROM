@@ -133,16 +133,18 @@ protected:
    double sigma = -1.0;
    double kappa = -1.0;
 
-   // // Used for bottom-up building, only with ComponentTopologyHandler.
-   // Array<DenseMatrix *> comp_mats;
-   // // boundary condition is enforced via forcing term.
-   // Array<Array<DenseMatrix *> *> bdr_mats;
-   // Array<Array2D<DenseMatrix *> *> port_mats;   // reference ports.
-
 public:
    StokesSolver();
 
    virtual ~StokesSolver();
+
+   static const std::vector<std::string> GetVariableNames()
+   {
+      std::vector<std::string> varnames(2);
+      varnames[0] = "vel";
+      varnames[1] = "pres";
+      return varnames;
+   }
 
    GridFunction* GetVelGridFunction(const int k) const { return vels[k]; }
    GridFunction* GetPresGridFunction(const int k) const { return ps[k]; }
@@ -188,6 +190,8 @@ public:
    virtual bool Solve();
    virtual void Solve_obsolete();
 
+   virtual void LoadReducedBasis() override;
+
    virtual void ProjectOperatorOnReducedBasis();
 
    void SanityCheckOnCoeffs();
@@ -197,7 +201,11 @@ public:
    // to ensure incompressibility for the problems with all velocity dirichlet bc.
    void SetComplementaryFlux(const Array<bool> nz_dbcs);
 
+   void EnrichSupremizer();
+
 private:
+   void LoadSupremizer();
+   
    // NOTE: Block Matrix does not own the offsets,
    // and will access to invalid memory if the offsets variable is destroyed.
    BlockMatrix* FormBlockMatrix(SparseMatrix* const m, SparseMatrix* const b, SparseMatrix* const bt,

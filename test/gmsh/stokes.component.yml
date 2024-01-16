@@ -43,6 +43,9 @@ discretization:
   order: 1
   full-discrete-galerkin: false
 
+solver:
+  direct_solve: true
+
 visualization:
   enable: false
   output_dir: dd_mms_output
@@ -72,6 +75,14 @@ basis:
     - name: "empty"
       number_of_basis: 2
     - name: "circle"
+      number_of_basis: 4
+    - name: "empty_vel"
+      number_of_basis: 2
+    - name: "circle_vel"
+      number_of_basis: 4
+    - name: "empty_pres"
+      number_of_basis: 2
+    - name: "circle_pres"
       number_of_basis: 4
   svd:
     save_spectrum: true

@@ -53,6 +53,10 @@ class SteadyNSTensorROM : public Operator
 {
 protected:
    bool direct_solve;
+   bool separate_variable;
+
+   const int num_var = 2;
+   int numSub = -1;
 
    Array<int> block_offsets;
    Array<Array<int> *> block_idxs;
@@ -112,6 +116,8 @@ public:
 
    virtual ~SteadyNSSolver();
 
+   using StokesSolver::GetVariableNames;
+
    virtual void InitVariables();
 
    virtual void BuildOperators() override;
@@ -122,6 +128,7 @@ public:
 
    virtual void Assemble();
 
+   virtual void SaveROMOperator(const std::string input_prefix="");
    virtual void LoadROMOperatorFromFile(const std::string input_prefix="");
 
    // Component-wise assembly
