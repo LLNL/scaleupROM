@@ -230,6 +230,13 @@ SteadyNSSolver::SteadyNSSolver()
       mfem_error("SteadyNSSolver: unknown operator type!\n");
 
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
+
+   /* SteadyNSSolver requires all the meshes to have the same element type. */
+   int num_comp = topol_handler->GetNumComponents();
+   const Element::Type type0 = topol_handler->GetMesh(0)->GetElementType(0);
+   for (int c = 0; c < num_comp; c++)
+      if (type0 != topol_handler->GetMesh(c)->GetElementType(0))
+         mfem_error("SteadyNSSolver requires all meshes to have the same element type!\n");
 }
 
 SteadyNSSolver::~SteadyNSSolver()

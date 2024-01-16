@@ -112,7 +112,7 @@ TEST(ComponentWiseTest, SteadyNSTest)
    config = InputParser("stokes.component.yml");
 
    config.dict_["main"]["solver"] = "steady-ns";
-   config.dict_["mesh"]["uniform_refinement"] = 3;
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "square.tri.mesh";
    config.dict_["solver"]["print_level"] = 1;
    config.dict_["solver"]["direct_solve"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
@@ -147,8 +147,8 @@ TEST(ComponentWiseTest, SteadyNSTest_SeparateVariable)
    config = InputParser("stokes.component.yml");
 
    config.dict_["main"]["solver"] = "steady-ns";
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "square.tri.mesh";
    config.dict_["model_reduction"]["separate_variable_basis"] = true;
-   config.dict_["mesh"]["uniform_refinement"] = 3;
    config.dict_["solver"]["print_level"] = 1;
    config.dict_["solver"]["direct_solve"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
@@ -243,7 +243,7 @@ TEST(MultiComponentGlobalROM, SteadyNSTestDirectSolve)
 {
    config = InputParser("stokes.component.yml");
    config.dict_["main"]["solver"] = "steady-ns";
-   config.dict_["mesh"]["uniform_refinement"] = 3;
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "square.tri.mesh";
    config.dict_["solver"]["print_level"] = 1;
 
    config.dict_["model_reduction"]["save_operator"]["level"] = "global";
@@ -279,7 +279,7 @@ TEST(MultiComponentGlobalROM, SteadyNSTest_SeparateVariable)
 {
    config = InputParser("stokes.component.yml");
    config.dict_["main"]["solver"] = "steady-ns";
-   config.dict_["mesh"]["uniform_refinement"] = 3;
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "square.tri.mesh";
    config.dict_["solver"]["print_level"] = 1;
 
    config.dict_["model_reduction"]["separate_variable_basis"] = true;
