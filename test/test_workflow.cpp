@@ -328,7 +328,7 @@ TEST(Stokes_Workflow, ComponentGlobalSeparateVariable)
    config.dict_["model_reduction"]["separate_variable_basis"] = true;
    config.dict_["solver"]["direct_solve"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
-   config.dict_["model_reduction"]["linear_system_type"] = "sid";
+   config.dict_["model_reduction"]["linear_system_type"] = "us";
    config.dict_["model_reduction"]["save_operator"]["level"] = "global";
 
    printf("\nSample Generation \n\n");

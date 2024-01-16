@@ -327,6 +327,9 @@ MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *in
       {
          mfem_error("Unknown ROM linear system type!\n");
       }
+
+      if (mat_type == MUMPSSolver::MatType::SYMMETRIC_INDEFINITE)
+         mfem_warning("MUMPS matrix type SYMMETRIC_INDEFINITE can be unstable, returning inaccurate answer.\n");
    }
 }
 
