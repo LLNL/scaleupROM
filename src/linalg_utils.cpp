@@ -158,9 +158,9 @@ void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const Matr
          assert((mats(i, j)->NumRows() == rdim) && (mats(i, j)->NumCols() == cdim));
 
          if (bmat.IsZeroBlock(ridx[i], cidx[j]))
-            bmat.SetBlock(ridx[i], cidx[j], new SparseMatrix(*mats(i, j)));
-         else
-            bmat.GetBlock(ridx[i], cidx[j]) += *mats(i, j);
+            bmat.SetBlock(ridx[i], cidx[j], new SparseMatrix(rdim, cdim));
+         
+         bmat.GetBlock(ridx[i], cidx[j]) += *mats(i, j);
       }
 }
 
