@@ -43,6 +43,9 @@ discretization:
   order: 1
   full-discrete-galerkin: false
 
+solver:
+  direct_solve: true
+
 visualization:
   enable: false
   output_dir: dd_mms_output

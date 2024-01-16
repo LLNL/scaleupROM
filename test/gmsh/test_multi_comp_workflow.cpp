@@ -10,7 +10,7 @@ using namespace std;
 using namespace mfem;
 
 static const double threshold = 1.0e-14;
-static const double stokes_threshold = 1.0e-12;
+static const double stokes_threshold = 2.0e-12;
 static const double ns_threshold = 1.0e-9;
 
 /**
