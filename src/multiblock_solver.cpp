@@ -371,8 +371,15 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
 
    hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
    
+   std::string dset_name;
+   int c1, c2, a1, a2;
    for (int p = 0; p < num_ref_ports; p++)
-      hdf5_utils::WriteDataset(grp_id, std::to_string(p), *port_mats[p]);
+   {
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+      dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
+      dset_name += "-" + std::to_string(a1) + ":" + std::to_string(a2);
+      hdf5_utils::WriteDataset(grp_id, dset_name, *port_mats[p]);
+   }
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
@@ -468,11 +475,18 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
 
    int num_ref_ports;
    hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
-   assert(num_ref_ports == topol_handler->GetNumRefPorts());
-   assert(port_mats.Size() == num_ref_ports);
+   assert(num_ref_ports >= topol_handler->GetNumRefPorts());
+   assert(port_mats.Size() == topol_handler->GetNumRefPorts());
 
+   std::string dset_name;
+   int c1, c2, a1, a2;
    for (int p = 0; p < num_ref_ports; p++)
-      hdf5_utils::ReadDataset(grp_id, std::to_string(p), *port_mats[p]);
+   {
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+      dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
+      dset_name += "-" + std::to_string(a1) + ":" + std::to_string(a2);
+      hdf5_utils::ReadDataset(grp_id, dset_name, *port_mats[p]);
+   }
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);

@@ -110,6 +110,8 @@ public:
    // return component indexes for a reference port
    virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)
    { mfem_error("TopologyHandler::GetComponentPair is abstract method!\n"); return; }
+   virtual void GetRefPortInfo(const int &ref_port_idx, int &comp1, int &comp2, int &attr1, int &attr2)
+   { mfem_error("TopologyHandler::GetRefPortInfo is abstract method!\n"); return; }
    virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k)
    { mfem_error("TopologyHandler::GetRefInterfaceInfos is abstract method!\n"); return NULL; }
    virtual Array<int>* GetBdrAttrComponentToGlobalMap(const int &m)

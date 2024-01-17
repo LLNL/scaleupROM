@@ -86,6 +86,14 @@ void ComponentTopologyHandler::GetComponentPair(const int &ref_port_idx, int &co
    return;
 }
 
+void ComponentTopologyHandler::GetRefPortInfo(const int &ref_port_idx, int &comp1, int &comp2, int &attr1, int &attr2)
+{
+   GetComponentPair(ref_port_idx, comp1, comp2);
+
+   attr1 = ref_ports[ref_port_idx]->Attr1;
+   attr2 = ref_ports[ref_port_idx]->Attr2;
+}
+
 void ComponentTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data)
 {
    mesh_ptrs = meshes;
