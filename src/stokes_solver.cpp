@@ -956,7 +956,8 @@ void StokesSolver::LoadSupremizer()
 
    const int num_comp = topol_handler->GetNumComponents();
    int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
-   DenseMatrix supreme;
+   DenseMatrix supreme_data;
+   DenseMatrix *supreme = NULL;
    for (int m = 0; m < size; m++)
    {
       // Load the supremizer basis.
@@ -965,16 +966,28 @@ void StokesSolver::LoadSupremizer()
          hid_t file_id;
          herr_t errf = 0;
          std::string filename(basis_prefix + basis_tag + ".h5");
+         printf("\nOpening file %s.. ", filename.c_str());
          file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
          assert(file_id >= 0);
 
-         hdf5_utils::ReadDataset(file_id, "supremizer_basis", supreme);
+         hdf5_utils::ReadDataset(file_id, "supremizer_basis", supreme_data);
 
          errf = H5Fclose(file_id);
          assert(errf >= 0);
+         printf("Done!\n");
       }
 
-      rom_handler->AppendReferenceBasis(m * num_var, supreme);
+      if (num_ref_supreme[m] > supreme_data.NumCols())
+      {
+         printf("Supremizer data number of columns: %d\n", supreme_data.NumCols());
+         printf("Number of required supremizers: %d\n", num_ref_supreme[m]);
+         mfem_error("The supremizer data does not have sufficient supremizers!\n");
+      }
+
+      // View DenseMatrix of the first num_ref_supreme[m] columns.
+      supreme = new DenseMatrix(supreme_data.GetData(), supreme_data.NumRows(), num_ref_supreme[m]);
+      rom_handler->AppendReferenceBasis(m * num_var, *supreme);
+      delete supreme;
    }
 }
 
