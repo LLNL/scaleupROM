@@ -315,10 +315,13 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
 
    hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
 
+   std::string dset_name;
    for (int c = 0; c < num_comp; c++)
    {
+      dset_name = topol_handler->GetComponentName(c);
+
       hid_t comp_grp_id;
-      comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      comp_grp_id = H5Gcreate(grp_id, dset_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp_mats[c]);
@@ -418,14 +421,17 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
 
    int num_comp;
    hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
-   assert(num_comp == topol_handler->GetNumComponents());
-   assert(comp_mats.Size() == num_comp);
-   assert(bdr_mats.Size() == num_comp);
+   assert(num_comp >= topol_handler->GetNumComponents());
+   assert(comp_mats.Size() == topol_handler->GetNumComponents());
+   assert(bdr_mats.Size() == topol_handler->GetNumComponents());
 
+   std::string dset_name;
    for (int c = 0; c < num_comp; c++)
    {
+      dset_name = topol_handler->GetComponentName(c);
+
       hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp_mats[c]);
