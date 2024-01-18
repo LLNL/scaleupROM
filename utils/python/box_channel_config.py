@@ -64,7 +64,12 @@ class BoxChannelConfig(Configuration):
             if ((face1 < 0) or (face2 < 0)): continue
             self.appendInterface(k, -1, face1, face2)
 
-        self.avail_locs.remove(new_loc)
+        used_idx = False
+        for idx, loc in enumerate(self.avail_locs):
+            if (np.array_equal(new_loc, loc)):
+                used_idx = idx
+                break
+        self.avail_locs.pop(used_idx)
         self.comp_used[comp_idx] = True
         return
     
