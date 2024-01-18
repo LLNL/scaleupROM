@@ -965,7 +965,7 @@ void StokesSolver::LoadSupremizer()
       {
          hid_t file_id;
          herr_t errf = 0;
-         std::string filename(basis_prefix + basis_tag + ".h5");
+         std::string filename(basis_prefix + "_" + basis_tag + ".h5");
          printf("\nOpening file %s.. ", filename.c_str());
          file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
          assert(file_id >= 0);
@@ -1325,7 +1325,7 @@ void StokesSolver::EnrichSupremizer()
       {
          hid_t file_id;
          herr_t errf = 0;
-         std::string filename(basis_prefix + basis_tag + ".h5");
+         std::string filename(basis_prefix + "_" + basis_tag + ".h5");
          file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
          assert(file_id >= 0);
 
