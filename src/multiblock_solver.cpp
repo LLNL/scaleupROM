@@ -426,7 +426,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
    assert(bdr_mats.Size() == topol_handler->GetNumComponents());
 
    std::string dset_name;
-   for (int c = 0; c < num_comp; c++)
+   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
    {
       dset_name = topol_handler->GetComponentName(c);
 
@@ -486,7 +486,7 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
 
    std::string dset_name;
    int c1, c2, a1, a2;
-   for (int p = 0; p < num_ref_ports; p++)
+   for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
    {
       topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
       dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
