@@ -841,12 +841,13 @@ void MultiBlockSolver::ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridF
    }
 }
 
-double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols)
+void MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error)
 {
    assert(fom_sols.Size() == (num_var * numSub));
    assert(rom_sols.Size() == (num_var * numSub));
 
-   Vector norm(num_var), error(num_var);
+   Vector norm(num_var);
+   error.SetSize(num_var);
    norm = 0.0; error = 0.0;
    for (int m = 0, idx = 0; m < numSub; m++)
    {
@@ -867,11 +868,9 @@ double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Ar
       error[v] /= norm[v];
       printf("Variable %d relative error: %.5E\n", v, error[v]);
    }
-
-   return error.Max();
 }
 
-double MultiBlockSolver::CompareSolution(BlockVector &test_U)
+void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
 {
    assert(test_U.NumBlocks() == U->NumBlocks());
    for (int b = 0; b < U->NumBlocks(); b++)
@@ -890,10 +889,8 @@ double MultiBlockSolver::CompareSolution(BlockVector &test_U)
 
    // Compare the solution.
    // Maximum L2-error / L2-norm over all variables.
-   double error = ComputeRelativeError(us, test_us);
-   printf("Relative error: %.5E\n", error);
+   error.SetSize(num_var);
+   ComputeRelativeError(us, test_us, error);
 
    DeletePointers(test_us);
-
-   return error;
 }

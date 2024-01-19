@@ -110,6 +110,7 @@ public:
    const int GetDim() const { return dim; }
    const int GetNumSubdomains() const { return numSub; }
    const int GetNumBdr() const { return numBdr; }
+   const int GetNumVar() const { return num_var; }
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() const { return order; }
@@ -223,8 +224,8 @@ public:
    virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
 
    void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
-   double ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols);
-   double CompareSolution(BlockVector &test_U);
+   void ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error);
+   void CompareSolution(BlockVector &test_U, Vector &error);
 };
 
 #endif
