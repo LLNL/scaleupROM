@@ -23,15 +23,18 @@ if __name__ == "__main__":
             jloc = np.array(iloc)
             jloc *= -1
             jloc = tuple(jloc)
-            jface = -1
             for jcomp in example.comps:
+                jface = -1
                 if (jloc in jcomp.face_map):
                     jface = jcomp.face_map[jloc]
-                    break
-            if (jface < 0):
-                continue
-            else:
-                example.appendRefPort(icomp.name, jcomp.name, iface, jface)
+                else:
+                    continue
+                print(icomp.name, jcomp.name, iface, jface)
+                if (jface < 0):
+                    continue
+                else:
+                    print('accepted')
+                    example.appendRefPort(icomp.name, jcomp.name, iface, jface)
 
     for c in range(len(example.comps)):
         example.addMesh(c, 0)
