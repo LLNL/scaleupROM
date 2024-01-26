@@ -61,6 +61,21 @@ add_executable(test_linalg_utils test_linalg_utils.cpp $<TARGET_OBJECTS:scaleupR
 
 add_executable(test_rom_nonlinearform test_rom_nonlinearform.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
+function(add_test_dir TEST_DIR)
+    # helper function that adds all executables in a given directory as tests for ctest
+    get_property(target_names DIRECTORY ${TEST_DIR} PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(target IN LISTS target_names)
+        get_target_property(target_type ${target} TYPE)
+        if (${target_type} STREQUAL "EXECUTABLE")
+            get_target_property(binary_dir ${target} BINARY_DIR)
+            add_test(NAME ${target} COMMAND ${target} WORKING_DIRECTORY "${binary_dir}")
+        endif()
+    endforeach(target)
+endfunction(add_test_dir)
+
+add_test_dir(".")
+
 if(GMSH)
     add_subdirectory(gmsh)
+    add_test_dir("gmsh")
 endif(GMSH)
