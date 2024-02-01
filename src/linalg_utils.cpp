@@ -164,22 +164,22 @@ void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const Matr
       }
 }
 
-void GramSchmidt(DenseMatrix& mat)
+void modifiedGramSchmidt(DenseMatrix& mat)
 {
    const int num_row = mat.NumRows();
    const int num_col = mat.NumCols();
    Vector vec_c, tmp;
+   /* modified Gram-Schmidt orthonormalization */
    for (int c = 0; c < num_col; c++)
    {
       mat.GetColumnReference(c, vec_c);
+      vec_c /= sqrt(vec_c * vec_c);
 
-      for (int i = 0; i < c; i++)
+      for (int i = c + 1; i < num_col; i++)
       {
          mat.GetColumnReference(i, tmp);
-         vec_c.Add(-(tmp * vec_c), tmp);
+         tmp.Add(-(tmp * vec_c), vec_c);
       }
-
-      vec_c /= sqrt(vec_c * vec_c);
    }
 }
 
@@ -191,25 +191,21 @@ void Orthonormalize(DenseMatrix& mat1, DenseMatrix& mat)
    assert(num_row == mat1.NumRows());
 
    Vector vec_c, tmp;
-   for (int c = 0; c < num_col; c++)
+   double tmp_dot;
+   /* we don't assume mat1 is normalized. */
+   for (int i = 0; i < num_col1; i++)
    {
-      mat.GetColumnReference(c, vec_c);
-
-      /* we don't assume mat1 is normalized. */
-      for (int i = 0; i < num_col1; i++)
+      mat1.GetColumnReference(i, tmp);
+      tmp_dot = (tmp * tmp);
+      for (int c = 0; c < num_col; c++)
       {
-         mat1.GetColumnReference(i, tmp);
-         vec_c.Add(-(tmp * vec_c) / (tmp * tmp), tmp);
+         mat.GetColumnReference(c, vec_c);
+         vec_c.Add(-(tmp * vec_c) / tmp_dot, tmp);
       }
-
-      for (int i = 0; i < c; i++)
-      {
-         mat.GetColumnReference(i, tmp);
-         vec_c.Add(-(tmp * vec_c), tmp);
-      }
-
-      vec_c /= sqrt(vec_c * vec_c);
    }
+
+   /* modified Gram-Schmidt orthonormalization */
+   modifiedGramSchmidt(mat);
 }
 
 void RtAP(DenseMatrix& R,

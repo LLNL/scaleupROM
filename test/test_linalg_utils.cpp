@@ -82,6 +82,58 @@ TEST(linalg_test, AddMultTransposeSubMatrix)
    return;
 }
 
+TEST(linalg_test, Orthonormalize)
+{
+   const double thre = 1.0e-15;
+   const int nrow = 15, ncol1 = 7, ncol = 5;
+   DenseMatrix mat1(nrow, ncol1);
+   DenseMatrix mat(nrow, ncol);
+   DenseMatrix test(ncol, ncol), test1(ncol1, ncol);
+
+   for (int i = 0; i < nrow; i++)
+   {
+      for (int j = 0; j < ncol; j++)
+         mat(i, j) = UniformRandom();
+
+      for (int j = 0; j < ncol1; j++)
+         mat1(i, j) = UniformRandom();
+   }
+
+   modifiedGramSchmidt(mat1);
+   Vector scale(ncol1);
+   for (int d = 0; d < ncol1; d++)
+      scale(d) = UniformRandom();
+   mat1.RightScaling(scale);
+
+   Orthonormalize(mat1, mat);
+
+   Vector tmp1, tmp2;
+   for (int j = 0; j < ncol; j++)
+   {
+      mat.GetColumnReference(j, tmp1);
+      test.GetColumnReference(j, tmp2);
+      mat.MultTranspose(tmp1, tmp2);
+   }
+   for (int i = 0; i < ncol; i++)
+      for (int j = 0; j < ncol; j++)
+      {
+         double val = (i == j) ? 1.0 : 0.0;
+         EXPECT_NEAR(test(i, j), val, thre);
+      };
+   
+   for (int j = 0; j < ncol; j++)
+   {
+      mat.GetColumnReference(j, tmp1);
+      test1.GetColumnReference(j, tmp2);
+      mat1.MultTranspose(tmp1, tmp2);
+   }
+   for (int i = 0; i < ncol1; i++)
+      for (int j = 0; j < ncol; j++)
+         EXPECT_NEAR(test1(i, j), 0.0, thre);
+
+   return;
+}
+
 // TODO: add more tests from sketches/yaml_example.cpp.
 
 int main(int argc, char* argv[])

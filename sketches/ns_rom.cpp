@@ -1375,7 +1375,7 @@ int main(int argc, char *argv[])
          basis.SetSubMatrix(uridx, ucidx, supreme);
 
          // Orthonormalize over the entire velocity basis for now.
-         GramSchmidt(basis);
+         modifiedGramSchmidt(basis);
 
          DenseTensor *nlin_rom = NULL;
          if (rom_mode == RomMode::TENSOR4)

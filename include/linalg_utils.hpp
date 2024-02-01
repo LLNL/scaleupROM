@@ -119,7 +119,7 @@ printf("operator= const MatrixBlocks.\n");
 
 void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const MatrixBlocks &mats, BlockMatrix &bmat);
 
-void GramSchmidt(DenseMatrix& mat);
+void modifiedGramSchmidt(DenseMatrix& mat);
 
 /* Orthonormalize mat over mat1 and itself. */
 void Orthonormalize(DenseMatrix& mat1, DenseMatrix& mat);
