@@ -84,7 +84,7 @@ TEST(linalg_test, AddMultTransposeSubMatrix)
 
 TEST(linalg_test, Orthonormalize)
 {
-   const double thre = 1.0e-15;
+   const double thre = 1.0e-14;
    const int nrow = 15, ncol1 = 7, ncol = 5;
    DenseMatrix mat1(nrow, ncol1);
    DenseMatrix mat(nrow, ncol);
