@@ -145,17 +145,10 @@ class Configuration:
         self.meshes[midx1].avail_face.pop(face1)
         self.meshes[midx2].avail_face.pop(face2)
 
-        if (face1 < face2):
-            interface = (self.meshes[midx1].name, self.meshes[midx2].name,
-                         face1, face2)
-        else:
-            interface = (self.meshes[midx2].name, self.meshes[midx1].name,
-                         face2, face1)
-            
-        # add the interface if not exists.
-        if interface not in self.ports:
-            self.ports[interface] = len(self.ports)
-        port = self.ports[interface]
+        self.appendRefPort(self.meshes[midx1].name, self.meshes[midx2].name,
+                           face1, face2)
+        port = self.getRefPort(self.meshes[midx1].name, self.meshes[midx2].name,
+                               face1, face2)
 
         if (face1 < face2):
             if_data = [[midx1, midx2, face1, face2, port]]
@@ -167,6 +160,52 @@ class Configuration:
         else:
             self.if_data = np.append(self.if_data, if_data, axis=0)
         return
+
+    def appendRefPort(self, cname1, cname2, face1, face2):
+        have_c1, have_c2 = False, False
+        for comp in self.comps:
+            if ((not have_c1) and (comp.name == cname1)):
+                have_c1 = True
+            if ((not have_c2) and (comp.name == cname2)):
+                have_c2 = True
+            if (have_c1 and have_c2):
+                break
+        if (not (have_c1 and have_c2)):
+            raise RuntimeError("Configuration does not have components named %s and %s!" % (cname1, cname2))
+
+        if (face1 < face2):
+            interface = (cname1, cname2, face1, face2)
+        else:
+            interface = (cname2, cname1, face2, face1)
+
+        # add the interface if not exists.
+        if interface not in self.ports:
+            self.ports[interface] = len(self.ports)
+        
+        return
+
+    def getRefPort(self, cname1, cname2, face1, face2):
+        have_c1, have_c2 = False, False
+        for comp in self.comps:
+            if ((not have_c1) and (comp.name == cname1)):
+                have_c1 = True
+            if ((not have_c2) and (comp.name == cname2)):
+                have_c2 = True
+            if (have_c1 and have_c2):
+                break
+        if (not (have_c1 and have_c2)):
+            raise RuntimeError("Configuration does not have components named %s and %s!" % (cname1, cname2))
+
+        if (face1 < face2):
+            interface = (cname1, cname2, face1, face2)
+        else:
+            interface = (cname2, cname1, face2, face1)
+
+        # add the interface if not exists.
+        if interface not in self.ports:
+            raise RuntimeError("Configuration does not have the interface (%s, %s, %d, %d)!" % interface)
+        
+        return self.ports[interface]
     
     def save(self, filename):
         comp_name2idx = {}

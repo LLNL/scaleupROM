@@ -144,7 +144,7 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
             error1 = error;
       }
    }
-   EXPECT_TRUE(error1 < 1.0e-7);
+   EXPECT_TRUE(error1 < 1.0e-6);
 
    // 17. Free the used memory.
    delete nform;

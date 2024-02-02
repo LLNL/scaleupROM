@@ -468,12 +468,14 @@ void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
    grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
    assert(grp_id >= 0);
 
+   std::string dset_name;
    for (int c = 0; c < num_comp; c++)
    {
       assert(comp_tensors[c]);
+      dset_name = topol_handler->GetComponentName(c);
 
       hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
@@ -499,10 +501,13 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
    grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
    assert(grp_id >= 0);
 
+   std::string dset_name;
    for (int c = 0; c < num_comp; c++)
    {
+      dset_name = topol_handler->GetComponentName(c);
+
       hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       comp_tensors[c] = new DenseTensor;

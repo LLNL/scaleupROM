@@ -544,7 +544,7 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
+   double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);

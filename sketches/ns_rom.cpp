@@ -1375,7 +1375,7 @@ int main(int argc, char *argv[])
          basis.SetSubMatrix(uridx, ucidx, supreme);
 
          // Orthonormalize over the entire velocity basis for now.
-         GramSchmidt(basis);
+         modifiedGramSchmidt(basis);
 
          DenseTensor *nlin_rom = NULL;
          if (rom_mode == RomMode::TENSOR4)
@@ -1575,6 +1575,22 @@ int main(int argc, char *argv[])
          printf("Size of sampled qp: %d\n", sample_el.Size());
          if (nnz != sample_el.Size())
             printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
+
+         {  // save empirical quadrature point locations.
+            ElementTransformation *T;
+            Vector loc(dim);
+            DenseMatrix qp_loc(sample_el.Size(), dim);
+            for (int p = 0; p < sample_el.Size(); p++)
+            {
+               T = ufes->GetElementTransformation(sample_el[p]);
+               const IntegrationPoint &ip = ir->IntPoint(sample_qp[p]);
+               T->Transform(ip, loc);
+
+               for (int d = 0; d < dim; d++)
+                  qp_loc(p, d) = loc(d);
+            }
+            PrintMatrix(qp_loc, filename + "_eqp_loc.txt");
+         }
 
          {  // save the sample to a hdf5 file.
             std::string sample_file = filename + "_sample.h5";

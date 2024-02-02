@@ -315,10 +315,13 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
 
    hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
 
+   std::string dset_name;
    for (int c = 0; c < num_comp; c++)
    {
+      dset_name = topol_handler->GetComponentName(c);
+
       hid_t comp_grp_id;
-      comp_grp_id = H5Gcreate(grp_id, std::to_string(c).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      comp_grp_id = H5Gcreate(grp_id, dset_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp_mats[c]);
@@ -371,8 +374,15 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
 
    hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
    
+   std::string dset_name;
+   int c1, c2, a1, a2;
    for (int p = 0; p < num_ref_ports; p++)
-      hdf5_utils::WriteDataset(grp_id, std::to_string(p), *port_mats[p]);
+   {
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+      dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
+      dset_name += "-" + std::to_string(a1) + ":" + std::to_string(a2);
+      hdf5_utils::WriteDataset(grp_id, dset_name, *port_mats[p]);
+   }
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
@@ -411,14 +421,17 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
 
    int num_comp;
    hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
-   assert(num_comp == topol_handler->GetNumComponents());
-   assert(comp_mats.Size() == num_comp);
-   assert(bdr_mats.Size() == num_comp);
+   assert(num_comp >= topol_handler->GetNumComponents());
+   assert(comp_mats.Size() == topol_handler->GetNumComponents());
+   assert(bdr_mats.Size() == topol_handler->GetNumComponents());
 
-   for (int c = 0; c < num_comp; c++)
+   std::string dset_name;
+   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
    {
+      dset_name = topol_handler->GetComponentName(c);
+
       hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, std::to_string(c).c_str(), H5P_DEFAULT);
+      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp_mats[c]);
@@ -468,11 +481,18 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
 
    int num_ref_ports;
    hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
-   assert(num_ref_ports == topol_handler->GetNumRefPorts());
-   assert(port_mats.Size() == num_ref_ports);
+   assert(num_ref_ports >= topol_handler->GetNumRefPorts());
+   assert(port_mats.Size() == topol_handler->GetNumRefPorts());
 
-   for (int p = 0; p < num_ref_ports; p++)
-      hdf5_utils::ReadDataset(grp_id, std::to_string(p), *port_mats[p]);
+   std::string dset_name;
+   int c1, c2, a1, a2;
+   for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
+   {
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+      dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
+      dset_name += "-" + std::to_string(a1) + ":" + std::to_string(a2);
+      hdf5_utils::ReadDataset(grp_id, dset_name, *port_mats[p]);
+   }
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
@@ -821,12 +841,13 @@ void MultiBlockSolver::ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridF
    }
 }
 
-double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols)
+void MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error)
 {
    assert(fom_sols.Size() == (num_var * numSub));
    assert(rom_sols.Size() == (num_var * numSub));
 
-   Vector norm(num_var), error(num_var);
+   Vector norm(num_var);
+   error.SetSize(num_var);
    norm = 0.0; error = 0.0;
    for (int m = 0, idx = 0; m < numSub; m++)
    {
@@ -847,11 +868,9 @@ double MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Ar
       error[v] /= norm[v];
       printf("Variable %d relative error: %.5E\n", v, error[v]);
    }
-
-   return error.Max();
 }
 
-double MultiBlockSolver::CompareSolution(BlockVector &test_U)
+void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
 {
    assert(test_U.NumBlocks() == U->NumBlocks());
    for (int b = 0; b < U->NumBlocks(); b++)
@@ -870,10 +889,8 @@ double MultiBlockSolver::CompareSolution(BlockVector &test_U)
 
    // Compare the solution.
    // Maximum L2-error / L2-norm over all variables.
-   double error = ComputeRelativeError(us, test_us);
-   printf("Relative error: %.5E\n", error);
+   error.SetSize(num_var);
+   ComputeRelativeError(us, test_us, error);
 
    DeletePointers(test_us);
-
-   return error;
 }
