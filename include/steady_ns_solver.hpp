@@ -49,7 +49,7 @@ public:
 };
 
 // A proxy Operator used for ROM Newton Solver.
-class SteadyNSTensorROM : public Operator
+class SteadyNSROM : public Operator
 {
 protected:
    bool direct_solve;
@@ -60,7 +60,6 @@ protected:
 
    Array<int> block_offsets;
    Array<Array<int> *> block_idxs;
-   Array<DenseTensor *> hs;
    SparseMatrix *linearOp = NULL;
 
    mutable Vector x_comp, y_comp;
@@ -70,9 +69,24 @@ protected:
    HYPRE_BigInt sys_glob_size;
    mutable HYPRE_BigInt sys_row_starts[2];
 public:
-   SteadyNSTensorROM(SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true);
+   SteadyNSROM(SparseMatrix *linearOp_, const int numSub_, const Array<int> &block_offsets_, const bool direct_solve_=true);
 
-   virtual ~SteadyNSTensorROM();
+   virtual ~SteadyNSROM();
+
+   virtual void Mult(const Vector &x, Vector &y) const = 0;
+   virtual Operator &GetGradient(const Vector &x) const = 0;
+};
+
+class SteadyNSTensorROM : public SteadyNSROM
+{
+protected:
+   Array<DenseTensor *> hs; // not owned by SteadyNSTensorROM.
+
+public:
+   SteadyNSTensorROM(SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true)
+      : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_) {}
+
+   virtual ~SteadyNSTensorROM() {}
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;

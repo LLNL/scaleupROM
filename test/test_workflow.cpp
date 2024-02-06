@@ -498,7 +498,7 @@ TEST(SteadyNS_Workflow, ComponentWiseTest)
 
 TEST(SteadyNS_Workflow, ComponentWiseWithDirectSolve)
 {
-   config = InputParser("inputs/stokes.component.yml");
+   config = InputParser("inputs/steady_ns.component.yml");
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "us";
 
@@ -527,7 +527,7 @@ TEST(SteadyNS_Workflow, ComponentWiseWithDirectSolve)
 
 TEST(SteadyNS_Workflow, ComponentSeparateVariable)
 {
-   config = InputParser("inputs/stokes.component.yml");
+   config = InputParser("inputs/steady_ns.component.yml");
    config.dict_["model_reduction"]["separate_variable_basis"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "us";

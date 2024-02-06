@@ -130,13 +130,13 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 }
 
 /*
-   SteadyNSTensorROM
+   SteadyNSROM
 */
 
-SteadyNSTensorROM::SteadyNSTensorROM(
-   SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_)
-   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_),
-     numSub(hs_.Size()), block_offsets(block_offsets_), direct_solve(direct_solve_)
+SteadyNSROM::SteadyNSROM(
+   SparseMatrix *linearOp_, const int numSub_, const Array<int> &block_offsets_, const bool direct_solve_)
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_),
+     numSub(numSub_), block_offsets(block_offsets_), direct_solve(direct_solve_)
 {
    separate_variable = (block_offsets.Size() == num_var * numSub + 1);
    assert(separate_variable || (block_offsets.Size() == numSub + 1));
@@ -156,10 +156,14 @@ SteadyNSTensorROM::SteadyNSTensorROM(
    }
 }
 
-SteadyNSTensorROM::~SteadyNSTensorROM()
+SteadyNSROM::~SteadyNSROM()
 {
    DeletePointers(block_idxs);
 }
+
+/*
+   SteadyNSTensorROM
+*/
 
 void SteadyNSTensorROM::Mult(const Vector &x, Vector &y) const
 {
