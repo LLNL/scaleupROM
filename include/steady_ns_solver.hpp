@@ -6,6 +6,7 @@
 #define SCALEUPROM_STEADY_NS_SOLVER_HPP
 
 #include "stokes_solver.hpp"
+#include "rom_nonlinearform.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -87,6 +88,21 @@ public:
       : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_) {}
 
    virtual ~SteadyNSTensorROM() {}
+
+   virtual void Mult(const Vector &x, Vector &y) const;
+   virtual Operator &GetGradient(const Vector &x) const;
+};
+
+class SteadyNSEQPROM : public SteadyNSROM
+{
+protected:
+   Array<ROMNonlinearForm *> hs; // not owned by SteadyNSEQPROM.
+
+public:
+   SteadyNSEQPROM(SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true)
+      : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_) {}
+
+   virtual ~SteadyNSEQPROM() {}
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;

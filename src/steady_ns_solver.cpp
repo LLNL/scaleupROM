@@ -211,6 +211,52 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 }
 
 /*
+   SteadyNSTensorROM
+*/
+
+void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
+{
+   y = 0.0;
+   linearOp->Mult(x, y);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int midx = (separate_variable) ? m * num_var : m;
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+      y_comp.MakeRef(y, block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+
+      hs[m]->AddMult(x_comp, y_comp);
+   }
+}
+
+Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
+{
+   delete jac_mono;
+   delete jac_hypre;
+   jac_mono = new SparseMatrix(*linearOp);
+   DenseMatrix *jac_comp;
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int midx = (separate_variable) ? m * num_var : m;
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+
+      // NOTE(kevin): jac_comp is owned by hs[m]. No need of deleting it.
+      jac_comp = dynamic_cast<DenseMatrix *>(&hs[m]->GetGradient(x_comp));
+      jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], *jac_comp);
+   }
+   jac_mono->Finalize();
+   
+   if (direct_solve)
+   {
+      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, jac_mono);
+      return *jac_hypre;
+   }
+   else
+      return *jac_mono;
+}
+
+/*
    SteadyNSSolver
 */
 
