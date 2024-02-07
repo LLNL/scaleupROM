@@ -197,6 +197,23 @@ public:
                                       Array2D<DenseMatrix*> &elmats);
 };
 
+// DGElasticityIntegrator
+// TODO(axel): you'll need to implement this class for dg interface for two different meshes.
+/* This is pretty much the copy version of MFEM DGElasticitityIntegrator */
+class InterfaceDGElasticityIntegrator : public InterfaceNonlinearFormIntegrator
+{
+public:
+   InterfaceDGElasticityIntegrator(){ }
+
+   virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
+                                        const FiniteElement &el2,
+                                        FaceElementTransformations &Trans1,
+                                        FaceElementTransformations &Trans2,
+                                        Array2D<DenseMatrix*> &elmats) {}
+
+   using InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix;
+};
+
 } // namespace mfem
 
 #endif
