@@ -693,7 +693,6 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
    // CAROM::Vector & sol)
    double nnls_tol = 1.0e-11;
    int maxNNLSnnz = 0;
-   const double delta = eqp_tol;
    CAROM::Vector eqpSol(Gt.numRows(), true);
    int nnz = 0;
    {
@@ -702,12 +701,12 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
       CAROM::Vector rhs_ub(rhs_Gw);
       CAROM::Vector rhs_lb(rhs_Gw);
 
+      double delta;
       for (int i = 0; i < rhs_ub.dim(); ++i)
       {
-         // rhs_lb(i) *= (1.0 - delta);
-         // rhs_ub(i) *= (1.0 + delta);
-         rhs_lb(i) -= (delta);
-         rhs_ub(i) += (delta);
+         delta = eqp_tol * abs(rhs_Gw(i));
+         rhs_lb(i) -= delta;
+         rhs_ub(i) += delta;
       }
 
       /*
@@ -719,7 +718,7 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
 
       /*
          The optimization will continue until
-            max_i || rhs_Gw(i) - eqp_Gw(i) || / || rhs_Gw(i) || < delta
+            max_i || rhs_Gw(i) - eqp_Gw(i) || / || rhs_Gw(i) || < eqp_tol
       */
       nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
 
