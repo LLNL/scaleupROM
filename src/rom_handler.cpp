@@ -83,6 +83,7 @@ ROMHandlerBase::ROMHandlerBase(
      numSub(input_topol->GetNumSubdomains()),
      fom_var_names(var_names),
      fom_var_offsets(input_var_offsets),
+     basis_tags(0),
      basis_loaded(false),
      operator_loaded(false),
      separate_variable(separate_variable_basis)
@@ -173,6 +174,11 @@ void ROMHandlerBase::ParseInputs()
    save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
 
    save_basis_visual = config.GetOption<bool>("basis/visualization/enabled", false);
+
+   std::string nlin_handle_str = config.GetOption<std::string>("model_reduction/nonlinear_handling", "none");
+   if (nlin_handle_str == "tensor")    nlin_handle = NonlinearHandling::TENSOR;
+   else if (nlin_handle_str == "eqp")  nlin_handle = NonlinearHandling::EQP;
+   assert((!nonlinear_mode) || (nlin_handle != NonlinearHandling::NUM_NLNHNDL));
 }
 
 void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme)
@@ -210,18 +216,19 @@ void ROMHandlerBase::LoadReducedBasis()
 {
    if (basis_loaded) return;
 
-   std::string basis_name;
+   std::string basis_name = basis_prefix + "_";
    int numRowRB, numColumnRB;
 
    carom_ref_basis.SetSize(num_rom_ref_blocks);
+   basis_tags.resize(num_rom_ref_blocks);
    for (int k = 0; k < num_rom_ref_blocks; k++)
    {
-      basis_name = basis_prefix + "_";
       if (separate_variable)
-         basis_name += GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
+         basis_tags[k] = GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
       else
-         basis_name += GetBasisTagForComponent(k, train_mode, topol_handler);
-      basis_reader = new CAROM::BasisReader(basis_name);
+         basis_tags[k] = GetBasisTagForComponent(k, train_mode, topol_handler);
+      basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k]);
+
       carom_ref_basis[k] = basis_reader->getSpatialBasis(0.0, num_ref_basis[k]);
       numRowRB = carom_ref_basis[k]->numRows();
       numColumnRB = carom_ref_basis[k]->numColumns();

@@ -30,6 +30,13 @@ enum ROMBuildingLevel
    NUM_BLD_LVL
 };
 
+enum NonlinearHandling
+{
+   TENSOR,
+   EQP,
+   NUM_NLNHNDL
+};
+
 const TrainMode SetTrainMode();
 
 const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
@@ -57,6 +64,7 @@ protected:
    TrainMode train_mode = NUM_TRAINMODE;
    bool nonlinear_mode = false;
    bool separate_variable = false;
+   NonlinearHandling nlin_handle = NUM_NLNHNDL;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
@@ -77,6 +85,7 @@ protected:
    Array<int> num_ref_basis;
    Array<const CAROM::Matrix*> carom_ref_basis;
    Array<int> rom_comp_block_offsets;
+   std::vector<std::string> basis_tags;
    bool basis_loaded;
    bool operator_loaded;
 
@@ -125,6 +134,7 @@ public:
    virtual SparseMatrix* GetOperator() = 0;
    const bool GetNonlinearMode() { return nonlinear_mode; }
    void SetNonlinearMode(const bool nl_mode) { nonlinear_mode = nl_mode; }
+   const NonlinearHandling GetNonlinearHandling() { return nlin_handle; }
 
    /* parse inputs for supremizer. only for Stokes/SteadyNS Solver. */
    void ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme);
