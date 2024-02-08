@@ -50,6 +50,8 @@ LinElastSolver::~LinElastSolver()
 
    DeletePointers(bs);
    DeletePointers(as);
+   DeletePointers(lambda_cs);
+   DeletePointers(mu_cs);
 
    delete globalMat_mono;
    delete globalMat;
