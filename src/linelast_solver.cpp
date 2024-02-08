@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#include "poisson_solver.hpp"
+#include "linelast_solver.hpp"
 #include "input_parser.hpp"
 #include "linalg_utils.hpp"
 #include "etc.hpp"
@@ -10,12 +10,12 @@
 using namespace std;
 using namespace mfem;
 
-PoissonSolver::PoissonSolver()
-   : MultiBlockSolver()
+LinElastSolver::LinElastSolver()
+    : MultiBlockSolver()
 {
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
- 
+
    var_names = GetVariableNames();
    num_var = var_names.size();
 
@@ -28,27 +28,28 @@ PoissonSolver::PoissonSolver()
    fec.SetSize(num_var);
    if (full_dg)
    {
-      fec = new DG_FECollection(order, dim);
-   }
+   fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+}
    else
    {
       fec = new H1_FECollection(order, dim);
    }
 
    fes.SetSize(numSub);
-   for (int m = 0; m < numSub; m++) {
+   for (int m = 0; m < numSub; m++)
+   {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
+
+   VectorFunctionCoefficient init_x(dim, InitDisplacement);
 }
 
-PoissonSolver::~PoissonSolver()
+LinElastSolver::~LinElastSolver()
 {
    delete a_itf;
 
    DeletePointers(bs);
    DeletePointers(as);
-   DeletePointers(bdr_coeffs);
-   DeletePointers(rhs_coeffs);
 
    delete globalMat_mono;
    delete globalMat;
@@ -56,55 +57,23 @@ PoissonSolver::~PoissonSolver()
    delete mumps;
 }
 
-void PoissonSolver::SetupBCVariables()
+void LinElastSolver::SetupMaterialVariables()
 {
-   MultiBlockSolver::SetupBCVariables();
+   // Set up the Lame constants for the two materials.
+   max_mesh_attr, how to get
+                      Vector lambda(mesh.attributes.Max());
+   lambda = 1.0;     // Set lambda = 1 for all element attributes.
+   lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
+   PWConstCoefficient lambda_c(lambda);
+   Vector mu(mesh.attributes.Max());
+   mu = 1.0;     // Set mu = 1 for all element attributes.
+   mu(0) = 50.0; // Set mu = 50 for element attribute 1.
+   PWConstCoefficient mu_c(mu);
 
-   bdr_coeffs.SetSize(numBdr);
-   bdr_coeffs = NULL;
+   
 }
 
-void PoissonSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr)
-{
-   assert(bdr_coeffs.Size() > 0);
-
-   if (battr > 0)
-   {
-      int idx = global_bdr_attributes.Find(battr);
-      if (idx < 0)
-      {
-         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
-         mfem_warning(msg.c_str());
-         return;
-      }
-      bdr_coeffs[idx] = new FunctionCoefficient(F);
-   }
-   else
-      for (int k = 0; k < bdr_coeffs.Size(); k++)
-         bdr_coeffs[k] = new FunctionCoefficient(F);
-}
-
-void PoissonSolver::AddBCFunction(const double &F, const int battr)
-{
-   assert(bdr_coeffs.Size() > 0);
-
-   if (battr > 0)
-   {
-      int idx = global_bdr_attributes.Find(battr);
-      if (idx < 0)
-      {
-         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
-         mfem_warning(msg.c_str());
-         return;
-      }
-      bdr_coeffs[idx] = new ConstantCoefficient(F);
-   }
-   else
-      for (int k = 0; k < bdr_coeffs.Size(); k++)
-         bdr_coeffs[k] = new ConstantCoefficient(F);
-}
-
-void PoissonSolver::InitVariables()
+void LinElastSolver::InitVariables()
 {
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
@@ -125,12 +94,13 @@ void PoissonSolver::InitVariables()
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
 
-   SetupBCVariables();
+   MultiBlockSolver::SetupBCVariables();
+   SetupMaterialVariables();
 
    // Set up solution/rhs variables/
    U = new BlockVector(var_offsets);
    RHS = new BlockVector(var_offsets);
-   /* 
+   /*
       Note: for compatibility with ROM, it's better to split with domain_offsets.
       For vector-component operations, can set up a view BlockVector like below:
 
@@ -144,111 +114,55 @@ void PoissonSolver::InitVariables()
    for (int m = 0; m < numSub; m++)
    {
       us[m] = new GridFunction(fes[m], U->GetBlock(m), 0);
-      (*us[m]) = 0.0;
+      us[m]->ProjectCoefficient(init_x);
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
 
-   rhs_coeffs.SetSize(0);
-
-   if (use_rom) MultiBlockSolver::InitROMHandler();
+   // if (use_rom)  //Off for now
+   //   MultiBlockSolver::InitROMHandler();
 }
 
-void PoissonSolver::BuildOperators()
+void LinElastSolver::BuildOperators()
 {
    BuildRHSOperators();
-
    BuildDomainOperators();
 }
 
-void PoissonSolver::BuildRHSOperators()
+void LinElastSolver::BuildRHSOperators()
 {
-   SanityCheckOnCoeffs();
-
    bs.SetSize(numSub);
 
-   // These are heavily system-dependent.
-   // Based on scalar/vector system, different integrators/coefficients will be used.
    for (int m = 0; m < numSub; m++)
    {
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
-      for (int r = 0; r < rhs_coeffs.Size(); r++)
-         bs[m]->AddDomainIntegrator(new DomainLFIntegrator(*rhs_coeffs[r]));
+      bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(init_x, lambda_cs[m], mu_cs[m], alpha, kappa), bdr_marker[0]); // TODO bdr_marker will be extended to include forces too
    }
 }
 
-void PoissonSolver::BuildDomainOperators()
+void LinElastSolver::BuildDomainOperators()
 {
-   SanityCheckOnCoeffs();
+   // SanityCheckOnCoeffs();
 
    as.SetSize(numSub);
 
    for (int m = 0; m < numSub; m++)
    {
       as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new DiffusionIntegrator);
+      as[m]->AddDomainIntegrator(new ElasticityIntegrator(lambda_cs[m], mu_cs[m]));
       if (full_dg)
-         as[m]->AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
+      {
+         as[m]->AddInteriorFaceIntegrator(
+             new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+         as[m]->AddBdrFaceIntegrator(
+             new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+      }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler);
-   a_itf->AddIntefaceIntegrator(new InterfaceDGDiffusionIntegrator(sigma, kappa));
-}
-
-bool PoissonSolver::BCExistsOnBdr(const int &global_battr_idx)
-{
-   assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
-   assert(bdr_coeffs.Size() == global_bdr_attributes.Size());
-   return (bdr_coeffs[global_battr_idx]);
-}
-
-void PoissonSolver::SetupBCOperators()
-{
-   SetupRHSBCOperators();
-
-   SetupDomainBCOperators();
-}
-
-void PoissonSolver::SetupRHSBCOperators()
-{
-   SanityCheckOnCoeffs();
-
-   assert(bs.Size() == numSub);
-
-   for (int m = 0; m < numSub; m++)
-   {
-      assert(bs[m]);
-      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
-      {
-         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-         if (idx < 0) continue;
-         if (!BCExistsOnBdr(b)) continue;
-
-         bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
-      }
-   }
-}
-
-void PoissonSolver::SetupDomainBCOperators()
-{
-   SanityCheckOnCoeffs();
-
-   assert(as.Size() == numSub);
-
-   for (int m = 0; m < numSub; m++)
-   {
-      assert(as[m]);
-      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
-      {
-         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-         if (idx < 0) continue;
-         if (!BCExistsOnBdr(b)) continue;
-
-         as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), *bdr_markers[b]);
-      }
-   }
+   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(sigma, kappa));
 }
 
 void PoissonSolver::Assemble()
@@ -257,9 +171,9 @@ void PoissonSolver::Assemble()
    AssembleOperator();
 }
 
-void PoissonSolver::AssembleRHS()
+void LinElastSolver::AssembleRHS()
 {
-   SanityCheckOnCoeffs();
+   // SanityCheckOnCoeffs();
 
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
 
@@ -271,12 +185,12 @@ void PoissonSolver::AssembleRHS()
 
    for (int m = 0; m < numSub; m++)
       // Do we really need SyncAliasMemory?
-      bs[m]->SyncAliasMemory(*RHS);  // Synchronize with block vector RHS. What is different from SyncMemory?
+      bs[m]->SyncAliasMemory(*RHS); // Synchronize with block vector RHS. What is different from SyncMemory?
 }
 
-void PoissonSolver::AssembleOperator()
+void LinElastSolver::AssembleOperator()
 {
-   SanityCheckOnCoeffs();
+   // SanityCheckOnCoeffs();
 
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
 
@@ -291,9 +205,12 @@ void PoissonSolver::AssembleOperator()
    {
       for (int j = 0; j < numSub; j++)
       {
-         if (i == j) {
+         if (i == j)
+         {
             mats(i, i) = &(as[i]->SpMat());
-         } else {
+         }
+         else
+         {
             mats(i, j) = new SparseMatrix(fes[i]->GetTrueVSize(), fes[j]->GetTrueVSize());
          }
       }
@@ -312,7 +229,8 @@ void PoissonSolver::AssembleOperator()
    {
       for (int j = 0; j < numSub; j++)
       {
-         if (i != j) mats(i, j)->Finalize();
+         if (i != j)
+            mats(i, j)->Finalize();
 
          globalMat->SetBlock(i, j, mats(i, j));
       }
@@ -334,107 +252,13 @@ void PoissonSolver::AssembleOperator()
    }
 }
 
-void PoissonSolver::AssembleInterfaceMatrixes()
+void LinElastSolver::AssembleInterfaceMatrixes()
 {
    assert(a_itf);
    a_itf->AssembleInterfaceMatrixes(mats);
 }
 
-void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
-{
-   assert(train_mode == UNIVERSAL);
-   assert(rom_handler->BasisLoaded());
-
-   const int num_comp = fes_comp.Size();
-   assert(comp_mats.Size() == num_comp);
-
-   for (int c = 0; c < num_comp; c++)
-   {
-      Mesh *comp = topol_handler->GetComponentMesh(c);
-      BilinearForm a_comp(fes_comp[c]);
-
-      a_comp.AddDomainIntegrator(new DiffusionIntegrator);
-      if (full_dg)
-         a_comp.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
-
-      a_comp.Assemble();
-      a_comp.Finalize();
-
-      // Poisson equation has only one solution variable.
-      comp_mats[c]->SetSize(1, 1);
-      (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
-   }
-}
-
-void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
-{
-   assert(train_mode == UNIVERSAL);
-   assert(rom_handler->BasisLoaded());
-
-   const int num_comp = fes_comp.Size();
-   assert(bdr_mats.Size() == num_comp);
-
-   for (int c = 0; c < num_comp; c++)
-   {
-      Mesh *comp = topol_handler->GetComponentMesh(c);
-      assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
-
-      MatrixBlocks *bdr_mat;
-      for (int b = 0; b < comp->bdr_attributes.Size(); b++)
-      {
-         Array<int> bdr_marker(comp->bdr_attributes.Max());
-         bdr_marker = 0;
-         bdr_marker[comp->bdr_attributes[b] - 1] = 1;
-         BilinearForm a_comp(fes_comp[c]);
-         a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
-
-         a_comp.Assemble();
-         a_comp.Finalize();
-
-         bdr_mat = (*bdr_mats[c])[b];
-         bdr_mat->SetSize(1, 1);
-         (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
-      }
-   }
-}
-
-void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
-{
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
-   assert(rom_handler->BasisLoaded());
-
-   const int num_ref_ports = topol_handler->GetNumRefPorts();
-   assert(port_mats.Size() == num_ref_ports);
-   for (int p = 0; p < num_ref_ports; p++)
-   {
-      assert(port_mats[p]->nrows == 2);
-      assert(port_mats[p]->ncols == 2);
-
-      int c1, c2;
-      topol_handler->GetComponentPair(p, c1, c2);
-
-      Array<int> c_idx(2);
-      c_idx[0] = c1;
-      c_idx[1] = c2;
-
-      Array2D<SparseMatrix *> spmats(2,2);
-      spmats = NULL;
-
-      // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
-      // Need to use two copied instances.
-      a_itf->AssembleInterfaceMatrixAtPort(p, fes_comp, spmats);
-
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
-            (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], spmats(i,j));
-
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++) delete spmats(i, j);
-   }  // for (int p = 0; p < num_ref_ports; p++)
-}
-
-bool PoissonSolver::Solve()
+bool LinElastSolver::Solve()
 {
    // If using direct solver, returns always true.
    bool converged = true;
@@ -456,7 +280,7 @@ bool PoissonSolver::Solve()
       CGSolver *solver = NULL;
       HypreBoomerAMG *M = NULL;
       BlockDiagonalPreconditioner *globalPrec = NULL;
-      
+
       // HypreBoomerAMG makes a meaningful difference in computation time.
       if (use_amg)
       {
@@ -474,7 +298,7 @@ bool PoissonSolver::Solve()
       else
       {
          solver = new CGSolver();
-         
+
          if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
          {
             globalPrec = new BlockDiagonalPreconditioner(var_offsets);
@@ -503,83 +327,11 @@ bool PoissonSolver::Solve()
       }
       else
       {
-         if (globalPrec != NULL) delete globalPrec;
+         if (globalPrec != NULL)
+            delete globalPrec;
       }
       delete solver;
    }
 
    return converged;
-}
-
-void PoissonSolver::ProjectOperatorOnReducedBasis()
-{ 
-   Array2D<Operator *> tmp(mats.NumRows(), mats.NumCols());
-   for (int i = 0; i < tmp.NumRows(); i++)
-      for (int j = 0; j < tmp.NumCols(); j++)
-         tmp(i, j) = mats(i, j);
-         
-   rom_handler->ProjectOperatorOnReducedBasis(tmp);
-}
-
-void PoissonSolver::SanityCheckOnCoeffs()
-{
-   if (rhs_coeffs.Size() == 0)
-      MFEM_WARNING("There is no right-hand side coeffcient assigned! Make sure to set rhs coefficients before BuildOperator.\n");
-
-   if (bdr_coeffs.Size() == 0)
-      MFEM_WARNING("There is no bc coeffcient assigned! Make sure to set bc coefficients before SetupBCOperator.\n");
-
-   bool all_null = true;
-   for (int i = 0; i < rhs_coeffs.Size(); i++)
-      if (rhs_coeffs[i] != NULL)
-      {
-         all_null = false;
-         break;
-      }
-   if (all_null)
-      MFEM_WARNING("All rhs coefficents are NULL! Make sure to set rhs coefficients before BuildOperator.\n");
-
-   all_null = true;
-   for (int i = 0; i < bdr_coeffs.Size(); i++)
-      if (bdr_coeffs[i] != NULL)
-      {
-         all_null = false;
-         break;
-      }
-   if (all_null)
-      MFEM_WARNING("All bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
-}
-
-void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
-{
-   // clean up rhs for parametrized problem.
-   if (rhs_coeffs.Size() > 0)
-   {
-      for (int k = 0; k < rhs_coeffs.Size(); k++) delete rhs_coeffs[k];
-      rhs_coeffs.SetSize(0);
-   }
-   // clean up boundary functions for parametrized problem.
-   bdr_coeffs = NULL;
-
-   for (int b = 0; b < problem->battr.Size(); b++)
-   {
-      switch (problem->bdr_type[b])
-      {
-         case PoissonProblem::BoundaryType::DIRICHLET:
-         { 
-            assert(problem->scalar_bdr_ptr[b]);
-            AddBCFunction(*(problem->scalar_bdr_ptr[b]), problem->battr[b]);
-            break;
-         }
-         case PoissonProblem::BoundaryType::NEUMANN: break;
-         default:
-         case PoissonProblem::BoundaryType::ZERO:
-         { AddBCFunction(0.0, problem->battr[b]); break; }
-      }
-   }
-
-   if (problem->scalar_rhs_ptr != NULL)
-      AddRHSFunction(*(problem->scalar_rhs_ptr));
-   else
-      AddRHSFunction(0.0);
 }
