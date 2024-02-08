@@ -20,16 +20,16 @@ LinElastSolver::LinElastSolver()
    num_var = var_names.size();
 
    // solution dimension is determined by initialization.
-   udim = 1;
+   udim = dim;
    vdim.SetSize(num_var);
-   vdim = 1;
+   vdim = dim;
 
    // Set up FE collection/spaces.
    fec.SetSize(num_var);
    if (full_dg)
    {
-   fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
-}
+      fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+   }
    else
    {
       fec = new H1_FECollection(order, dim);
@@ -59,18 +59,31 @@ LinElastSolver::~LinElastSolver()
 
 void LinElastSolver::SetupMaterialVariables()
 {
+   int max_bdr_attr = -1; // A bit redundant...
+   for (int m = 0; m < numSub; m++)
+   {
+      max_bdr_attr = max(max_bdr_attr, meshes[m]->bdr_attributes.Max());
+   }
+
    // Set up the Lame constants for the two materials.
-   max_mesh_attr, how to get
-                      Vector lambda(mesh.attributes.Max());
+   Vector lambda(mesh.attributes.Max());
    lambda = 1.0;     // Set lambda = 1 for all element attributes.
    lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
    PWConstCoefficient lambda_c(lambda);
+
    Vector mu(mesh.attributes.Max());
    mu = 1.0;     // Set mu = 1 for all element attributes.
    mu(0) = 50.0; // Set mu = 50 for element attribute 1.
    PWConstCoefficient mu_c(mu);
 
-   
+   lambda_cs.SetSize(numSub);
+   mu_cs.SetSize(numSub);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      lambda_cs[m] = lambda_c;
+      mu_cs[m] = mu_c;
+   }
 }
 
 void LinElastSolver::InitVariables()

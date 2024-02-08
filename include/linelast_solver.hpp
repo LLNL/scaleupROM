@@ -50,9 +50,9 @@ protected:
    double kappa = -1.0;
 
 public:
-   PoissonSolver();
+   LinElastSolver();
 
-   virtual ~PoissonSolver();
+   virtual ~LinElastSolver();
 
    static const std::vector<std::string> GetVariableNames()
    {
