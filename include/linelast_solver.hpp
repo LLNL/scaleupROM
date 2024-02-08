@@ -15,7 +15,7 @@ using namespace mfem;
 class LinElastSolver : public MultiBlockSolver
 {
 
-friend class ParameterizedProblem;
+   friend class ParameterizedProblem;
 
 protected:
    // interface integrator
@@ -39,15 +39,16 @@ protected:
    Array<LinearForm *> bs;
    Array<BilinearForm *> as;
 
-   // rhs coefficients
-   // The solution dimension is 1 by default, for which using VectorCoefficient is not allowed. (in LinearForm Assemble.)
-   // For a derived class for vector solution, this is the first one needs to be changed to Array<VectorCoefficient*>.
-   Array<Coefficient *> rhs_coeffs;
-   Array<Coefficient *> bdr_coeffs;
+   // Lame constants for each subdomain, global boundary attribute ordering
+   Array<PWConstCoefficient *> lambda_cs;
+   Array<PWConstCoefficient *> mu_cs;
 
    // DG parameters specific to linear elasticity equation.
    double sigma = -1.0;
    double kappa = -1.0;
+
+   // Initial positions
+   VectorFunctionCoefficient init_x;
 
 public:
    LinElastSolver();
@@ -61,6 +62,12 @@ public:
       return varnames;
    }
 
+   static void InitDisplacement(const Vector &x, Vector &u) // Making this static for now
+   {
+      u = 0.0;
+      u(u.Size() - 1) = -0.2 * x(0);
+   }
+
    virtual void SetupBCVariables() override;
    virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
    virtual void AddBCFunction(const double &F, const int battr = -1);
@@ -69,16 +76,20 @@ public:
    virtual void BuildOperators();
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
-   
+
    virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
 
    virtual void AddRHSFunction(std::function<double(const Vector &)> F)
-   { rhs_coeffs.Append(new FunctionCoefficient(F)); }
+   {
+      rhs_coeffs.Append(new FunctionCoefficient(F));
+   }
    virtual void AddRHSFunction(const double F)
-   { rhs_coeffs.Append(new ConstantCoefficient(F)); }
+   {
+      rhs_coeffs.Append(new ConstantCoefficient(F));
+   }
 
    virtual void Assemble();
    virtual void AssembleRHS();
