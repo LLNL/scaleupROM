@@ -41,7 +41,7 @@ LinElastSolver::LinElastSolver()
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
 
-   VectorFunctionCoefficient init_x(dim, InitDisplacement);
+   init_x = VectorFunctionCoefficient(dim, InitDisplacement);
 }
 
 LinElastSolver::~LinElastSolver()
@@ -66,12 +66,12 @@ void LinElastSolver::SetupMaterialVariables()
    }
 
    // Set up the Lame constants for the two materials.
-   Vector lambda(mesh.attributes.Max());
+   Vector lambda(max_bdr_attr);
    lambda = 1.0;     // Set lambda = 1 for all element attributes.
    lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
    PWConstCoefficient lambda_c(lambda);
 
-   Vector mu(mesh.attributes.Max());
+   Vector mu(max_bdr_attr);
    mu = 1.0;     // Set mu = 1 for all element attributes.
    mu(0) = 50.0; // Set mu = 50 for element attribute 1.
    PWConstCoefficient mu_c(mu);
@@ -178,7 +178,7 @@ void LinElastSolver::BuildDomainOperators()
    a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(sigma, kappa));
 }
 
-void PoissonSolver::Assemble()
+void LinElastSolver::Assemble()
 {
    AssembleRHS();
    AssembleOperator();
