@@ -1422,159 +1422,21 @@ int main(int argc, char *argv[])
          // TODO: what happen if we do not deep-copy?
          const CAROM::Matrix *snapshots = snapshot_generator.getSnapshotMatrix();
 
+         DenseMatrix u_basis;
+         u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
+
          const IntegrationRule *ir = oper.GetNonlinearIntRule();
          auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
          nl_integ->SetIntRule(ir);
 
-         const int nqe = ir->GetNPoints();
-         const int ne = ufes->GetNE();
-         const int NB = basis.NumCols();
-         const int NQ = ne * nqe;
-         const int nsnap = min(1000, snapshots->numColumns());
+         ROMNonlinearForm *rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
+         rom_nlinf->AddDomainIntegrator(nl_integ);
+         rom_nlinf->SetBasis(u_basis);
 
-         assert(basis.NumRows() == snapshots->numRows());
-         assert(basis.NumRows() == (ufes->GetTrueVSize() + pfes->GetTrueVSize()));
-
-         // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
-         CAROM::Matrix Gt(NQ, NB * nsnap, true);
-         // For 0 <= j < NB, 0 <= i < nsnap, 0 <= e < ne, 0 <= m < nqe,
-         // G(j + (i*NB), (e*nqe) + m)
-         // is the coefficient of v_j^T M(p_i) V v_i at point m of element e,
-         // with respect to the integration rule weight at that point,
-         // where the "exact" quadrature solution is ir0->GetWeights().
-
-         Vector v_i(ufes->GetTrueVSize());
-         Vector r(nqe);
-
-         Array<int> vdofs;
-         Vector el_x, el_tr;
-         DenseMatrix el_quad;
-         const FiniteElement *fe;
-         ElementTransformation *T;
-         DofTransformation *doftrans;
-
-         for (int i = 0; i < nsnap; ++i)
-         {
-            for (int k = 0; k < ufes->GetTrueVSize(); ++k)
-                  v_i[k] = (*snapshots)(k, i);
-
-            for (int e = 0; e < ne; ++e)
-            {
-               fe = ufes->GetFE(e);
-               doftrans = ufes->GetElementVDofs(e, vdofs);
-               T = ufes->GetElementTransformation(e);
-               v_i.GetSubVector(vdofs, el_x);
-
-               const int nd = fe->GetDof();
-               el_quad.SetSize(nd * dim, nqe);
-               for (int i = 0; i < ir->GetNPoints(); i++)
-               {
-                  Vector EQ(el_quad.GetColumn(i), nd * dim);
-
-                  const IntegrationPoint &ip = ir->IntPoint(i);
-                  nl_integ->AssembleQuadratureVector(*fe, *T, ip, 1.0, el_x, EQ);
-               }
-               // nl_integ->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
-
-               for (int j = 0; j < NB; ++j)
-               {
-                  Vector v_j(basis.GetColumn(j), ufes->GetVSize());
-                  v_j.GetSubVector(vdofs, el_tr);
-
-                  el_quad.MultTranspose(el_tr, r);
-
-                  for (int m = 0; m < nqe; ++m)
-                     Gt(m + (e * nqe), j + (i * NB)) = r[m];
-               }  // for (int j = 0; j < NB; ++j)
-            }  // for (int e = 0; e < ne; ++e)
-
-            // if (precondition)
-            // {
-               // // Preconditioning is done by (V^T M(p_i) V)^{-1} (of size NB x NB).
-               // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
-            // }
-         }  // for (int i = 0; i < nsnap; ++i)
-
-         Array<double> const& w_el = ir->GetWeights();
-         CAROM::Vector w(ne * nqe, true);
-
-         for (int i = 0; i < ne; ++i)
-            for (int j = 0; j < nqe; ++j)
-               w(j + (i * nqe)) = w_el[j];
-
-         //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
-         // CAROM::Vector const& w, CAROM::Matrix & Gt,
-         // CAROM::Vector & sol)
-         double nnls_tol = 1.0e-11;
-         int maxNNLSnnz = 0;
-         const double delta = eqp_tol;
-         CAROM::Vector eqpSol(ne * nqe, true);
-         CAROM::Vector rhs_Gw(Gt.numColumns(), false);
-         // G.mult(w, rhs_ub);  // rhs = Gw
-         // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
-         Gt.transposeMult(w, rhs_Gw);
-         int nnz = 0;
-         {
-            CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
-
-            CAROM::Vector rhs_ub(rhs_Gw);
-            CAROM::Vector rhs_lb(rhs_Gw);
-
-            for (int i = 0; i < rhs_ub.dim(); ++i)
-            {
-               rhs_lb(i) -= delta;
-               rhs_ub(i) += delta;
-            }
-
-            // nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
-            nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
-
-            nnz = 0;
-            for (int i = 0; i < eqpSol.dim(); ++i)
-            {
-               if (eqpSol(i) != 0.0)
-               {
-                     nnz++;
-               }
-            }
-
-            cout << rank << ": Number of nonzeros in NNLS solution: " << nnz
-                  << ", out of " << eqpSol.dim() << endl;
-
-            MPI_Allreduce(MPI_IN_PLACE, &nnz, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
-            if (rank == 0)
-               cout << "Global number of nonzeros in NNLS solution: " << nnz << endl;
-
-            // Check residual of NNLS solution
-            CAROM::Vector res(Gt.numColumns(), false);
-            Gt.transposeMult(eqpSol, res);
-
-            const double normGsol = res.norm();
-            const double normRHS = rhs_Gw.norm();
-
-            res -= rhs_Gw;
-            const double relNorm = res.norm() / std::max(normGsol, normRHS);
-            cout << rank << ": relative residual norm for NNLS solution of Gs = Gw: " <<
-                  relNorm << endl;
-
-         }
-
-         Array<int> sample_el(0), sample_qp(0);
-         Array<double> sample_qw(0);
-         for (int i = 0; i < eqpSol.dim(); ++i)
-         {
-            if (eqpSol(i) > 1.0e-12)
-            {
-               const int e = i / nqe;  // Element index
-               sample_el.Append(i / nqe);
-               sample_qp.Append(i % nqe);
-               sample_qw.Append(eqpSol(i));
-            }
-         }
-         printf("Size of sampled qp: %d\n", sample_el.Size());
-         if (nnz != sample_el.Size())
-            printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
+         rom_nlinf->TrainEQP(*snapshots, eqp_tol);
+         Array<int> sample_el, sample_qp;
+         Array<double> sample_qw;
+         rom_nlinf->GetEQPForDomainIntegrator(0, sample_el, sample_qp, sample_qw);
 
          {  // save empirical quadrature point locations.
             ElementTransformation *T;

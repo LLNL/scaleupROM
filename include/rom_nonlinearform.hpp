@@ -7,6 +7,7 @@
 
 #include "mfem.hpp"
 #include "hyperreduction_integ.hpp"
+#include "linalg/NNLS.h"
 
 namespace mfem
 {
@@ -61,6 +62,21 @@ public:
       assert(basis_.NumRows() == fes->GetTrueVSize());
       basis = &basis_;
    }
+
+   void TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol = 1.0e-2);
+   void TrainEQPForIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi,
+                              const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw, const double eqp_tol,
+                              Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   void SetupEQPSystemForDomainIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+                                          CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
+   void SetupEQPSystemForInteriorFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+                                                CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw)
+   { mfem_error("SetupEQPSystemForInteriorFaceIntegrator is not implemented yet!\n"); }
+   void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+                                           CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw)
+   { mfem_error("SetupEQPSystemForInteriorFaceIntegrator is not implemented yet!\n"); }
+
+   void GetEQPForDomainIntegrator(const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
 
    /// Adds new Domain Integrator.
    void AddDomainIntegrator(HyperReductionIntegrator *nlfi)
