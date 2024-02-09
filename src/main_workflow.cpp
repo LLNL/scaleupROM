@@ -272,12 +272,12 @@ void TrainROM(MPI_Comm comm)
       sample_generator->FormReducedBasis(basis_prefix, basis_tags[p], file_list, num_basis);
    }  // for (int p = 0; p < basis_tags.size(); p++)
 
-   delete sample_generator;
+   AuxiliaryTrainROM(comm, sample_generator);
 
-   AuxiliaryTrainROM(comm);
+   delete sample_generator;
 }
 
-void AuxiliaryTrainROM(MPI_Comm comm)
+void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
 {
    std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
@@ -319,6 +319,8 @@ void AuxiliaryTrainROM(MPI_Comm comm)
       if (!test->UseRom()) mfem_error("ROM must be enabled for EQP training!\n");
 
       test->LoadReducedBasis();
+
+      test->TrainEQP(sample_generator);
 
       delete test;
    }
