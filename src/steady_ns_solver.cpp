@@ -263,6 +263,8 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
 SteadyNSSolver::SteadyNSSolver()
    : StokesSolver()
 {
+   nonlinear_mode = true;
+
    // StokesSolver reads viscosity from stokes/nu.
    nu = config.GetOption<double>("stokes/nu", 1.0);
    delete nu_coeff;
@@ -304,8 +306,12 @@ SteadyNSSolver::~SteadyNSSolver()
    if (use_rom)
    {
       DeletePointers(comp_tensors);
+      DeletePointers(comp_eqps);
       if (rom_handler->GetBuildingLevel() != ROMBuildingLevel::COMPONENT)
+      {
          DeletePointers(subdomain_tensors);
+         DeletePointers(subdomain_eqps);
+      }
    }
 }
 
@@ -314,9 +320,11 @@ void SteadyNSSolver::InitVariables()
    StokesSolver::InitVariables();
    if (use_rom)
    {
-      rom_handler->SetNonlinearMode(true);
+      rom_handler->SetNonlinearMode(nonlinear_mode);
       subdomain_tensors.SetSize(numSub);
       subdomain_tensors = NULL;
+      subdomain_eqps.SetSize(numSub);
+      subdomain_eqps = NULL;
    }
 }
 
@@ -702,6 +710,42 @@ void SteadyNSSolver::SolveROM()
    // NOTE(kevin): currently assumes direct solve.
    SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
    rom_handler->NonlinearSolve(rom_oper, U_domain);
+}
+
+void SteadyNSSolver::TrainEQP(SampleGenerator *sample_generator)
+{
+   assert(sample_generator);
+   assert(rom_handler);
+   assert(rom_handler->BasisLoaded());
+
+   bool separate_variable = rom_handler->SeparateVariable();
+   double eqp_tol = config.GetOption<double>("model_reduction/eqp/relative_tolerance", 1.0e-2);
+
+   Array<FiniteElementSpace *> fes_comp;
+   GetComponentFESpaces(fes_comp);
+
+   /* EQP NNLS for each reference component */
+   const int num_comp = topol_handler->GetNumComponents();
+   comp_eqps.SetSize(num_comp);
+   comp_eqps = NULL;
+   DenseMatrix *basis;
+   std::string basis_tag;
+   for (int c = 0; c < num_comp; c++)
+   {
+      int idx = (separate_variable) ? c * num_var : c;
+      rom_handler->GetReferenceBasis(idx, basis);
+      basis_tag = rom_handler->GetRefBasisTag(idx);
+
+      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+      nl_integ_tmp->SetIntRule(ir_nl);
+
+      comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), fes_comp[idx]);
+      comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+      comp_eqps[c]->SetBasis(*basis);
+
+      const CAROM::Matrix *snapshots = sample_generator->LookUpSnapshot(basis_tag);
+      comp_eqps[c]->TrainEQP(*snapshots, eqp_tol);
+   }
 }
 
 DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)
