@@ -21,7 +21,7 @@ private:
 protected:
    /// ROM basis for projection.
    /// Needs to be converted to MFEM DenseMatrix.
-   DenseMatrix *basis = NULL;   // not owned
+   DenseMatrix *basis = NULL;   // owned
 
    /// Projection ROM's jacobian matrix is dense most of time.
    mutable DenseMatrix *Grad = NULL;
@@ -56,12 +56,7 @@ public:
 
    void PrecomputeCoefficients();
 
-   void SetBasis(DenseMatrix &basis_)
-   {
-      assert(basis_.NumCols() == height);
-      assert(basis_.NumRows() == fes->GetTrueVSize());
-      basis = &basis_;
-   }
+   void SetBasis(DenseMatrix &basis_, const int offset=0);
 
    void TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol = 1.0e-2);
    void TrainEQPForIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi,

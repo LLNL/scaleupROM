@@ -21,6 +21,7 @@ ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f)
 ROMNonlinearForm::~ROMNonlinearForm()
 {
    delete Grad;
+   delete basis;
 
    for (int i = 0; i <  dnfi.Size(); i++)
    {
@@ -651,6 +652,17 @@ void ROMNonlinearForm::PrecomputeCoefficients()
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
+}
+
+void ROMNonlinearForm::SetBasis(DenseMatrix &basis_, const int offset)
+{
+   assert(basis_.NumCols() == height);
+   assert(basis_.NumRows() >= fes->GetTrueVSize() + offset);
+   if (basis) delete basis;
+
+   const int nrow = fes->GetTrueVSize();
+   basis = new DenseMatrix(nrow, height);
+   basis_.GetSubMatrix(offset, offset+nrow, 0, height, *basis);
 }
 
 void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol)
