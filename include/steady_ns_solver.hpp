@@ -176,6 +176,7 @@ public:
    virtual void SolveROM() override;
 
    virtual void TrainEQP(SampleGenerator *sample_generator) override;
+   virtual void SaveEQP() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);

@@ -748,6 +748,31 @@ void SteadyNSSolver::TrainEQP(SampleGenerator *sample_generator)
    }
 }
 
+void SteadyNSSolver::SaveEQP()
+{
+   std::string filename = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
+   filename += ".eqp.h5";
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_eqps.Size() == num_comp);
+   std::string dset_name;
+   for (int c = 0; c < num_comp; c++)
+   {
+      assert(comp_eqps[c]);
+      dset_name = topol_handler->GetComponentName(c);
+      comp_eqps[c]->SaveEQPForDomainIntegrator(0, file_id, dset_name);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
+}
+
 DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)
 {
    assert(basis && fespace);

@@ -215,6 +215,8 @@ public:
 
    virtual void TrainEQP(SampleGenerator *sample_generator)
    { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
+   virtual void SaveEQP()
+   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
 
    void InitROMHandler();
    void GetBasisTags(std::vector<std::string> &basis_tags);

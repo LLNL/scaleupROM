@@ -322,6 +322,8 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
 
       test->TrainEQP(sample_generator);
 
+      test->SaveEQP();
+
       delete test;
    }
 }
