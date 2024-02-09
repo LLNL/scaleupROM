@@ -500,6 +500,9 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    StokesSolver::BuildCompROMElement(fes_comp);
 
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
+
    DenseMatrix *basis = NULL;
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
@@ -517,6 +520,9 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
 {
    MultiBlockSolver::SaveCompBdrROMElement(file_id);
+
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
 
    const int num_comp = topol_handler->GetNumComponents();
    assert(comp_tensors.Size() == num_comp);
@@ -549,6 +555,9 @@ void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
 void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
 {
    MultiBlockSolver::LoadCompBdrROMElement(file_id);
+
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
 
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
@@ -674,6 +683,9 @@ bool SteadyNSSolver::Solve()
 void SteadyNSSolver::ProjectOperatorOnReducedBasis()
 {
    StokesSolver::ProjectOperatorOnReducedBasis();
+
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
 
    subdomain_tensors.SetSize(numSub);
    subdomain_tensors = NULL;

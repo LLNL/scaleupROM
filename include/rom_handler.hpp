@@ -135,7 +135,12 @@ public:
    const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
    virtual SparseMatrix* GetOperator() = 0;
    const bool GetNonlinearMode() { return nonlinear_mode; }
-   void SetNonlinearMode(const bool nl_mode) { nonlinear_mode = nl_mode; }
+   void SetNonlinearMode(const bool nl_mode)
+   {
+      if (nlin_handle == NonlinearHandling::NUM_NLNHNDL)
+         mfem_error("ROMHandler::SetNonlinearMode - nonlinear handling is not set!\n");
+      nonlinear_mode = nl_mode;
+   }
    const NonlinearHandling GetNonlinearHandling() { return nlin_handle; }
 
    /* parse inputs for supremizer. only for Stokes/SteadyNS Solver. */

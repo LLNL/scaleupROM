@@ -665,10 +665,10 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable_EQP)
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
 
-   // printf("\nBuild ROM \n\n");
+   printf("\nBuild ROM \n\n");
 
-   // config.dict_["main"]["mode"] = "build_rom";
-   // BuildROM(MPI_COMM_WORLD);
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
 
    // config.dict_["main"]["mode"] = "single_run";
    // double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
