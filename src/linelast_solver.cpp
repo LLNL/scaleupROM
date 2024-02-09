@@ -153,7 +153,7 @@ void LinElastSolver::BuildRHSOperators()
    for (int m = 0; m < numSub; m++)
    {
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
-      bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *(lambda_cs[m]), *(mu_cs[m]), alpha, kappa), *(bdr_markers[0])); //m ight be wrong TODO bdr_marker will be extended to include forces too, also, unsure if this is correct
+      bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *(lambda_cs[m]), *(mu_cs[m]), alpha, kappa), *(bdr_markers[0])); // m ight be wrong TODO bdr_marker will be extended to include forces too, also, unsure if this is correct
    }
 }
 
@@ -350,3 +350,22 @@ bool LinElastSolver::Solve()
 
    return converged;
 }
+
+void LinElastSolver::SetupBCVariables(){"LinElastSolver::SetupBCVariables is not implemented yet!\n";}
+void LinElastSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr){"LinElastSolver::AddBCFunction is not implemented yet!\n";}
+void LinElastSolver::AddBCFunction(const double &F, const int battr){"LinElastSolver::AddBCFunction is not implemented yet!\n";}
+bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx){std::cout<<"LinElastSolver::BCExistsOnBdr is not implemented yet!\n"; return false;}
+void LinElastSolver::SetupBCOperators(){"LinElastSolver::SetupBCOperators is not implemented yet!\n";}
+void LinElastSolver::SetupRHSBCOperators(){"LinElastSolver::SetupRHSBCOperators is not implemented yet!\n";}
+void LinElastSolver::SetupDomainBCOperators(){"LinElastSolver::SetupDomainBCOperators is not implemented yet!\n";}
+
+// Component-wise assembly
+void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp){"LinElastSolver::BuildCompROMElement is not implemented yet!\n";}
+void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp){"LinElastSolver::BuildBdrROMElement is not implemented yet!\n";}
+void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp){"LinElastSolver::BuildInterfaceROMElement is not implemented yet!\n";}
+
+void LinElastSolver::ProjectOperatorOnReducedBasis(){"LinElastSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n";}
+
+void LinElastSolver::SanityCheckOnCoeffs(){"LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n";}
+
+void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem){"LinElastSolver::SetParameterizedProblem is not implemented yet!\n";}

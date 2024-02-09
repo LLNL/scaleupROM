@@ -68,21 +68,12 @@ public:
       u(u.Size() - 1) = -0.2 * x(0);
    }
 
-   //virtual void SetupBCVariables() override;
-   //virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
-   //virtual void AddBCFunction(const double &F, const int battr = -1);
    virtual void InitVariables();
    virtual void SetupMaterialVariables();
 
    virtual void BuildOperators();
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
-
-   //virtual bool BCExistsOnBdr(const int &global_battr_idx);
-   //virtual void SetupBCOperators();
-   //virtual void SetupRHSBCOperators();
-   //virtual void SetupDomainBCOperators();
-
 
    virtual void Assemble();
    virtual void AssembleRHS();
@@ -91,18 +82,28 @@ public:
    // system-specific.
    virtual void AssembleInterfaceMatrixes();
 
-   // Component-wise assembly
-   //virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
-   //virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
-   //virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
-
    virtual bool Solve();
 
-   //virtual void ProjectOperatorOnReducedBasis();
+   // Below are not implemented for FOM
 
-   //void SanityCheckOnCoeffs();
+   virtual void SetupBCVariables() override;
+   virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
+   virtual void AddBCFunction(const double &F, const int battr = -1);
+   virtual bool BCExistsOnBdr(const int &global_battr_idx);
+   virtual void SetupBCOperators();
+   virtual void SetupRHSBCOperators();
+   virtual void SetupDomainBCOperators();
 
-   //virtual void SetParameterizedProblem(ParameterizedProblem *problem);
+   // Component-wise assembly
+   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
+
+   virtual void ProjectOperatorOnReducedBasis();
+
+   void SanityCheckOnCoeffs();
+
+   virtual void SetParameterizedProblem(ParameterizedProblem *problem);
 };
 
 #endif

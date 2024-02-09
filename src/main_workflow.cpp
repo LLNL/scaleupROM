@@ -54,7 +54,7 @@ MultiBlockSolver* InitSolver()
    if (solver_type == "poisson")       { solver = new PoissonSolver; }
    else if (solver_type == "stokes")   { solver = new StokesSolver; }
    else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
-   //else if (solver_type == "linelast")   { solver = new LinElastSolver; } // TODO: make this work
+   else if (solver_type == "linelast")   { solver = new LinElastSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
