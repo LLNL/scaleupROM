@@ -44,11 +44,11 @@ protected:
    Array<PWConstCoefficient *> mu_cs;
 
    // DG parameters specific to linear elasticity equation.
-   double sigma = -1.0;
+   double alpha = -1.0;
    double kappa = -1.0;
 
    // Initial positions
-   VectorFunctionCoefficient init_x;
+   VectorFunctionCoefficient *init_x;
 
 public:
    LinElastSolver();
@@ -68,28 +68,21 @@ public:
       u(u.Size() - 1) = -0.2 * x(0);
    }
 
-   virtual void SetupBCVariables() override;
-   virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
-   virtual void AddBCFunction(const double &F, const int battr = -1);
+   //virtual void SetupBCVariables() override;
+   //virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
+   //virtual void AddBCFunction(const double &F, const int battr = -1);
    virtual void InitVariables();
+   virtual void SetupMaterialVariables();
 
    virtual void BuildOperators();
    virtual void BuildRHSOperators();
    virtual void BuildDomainOperators();
 
-   virtual bool BCExistsOnBdr(const int &global_battr_idx);
-   virtual void SetupBCOperators();
-   virtual void SetupRHSBCOperators();
-   virtual void SetupDomainBCOperators();
+   //virtual bool BCExistsOnBdr(const int &global_battr_idx);
+   //virtual void SetupBCOperators();
+   //virtual void SetupRHSBCOperators();
+   //virtual void SetupDomainBCOperators();
 
-   virtual void AddRHSFunction(std::function<double(const Vector &)> F)
-   {
-      rhs_coeffs.Append(new FunctionCoefficient(F));
-   }
-   virtual void AddRHSFunction(const double F)
-   {
-      rhs_coeffs.Append(new ConstantCoefficient(F));
-   }
 
    virtual void Assemble();
    virtual void AssembleRHS();
@@ -99,17 +92,17 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    // Component-wise assembly
-   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
+   //virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   //virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
+   //virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
 
    virtual bool Solve();
 
-   virtual void ProjectOperatorOnReducedBasis();
+   //virtual void ProjectOperatorOnReducedBasis();
 
-   void SanityCheckOnCoeffs();
+   //void SanityCheckOnCoeffs();
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem);
+   //virtual void SetParameterizedProblem(ParameterizedProblem *problem);
 };
 
 #endif

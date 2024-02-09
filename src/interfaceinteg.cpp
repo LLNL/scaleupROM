@@ -1014,16 +1014,16 @@ namespace mfem
       DenseMatrix dshape1, dshape2;
       DenseMatrix adjJ;
       DenseMatrix dshape1_ps, dshape2_ps;
-      Vector nor;
+      Vector nor1, nor2;
       Vector nL1, nL2;
       Vector nM1, nM2;
       Vector dshape1_dnM, dshape2_dnM;
       DenseMatrix jmat;
 #endif
-
+      bool boundary = false;
       const int dim = el1.GetDim();
       const int ndofs1 = el1.GetDof();
-      const int ndofs2 = (boundary) ? el2.GetDof() : 0;
+      const int ndofs2 = (boundary) ? 0 : el2.GetDof();
       const int nvdofs = dim * (ndofs1 + ndofs2);
 
       // Initially 'elmat' corresponds to the term:
@@ -1031,10 +1031,10 @@ namespace mfem
       //    < { (lambda div(u) I + mu (grad(u) + grad(u)^T)) . n }, [v] >
       // But eventually, it's going to be replaced by:
       //    elmat := -elmat + alpha*elmat^T + jmat
-      elmats(0, 0)->SetSize(ndof1, ndof1);
-      elmats(0, 1)->SetSize(ndof1, ndof2);
-      elmats(1, 0)->SetSize(ndof2, ndof1);
-      elmats(1, 1)->SetSize(ndof2, ndof2);
+      elmats(0, 0)->SetSize(ndofs1, ndofs1);
+      elmats(0, 1)->SetSize(ndofs1, ndofs2);
+      elmats(1, 0)->SetSize(ndofs2, ndofs1);
+      elmats(1, 1)->SetSize(ndofs2, ndofs2);
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
             *elmats(i, j) = 0.0;
@@ -1045,11 +1045,11 @@ namespace mfem
       if (kappa_is_nonzero)
       {
          jmats.SetSize(2, 2);
-         jmats(0, 0) = new DenseMatrix(ndof1, ndof1);
+         jmats(0, 0) = new DenseMatrix(ndofs1, ndofs1);
          // only the lower-triangular part of jmat is assembled.
          jmats(0, 1) = NULL;
-         jmats(1, 0) = new DenseMatrix(ndof2, ndof1);
-         jmats(1, 1) = new DenseMatrix(ndof2, ndof2);
+         jmats(1, 0) = new DenseMatrix(ndofs2, ndofs1);
+         jmats(1, 1) = new DenseMatrix(ndofs2, ndofs2);
          for (int i = 0; i < 2; i++)
             for (int j = 0; j <= i; j++)
                *jmats(i, j) = 0.0;
@@ -1061,7 +1061,7 @@ namespace mfem
       shape1.SetSize(ndofs1);
       dshape1.SetSize(ndofs1, dim);
       dshape1_ps.SetSize(ndofs1, dim);
-      nor.SetSize(dim);
+      nor1.SetSize(dim);
       nL1.SetSize(dim);
       nM1.SetSize(dim);
       dshape1_dnM.SetSize(ndofs1);
@@ -1071,6 +1071,7 @@ namespace mfem
          shape2.SetSize(ndofs2);
          dshape2.SetSize(ndofs2, dim);
          dshape2_ps.SetSize(ndofs2, dim);
+         nor2.SetSize(dim);
          nL2.SetSize(dim);
          nM2.SetSize(dim);
          dshape2_dnM.SetSize(ndofs2);
@@ -1081,7 +1082,7 @@ namespace mfem
       {
          // a simple choice for the integration order; is this OK?
          const int order = 2 * max(el1.GetOrder(), ndofs2 ? el2.GetOrder() : 0);
-         ir = &IntRules.Get(Trans.GetGeometryType(), order);
+         ir = &IntRules.Get(Trans1.GetGeometryType(), order);
          assert(Trans1.GetGeometryType() == Trans2.GetGeometryType());
       }
 
@@ -1101,12 +1102,12 @@ namespace mfem
          // computing outward normal vectors.
          if (dim == 1)
          {
-            nor(0) = 2 * eip1.x - 1.0;
+            nor1(0) = 2 * eip1.x - 1.0;
             nor2(0) = 2 * eip2.x - 1.0;
          }
          else
          {
-            CalcOrtho(Trans1.Jacobian(), nor);
+            CalcOrtho(Trans1.Jacobian(), nor1);
             CalcOrtho(Trans2.Jacobian(), nor2);
          }
 
@@ -1128,8 +1129,8 @@ namespace mfem
             const double w2 = w / Trans2.Elem1->Weight();
             const double wL2 = w2 * lambda->Eval(*Trans2.Elem1, eip2);
             const double wM2 = w2 * mu->Eval(*Trans2.Elem1, eip2);
-            nL2.Set(wL2, nor);
-            nM2.Set(wM2, nor);
+            nL2.Set(wL2, nor2);
+            nM2.Set(wM2, nor2);
             wLM = (wL2 + 2.0 * wM2);
             dshape2_ps.Mult(nM2, dshape2_dnM);
          }
@@ -1143,13 +1144,13 @@ namespace mfem
             const double w1 = w / Trans1.Elem1->Weight();
             const double wL1 = w1 * lambda->Eval(*Trans1.Elem1, eip1);
             const double wM1 = w1 * mu->Eval(*Trans1.Elem1, eip1);
-            nL1.Set(wL1, nor);
-            nM1.Set(wM1, nor);
+            nL1.Set(wL1, nor1);
+            nM1.Set(wM1, nor1);
             wLM += (wL1 + 2.0 * wM1);
             dshape1_ps.Mult(nM1, dshape1_dnM);
          }
 
-         const double jmatcoef = kappa * (nor * nor) * wLM;
+         const double jmatcoef = kappa * (nor1 * nor2) * wLM;
          // (1,1) block
          AssembleBlock(
              dim, ndofs1, ndofs1, 0, 0, jmatcoef, nL1, nM1,
@@ -1179,8 +1180,10 @@ namespace mfem
 
       // elmat := -elmat + sigma*elmat^t + jmat
       Array<int> ndof_array(2);
-      ndof_array[0] = ndof1;
-      ndof_array[1] = ndof2;
+      ndof_array[0] = ndofs1;
+      ndof_array[1] = ndofs2;
+      DenseMatrix *elmat = NULL;
+      DenseMatrix *jmat = NULL;
       DenseMatrix *elmat12 = NULL;
       if (kappa_is_nonzero)
       {
@@ -1193,23 +1196,23 @@ namespace mfem
                for (int j = 0; j < i; j++)
                {
                   double aij = (*elmat)(i, j), aji = (*elmat)(j, i), mij = (*jmat)(i, j);
-                  (*elmat)(i, j) = sigma * aji - aij + mij;
-                  (*elmat)(j, i) = sigma * aij - aji + mij;
+                  (*elmat)(i, j) = alpha * aji - aij + mij;
+                  (*elmat)(j, i) = alpha * aij - aji + mij;
                }
-               (*elmat)(i, i) = (sigma - 1.) * (*elmat)(i, i) + (*jmat)(i, i);
+               (*elmat)(i, i) = (alpha - 1.) * (*elmat)(i, i) + (*jmat)(i, i);
             } // for (int i = 0; i < ndofs_array[I]; i++)
          }    // for (int I = 0; I < 2; I++)
          elmat = elmats(1, 0);
          jmat = jmats(1, 0);
          assert(jmat != NULL);
          elmat12 = elmats(0, 1);
-         for (int i = 0; i < ndof2; i++)
+         for (int i = 0; i < ndofs2; i++)
          {
-            for (int j = 0; j < ndof1; j++)
+            for (int j = 0; j < ndofs1; j++)
             {
                double aij = (*elmat)(i, j), aji = (*elmat12)(j, i), mij = (*jmat)(i, j);
-               (*elmat)(i, j) = sigma * aji - aij + mij;
-               (*elmat12)(j, i) = sigma * aij - aji + mij;
+               (*elmat)(i, j) = alpha * aji - aij + mij;
+               (*elmat12)(j, i) = alpha * aij - aji + mij;
             } // for (int j = 0; j < ndofs1; j++)
          }    // for (int i = 0; i < ndofs2; i++)
       }       // if (kappa_is_nonzero)
@@ -1223,21 +1226,21 @@ namespace mfem
                for (int j = 0; j < i; j++)
                {
                   double aij = (*elmat)(i, j), aji = (*elmat)(j, i);
-                  (*elmat)(i, j) = sigma * aji - aij;
-                  (*elmat)(j, i) = sigma * aij - aji;
+                  (*elmat)(i, j) = alpha * aji - aij;
+                  (*elmat)(j, i) = alpha * aij - aji;
                }
-               (*elmat)(i, i) *= (sigma - 1.);
+               (*elmat)(i, i) *= (alpha - 1.);
             } // for (int i = 0; i < ndofs_array[I]; i++)
          }    // for (int I = 0; I < 2; I++)
          elmat = elmats(1, 0);
          elmat12 = elmats(0, 1);
-         for (int i = 0; i < ndof2; i++)
+         for (int i = 0; i < ndofs2; i++)
          {
-            for (int j = 0; j < ndof1; j++)
+            for (int j = 0; j < ndofs1; j++)
             {
                double aij = (*elmat)(i, j), aji = (*elmat12)(j, i);
-               (*elmat)(i, j) = sigma * aji - aij;
-               (*elmat12)(j, i) = sigma * aij - aji;
+               (*elmat)(i, j) = alpha * aji - aij;
+               (*elmat12)(j, i) = alpha * aij - aji;
             } // for (int j = 0; j < ndofs1; j++)
          }    // for (int i = 0; i < ndofs2; i++)
       }       // not if (kappa_is_nonzero)
@@ -1247,10 +1250,10 @@ namespace mfem
    }
 
    // static method
-   void InterfaceDGElasticityIntegrator::AssembleBlock(const int dim, const int row_ndofs, 
-   const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef, 
-   const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape, 
-   const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat)
+   void InterfaceDGElasticityIntegrator::AssembleBlock(const int dim, const int row_ndofs,
+                                                       const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef,
+                                                       const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape,
+                                                       const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat)
    {
       // row_offset and col_offset are not needed for elmat.
       for (int jm = 0, j = 0; jm < dim; ++jm)

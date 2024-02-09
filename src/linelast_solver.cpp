@@ -13,7 +13,7 @@ using namespace mfem;
 LinElastSolver::LinElastSolver()
     : MultiBlockSolver()
 {
-   sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
+   alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 
    var_names = GetVariableNames();
@@ -41,7 +41,7 @@ LinElastSolver::LinElastSolver()
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
 
-   init_x = VectorFunctionCoefficient(dim, InitDisplacement);
+   init_x = new VectorFunctionCoefficient(dim, InitDisplacement);
 }
 
 LinElastSolver::~LinElastSolver()
@@ -83,8 +83,8 @@ void LinElastSolver::SetupMaterialVariables()
 
    for (int m = 0; m < numSub; m++)
    {
-      lambda_cs[m] = lambda_c;
-      mu_cs[m] = mu_c;
+      lambda_cs[m] = &lambda_c;
+      mu_cs[m] = &mu_c;
    }
 }
 
@@ -129,7 +129,7 @@ void LinElastSolver::InitVariables()
    for (int m = 0; m < numSub; m++)
    {
       us[m] = new GridFunction(fes[m], U->GetBlock(m), 0);
-      us[m]->ProjectCoefficient(init_x);
+      us[m]->ProjectCoefficient(*init_x);
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
@@ -153,7 +153,7 @@ void LinElastSolver::BuildRHSOperators()
    for (int m = 0; m < numSub; m++)
    {
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
-      bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(init_x, lambda_cs[m], mu_cs[m], alpha, kappa), bdr_marker[0]); // TODO bdr_marker will be extended to include forces too
+      bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *(lambda_cs[m]), *(mu_cs[m]), alpha, kappa), *(bdr_markers[0])); //m ight be wrong TODO bdr_marker will be extended to include forces too, also, unsure if this is correct
    }
 }
 
@@ -166,18 +166,18 @@ void LinElastSolver::BuildDomainOperators()
    for (int m = 0; m < numSub; m++)
    {
       as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new ElasticityIntegrator(lambda_cs[m], mu_cs[m]));
+      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m])));
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
-             new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+             new DGElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m]), alpha, kappa));
          as[m]->AddBdrFaceIntegrator(
-             new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+             new DGElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m]), alpha, kappa), *(bdr_markers[0]));
       }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler);
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(sigma, kappa));
+   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(alpha, kappa));
 }
 
 void LinElastSolver::Assemble()

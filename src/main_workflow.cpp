@@ -6,6 +6,7 @@
 #include "component_topology_handler.hpp"
 #include "multiblock_solver.hpp"
 #include "poisson_solver.hpp"
+#include "linelast_solver.hpp"
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
 #include "etc.hpp"
@@ -53,7 +54,7 @@ MultiBlockSolver* InitSolver()
    if (solver_type == "poisson")       { solver = new PoissonSolver; }
    else if (solver_type == "stokes")   { solver = new StokesSolver; }
    else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
-   else if (solver_type == "linelast")   { solver = new LinElastSolver; }
+   //else if (solver_type == "linelast")   { solver = new LinElastSolver; } // TODO: make this work
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
