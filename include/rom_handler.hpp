@@ -127,8 +127,10 @@ public:
    const ROMBuildingLevel GetBuildingLevel() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
+   const bool SeparateVariable() { return separate_variable; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const std::string GetBasisPrefix() { return basis_prefix; }
+   const std::string GetRefBasisTag(const int ref_idx) { return basis_tags[ref_idx]; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
    const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
    virtual SparseMatrix* GetOperator() = 0;
@@ -144,7 +146,6 @@ public:
    int GetBasisIndexForSubdomain(const int &subdomain_index);
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) = 0;
    virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis) = 0;
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) = 0;
    virtual void SetBlockSizes();
 
    // P_i^T * mat * P_j
@@ -230,7 +231,6 @@ public:
    virtual void LoadReducedBasis();
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) override;
    virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis);
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) override;
 
    // P_i^T * mat * P_j
    virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat);

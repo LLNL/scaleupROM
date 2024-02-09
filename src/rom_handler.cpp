@@ -397,14 +397,6 @@ void MFEMROMHandler::GetDomainBasis(const int &basis_index, DenseMatrix* &basis)
    basis = dom_basis[basis_index];
 }
 
-void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
-{
-   assert(basis_loaded);
-
-   int idx = GetBasisIndexForSubdomain(subdomain_index);
-   GetReferenceBasis(idx, basis);
-}
-
 void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    assert(mats.NumRows() == num_rom_blocks);
