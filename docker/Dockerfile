@@ -50,7 +50,9 @@ ENV YAML_DIR=$LIB_DIR/yaml-cpp
 # install libROM for scaleupROM
 WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/LLNL/libROM.git
-WORKDIR ./libROM/build
+WORKDIR ./libROM
+RUN sudo git pull && sudo git checkout generator-fix2
+WORKDIR ./build
 # libROM is using the MFEM without MUMPS right now.
 RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=${USE_MFEM} -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
 RUN sudo make -j 16
