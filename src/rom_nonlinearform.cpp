@@ -683,10 +683,18 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
    }
 
    for (int k = 0; k < fnfi.Size(); k++)
-      mfem_error("ROMNonlinearForm::TrainEQP- not implemented for interior face integrators yet!\n");
+   {
+      SetupEQPSystemForInteriorFaceIntegrator(snapshots, fnfi[k], Gt, rhs_Gw);
+      TrainEQPForIntegrator(snapshots, fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      UpdateDomainIntegratorSampling(k, el, qp, qw);
+   }
 
    for (int k = 0; k < bfnfi.Size(); k++)
-      mfem_error("ROMNonlinearForm::TrainEQP- not implemented for boundary face integrators yet!\n");
+   {
+      SetupEQPSystemForBdrFaceIntegrator(snapshots, bfnfi[k], Gt, rhs_Gw);
+      TrainEQPForIntegrator(snapshots, bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      UpdateDomainIntegratorSampling(k, el, qp, qw);
+   }
 }
 
 void ROMNonlinearForm::TrainEQPForIntegrator(
