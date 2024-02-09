@@ -1462,9 +1462,7 @@ int main(int argc, char *argv[])
             file_id = H5Fcreate(sample_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
             assert(file_id >= 0);
 
-            hdf5_utils::WriteDataset(file_id, "sample_element", sample_el);
-            hdf5_utils::WriteDataset(file_id, "sample_quadrature_point", sample_qp);
-            hdf5_utils::WriteDataset(file_id, "sample_quadrature_weight", sample_qw);
+            rom_nlinf->SaveEQPForDomainIntegrator(0, file_id, "sample");
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);
@@ -1710,8 +1708,15 @@ int main(int argc, char *argv[])
       }  // if (rom_mode == RomMode::TENSOR2)
       else if (rom_mode == RomMode::EQP)
       {
-         Array<int> sample_el, sample_qp;
-         Array<double> sample_qw;
+         const IntegrationRule *ir = oper.GetNonlinearIntRule();
+         auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
+         nl_integ->SetIntRule(ir);
+
+         rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
+         rom_nlinf->AddDomainIntegrator(nl_integ);
+         rom_nlinf->SetBasis(u_basis);
+         rom_nlinf->SetPrecomputeMode(precompute);
+
          {  // load the sample from a hdf5 file.
             std::string sample_file = filename + "_sample.h5";
 
@@ -1720,23 +1725,11 @@ int main(int argc, char *argv[])
             file_id = H5Fopen(sample_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
             assert(file_id >= 0);
 
-            hdf5_utils::ReadDataset(file_id, "sample_element", sample_el);
-            hdf5_utils::ReadDataset(file_id, "sample_quadrature_point", sample_qp);
-            hdf5_utils::ReadDataset(file_id, "sample_quadrature_weight", sample_qw);
+            rom_nlinf->LoadEQPForDomainIntegrator(0, file_id, "sample");
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);
          }
-
-         const IntegrationRule *ir = oper.GetNonlinearIntRule();
-         auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
-         nl_integ->SetIntRule(ir);
-
-         rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
-         rom_nlinf->AddDomainIntegrator(nl_integ);
-         rom_nlinf->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
-         rom_nlinf->SetBasis(u_basis);
-         rom_nlinf->SetPrecomputeMode(precompute);
 
          if (precompute)
             rom_nlinf->PrecomputeCoefficients();

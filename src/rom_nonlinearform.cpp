@@ -930,4 +930,27 @@ void ROMNonlinearForm::SaveEQPForDomainIntegrator(const int k, hid_t file_id, co
    return;
 }
 
+void ROMNonlinearForm::LoadEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname)
+{
+   Array<int> el, qp;
+   Array<double> qw;
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::ReadDataset(grp_id, "elem", el);
+   hdf5_utils::ReadDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::ReadDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   UpdateDomainIntegratorSampling(k, el, qp, qw);
+   return;
+}
+
 }
