@@ -8,7 +8,7 @@
 #include "mfem.hpp"
 #include "parameter.hpp"
 #include "linalg/BasisGenerator.h"
-#include "multiblock_solver.hpp"
+#include "linalg_utils.hpp"
 
 using namespace mfem;
 
@@ -92,6 +92,7 @@ public:
    void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags);
    void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag);
    void WriteSnapshots();
+   const CAROM::Matrix* LookUpSnapshot(const std::string &basis_tag);
 
    void ReportStatus(const int &sample_idx);
 

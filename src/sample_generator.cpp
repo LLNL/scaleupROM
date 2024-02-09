@@ -204,6 +204,28 @@ void SampleGenerator::WriteSnapshots()
    }
 }
 
+const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_tag)
+{
+   assert(snapshot_generators.Size() > 0);
+   assert(snapshot_generators.Size() == basis_tags.size());
+
+   int idx = -1;
+   for (int k = 0; k < basis_tags.size(); k++)
+      if (basis_tags[k] == basis_tag)
+      {
+         idx = k;
+         break;
+      }
+
+   if (idx < 0)
+   {
+      printf("basis tag: %s\n", basis_tag.c_str());
+      mfem_error("SampleGenerator::LookUpSnapshot- basis tag does not exist in snapshot list!\n");
+   }
+
+   return snapshot_generators[idx]->getSnapshotMatrix();
+}
+
 void SampleGenerator::ReportStatus(const int &sample_idx)
 {
    if (sample_idx % report_freq != 0) return;
