@@ -8,6 +8,7 @@
 #include "mfem.hpp"
 #include "hyperreduction_integ.hpp"
 #include "linalg/NNLS.h"
+#include "hdf5_utils.hpp"
 
 namespace mfem
 {
@@ -72,6 +73,7 @@ public:
    { mfem_error("SetupEQPSystemForInteriorFaceIntegrator is not implemented yet!\n"); }
 
    void GetEQPForDomainIntegrator(const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   void SaveEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname);
 
    /// Adds new Domain Integrator.
    void AddDomainIntegrator(HyperReductionIntegrator *nlfi)
