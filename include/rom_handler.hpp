@@ -122,6 +122,7 @@ public:
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
+   const int GetNumROMRefComps() { return num_rom_comp; }
    const int GetNumROMRefBlocks() { return num_rom_ref_blocks; }
    const int GetRefNumBasis(const int &basis_idx) { return num_ref_basis[basis_idx]; }
    const ROMBuildingLevel GetBuildingLevel() { return save_operator; }
@@ -148,7 +149,7 @@ public:
 
    virtual void LoadReducedBasis();
 
-   int GetBasisIndexForSubdomain(const int &subdomain_index);
+   int GetRefIndexForSubdomain(const int &subdomain_index);
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) = 0;
    virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis) = 0;
    virtual void SetBlockSizes();

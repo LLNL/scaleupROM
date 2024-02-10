@@ -240,7 +240,7 @@ void ROMHandlerBase::LoadReducedBasis()
    basis_loaded = true;
 }
 
-int ROMHandlerBase::GetBasisIndexForSubdomain(const int &subdomain_index)
+int ROMHandlerBase::GetRefIndexForSubdomain(const int &subdomain_index)
 {
    int idx = -1;
    switch (train_mode)

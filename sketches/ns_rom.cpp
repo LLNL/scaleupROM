@@ -16,6 +16,7 @@
 #include "linalg/NNLS.h"
 #include "rom_nonlinearform.hpp"
 #include "hdf5_utils.hpp"
+#include "steady_ns_solver.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -1665,6 +1666,17 @@ int main(int argc, char *argv[])
       Operator *rom_oper = NULL;
       TensorROM *tenrom = NULL;
       EQPROM *eqprom = NULL;
+      SteadyNSEQPROM *eqprom1 = NULL;
+      SparseMatrix lin_rom1(lin_rom.NumRows(), lin_rom.NumCols());
+      Array<int> idx(lin_rom.NumRows());
+      for (int k = 0; k < idx.Size(); k++) idx[k] = k;
+      lin_rom1.AddSubMatrix(idx, idx, lin_rom);
+      lin_rom1.Finalize();
+      Array<ROMNonlinearForm *> eqp_opers(1);
+      eqp_opers = NULL;
+      Array<int> block_offsets(2);
+      block_offsets[0] = 0;
+      block_offsets[1] = lin_rom.NumRows();
 
       if ((rom_mode == RomMode::TENSOR) || (rom_mode == RomMode::TENSOR3))
       {
@@ -1735,7 +1747,10 @@ int main(int argc, char *argv[])
             rom_nlinf->PrecomputeCoefficients();
 
          eqprom = new EQPROM(lin_rom, *rom_nlinf);
-         rom_oper = eqprom;
+         eqp_opers[0] = rom_nlinf;
+         eqprom1 = new SteadyNSEQPROM(&lin_rom1, eqp_opers, block_offsets);
+         // rom_oper = eqprom;
+         rom_oper = eqprom1;
       }  // if (rom_mode == RomMode::EQP)
       else
          mfem_error("ROM Mode is not set!");

@@ -650,12 +650,20 @@ TEST(LinElast_Workflow, ComponentWiseWithDirectSolve)
 
 TEST(SteadyNS_Workflow, ComponentSeparateVariable_EQP)
 {
-   config = InputParser("inputs/steady_ns.component.yml");
-   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   // config = InputParser("inputs/steady_ns.component.yml");
+   config = InputParser("inputs/steady_ns.base.yml");
+   config.dict_["domain-decomposition"]["type"] = "none";
+   // for (int k = 0; k < 4; k++)
+   //    config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
+   config.dict_["model_reduction"]["save_operator"]["level"] = "none";
+
+   config.dict_["model_reduction"]["separate_variable_basis"] = false;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "us";
    config.dict_["model_reduction"]["nonlinear_handling"] = "eqp";
    config.dict_["model_reduction"]["eqp"]["relative_tolerance"] = 1.0e-11;
+   config.dict_["model_reduction"]["eqp"]["precompute"] = false;
+   config.dict_["solver"]["print_level"] = 1;
 
    printf("\nSample Generation \n\n");
    
@@ -670,8 +678,8 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable_EQP)
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
-   // config.dict_["main"]["mode"] = "single_run";
-   // double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
 
    // // This reproductive case must have a very small error at the level of finite-precision.
    // printf("Error: %.15E\n", error);

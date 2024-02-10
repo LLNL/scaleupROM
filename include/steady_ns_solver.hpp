@@ -137,6 +137,7 @@ protected:
    // component ROM element for nonlinear convection.
    Array<DenseTensor *> comp_tensors, subdomain_tensors;
    Array<ROMNonlinearForm *> comp_eqps, subdomain_eqps;
+   Array<FiniteElementSpace *> comp_fes;  // pointers to existing fespace, no need to delete
 
    Solver *J_solver = NULL;
    GMRESSolver *J_gmres = NULL;
@@ -177,9 +178,11 @@ public:
 
    virtual void TrainEQP(SampleGenerator *sample_generator) override;
    virtual void SaveEQP() override;
+   virtual void LoadEQP() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
+   void SetupEQPOperators();
 };
 
 #endif

@@ -458,6 +458,9 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    {
       rom = test->GetROMHandler();
       test->LoadReducedBasis();
+
+      if ((test->IsNonlinear()) && (rom->GetNonlinearHandling() == NonlinearHandling::EQP))
+         test->LoadEQP();
    }
 
    solveTimer.Start();
