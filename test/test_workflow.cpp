@@ -651,10 +651,7 @@ TEST(LinElast_Workflow, ComponentWiseWithDirectSolve)
 TEST(SteadyNS_Workflow, ComponentSeparateVariable_EQP)
 {
    config = InputParser("inputs/steady_ns.component.yml");
-   config.dict_["domain-decomposition"]["type"] = "none";
-   config.dict_["discretization"]["order"] = 1;
-   config.dict_["model_reduction"]["save_operator"]["level"] = "none";
-
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "us";
    config.dict_["model_reduction"]["nonlinear_handling"] = "eqp";
