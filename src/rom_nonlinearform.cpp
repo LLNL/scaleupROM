@@ -678,29 +678,28 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
    for (int k = 0; k < dnfi.Size(); k++)
    {
       SetupEQPSystemForDomainIntegrator(snapshots, dnfi[k], Gt, rhs_Gw);
-      TrainEQPForIntegrator(snapshots, dnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      TrainEQPForIntegrator(dnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
       UpdateDomainIntegratorSampling(k, el, qp, qw);
    }
 
    for (int k = 0; k < fnfi.Size(); k++)
    {
       SetupEQPSystemForInteriorFaceIntegrator(snapshots, fnfi[k], Gt, rhs_Gw);
-      TrainEQPForIntegrator(snapshots, fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      TrainEQPForIntegrator(fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
       UpdateDomainIntegratorSampling(k, el, qp, qw);
    }
 
    for (int k = 0; k < bfnfi.Size(); k++)
    {
       SetupEQPSystemForBdrFaceIntegrator(snapshots, bfnfi[k], Gt, rhs_Gw);
-      TrainEQPForIntegrator(snapshots, bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      TrainEQPForIntegrator(bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
       UpdateDomainIntegratorSampling(k, el, qp, qw);
    }
 }
 
 void ROMNonlinearForm::TrainEQPForIntegrator(
-   const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi,
-   const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw, const double eqp_tol,
-   Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw)
+   HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw,
+   const double eqp_tol, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw)
 {
    const IntegrationRule *ir = nlfi->GetIntegrationRule();
 

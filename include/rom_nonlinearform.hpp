@@ -61,8 +61,8 @@ public:
    void SetBasis(DenseMatrix &basis_, const int offset=0);
 
    void TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol = 1.0e-2);
-   void TrainEQPForIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi,
-                              const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw, const double eqp_tol,
+   void TrainEQPForIntegrator(HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt,
+                              const CAROM::Vector &rhs_Gw, const double eqp_tol,
                               Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
    void SetupEQPSystemForDomainIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                           CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
