@@ -1437,7 +1437,7 @@ int main(int argc, char *argv[])
          rom_nlinf->TrainEQP(*snapshots, eqp_tol);
          Array<int> sample_el, sample_qp;
          Array<double> sample_qw;
-         rom_nlinf->GetEQPForDomainIntegrator(0, sample_el, sample_qp, sample_qw);
+         rom_nlinf->GetEQPForIntegrator(IntegratorType::DOMAIN, 0, sample_el, sample_qp, sample_qw);
 
          {  // save empirical quadrature point locations.
             ElementTransformation *T;
@@ -1463,7 +1463,7 @@ int main(int argc, char *argv[])
             file_id = H5Fcreate(sample_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
             assert(file_id >= 0);
 
-            rom_nlinf->SaveEQPForDomainIntegrator(0, file_id, "sample");
+            rom_nlinf->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, "sample");
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);
@@ -1737,7 +1737,7 @@ int main(int argc, char *argv[])
             file_id = H5Fopen(sample_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
             assert(file_id >= 0);
 
-            rom_nlinf->LoadEQPForDomainIntegrator(0, file_id, "sample");
+            rom_nlinf->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, "sample");
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);

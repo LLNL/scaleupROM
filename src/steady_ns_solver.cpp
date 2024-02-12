@@ -783,7 +783,8 @@ void SteadyNSSolver::SaveEQP()
    {
       assert(comp_eqps[c]);
       dset_name = GetBasisTagForComponent(c, train_mode, topol_handler);
-      comp_eqps[c]->SaveEQPForDomainIntegrator(0, file_id, dset_name);
+      // only one integrator exists in each nonlinear form.
+      comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, dset_name);
    }
 
    errf = H5Fclose(file_id);
@@ -812,7 +813,8 @@ void SteadyNSSolver::LoadEQP()
    {
       assert(comp_eqps[c]);
       dset_name = GetBasisTagForComponent(c, train_mode, topol_handler);
-      comp_eqps[c]->LoadEQPForDomainIntegrator(0, file_id, dset_name);
+      // only one integrator exists in each nonlinear form.
+      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, dset_name);
 
       if (comp_eqps[c]->PrecomputeMode())
          comp_eqps[c]->PrecomputeCoefficients();

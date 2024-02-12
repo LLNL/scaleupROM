@@ -1147,31 +1147,70 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
    return;
 }
 
-void ROMNonlinearForm::GetEQPForDomainIntegrator(
-   const int k, Array<int> &el, Array<int> &qp, Array<double> &qw)
+void ROMNonlinearForm::GetEQPForIntegrator(
+   const IntegratorType type, const int k, Array<int> &el, Array<int> &qp, Array<double> &qw)
 {
-   assert((k >= 0) && (k < dnfi.Size()));
-   assert(dnfi.Size() == dnfi_sample.Size());
+   Array<SampleInfo> *sample = NULL;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:
+      {
+         assert((k >= 0) && (k < dnfi.Size()));
+         assert(dnfi.Size() == dnfi_sample.Size());
+         sample = dnfi_sample[k];
+      }
+      break;
+      case IntegratorType::INTERIORFACE:
+      {
+         assert((k >= 0) && (k < fnfi.Size()));
+         assert(fnfi.Size() == fnfi_sample.Size());
+         sample = fnfi_sample[k];
+      }
+      break;
+      case IntegratorType::BDRFACE:
+      {
+         assert((k >= 0) && (k < bfnfi.Size()));
+         assert(bfnfi.Size() == bfnfi_sample.Size());
+         sample = bfnfi_sample[k];
+      }
+      break;
+      default:
+         mfem_error("Unknown Integrator type!\n");
+   }
 
    el.SetSize(0);
    qp.SetSize(0);
    qw.SetSize(0);
 
-   Array<SampleInfo> *sample = dnfi_sample[k];
-
    for (int s = 0; s < sample->Size(); s++)
    {
-      el.Append((*sample)[s].el);
+      switch (type)
+      {
+         case IntegratorType::DOMAIN:        el.Append((*sample)[s].el); break;
+         case IntegratorType::INTERIORFACE:  el.Append((*sample)[s].face); break;
+         case IntegratorType::BDRFACE:       el.Append((*sample)[s].be); break;
+      }
       qp.Append((*sample)[s].qp);
       qw.Append((*sample)[s].qw);
    }
 }
 
-void ROMNonlinearForm::SaveEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname)
+void ROMNonlinearForm::SaveEQPForIntegrator(
+   const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname)
 {
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      default:
+         mfem_error("ROMNonlinearForm::SaveEQPForIntegrator- Unknown IntegratorType!\n");
+   }
+
    Array<int> el, qp;
    Array<double> qw;
-   GetEQPForDomainIntegrator(k, el, qp, qw);
+   GetEQPForIntegrator(type, k, el, qp, qw);
 
    assert(file_id >= 0);
    hid_t grp_id;
@@ -1180,7 +1219,7 @@ void ROMNonlinearForm::SaveEQPForDomainIntegrator(const int k, hid_t file_id, co
    grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
    assert(grp_id >= 0);
 
-   hdf5_utils::WriteDataset(grp_id, "elem", el);
+   hdf5_utils::WriteDataset(grp_id, eldset, el);
    hdf5_utils::WriteDataset(grp_id, "quad-pt", qp);
    hdf5_utils::WriteDataset(grp_id, "quad-wt", qw);
 
@@ -1189,8 +1228,19 @@ void ROMNonlinearForm::SaveEQPForDomainIntegrator(const int k, hid_t file_id, co
    return;
 }
 
-void ROMNonlinearForm::LoadEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname)
+void ROMNonlinearForm::LoadEQPForIntegrator(
+   const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname)
 {
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      default:
+         mfem_error("ROMNonlinearForm::LoadEQPForIntegrator- Unknown IntegratorType!\n");
+   }
+
    Array<int> el, qp;
    Array<double> qw;
 
@@ -1201,14 +1251,21 @@ void ROMNonlinearForm::LoadEQPForDomainIntegrator(const int k, hid_t file_id, co
    grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
    assert(grp_id >= 0);
 
-   hdf5_utils::ReadDataset(grp_id, "elem", el);
+   hdf5_utils::ReadDataset(grp_id, eldset, el);
    hdf5_utils::ReadDataset(grp_id, "quad-pt", qp);
    hdf5_utils::ReadDataset(grp_id, "quad-wt", qw);
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
 
-   UpdateDomainIntegratorSampling(k, el, qp, qw);
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        UpdateDomainIntegratorSampling(k, el, qp, qw); break;
+      case IntegratorType::INTERIORFACE:  UpdateInteriorFaceIntegratorSampling(k, el, qp, qw); break;
+      case IntegratorType::BDRFACE:       UpdateBdrFaceIntegratorSampling(k, el, qp, qw); break;
+      default:
+         mfem_error("ROMNonlinearForm::LoadEQPForIntegrator- Unknown IntegratorType!\n");
+   }
    return;
 }
 

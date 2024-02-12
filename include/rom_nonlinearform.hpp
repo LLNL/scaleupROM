@@ -13,6 +13,14 @@
 namespace mfem
 {
 
+enum IntegratorType
+{
+   DOMAIN,
+   INTERIORFACE,
+   BDRFACE,
+   NUM_INTEG_TYPE
+};
+
 class ROMNonlinearForm : public NonlinearForm
 {
 private:
@@ -71,9 +79,9 @@ public:
    void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                            const Array<int> &bdr_attr_marker, CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs);
 
-   void GetEQPForDomainIntegrator(const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
-   void SaveEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname);
-   void LoadEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname);
+   void GetEQPForIntegrator(const IntegratorType type, const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   void SaveEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
+   void LoadEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
 
    /// Adds new Domain Integrator.
    void AddDomainIntegrator(HyperReductionIntegrator *nlfi)
