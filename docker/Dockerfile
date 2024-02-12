@@ -1,5 +1,5 @@
-FROM ghcr.io/llnl/librom/librom_env:arm64
-# FROM ghcr.io/llnl/librom/librom_env:latest
+# FROM ghcr.io/llnl/librom/librom_env:arm64
+FROM ghcr.io/llnl/librom/librom_env:latest
 
 # install parmetis
 WORKDIR $LIB_DIR
