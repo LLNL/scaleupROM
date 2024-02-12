@@ -1,5 +1,5 @@
-# FROM ghcr.io/llnl/librom/librom_env:arm64
-FROM ghcr.io/llnl/librom/librom_env:latest
+FROM ghcr.io/llnl/librom/librom_env:arm64
+# FROM ghcr.io/llnl/librom/librom_env:latest
 
 # install parmetis
 WORKDIR $LIB_DIR
@@ -51,7 +51,7 @@ ENV YAML_DIR=$LIB_DIR/yaml-cpp
 WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/LLNL/libROM.git
 WORKDIR ./libROM
-RUN sudo git pull && sudo git checkout generator-fix2
+RUN sudo git pull && sudo git checkout svd-fix
 WORKDIR ./build
 # libROM is using the MFEM without MUMPS right now.
 RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=${USE_MFEM} -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}

@@ -843,6 +843,8 @@ void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
          T = fes->GetElementTransformation(e);
          v_i.GetSubVector(vdofs, el_x);
 
+         if (doftrans) { doftrans->InvTransformPrimal(el_x); }
+
          const int nd = fe->GetDof();
          el_quad.SetSize(nd * vdim, nqe);
          for (int i = 0; i < ir->GetNPoints(); i++)
@@ -851,6 +853,7 @@ void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
 
             const IntegrationPoint &ip = ir->IntPoint(i);
             nlfi->AssembleQuadratureVector(*fe, *T, ip, 1.0, el_x, EQ);
+            if (doftrans) { doftrans->TransformDual(EQ); }
          }
          // nlfi->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
 
