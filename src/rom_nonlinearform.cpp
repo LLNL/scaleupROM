@@ -686,14 +686,14 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
    {
       SetupEQPSystemForInteriorFaceIntegrator(snapshots, fnfi[k], Gt, rhs_Gw);
       TrainEQPForIntegrator(fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
-      UpdateDomainIntegratorSampling(k, el, qp, qw);
+      UpdateInteriorFaceIntegratorSampling(k, el, qp, qw);
    }
 
    for (int k = 0; k < bfnfi.Size(); k++)
    {
       SetupEQPSystemForBdrFaceIntegrator(snapshots, bfnfi[k], Gt, rhs_Gw);
       TrainEQPForIntegrator(bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
-      UpdateDomainIntegratorSampling(k, el, qp, qw);
+      UpdateBdrFaceIntegratorSampling(k, el, qp, qw);
    }
 }
 
