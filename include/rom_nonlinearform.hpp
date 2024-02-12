@@ -67,11 +67,9 @@ public:
    void SetupEQPSystemForDomainIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                           CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
    void SetupEQPSystemForInteriorFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
-                                                CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw)
-   { mfem_error("SetupEQPSystemForInteriorFaceIntegrator is not implemented yet!\n"); }
+                                                CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &fidxs);
    void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
-                                           CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw)
-   { mfem_error("SetupEQPSystemForInteriorFaceIntegrator is not implemented yet!\n"); }
+                                           const Array<int> &bdr_attr_marker, CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs);
 
    void GetEQPForDomainIntegrator(const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
    void SaveEQPForDomainIntegrator(const int k, hid_t file_id, const std::string &dsetname);
