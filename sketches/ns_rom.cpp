@@ -1491,8 +1491,8 @@ int main(int argc, char *argv[])
          problem::offsets = 0.0;
          problem::k = 0.0;
 
-         problem::u0(0) = 1.0;
-         problem::u0(1) = -1.0;
+         problem::u0(0) = -1.0;
+         problem::u0(1) = 1.0;
          printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
       }
 
@@ -1747,10 +1747,10 @@ int main(int argc, char *argv[])
             rom_nlinf->PrecomputeCoefficients();
 
          eqprom = new EQPROM(lin_rom, *rom_nlinf);
-         eqp_opers[0] = rom_nlinf;
-         eqprom1 = new SteadyNSEQPROM(&lin_rom1, eqp_opers, block_offsets);
-         // rom_oper = eqprom;
-         rom_oper = eqprom1;
+         // eqp_opers[0] = rom_nlinf;
+         // eqprom1 = new SteadyNSEQPROM(&lin_rom1, eqp_opers, block_offsets);
+         rom_oper = eqprom;
+         // rom_oper = eqprom1;
       }  // if (rom_mode == RomMode::EQP)
       else
          mfem_error("ROM Mode is not set!");
