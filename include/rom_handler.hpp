@@ -95,9 +95,6 @@ protected:
    */
    Array<int> rom_varblock_offsets;
    
-   CAROM::Vector *reduced_rhs = NULL;
-   CAROM::Vector *reduced_sol = NULL;
-   
    CAROM::Options* rom_options;
    CAROM::BasisGenerator *basis_generator;
    CAROM::BasisReader *basis_reader;
@@ -169,6 +166,7 @@ public:
    virtual void SaveOperator(const std::string input_prefix="") = 0;
    virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
    virtual void SetRomMat(BlockMatrix *input_mat) = 0;
+   virtual void SaveRomSystem(const std::string &input_prefix, const std::string type="mm") = 0;
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names) = 0;
 
@@ -254,6 +252,7 @@ public:
    virtual void SaveOperator(const std::string input_prefix="");
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
    virtual void SetRomMat(BlockMatrix *input_mat);
+   virtual void SaveRomSystem(const std::string &input_prefix, const std::string type="mm");
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
 
