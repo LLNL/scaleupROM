@@ -895,7 +895,7 @@ void SteadyNSSolver::SetupEQPOperators()
          }
       assert((midx >= 0) && (midx < numSub));
 
-      comp_fes = ufes[midx];
+      comp_fes[c] = ufes[midx];
    }
 
    DenseMatrix *basis;

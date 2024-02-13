@@ -312,6 +312,45 @@ TEST(MultiComponentGlobalROM, SteadyNSTest_SeparateVariable)
    return;
 }
 
+TEST(MultiComponentGlobalROM, SteadyNSTest_SeparateVariable_EQP)
+{
+   config = InputParser("stokes.component.yml");
+   config.dict_["main"]["solver"] = "steady-ns";
+   config.dict_["mesh"]["component-wise"]["components"][0]["file"] = "square.tri.mesh";
+   config.dict_["solver"]["print_level"] = 1;
+
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["model_reduction"]["save_operator"]["level"] = "global";
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["model_reduction"]["linear_solver_type"] = "direct";
+   config.dict_["model_reduction"]["linear_system_type"] = "us";
+   config.dict_["model_reduction"]["nonlinear_handling"] = "eqp";
+   config.dict_["model_reduction"]["eqp"]["relative_tolerance"] = 1.0e-12;
+
+   printf("\nSample Generation \n\n");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["mesh"]["type"] = "component-wise";
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < ns_threshold);
+
+   return;
+}
+
 int main(int argc, char* argv[])
 {
    ::testing::InitGoogleTest(&argc, argv);
