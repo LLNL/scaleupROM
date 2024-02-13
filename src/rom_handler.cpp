@@ -104,8 +104,7 @@ ROMHandlerBase::ROMHandlerBase(
 
 ROMHandlerBase::~ROMHandlerBase()
 {
-   delete reduced_rhs;
-   delete reduced_sol;
+   DeletePointers(carom_ref_basis);
 }
 
 void ROMHandlerBase::ParseInputs()
@@ -907,6 +906,29 @@ void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
 
    if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
    operator_loaded = true;
+}
+
+void MFEMROMHandler::SaveRomSystem(const std::string &input_prefix, const std::string type)
+{
+   if (!romMat_mono)
+   {
+      assert(romMat);
+      romMat_mono = romMat->CreateMonolithic();
+   }
+   assert(reduced_rhs);
+   assert(reduced_sol);
+
+   PrintVector(*reduced_rhs, input_prefix + "_rhs.txt");
+   PrintVector(*reduced_sol, input_prefix + "_sol.txt");
+
+   std::string matfile = input_prefix + "_mat." + type;
+   std::ofstream file(matfile.c_str());
+   if (type == "mm")
+      romMat_mono->PrintMM(file);
+   else if (type == "matlab")
+      romMat_mono->PrintMatlab(file);
+   else
+      mfem_error("MFEMROMHandler::SaveRomSystem - unknown matrix format type!\n");
 }
 
 void MFEMROMHandler::SaveBasisVisualization(

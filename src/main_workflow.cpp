@@ -503,6 +503,14 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    else
       fom_solve = solveTimer.RealTime();
 
+   /* save the ROM system for analysis/debug */
+   bool save_rom = config.GetOption<bool>("model_reduction/save_linear_system/enabled", false);
+   if (save_rom)
+   {
+      std::string rom_prefix = config.GetRequiredOption<std::string>("model_reduction/save_linear_system/prefix");
+      rom->SaveRomSystem(rom_prefix);
+   }
+
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
    bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
    if (test->UseRom() && compare_sol)
