@@ -651,10 +651,11 @@ void OutputOperators()
    cout<<"sol_file is: "<<sol_file<<endl;
    cout<<"visual_path is: "<<visual_path<<endl;
    test.InitVisualization(visual_path);
-   test.BuildOperators();
    cout<<"op done"<<endl;
    test.AddBCFunction(LinElastSolver::InitDisplacement, 1);
    test.AddBCFunction(LinElastSolver::InitDisplacement, 2);
+   test.BuildOperators();
+   test.SetupBCOperators();
    cout<<"bc done"<<endl;
    test.Assemble();
    cout<<"assembly done"<<endl;

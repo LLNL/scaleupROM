@@ -50,8 +50,8 @@ LinElastSolver::~LinElastSolver()
 
    DeletePointers(bs);
    DeletePointers(as);
-   DeletePointers(lambda_cs);
-   DeletePointers(mu_cs);
+   delete lambda_c;
+   delete mu_c;
 
    delete globalMat_mono;
    delete globalMat;
@@ -65,23 +65,17 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   lambda_cs.SetSize(numBdr);
-   mu_cs.SetSize(numBdr);
-
    // Set up the Lame constants for the two materials.
    Vector lambda(numBdr);
-   lambda = 1.0;     // Set lambda = 1 for all element attributes.
-   //lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
+   lambda = 1.0; // Set lambda = 1 for all element attributes.
+   // lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
 
    Vector mu(numBdr);
-   mu = 1.0;     // Set mu = 1 for all element attributes.
-   //mu(0) = 50.0; // Set mu = 50 for element attribute 1.
+   mu = 1.0; // Set mu = 1 for all element attributes.
+             // mu(0) = 50.0; // Set mu = 50 for element attribute 1.
 
-   for (int m = 0; m < numSub; m++)
-   {
-      lambda_cs[m] = new PWConstCoefficient(lambda);
-      mu_cs[m] = new PWConstCoefficient(mu);
-   }
+   lambda_c = new PWConstCoefficient(lambda);
+   mu_c = new PWConstCoefficient(mu);
 }
 
 void LinElastSolver::InitVariables()
@@ -104,10 +98,10 @@ void LinElastSolver::InitVariables()
    block_offsets.PartialSum();
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
-   cout<<"1"<<endl;
+   cout << "1" << endl;
 
    SetupBCVariables();
-   cout<<"2"<<endl;
+   cout << "2" << endl;
 
    // Set up solution/rhs variables/
    U = new BlockVector(var_offsets);
@@ -121,7 +115,7 @@ void LinElastSolver::InitVariables()
       U_blocks does not own the data.
       These are system-specific, therefore not defining it now.
    */
-cout<<"3"<<endl;
+   cout << "3" << endl;
    us.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
@@ -132,7 +126,7 @@ cout<<"3"<<endl;
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
-cout<<"4"<<endl;
+   cout << "4" << endl;
    // if (use_rom)  //Off for now
    //   MultiBlockSolver::InitROMHandler();
 }
@@ -174,7 +168,7 @@ void LinElastSolver::SetupRHSBCOperators()
  */
          // bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
          // bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
-         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
+         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c, *mu_c, alpha, kappa), *bdr_markers[b]);
       }
    }
 }
@@ -187,31 +181,29 @@ void LinElastSolver::BuildDomainOperators()
    for (int m = 0; m < numSub; m++)
    {
       as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m])));
+      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c), *(mu_c)));
 
       if (full_dg)
       {
 
+         as[m]->AddInteriorFaceIntegrator(
+             new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa));
          for (int b = 0; b < global_bdr_attributes.Size(); b++)
          {
-            as[m]->AddInteriorFaceIntegrator(
-                new DGElasticityIntegrator(*(lambda_cs[b]), *(mu_cs[b]), alpha, kappa));
             int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
             /* if (idx < 0)
                continue;
             if (!BCExistsOnBdr(b))
                continue; */
             as[m]->AddBdrFaceIntegrator(
-                new DGElasticityIntegrator(*(lambda_cs[b]), *(mu_cs[b]), alpha, kappa), *(bdr_markers[b]));
+                new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa), *(bdr_markers[b]));
          }
       }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
-   for (int b = 0; b < global_bdr_attributes.Size(); b++)
-   {
-      a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs[b], mu_cs[b], alpha, kappa));
-   }
+   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+
 }
 
 void LinElastSolver::Assemble()

@@ -40,8 +40,8 @@ protected:
    Array<BilinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
-   Array<PWConstCoefficient *> lambda_cs;
-   Array<PWConstCoefficient *> mu_cs;
+   PWConstCoefficient *lambda_c;
+   PWConstCoefficient *mu_c;
    Array<VectorFunctionCoefficient *> bdr_coeffs;
 
    // DG parameters specific to linear elasticity equation.
