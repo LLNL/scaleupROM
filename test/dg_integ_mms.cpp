@@ -71,7 +71,7 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
 
    /* assemble InterfaceDGElasticityIntegrator Assemble */
    InterfaceForm a_itf(meshes, fes, submesh);
-   a_itf.AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(alpha, kappa));
+   a_itf.AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs, mu_cs,alpha, kappa));
 
    Array2D<SparseMatrix *> mats;
    mats.SetSize(topol_data.numSub, topol_data.numSub);

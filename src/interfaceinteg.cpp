@@ -1008,55 +1008,54 @@ namespace mfem
        FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
        Array2D<DenseMatrix *> &elmats)
    {
-#ifdef MFEM_THREAD_SAFE
-      // For descriptions of these variables, see the class declaration.
-      Vector shape1, shape2;
-      DenseMatrix dshape1, dshape2;
-      DenseMatrix adjJ;
-      DenseMatrix dshape1_ps, dshape2_ps;
-      Vector nor1, nor2;
-      Vector nL1, nL2;
-      Vector nM1, nM2;
-      Vector dshape1_dnM, dshape2_dnM;
-      DenseMatrix jmat;
-#endif
+      /* #ifdef MFEM_THREAD_SAFE
+            // For descriptions of these variables, see the class declaration.
+            Vector shape1, shape2;
+            DenseMatrix dshape1, dshape2;
+            DenseMatrix adjJ;
+            DenseMatrix dshape1_ps, dshape2_ps;
+            Vector nor1, nor2;
+            Vector nL1, nL2;
+            Vector nM1, nM2;
+            Vector dshape1_dnM, dshape2_dnM;
+            DenseMatrix jmat;
+      #endif */
       bool boundary = false;
       const int dim = el1.GetDim();
       const int ndofs1 = el1.GetDof();
       const int ndofs2 = (boundary) ? 0 : el2.GetDof();
-      const int nvdofs = dim * (ndofs1 + ndofs2);
-
+      // const int nvdofs = dim * (ndofs1 + ndofs2);
+      const int nvdofs1 = dim * ndofs1;
+      const int nvdofs2 = dim * ndofs2;
       // Initially 'elmat' corresponds to the term:
       //    < { sigma(u) . n }, [v] > =
       //    < { (lambda div(u) I + mu (grad(u) + grad(u)^T)) . n }, [v] >
       // But eventually, it's going to be replaced by:
       //    elmat := -elmat + alpha*elmat^T + jmat
-      elmats(0, 0)->SetSize(ndofs1, ndofs1);
-      elmats(0, 1)->SetSize(ndofs1, ndofs2);
-      elmats(1, 0)->SetSize(ndofs2, ndofs1);
-      elmats(1, 1)->SetSize(ndofs2, ndofs2);
+      elmats(0, 0)->SetSize(nvdofs1, nvdofs1);
+      elmats(0, 1)->SetSize(nvdofs1, nvdofs2);
+      elmats(1, 0)->SetSize(nvdofs2, nvdofs1);
+      elmats(1, 1)->SetSize(nvdofs2, nvdofs2);
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
             *elmats(i, j) = 0.0;
       // elmat.SetSize(ndofs);
       // elmat = 0.0;
-
       const bool kappa_is_nonzero = (kappa != 0.0);
+      jmats.SetSize(2, 2);
       if (kappa_is_nonzero)
       {
-         jmats.SetSize(2, 2);
-         jmats(0, 0) = new DenseMatrix(ndofs1, ndofs1);
+         jmats(0, 0) = new DenseMatrix(nvdofs1, nvdofs1);
          // only the lower-triangular part of jmat is assembled.
          jmats(0, 1) = NULL;
-         jmats(1, 0) = new DenseMatrix(ndofs2, ndofs1);
-         jmats(1, 1) = new DenseMatrix(ndofs2, ndofs2);
+         jmats(1, 0) = new DenseMatrix(nvdofs2, nvdofs1);
+         jmats(1, 1) = new DenseMatrix(nvdofs2, nvdofs2);
          for (int i = 0; i < 2; i++)
             for (int j = 0; j <= i; j++)
                *jmats(i, j) = 0.0;
          // jmat.SetSize(ndofs);
          // jmat = 0.;
       }
-
       adjJ.SetSize(dim);
       shape1.SetSize(ndofs1);
       dshape1.SetSize(ndofs1, dim);
@@ -1076,7 +1075,6 @@ namespace mfem
          nM2.SetSize(dim);
          dshape2_dnM.SetSize(ndofs2);
       }
-
       const IntegrationRule *ir = IntRule;
       if (ir == NULL)
       {
@@ -1085,7 +1083,6 @@ namespace mfem
          ir = &IntRules.Get(Trans1.GetGeometryType(), order);
          assert(Trans1.GetGeometryType() == Trans2.GetGeometryType());
       }
-
       for (int pind = 0; pind < ir->GetNPoints(); ++pind)
       {
          const IntegrationPoint &ip = ir->IntPoint(pind);
@@ -1098,8 +1095,7 @@ namespace mfem
          // Note: eip1 and eip2 come from Element1 of Trans1 and Trans2 respectively.
          const IntegrationPoint &eip1 = Trans1.GetElement1IntPoint();
          const IntegrationPoint &eip2 = Trans2.GetElement1IntPoint();
-
-         // computing outward normal vectors.
+         //  computing outward normal vectors.
          if (dim == 1)
          {
             nor1(0) = 2 * eip1.x - 1.0;
@@ -1166,7 +1162,7 @@ namespace mfem
 
          // (1,2) block
          AssembleBlock(
-             dim, ndofs1, ndofs2, 0, dim * ndofs1, jmatcoef, nL2, nM2,
+             dim, ndofs1, ndofs2, 0, dim * ndofs1, 0.0, nL2, nM2,
              shape1, shape2, dshape2_dnM, dshape2_ps, *elmats(0, 1), *jmats(0, 1));
          // (2,1) block
          AssembleBlock(
@@ -1256,21 +1252,15 @@ namespace mfem
                                                        const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat)
    {
       // row_offset and col_offset are not needed for elmat.
-      for (int jm = 0, j = 0; jm < dim; ++jm)
+      for (int d = 0; d < dim; ++d)
       {
+         int j = d * col_ndofs;
          for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
          {
+            int i = d * row_ndofs;
             const double t2 = col_dshape_dnM(jdof);
-            for (int im = 0, i = 0; im < dim; ++im)
-            {
-               const double t1 = col_dshape(jdof, jm) * col_nL(im);
-               const double t3 = col_dshape(jdof, im) * col_nM(jm);
-               const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
-               for (int idof = 0; idof < row_ndofs; ++idof, ++i)
-               {
-                  elmat(i, j) += row_shape(idof) * tt;
-               }
-            }
+            for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+               elmat(i, j) += row_shape(idof) * t2;
          }
       }
 

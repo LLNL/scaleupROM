@@ -680,8 +680,8 @@ void MultiBlockSolver::SaveVisualization()
 
 void MultiBlockSolver::SaveSolution(std::string filename)
 {
-   if (!save_sol) return;
-
+   //if (!save_sol) return;
+cout<<"here is: "<<1<<endl;
    if (filename == "")
    {
       filename = sol_dir + "/" + sol_prefix + ".h5";

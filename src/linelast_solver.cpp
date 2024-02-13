@@ -59,6 +59,14 @@ LinElastSolver::~LinElastSolver()
    delete mumps;
 }
 
+void LinElastSolver::SetupBCVariables()
+{
+   MultiBlockSolver::SetupBCVariables();
+
+   bdr_coeffs.SetSize(numBdr);
+   bdr_coeffs = NULL;
+}
+
 void LinElastSolver::SetupMaterialVariables()
 {
    int max_bdr_attr = -1; // A bit redundant...
@@ -71,20 +79,22 @@ void LinElastSolver::SetupMaterialVariables()
    Vector lambda(max_bdr_attr);
    lambda = 1.0;     // Set lambda = 1 for all element attributes.
    lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
-   PWConstCoefficient lambda_c(lambda);
+   // PWConstCoefficient lambda_c(lambda);
 
    Vector mu(max_bdr_attr);
    mu = 1.0;     // Set mu = 1 for all element attributes.
    mu(0) = 50.0; // Set mu = 50 for element attribute 1.
-   PWConstCoefficient mu_c(mu);
+   // PWConstCoefficient mu_c(mu);
 
    lambda_cs.SetSize(numSub);
    mu_cs.SetSize(numSub);
 
    for (int m = 0; m < numSub; m++)
    {
-      lambda_cs[m] = &lambda_c;
-      mu_cs[m] = &mu_c;
+      // lambda_cs[m] = &lambda_c;
+      // mu_cs[m] = &mu_c;
+      lambda_cs[m] = new PWConstCoefficient(lambda);
+      mu_cs[m] = new PWConstCoefficient(mu);
    }
 }
 
@@ -149,35 +159,65 @@ void LinElastSolver::BuildOperators()
 void LinElastSolver::BuildRHSOperators()
 {
    bs.SetSize(numSub);
-
    for (int m = 0; m < numSub; m++)
    {
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
-      bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *(lambda_cs[m]), *(mu_cs[m]), alpha, kappa), *(bdr_markers[0])); // m ight be wrong TODO bdr_marker will be extended to include forces too, also, unsure if this is correct
+   }
+}
+
+void LinElastSolver::SetupRHSBCOperators()
+{
+   assert(bs.Size() == numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(bs[m]);
+      for (int b = 0; b < global_bdr_attributes.Size(); b++)
+      {
+         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+         if (idx < 0)
+            continue;
+         if (!BCExistsOnBdr(b))
+            continue;
+
+         // bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
+         // bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
+         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
+      }
    }
 }
 
 void LinElastSolver::BuildDomainOperators()
 {
    // SanityCheckOnCoeffs();
-
    as.SetSize(numSub);
 
    for (int m = 0; m < numSub; m++)
    {
       as[m] = new BilinearForm(fes[m]);
       as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m])));
+
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
              new DGElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m]), alpha, kappa));
-         as[m]->AddBdrFaceIntegrator(
-             new DGElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m]), alpha, kappa), *(bdr_markers[0]));
+
+         for (int b = 0; b < global_bdr_attributes.Size(); b++)
+         {
+            int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+            if (idx < 0)
+               continue;
+            if (!BCExistsOnBdr(b))
+               continue;
+
+            as[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
+         }
       }
+      as[m]->Assemble();
+      as[m]->Finalize();
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler);
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(alpha, kappa));
+   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs[0], mu_cs[0], alpha, kappa));
 }
 
 void LinElastSolver::Assemble()
@@ -189,13 +229,13 @@ void LinElastSolver::Assemble()
 void LinElastSolver::AssembleRHS()
 {
    // SanityCheckOnCoeffs();
-
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
-
    for (int m = 0; m < numSub; m++)
    {
       MFEM_ASSERT(bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
+      cout << bs[m]->GetFLFI()[0] << endl;
       bs[m]->Assemble();
+      cout << "linear form norm: " << bs[m]->Norml2() << endl;
    }
 
    for (int m = 0; m < numSub; m++)
@@ -206,15 +246,16 @@ void LinElastSolver::AssembleRHS()
 void LinElastSolver::AssembleOperator()
 {
    // SanityCheckOnCoeffs();
-
    MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
-
    for (int m = 0; m < numSub; m++)
    {
       MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
       as[m]->Assemble();
-   }
+      as[m]->Finalize();
+      double binorm = as[m]->SpMat().ToDenseMatrix()->FNorm();
 
+      cout << "bilinear form norm: " << binorm << endl;
+   }
    mats.SetSize(numSub, numSub);
    for (int i = 0; i < numSub; i++)
    {
@@ -231,7 +272,6 @@ void LinElastSolver::AssembleOperator()
       }
    }
    AssembleInterfaceMatrixes();
-
    for (int m = 0; m < numSub; m++)
       as[m]->Finalize();
 
@@ -282,8 +322,13 @@ bool LinElastSolver::Solve()
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
-
+   for (size_t i = 0; i < U->NumBlocks(); i++)
+   {
+      cout << "Unorm " << i << ": " << U->GetBlock(i).Norml2() << endl;
+   }
+   cout << "RHSnorm: " << RHS->Norml2() << endl;
    // TODO: need to change when the actual parallelization is implemented.
+   cout << "direct_solve is: " << direct_solve << endl;
    if (direct_solve)
    {
       assert(mumps);
@@ -351,21 +396,97 @@ bool LinElastSolver::Solve()
    return converged;
 }
 
-void LinElastSolver::SetupBCVariables(){"LinElastSolver::SetupBCVariables is not implemented yet!\n";}
-void LinElastSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr){"LinElastSolver::AddBCFunction is not implemented yet!\n";}
-void LinElastSolver::AddBCFunction(const double &F, const int battr){"LinElastSolver::AddBCFunction is not implemented yet!\n";}
-bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx){std::cout<<"LinElastSolver::BCExistsOnBdr is not implemented yet!\n"; return false;}
-void LinElastSolver::SetupBCOperators(){"LinElastSolver::SetupBCOperators is not implemented yet!\n";}
-void LinElastSolver::SetupRHSBCOperators(){"LinElastSolver::SetupRHSBCOperators is not implemented yet!\n";}
-void LinElastSolver::SetupDomainBCOperators(){"LinElastSolver::SetupDomainBCOperators is not implemented yet!\n";}
+void PrintVector(string filename, Vector &vec)
+{
+   std::ofstream outfile(filename);
+   double tol = 1e-7;
+   double val = 0.0;
+   for (size_t i = 0; i < vec.Size(); i++)
+   {
+      val = vec[i];
+      if (abs(val) < tol)
+      {
+         val = 0.0;
+      }
+
+      outfile << setprecision(8) << val << endl;
+   }
+   outfile.close();
+   cout << "done printing vector" << endl;
+}
+
+void PrintMatrix(string filename, DenseMatrix &mat)
+{
+   std::ofstream outfile(filename);
+
+   double tol = 1e-7;
+   double val = 0.0;
+
+   for (size_t i = 0; i < mat.Height(); i++)
+   {
+      for (size_t j = 0; j < mat.Width(); j++)
+      {
+         val = mat(i, j);
+         if (abs(val) < tol)
+         {
+            val = 0.0;
+         }
+
+         outfile << setprecision(8) << val << " ";
+      }
+      outfile << endl;
+   }
+   outfile.close();
+   cout << "done printing matrix" << endl;
+}
+
+void PrintBlockVector(string filename, BlockVector &bvec)
+{
+   std::ofstream outfile(filename);
+
+   for (size_t i = 0; i < bvec.GetBlock(0).Size(); i++)
+   {
+      for (size_t j = 0; j < bvec.NumBlocks(); j++)
+      {
+         outfile << setprecision(1) << bvec.GetBlock(j)[i] << " ";
+      }
+      outfile << endl;
+   }
+   outfile.close();
+   cout << "done printing blockvector" << endl;
+}
+
+void LinElastSolver::PrintOperators()
+{
+   PrintMatrix("scaleuprom_a.txt", *(as[0]->SpMat().ToDenseMatrix()));
+   PrintVector("scaleuprom_b.txt", *bs[0]);
+}
+
+void LinElastSolver::SetupBCVariables() { "LinElastSolver::SetupBCVariables is not implemented yet!\n"; }
+void LinElastSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr) { "LinElastSolver::AddBCFunction is not implemented yet!\n"; }
+void LinElastSolver::AddBCFunction(const double &F, const int battr) { "LinElastSolver::AddBCFunction is not implemented yet!\n"; }
+bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx)
+{
+   std::cout << "LinElastSolver::BCExistsOnBdr is not implemented yet!\n";
+   return false;
+}
+
+void LinElastSolver::SetupBCOperators()
+{
+   SetupRHSBCOperators();
+   SetupDomainBCOperators();
+}
+
+void LinElastSolver::SetupRHSBCOperators() { "LinElastSolver::SetupRHSBCOperators is not implemented yet!\n"; }
+void LinElastSolver::SetupDomainBCOperators() { "LinElastSolver::SetupDomainBCOperators is not implemented yet!\n"; }
 
 // Component-wise assembly
-void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp){"LinElastSolver::BuildCompROMElement is not implemented yet!\n";}
-void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp){"LinElastSolver::BuildBdrROMElement is not implemented yet!\n";}
-void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp){"LinElastSolver::BuildInterfaceROMElement is not implemented yet!\n";}
+void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildCompROMElement is not implemented yet!\n"; }
+void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildBdrROMElement is not implemented yet!\n"; }
+void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildInterfaceROMElement is not implemented yet!\n"; }
 
-void LinElastSolver::ProjectOperatorOnReducedBasis(){"LinElastSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n";}
+void LinElastSolver::ProjectOperatorOnReducedBasis() { "LinElastSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"; }
 
-void LinElastSolver::SanityCheckOnCoeffs(){"LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n";}
+void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
 
-void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem){"LinElastSolver::SetParameterizedProblem is not implemented yet!\n";}
+void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem) { "LinElastSolver::SetParameterizedProblem is not implemented yet!\n"; }
