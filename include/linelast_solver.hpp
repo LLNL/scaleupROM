@@ -84,6 +84,9 @@ public:
 
    virtual bool Solve();
 
+   // For testing operators
+   virtual void PrintOperators();
+
    // Below are not implemented for FOM
 
    virtual void SetupBCVariables() override;

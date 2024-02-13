@@ -24,5 +24,7 @@ void TrainROM(MPI_Comm comm);
 void AuxiliaryTrainROM(MPI_Comm comm);
 // return relative error if comparing solution.
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
+void TEMPRunAndCompare();
+void OutputOperators();
 
 #endif
