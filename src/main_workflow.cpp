@@ -637,10 +637,13 @@ void TEMPRunAndCompare()
 
 }
 
+
+
 void OutputOperators()
 {
    LinElastSolver test;
    test.InitVariables();
+   cout<<"hej3"<<endl;
    const std::string visual_path = "test_"+ test.GetVisualizationPrefix();
    std::string sol_file = "test_"+ test.GetSolutionFilePrefix();
    sol_file += ".h5";
@@ -650,8 +653,8 @@ void OutputOperators()
    test.InitVisualization(visual_path);
    test.BuildOperators();
    cout<<"op done"<<endl;
-   test.AddBCFunction(dbc2, 2);
-   test.AddBCFunction(dbc4, 4);
+   test.AddBCFunction(LinElastSolver::InitDisplacement, 1);
+   test.AddBCFunction(LinElastSolver::InitDisplacement, 2);
    cout<<"bc done"<<endl;
    test.Assemble();
    cout<<"assembly done"<<endl;

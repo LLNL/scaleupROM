@@ -62,37 +62,23 @@ LinElastSolver::~LinElastSolver()
 void LinElastSolver::SetupBCVariables()
 {
    MultiBlockSolver::SetupBCVariables();
-
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
-}
 
-void LinElastSolver::SetupMaterialVariables()
-{
-   int max_bdr_attr = -1; // A bit redundant...
-   for (int m = 0; m < numSub; m++)
-   {
-      max_bdr_attr = max(max_bdr_attr, meshes[m]->bdr_attributes.Max());
-   }
+   lambda_cs.SetSize(numBdr);
+   mu_cs.SetSize(numBdr);
 
    // Set up the Lame constants for the two materials.
-   Vector lambda(max_bdr_attr);
+   Vector lambda(numBdr);
    lambda = 1.0;     // Set lambda = 1 for all element attributes.
-   lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
-   // PWConstCoefficient lambda_c(lambda);
+   //lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
 
-   Vector mu(max_bdr_attr);
+   Vector mu(numBdr);
    mu = 1.0;     // Set mu = 1 for all element attributes.
-   mu(0) = 50.0; // Set mu = 50 for element attribute 1.
-   // PWConstCoefficient mu_c(mu);
-
-   lambda_cs.SetSize(numSub);
-   mu_cs.SetSize(numSub);
+   //mu(0) = 50.0; // Set mu = 50 for element attribute 1.
 
    for (int m = 0; m < numSub; m++)
    {
-      // lambda_cs[m] = &lambda_c;
-      // mu_cs[m] = &mu_c;
       lambda_cs[m] = new PWConstCoefficient(lambda);
       mu_cs[m] = new PWConstCoefficient(mu);
    }
@@ -118,9 +104,10 @@ void LinElastSolver::InitVariables()
    block_offsets.PartialSum();
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
+   cout<<"1"<<endl;
 
-   MultiBlockSolver::SetupBCVariables();
-   SetupMaterialVariables();
+   SetupBCVariables();
+   cout<<"2"<<endl;
 
    // Set up solution/rhs variables/
    U = new BlockVector(var_offsets);
@@ -134,7 +121,7 @@ void LinElastSolver::InitVariables()
       U_blocks does not own the data.
       These are system-specific, therefore not defining it now.
    */
-
+cout<<"3"<<endl;
    us.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
@@ -145,7 +132,7 @@ void LinElastSolver::InitVariables()
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
-
+cout<<"4"<<endl;
    // if (use_rom)  //Off for now
    //   MultiBlockSolver::InitROMHandler();
 }
@@ -154,6 +141,12 @@ void LinElastSolver::BuildOperators()
 {
    BuildRHSOperators();
    BuildDomainOperators();
+}
+bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx)
+{
+   assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
+   assert(bdr_coeffs.Size() == global_bdr_attributes.Size());
+   return (bdr_coeffs[global_battr_idx]);
 }
 
 void LinElastSolver::BuildRHSOperators()
@@ -174,11 +167,11 @@ void LinElastSolver::SetupRHSBCOperators()
       for (int b = 0; b < global_bdr_attributes.Size(); b++)
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-         if (idx < 0)
+         /* if (idx < 0)
             continue;
          if (!BCExistsOnBdr(b))
             continue;
-
+ */
          // bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
          // bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
          bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
@@ -198,26 +191,27 @@ void LinElastSolver::BuildDomainOperators()
 
       if (full_dg)
       {
-         as[m]->AddInteriorFaceIntegrator(
-             new DGElasticityIntegrator(*(lambda_cs[m]), *(mu_cs[m]), alpha, kappa));
 
          for (int b = 0; b < global_bdr_attributes.Size(); b++)
          {
+            as[m]->AddInteriorFaceIntegrator(
+                new DGElasticityIntegrator(*(lambda_cs[b]), *(mu_cs[b]), alpha, kappa));
             int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-            if (idx < 0)
+            /* if (idx < 0)
                continue;
             if (!BCExistsOnBdr(b))
-               continue;
-
-            as[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
+               continue; */
+            as[m]->AddBdrFaceIntegrator(
+                new DGElasticityIntegrator(*(lambda_cs[b]), *(mu_cs[b]), alpha, kappa), *(bdr_markers[b]));
          }
       }
-      as[m]->Assemble();
-      as[m]->Finalize();
    }
 
-   a_itf = new InterfaceForm(meshes, fes, topol_handler);
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs[0], mu_cs[0], alpha, kappa));
+   a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
+   for (int b = 0; b < global_bdr_attributes.Size(); b++)
+   {
+      a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs[b], mu_cs[b], alpha, kappa));
+   }
 }
 
 void LinElastSolver::Assemble()
@@ -462,13 +456,24 @@ void LinElastSolver::PrintOperators()
    PrintVector("scaleuprom_b.txt", *bs[0]);
 }
 
-void LinElastSolver::SetupBCVariables() { "LinElastSolver::SetupBCVariables is not implemented yet!\n"; }
-void LinElastSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr) { "LinElastSolver::AddBCFunction is not implemented yet!\n"; }
-void LinElastSolver::AddBCFunction(const double &F, const int battr) { "LinElastSolver::AddBCFunction is not implemented yet!\n"; }
-bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx)
+void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
 {
-   std::cout << "LinElastSolver::BCExistsOnBdr is not implemented yet!\n";
-   return false;
+   assert(bdr_coeffs.Size() > 0);
+
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      bdr_coeffs[idx] = new VectorFunctionCoefficient(dim, F);
+   }
+   else
+      for (int k = 0; k < bdr_coeffs.Size(); k++)
+         bdr_coeffs[k] = new VectorFunctionCoefficient(dim, F);
 }
 
 void LinElastSolver::SetupBCOperators()
@@ -477,7 +482,6 @@ void LinElastSolver::SetupBCOperators()
    SetupDomainBCOperators();
 }
 
-void LinElastSolver::SetupRHSBCOperators() { "LinElastSolver::SetupRHSBCOperators is not implemented yet!\n"; }
 void LinElastSolver::SetupDomainBCOperators() { "LinElastSolver::SetupDomainBCOperators is not implemented yet!\n"; }
 
 // Component-wise assembly

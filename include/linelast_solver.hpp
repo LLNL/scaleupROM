@@ -42,6 +42,7 @@ protected:
    // Lame constants for each subdomain, global boundary attribute ordering
    Array<PWConstCoefficient *> lambda_cs;
    Array<PWConstCoefficient *> mu_cs;
+   Array<VectorFunctionCoefficient *> bdr_coeffs;
 
    // DG parameters specific to linear elasticity equation.
    double alpha = -1.0;
@@ -62,14 +63,13 @@ public:
       return varnames;
    }
 
-   static void InitDisplacement(const Vector &x, Vector &u) // Making this static for now
+   static void InitDisplacement(const Vector &x, Vector &u)
    {
       u = 0.0;
       u(u.Size() - 1) = -0.2 * x(0);
    }
 
    virtual void InitVariables();
-   virtual void SetupMaterialVariables();
 
    virtual void BuildOperators();
    virtual void BuildRHSOperators();
@@ -87,11 +87,8 @@ public:
    // For testing operators
    virtual void PrintOperators();
 
-   // Below are not implemented for FOM
-
    virtual void SetupBCVariables() override;
-   virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
-   virtual void AddBCFunction(const double &F, const int battr = -1);
+   virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1);
    virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();
    virtual void SetupRHSBCOperators();
