@@ -161,11 +161,11 @@ void LinElastSolver::SetupRHSBCOperators()
       for (int b = 0; b < global_bdr_attributes.Size(); b++)
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-         /* if (idx < 0)
+         if (idx < 0)
             continue;
          if (!BCExistsOnBdr(b))
             continue;
- */
+
          // bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
          // bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
          bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c, *mu_c, alpha, kappa), *bdr_markers[b]);
@@ -185,25 +185,13 @@ void LinElastSolver::BuildDomainOperators()
 
       if (full_dg)
       {
-
          as[m]->AddInteriorFaceIntegrator(
              new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa));
-         for (int b = 0; b < global_bdr_attributes.Size(); b++)
-         {
-            int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-            /* if (idx < 0)
-               continue;
-            if (!BCExistsOnBdr(b))
-               continue; */
-            as[m]->AddBdrFaceIntegrator(
-                new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa), *(bdr_markers[b]));
-         }
       }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
    a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
-
 }
 
 void LinElastSolver::Assemble()
@@ -474,7 +462,25 @@ void LinElastSolver::SetupBCOperators()
    SetupDomainBCOperators();
 }
 
-void LinElastSolver::SetupDomainBCOperators() { "LinElastSolver::SetupDomainBCOperators is not implemented yet!\n"; }
+void LinElastSolver::SetupDomainBCOperators()
+{
+   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
+   if (full_dg)
+   {
+      for (int m = 0; m < numSub; m++)
+      {
+         for (int b = 0; b < global_bdr_attributes.Size(); b++)
+         {
+            int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+            if (idx < 0)
+               continue;
+            if (!BCExistsOnBdr(b))
+               continue;
+            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa), *(bdr_markers[b]));
+         }
+      }
+   }
+}
 
 // Component-wise assembly
 void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildCompROMElement is not implemented yet!\n"; }
