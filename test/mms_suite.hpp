@@ -75,6 +75,22 @@ void CheckConvergence(const double &threshold = 1.0);
 
 }   // namespace steady_ns
 
+namespace linelast
+{
+
+static const double pi = 4.0 * atan(1.0);
+static double amp[3];
+static double L[3];
+static double offset[3];
+static double constant;
+
+double ExactSolution(const Vector &);
+double ExactRHS(const Vector &);
+LinElastSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence();
+
+}  // namespace linelast
+
 namespace fem
 {
 

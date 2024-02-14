@@ -67,12 +67,12 @@ void LinElastSolver::SetupBCVariables()
 
    // Set up the Lame constants for the two materials.
    Vector lambda(numBdr);
-   lambda = 1.0; // Set lambda = 1 for all element attributes.
-   // lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
+   lambda = 1.0;     // Set lambda = 1 for all element attributes.
+   //lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
 
    Vector mu(numBdr);
-   mu = 1.0; // Set mu = 1 for all element attributes.
-             // mu(0) = 50.0; // Set mu = 50 for element attribute 1.
+   mu = 1.0;     // Set mu = 1 for all element attributes.
+   //mu(0) = 50.0; // Set mu = 50 for element attribute 1.
 
    lambda_c = new PWConstCoefficient(lambda);
    mu_c = new PWConstCoefficient(mu);
@@ -166,8 +166,6 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         // bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
-         // bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*init_x, *lambda_cs[b], *mu_cs[b], alpha, kappa), *bdr_markers[b]);
          bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c, *mu_c, alpha, kappa), *bdr_markers[b]);
       }
    }
@@ -492,3 +490,19 @@ void LinElastSolver::ProjectOperatorOnReducedBasis() { "LinElastSolver::ProjectO
 void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
 
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem) { "LinElastSolver::SetParameterizedProblem is not implemented yet!\n"; }
+
+
+/*Todo: add force vector
+ VectorArrayCoefficient f(dim);
+   for (int i = 0; i < dim - 1; i++)
+   {
+      f.Set(i, new ConstantCoefficient(0.0));
+   }
+   {
+      Vector pull_force(NumBdr);
+      pull_force = 0.0;
+      pull_force(1) = -1.0e-2;
+      f.Set(dim - 1, new PWConstCoefficient(pull_force));
+   }
+   b.AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(f));
+*/

@@ -86,13 +86,15 @@ public:
 
    // For testing operators
    virtual void PrintOperators();
-
+   
    virtual void SetupBCVariables() override;
    virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1);
    virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
+   virtual void AddRHSFunction(std::function<double(const Vector &)> F)
+   { rhs_coeffs.Append(new VectorArrayCoefficient(F)); }
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
