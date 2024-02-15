@@ -43,6 +43,7 @@ protected:
    PWConstCoefficient *lambda_c;
    PWConstCoefficient *mu_c;
    Array<VectorFunctionCoefficient *> bdr_coeffs;
+   Array<VectorFunctionCoefficient *> rhs_coeffs;
 
    // DG parameters specific to linear elasticity equation.
    double alpha = -1.0;
@@ -63,10 +64,9 @@ public:
       return varnames;
    }
 
-   static void InitDisplacement(const Vector &x, Vector &u)
+   static void ZeroDisplacement(const Vector &x, Vector &u)
    {
       u = 0.0;
-      u(u.Size() - 1) = -0.2 * x(0);
    }
 
    virtual void InitVariables();
@@ -86,15 +86,15 @@ public:
 
    // For testing operators
    virtual void PrintOperators();
-   
+
    virtual void SetupBCVariables() override;
+   virtual void SetupIC(std::function<void(const Vector &, Vector &)> F);
    virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1);
+   virtual void AddRHSFunction(std::function<void(const Vector &, Vector &)> F);
    virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
-   virtual void AddRHSFunction(std::function<double(const Vector &)> F)
-   { rhs_coeffs.Append(new VectorArrayCoefficient(F)); }
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);

@@ -637,12 +637,17 @@ void TEMPRunAndCompare()
 
 }
 
-
+static void InitDisplacement(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u(u.Size() - 1) = -0.2 * x(0);
+   }
 
 void OutputOperators()
 {
    LinElastSolver test;
    test.InitVariables();
+   test.SetupIC(InitDisplacement);
    cout<<"hej3"<<endl;
    const std::string visual_path = "test_"+ test.GetVisualizationPrefix();
    std::string sol_file = "test_"+ test.GetSolutionFilePrefix();
@@ -652,8 +657,8 @@ void OutputOperators()
    cout<<"visual_path is: "<<visual_path<<endl;
    test.InitVisualization(visual_path);
    cout<<"op done"<<endl;
-   test.AddBCFunction(LinElastSolver::InitDisplacement, 1);
-   test.AddBCFunction(LinElastSolver::InitDisplacement, 2);
+   test.AddBCFunction(InitDisplacement, 1);
+   test.AddBCFunction(InitDisplacement, 2);
    test.BuildOperators();
    test.SetupBCOperators();
    cout<<"bc done"<<endl;

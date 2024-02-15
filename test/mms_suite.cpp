@@ -496,13 +496,13 @@ namespace mms
       void ExactSolution(const Vector &x, Vector &u)
       {
          u = 0.0;
-         u(0) = sin(pi * x(0)); //+ x(0) * pow(x(1), 2);
-         u(1) = sin(pi * x(1)); //+ x(1) * pow(x(0), 2);
+         u(0) = sin(pi * x(0))+ x(0) * pow(x(1), 2);
+         u(1) = sin(pi * x(1))+ x(1) * pow(x(0), 2);
          if (dim == 3)
          {
-            //u(0) += x(0) * pow(x(2), 2);
-            //u(1) += x(1) * pow(x(2), 2);
-            u(2) = sin(pi * x(2)); // + x(2) * pow(x(0), 2) + x(2) * pow(x(1), 2);
+            u(0) += x(0) * pow(x(2), 2);
+            u(1) += x(1) * pow(x(2), 2);
+            u(2) = sin(pi * x(2)) + x(2) * pow(x(0), 2) + x(2) * pow(x(1), 2);
          }
       }
 
@@ -516,15 +516,21 @@ namespace mms
          }
 
          u *= -mu * pi_2;
-         u(0) += (-pi_2 * sin(pi * x(0)) /* + 2 * x(1)) */)* (lambda + mu);
-         u(1) += (-pi_2 * sin(pi * x(1)) /* + 2 * x(0)) */) * (lambda + mu);
+         u(0) += (-pi_2 * sin(pi * x(0)) + 2 * x(1))* (lambda + mu);
+         u(1) += (-pi_2 * sin(pi * x(1)) + 2 * x(0)) * (lambda + mu);
          if (dim == 3)
          {
-            //u(0) += 2 * x(2) * (lambda + mu);
-            //u(1) += 2 * x(2) * (lambda + mu);
-            u(2) += (-pi_2 * sin(pi * x(2)) /* + 2 * x(0) + 2 * x(1) */) * (lambda + mu);
+            u(0) += 2 * x(2) * (lambda + mu);
+            u(1) += 2 * x(2) * (lambda + mu);
+            u(2) += (-pi_2 * sin(pi * x(2)) + 2 * x(0) + 2 * x(1)) * (lambda + mu);
          }
-         //u *= -1.0;
+         u *= -1.0;
+         if (x(0) > 0.0 && x(1) > 0.0 && x(2) > 0.0 )
+         {
+            cout<<u(0)<<endl<<u(1)<<endl<<u(2)<<endl;
+            MFEM_ABORT(":(")
+         }
+         
       }
 
       LinElastSolver *SolveWithRefinement(const int num_refinement)

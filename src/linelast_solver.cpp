@@ -41,7 +41,6 @@ LinElastSolver::LinElastSolver()
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
 
-   init_x = new VectorFunctionCoefficient(dim, InitDisplacement);
 }
 
 LinElastSolver::~LinElastSolver()
@@ -59,11 +58,24 @@ LinElastSolver::~LinElastSolver()
    delete mumps;
 }
 
+void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
+{
+   init_x = new VectorFunctionCoefficient(dim, F);
+   for (int m = 0; m < numSub; m++)
+   {
+      assert(us[m]);
+      us[m]->ProjectCoefficient(*init_x);
+   }
+}
+
 void LinElastSolver::SetupBCVariables()
 {
    MultiBlockSolver::SetupBCVariables();
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
+
+   //rhs_coeffs.SetSize(numBdr); // TODO: For now the right hand side function works like the BC functions
+//rhs_coeffs = NULL;
 
    // Set up the Lame constants for the two materials.
    Vector lambda(numBdr);
@@ -120,7 +132,6 @@ void LinElastSolver::InitVariables()
    for (int m = 0; m < numSub; m++)
    {
       us[m] = new GridFunction(fes[m], U->GetBlock(m), 0);
-      us[m]->ProjectCoefficient(*init_x);
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
@@ -149,6 +160,8 @@ void LinElastSolver::BuildRHSOperators()
    for (int m = 0; m < numSub; m++)
    {
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
+      for (int r = 0; r < rhs_coeffs.Size(); r++)
+         bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));
    }
 }
 
@@ -452,6 +465,11 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
    else
       for (int k = 0; k < bdr_coeffs.Size(); k++)
          bdr_coeffs[k] = new VectorFunctionCoefficient(dim, F);
+}
+
+void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
+{
+         rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
 }
 
 void LinElastSolver::SetupBCOperators()
