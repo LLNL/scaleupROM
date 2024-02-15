@@ -1,0 +1,25 @@
+main:
+  mode: output_operators
+  use_rom: false
+  solver: linelast
+
+mesh:
+  filename: meshes/beam-tri.mesh
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: none
+  #type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: true
+  unified_paraview: true
+  file_path:
+    prefix: test_paraview_output
