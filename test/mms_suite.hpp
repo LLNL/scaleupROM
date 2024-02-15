@@ -9,6 +9,7 @@
 #include "poisson_solver.hpp"
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
+#include "linelast_solver.hpp"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -79,13 +80,12 @@ namespace linelast
 {
 
 static const double pi = 4.0 * atan(1.0);
-static double amp[3];
-static double L[3];
-static double offset[3];
-static double constant;
-
-double ExactSolution(const Vector &);
-double ExactRHS(const Vector &);
+static const double mu = 1.0; //only test case when mu = 1.0 (homogenous material)
+static double lambda = 1.0;
+static int dim;
+static void InitDisplacement2(const Vector &x, Vector &u);
+static void ExactSolution(const Vector & x, Vector & u);
+static void ExactRHS(const Vector & x, Vector & u);
 LinElastSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 

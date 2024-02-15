@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "mms_suite.hpp"
-#include<gtest/gtest.h>
+#include <gtest/gtest.h>
 #include "dg_linear.hpp"
 
 using namespace std;
@@ -12,715 +12,733 @@ using namespace mfem;
 namespace mms
 {
 
-namespace poisson
-{
-
-double ExactSolution(const Vector &x)
-{
-   double result = constant;
-   for (int d = 0; d < x.Size(); d++)
-      result += amp[d] * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
-   return result;
-}
-
-double ExactRHS(const Vector &x)
-{
-   double result = 0.0;
-   for (int d = 0; d < x.Size(); d++)
-      result += amp[d] * (2.0 * pi / L[d]) * (2.0 * pi / L[d]) * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
-   return result;
-}
-
-PoissonSolver *SolveWithRefinement(const int num_refinement)
-{
-   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   PoissonSolver *test = new PoissonSolver();
-
-   test->InitVariables();
-   test->InitVisualization();
-
-   test->AddBCFunction(ExactSolution);
-   test->AddRHSFunction(ExactRHS);
-
-   test->BuildOperators();
-
-   test->SetupBCOperators();
-
-   test->Assemble();
-
-   test->Solve();
-
-   return test;
-}
-
-void CheckConvergence()
-{
-   amp[0] = config.GetOption<double>("manufactured_solution/amp1", 0.22);
-   amp[1] = config.GetOption<double>("manufactured_solution/amp2", 0.13);
-   amp[2] = config.GetOption<double>("manufactured_solution/amp3", 0.37);
-   L[0] = config.GetOption<double>("manufactured_solution/L1", 0.31);
-   L[1] = config.GetOption<double>("manufactured_solution/L2", 0.72);
-   L[2] = config.GetOption<double>("manufactured_solution/L2", 0.47);
-   offset[0] = config.GetOption<double>("manufactured_solution/offset1", 0.35);
-   offset[1] = config.GetOption<double>("manufactured_solution/offset2", 0.73);
-   offset[2] = config.GetOption<double>("manufactured_solution/offset3", 0.59);
-   constant = config.GetOption<double>("manufactured_solution/constant", -0.27);
-
-   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
-   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
-
-   // Compare with exact solution
-   FunctionCoefficient exact_sol(ExactSolution);
-
-   printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
-
-   Vector conv_rate(num_refine);
-   conv_rate = 0.0;
-   double error1 = 0.0;
-   for (int r = base_refine; r < num_refine; r++)
+   namespace poisson
    {
-      PoissonSolver *test = SolveWithRefinement(r);
 
-      int order = test->GetDiscretizationOrder();
-      int order_quad = max(2, 2*order+1);
-      const IntegrationRule *irs[Geometry::NumGeom];
-      for (int i=0; i < Geometry::NumGeom; ++i)
+      double ExactSolution(const Vector &x)
       {
-         irs[i] = &(IntRules.Get(i, order_quad));
+         double result = constant;
+         for (int d = 0; d < x.Size(); d++)
+            result += amp[d] * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
+         return result;
       }
 
-      int numEl = 0;
-      double norm = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      double ExactRHS(const Vector &x)
       {
-         Mesh *mk = test->GetMesh(k);
-         norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
-         numEl += mk->GetNE();
+         double result = 0.0;
+         for (int d = 0; d < x.Size(); d++)
+            result += amp[d] * (2.0 * pi / L[d]) * (2.0 * pi / L[d]) * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
+         return result;
       }
-      norm = sqrt(norm);
 
-      double error = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      PoissonSolver *SolveWithRefinement(const int num_refinement)
       {
-         GridFunction *uk = test->GetGridFunction(k);
-         error += pow(uk->ComputeLpError(2, exact_sol), 2);
+         config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+         PoissonSolver *test = new PoissonSolver();
+
+         test->InitVariables();
+         test->InitVisualization();
+
+         test->AddBCFunction(ExactSolution);
+         test->AddRHSFunction(ExactRHS);
+
+         test->BuildOperators();
+
+         test->SetupBCOperators();
+
+         test->Assemble();
+
+         test->Solve();
+
+         return test;
       }
-      error = sqrt(error);
-      error /= norm;
-      
-      if (r > base_refine)
+
+      void CheckConvergence()
       {
-         conv_rate(r) = error1 / error;
+         amp[0] = config.GetOption<double>("manufactured_solution/amp1", 0.22);
+         amp[1] = config.GetOption<double>("manufactured_solution/amp2", 0.13);
+         amp[2] = config.GetOption<double>("manufactured_solution/amp3", 0.37);
+         L[0] = config.GetOption<double>("manufactured_solution/L1", 0.31);
+         L[1] = config.GetOption<double>("manufactured_solution/L2", 0.72);
+         L[2] = config.GetOption<double>("manufactured_solution/L2", 0.47);
+         offset[0] = config.GetOption<double>("manufactured_solution/offset1", 0.35);
+         offset[1] = config.GetOption<double>("manufactured_solution/offset2", 0.73);
+         offset[2] = config.GetOption<double>("manufactured_solution/offset3", 0.59);
+         constant = config.GetOption<double>("manufactured_solution/constant", -0.27);
+
+         int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+         int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+         // Compare with exact solution
+         FunctionCoefficient exact_sol(ExactSolution);
+
+         printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
+
+         Vector conv_rate(num_refine);
+         conv_rate = 0.0;
+         double error1 = 0.0;
+         for (int r = base_refine; r < num_refine; r++)
+         {
+            PoissonSolver *test = SolveWithRefinement(r);
+
+            int order = test->GetDiscretizationOrder();
+            int order_quad = max(2, 2 * order + 1);
+            const IntegrationRule *irs[Geometry::NumGeom];
+            for (int i = 0; i < Geometry::NumGeom; ++i)
+            {
+               irs[i] = &(IntRules.Get(i, order_quad));
+            }
+
+            int numEl = 0;
+            double norm = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               Mesh *mk = test->GetMesh(k);
+               norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
+               numEl += mk->GetNE();
+            }
+            norm = sqrt(norm);
+
+            double error = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *uk = test->GetGridFunction(k);
+               error += pow(uk->ComputeLpError(2, exact_sol), 2);
+            }
+            error = sqrt(error);
+            error /= norm;
+
+            if (r > base_refine)
+            {
+               conv_rate(r) = error1 / error;
+            }
+            printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
+
+            // reported convergence rate
+            if (r > base_refine)
+               EXPECT_TRUE(conv_rate(r) > pow(2.0, order + 1) - 0.5);
+
+            error1 = error;
+         }
+
+         return;
       }
-      printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
 
-      // reported convergence rate
-      if (r > base_refine)
-         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
+   } // namespace poisson
 
-      error1 = error;
-   }
-
-   return;
-}
-
-}  // namespace poisson
-
-namespace stokes
-{
-
-void uFun_ex(const Vector & x, Vector & u)
-{
-   double xi(x(0));
-   double yi(x(1));
-   assert(x.Size() == 2);
-
-   u(0) = cos(xi)*sin(yi);
-   u(1) = - sin(xi)*cos(yi);
-}
-
-// Change if needed
-double pFun_ex(const Vector & x)
-{
-   double xi(x(0));
-   double yi(x(1));
-
-   assert(x.Size() == 2);
-
-   return 2.0 * nu * sin(xi)*sin(yi);
-}
-
-void fFun(const Vector & x, Vector & f)
-{
-   assert(x.Size() == 2);
-   f.SetSize(x.Size());
-
-   double xi(x(0));
-   double yi(x(1));
-
-   f(0) = 4.0 * nu * cos(xi) * sin(yi);
-   f(1) = 0.0;
-}
-
-double gFun(const Vector & x)
-{
-   assert(x.Size() == 2);
-
-   return 0.0;
-}
-
-StokesSolver *SolveWithRefinement(const int num_refinement)
-{
-   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   StokesSolver *test = new StokesSolver();
-
-   test->InitVariables();
-   test->InitVisualization();
-
-   test->AddBCFunction(uFun_ex);
-   test->AddRHSFunction(fFun);
-   // NOTE(kevin): uFun_ex already satisfies zero divergence.
-   //              no need to set complementary flux.
-   // Array<bool> nz_dbcs(test->GetNumBdr());
-   // nz_dbcs = true;
-   // test->SetComplementaryFlux(nz_dbcs);
-
-   test->BuildOperators();
-
-   test->SetupBCOperators();
-
-   test->Assemble();
-
-   test->Solve();
-
-   return test;
-}
-
-void CheckConvergence(const double &threshold)
-{
-   nu = config.GetOption<double>("stokes/nu", 1.0);
-
-   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
-   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
-
-   //printf("Num. Elem.\tRel. v err.\tConv Rate\tNorm\tRel. p err.\tConv Rate\tNorm\n");
-   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
-          "Num. Elem.", "Rel v err", "Conv Rate", "Norm", "Rel p err", "Conv Rate", "Norm");
-
-   Vector uconv_rate(num_refine), pconv_rate(num_refine);
-   uconv_rate = 0.0;
-   pconv_rate = 0.0;
-   double uerror1 = 0.0, perror1 = 0.0;
-   for (int r = base_refine; r < num_refine; r++)
+   namespace stokes
    {
-      StokesSolver *test = SolveWithRefinement(r);
 
-      // Compare with exact solution
-      int dim = test->GetDim();
-      VectorFunctionCoefficient exact_usol(dim, uFun_ex);
-      FunctionCoefficient exact_psol(pFun_ex);
-
-      // For all velocity dirichlet bc, pressure does not have the absolute value.
-      // specify the constant scalar for the reference value.
-      double p_const = 0.0;
-      int ps = 0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      void uFun_ex(const Vector &x, Vector &u)
       {
-         GridFunction *pk = test->GetPresGridFunction(k);
-         GridFunction p_ex(*pk);
-         p_ex.ProjectCoefficient(exact_psol);
-         ps += p_ex.Size();
-         p_const += p_ex.Sum();
-         // If p_ex is the view vector of pk, then this will prevent false negative test result.
-         p_ex += 1.0;
-      }
-      p_const /= static_cast<double>(ps);
+         double xi(x(0));
+         double yi(x(1));
+         assert(x.Size() == 2);
 
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
-      {
-         GridFunction *pk = test->GetPresGridFunction(k);
-         (*pk) += p_const;
+         u(0) = cos(xi) * sin(yi);
+         u(1) = -sin(xi) * cos(yi);
       }
 
-      int uorder = test->GetVelFEOrder();
-      int porder = test->GetPresFEOrder();
-      int order_quad = max(2, 2*uorder+1);
-      const IntegrationRule *irs[Geometry::NumGeom];
-      for (int i=0; i < Geometry::NumGeom; ++i)
+      // Change if needed
+      double pFun_ex(const Vector &x)
       {
-         irs[i] = &(IntRules.Get(i, order_quad));
+         double xi(x(0));
+         double yi(x(1));
+
+         assert(x.Size() == 2);
+
+         return 2.0 * nu * sin(xi) * sin(yi);
       }
 
-      int numEl = 0;
-      double unorm = 0.0, pnorm = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      void fFun(const Vector &x, Vector &f)
       {
-         Mesh *mk = test->GetMesh(k);
-         unorm += pow(ComputeLpNorm(2.0, exact_usol, *mk, irs), 2);
-         pnorm += pow(ComputeLpNorm(2.0, exact_psol, *mk, irs), 2);
-         numEl += mk->GetNE();
-      }
-      unorm = sqrt(unorm);
-      pnorm = sqrt(pnorm);
+         assert(x.Size() == 2);
+         f.SetSize(x.Size());
 
-      double uerror = 0.0, perror = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
-      {
-         GridFunction *uk = test->GetVelGridFunction(k);
-         GridFunction *pk = test->GetPresGridFunction(k);
-         uerror += pow(uk->ComputeLpError(2, exact_usol), 2);
-         perror += pow(pk->ComputeLpError(2, exact_psol), 2);
-      }
-      uerror = sqrt(uerror);
-      perror = sqrt(perror);
+         double xi(x(0));
+         double yi(x(1));
 
-      uerror /= unorm;
-      perror /= pnorm;
-      
-      if (r > base_refine)
-      {
-         uconv_rate(r) = uerror1 / uerror;
-         pconv_rate(r) = perror1 / perror;
-      }
-      printf("%10d\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
-
-      // reported convergence rate
-      if (r > base_refine)
-      {
-         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - threshold);
-         EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - threshold);
+         f(0) = 4.0 * nu * cos(xi) * sin(yi);
+         f(1) = 0.0;
       }
 
-      uerror1 = uerror;
-      perror1 = perror;
+      double gFun(const Vector &x)
+      {
+         assert(x.Size() == 2);
 
-      delete test;
-   }
+         return 0.0;
+      }
 
-   return;
-}
+      StokesSolver *SolveWithRefinement(const int num_refinement)
+      {
+         config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+         StokesSolver *test = new StokesSolver();
 
-}  // namespace stokes
+         test->InitVariables();
+         test->InitVisualization();
 
-namespace steady_ns
-{
+         test->AddBCFunction(uFun_ex);
+         test->AddRHSFunction(fFun);
+         // NOTE(kevin): uFun_ex already satisfies zero divergence.
+         //              no need to set complementary flux.
+         // Array<bool> nz_dbcs(test->GetNumBdr());
+         // nz_dbcs = true;
+         // test->SetComplementaryFlux(nz_dbcs);
 
-void uFun_ex(const Vector & x, Vector & u)
-{
-   double xi(x(0));
-   double yi(x(1));
-   assert(x.Size() == 2);
+         test->BuildOperators();
 
-   u(0) = cos(xi)*sin(yi);
-   u(1) = - sin(xi)*cos(yi);
-}
+         test->SetupBCOperators();
 
-// Change if needed
-double pFun_ex(const Vector & x)
-{
-   double xi(x(0));
-   double yi(x(1));
+         test->Assemble();
 
-   assert(x.Size() == 2);
+         test->Solve();
 
-   return 2.0 * nu * sin(xi)*sin(yi);
-}
+         return test;
+      }
 
-void fFun(const Vector & x, Vector & f)
-{
-   assert(x.Size() == 2);
-   f.SetSize(x.Size());
+      void CheckConvergence(const double &threshold)
+      {
+         nu = config.GetOption<double>("stokes/nu", 1.0);
 
-   double xi(x(0));
-   double yi(x(1));
+         int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+         int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
 
-   f(0) = 4.0 * nu * cos(xi) * sin(yi);
-   f(1) = 0.0;
+         // printf("Num. Elem.\tRel. v err.\tConv Rate\tNorm\tRel. p err.\tConv Rate\tNorm\n");
+         printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
+                "Num. Elem.", "Rel v err", "Conv Rate", "Norm", "Rel p err", "Conv Rate", "Norm");
 
-   f(0) += - zeta * sin(xi) * cos(xi);
-   f(1) += - zeta * sin(yi) * cos(yi);
-}
+         Vector uconv_rate(num_refine), pconv_rate(num_refine);
+         uconv_rate = 0.0;
+         pconv_rate = 0.0;
+         double uerror1 = 0.0, perror1 = 0.0;
+         for (int r = base_refine; r < num_refine; r++)
+         {
+            StokesSolver *test = SolveWithRefinement(r);
 
-double gFun(const Vector & x)
-{
-   assert(x.Size() == 2);
+            // Compare with exact solution
+            int dim = test->GetDim();
+            VectorFunctionCoefficient exact_usol(dim, uFun_ex);
+            FunctionCoefficient exact_psol(pFun_ex);
 
-   return 0.0;
-}
+            // For all velocity dirichlet bc, pressure does not have the absolute value.
+            // specify the constant scalar for the reference value.
+            double p_const = 0.0;
+            int ps = 0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *pk = test->GetPresGridFunction(k);
+               GridFunction p_ex(*pk);
+               p_ex.ProjectCoefficient(exact_psol);
+               ps += p_ex.Size();
+               p_const += p_ex.Sum();
+               // If p_ex is the view vector of pk, then this will prevent false negative test result.
+               p_ex += 1.0;
+            }
+            p_const /= static_cast<double>(ps);
 
-SteadyNSSolver *SolveWithRefinement(const int num_refinement)
-{
-   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   SteadyNSSolver *test = new SteadyNSSolver();
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *pk = test->GetPresGridFunction(k);
+               (*pk) += p_const;
+            }
 
-   test->InitVariables();
-   test->InitVisualization();
+            int uorder = test->GetVelFEOrder();
+            int porder = test->GetPresFEOrder();
+            int order_quad = max(2, 2 * uorder + 1);
+            const IntegrationRule *irs[Geometry::NumGeom];
+            for (int i = 0; i < Geometry::NumGeom; ++i)
+            {
+               irs[i] = &(IntRules.Get(i, order_quad));
+            }
 
-   test->AddBCFunction(uFun_ex);
-   test->AddRHSFunction(fFun);
-   // NOTE(kevin): uFun_ex already satisfies zero divergence.
-   //              no need to set complementary flux.
-   // Array<bool> nz_dbcs(test->GetNumBdr());
-   // nz_dbcs = true;
-   // test->SetComplementaryFlux(nz_dbcs);
+            int numEl = 0;
+            double unorm = 0.0, pnorm = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               Mesh *mk = test->GetMesh(k);
+               unorm += pow(ComputeLpNorm(2.0, exact_usol, *mk, irs), 2);
+               pnorm += pow(ComputeLpNorm(2.0, exact_psol, *mk, irs), 2);
+               numEl += mk->GetNE();
+            }
+            unorm = sqrt(unorm);
+            pnorm = sqrt(pnorm);
 
-   test->BuildOperators();
+            double uerror = 0.0, perror = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *uk = test->GetVelGridFunction(k);
+               GridFunction *pk = test->GetPresGridFunction(k);
+               uerror += pow(uk->ComputeLpError(2, exact_usol), 2);
+               perror += pow(pk->ComputeLpError(2, exact_psol), 2);
+            }
+            uerror = sqrt(uerror);
+            perror = sqrt(perror);
 
-   test->SetupBCOperators();
+            uerror /= unorm;
+            perror /= pnorm;
 
-   test->Assemble();
+            if (r > base_refine)
+            {
+               uconv_rate(r) = uerror1 / uerror;
+               pconv_rate(r) = perror1 / perror;
+            }
+            printf("%10d\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
 
-   test->Solve();
+            // reported convergence rate
+            if (r > base_refine)
+            {
+               EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder + 1) - threshold);
+               EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder + 1) - threshold);
+            }
 
-   return test;
-}
+            uerror1 = uerror;
+            perror1 = perror;
 
-void CheckConvergence(const double &threshold)
-{
-   nu = config.GetOption<double>("stokes/nu", 1.0);
-   zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
+            delete test;
+         }
 
-   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
-   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+         return;
+      }
 
-   //printf("Num. Elem.\tRel. v err.\tConv Rate\tNorm\tRel. p err.\tConv Rate\tNorm\n");
-   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
-          "Num. Elem.", "Rel v err", "Conv Rate", "Norm", "Rel p err", "Conv Rate", "Norm");
+   } // namespace stokes
 
-   Vector uconv_rate(num_refine), pconv_rate(num_refine);
-   uconv_rate = 0.0;
-   pconv_rate = 0.0;
-   double uerror1 = 0.0, perror1 = 0.0;
-   for (int r = base_refine; r < num_refine; r++)
+   namespace steady_ns
    {
-      SteadyNSSolver *test = SolveWithRefinement(r);
 
-      // Compare with exact solution
-      int dim = test->GetDim();
-      VectorFunctionCoefficient exact_usol(dim, uFun_ex);
-      FunctionCoefficient exact_psol(pFun_ex);
-
-      // For all velocity dirichlet bc, pressure does not have the absolute value.
-      // specify the constant scalar for the reference value.
-      double p_const = 0.0;
-      int ps = 0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      void uFun_ex(const Vector &x, Vector &u)
       {
-         GridFunction *pk = test->GetPresGridFunction(k);
-         GridFunction p_ex(*pk);
-         p_ex.ProjectCoefficient(exact_psol);
-         ps += p_ex.Size();
-         p_const += p_ex.Sum();
-         // If p_ex is the view vector of pk, then this will prevent false negative test result.
-         p_ex += 1.0;
-      }
-      p_const /= static_cast<double>(ps);
+         double xi(x(0));
+         double yi(x(1));
+         assert(x.Size() == 2);
 
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
-      {
-         GridFunction *pk = test->GetPresGridFunction(k);
-         (*pk) += p_const;
+         u(0) = cos(xi) * sin(yi);
+         u(1) = -sin(xi) * cos(yi);
       }
 
-      int uorder = test->GetVelFEOrder();
-      int porder = test->GetPresFEOrder();
-      int order_quad = max(2, 2*uorder+1);
-      const IntegrationRule *irs[Geometry::NumGeom];
-      for (int i=0; i < Geometry::NumGeom; ++i)
+      // Change if needed
+      double pFun_ex(const Vector &x)
       {
-         irs[i] = &(IntRules.Get(i, order_quad));
+         double xi(x(0));
+         double yi(x(1));
+
+         assert(x.Size() == 2);
+
+         return 2.0 * nu * sin(xi) * sin(yi);
       }
 
-      int numEl = 0;
-      double unorm = 0.0, pnorm = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      void fFun(const Vector &x, Vector &f)
       {
-         Mesh *mk = test->GetMesh(k);
-         unorm += pow(ComputeLpNorm(2.0, exact_usol, *mk, irs), 2);
-         pnorm += pow(ComputeLpNorm(2.0, exact_psol, *mk, irs), 2);
-         numEl += mk->GetNE();
-      }
-      unorm = sqrt(unorm);
-      pnorm = sqrt(pnorm);
+         assert(x.Size() == 2);
+         f.SetSize(x.Size());
 
-      double uerror = 0.0, perror = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
-      {
-         GridFunction *uk = test->GetVelGridFunction(k);
-         GridFunction *pk = test->GetPresGridFunction(k);
-         uerror += pow(uk->ComputeLpError(2, exact_usol), 2);
-         perror += pow(pk->ComputeLpError(2, exact_psol), 2);
-      }
-      uerror = sqrt(uerror);
-      perror = sqrt(perror);
+         double xi(x(0));
+         double yi(x(1));
 
-      uerror /= unorm;
-      perror /= pnorm;
-      
-      if (r > base_refine)
-      {
-         uconv_rate(r) = uerror1 / uerror;
-         pconv_rate(r) = perror1 / perror;
-      }
-      printf("%10d\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
+         f(0) = 4.0 * nu * cos(xi) * sin(yi);
+         f(1) = 0.0;
 
-      // reported convergence rate
-      if (r > base_refine)
-      {
-         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - threshold);
-         EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - threshold);
+         f(0) += -zeta * sin(xi) * cos(xi);
+         f(1) += -zeta * sin(yi) * cos(yi);
       }
 
-      uerror1 = uerror;
-      perror1 = perror;
+      double gFun(const Vector &x)
+      {
+         assert(x.Size() == 2);
 
-      delete test;
-   }
+         return 0.0;
+      }
 
-   return;
-}
+      SteadyNSSolver *SolveWithRefinement(const int num_refinement)
+      {
+         config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+         SteadyNSSolver *test = new SteadyNSSolver();
 
-}  // namespace steady_ns
+         test->InitVariables();
+         test->InitVisualization();
 
+         test->AddBCFunction(uFun_ex);
+         test->AddRHSFunction(fFun);
+         // NOTE(kevin): uFun_ex already satisfies zero divergence.
+         //              no need to set complementary flux.
+         // Array<bool> nz_dbcs(test->GetNumBdr());
+         // nz_dbcs = true;
+         // test->SetComplementaryFlux(nz_dbcs);
 
-namespace linelast
-{
+         test->BuildOperators();
 
-double ExactSolution(const Vector &x)
-{
-   double result = constant;
-   for (int d = 0; d < x.Size(); d++)
-      result += amp[d] * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
-   return result;
-}
+         test->SetupBCOperators();
 
-double ExactRHS(const Vector &x)
-{
-   double result = 0.0;
-   for (int d = 0; d < x.Size(); d++)
-      result += amp[d] * (2.0 * pi / L[d]) * (2.0 * pi / L[d]) * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
-   return result;
-}
+         test->Assemble();
 
-PoissonSolver *SolveWithRefinement(const int num_refinement)
-{
-   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-   PoissonSolver *test = new PoissonSolver();
+         test->Solve();
 
-   test->InitVariables();
-   test->InitVisualization();
+         return test;
+      }
 
-   test->AddBCFunction(ExactSolution);
-   test->AddRHSFunction(ExactRHS);
+      void CheckConvergence(const double &threshold)
+      {
+         nu = config.GetOption<double>("stokes/nu", 1.0);
+         zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
 
-   test->BuildOperators();
+         int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+         int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
 
-   test->SetupBCOperators();
+         // printf("Num. Elem.\tRel. v err.\tConv Rate\tNorm\tRel. p err.\tConv Rate\tNorm\n");
+         printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
+                "Num. Elem.", "Rel v err", "Conv Rate", "Norm", "Rel p err", "Conv Rate", "Norm");
 
-   test->Assemble();
+         Vector uconv_rate(num_refine), pconv_rate(num_refine);
+         uconv_rate = 0.0;
+         pconv_rate = 0.0;
+         double uerror1 = 0.0, perror1 = 0.0;
+         for (int r = base_refine; r < num_refine; r++)
+         {
+            SteadyNSSolver *test = SolveWithRefinement(r);
 
-   test->Solve();
+            // Compare with exact solution
+            int dim = test->GetDim();
+            VectorFunctionCoefficient exact_usol(dim, uFun_ex);
+            FunctionCoefficient exact_psol(pFun_ex);
 
-   return test;
-}
+            // For all velocity dirichlet bc, pressure does not have the absolute value.
+            // specify the constant scalar for the reference value.
+            double p_const = 0.0;
+            int ps = 0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *pk = test->GetPresGridFunction(k);
+               GridFunction p_ex(*pk);
+               p_ex.ProjectCoefficient(exact_psol);
+               ps += p_ex.Size();
+               p_const += p_ex.Sum();
+               // If p_ex is the view vector of pk, then this will prevent false negative test result.
+               p_ex += 1.0;
+            }
+            p_const /= static_cast<double>(ps);
 
-void CheckConvergence()
-{
-   amp[0] = config.GetOption<double>("manufactured_solution/amp1", 0.22);
-   amp[1] = config.GetOption<double>("manufactured_solution/amp2", 0.13);
-   amp[2] = config.GetOption<double>("manufactured_solution/amp3", 0.37);
-   L[0] = config.GetOption<double>("manufactured_solution/L1", 0.31);
-   L[1] = config.GetOption<double>("manufactured_solution/L2", 0.72);
-   L[2] = config.GetOption<double>("manufactured_solution/L2", 0.47);
-   offset[0] = config.GetOption<double>("manufactured_solution/offset1", 0.35);
-   offset[1] = config.GetOption<double>("manufactured_solution/offset2", 0.73);
-   offset[2] = config.GetOption<double>("manufactured_solution/offset3", 0.59);
-   constant = config.GetOption<double>("manufactured_solution/constant", -0.27);
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *pk = test->GetPresGridFunction(k);
+               (*pk) += p_const;
+            }
 
-   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
-   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+            int uorder = test->GetVelFEOrder();
+            int porder = test->GetPresFEOrder();
+            int order_quad = max(2, 2 * uorder + 1);
+            const IntegrationRule *irs[Geometry::NumGeom];
+            for (int i = 0; i < Geometry::NumGeom; ++i)
+            {
+               irs[i] = &(IntRules.Get(i, order_quad));
+            }
 
-   // Compare with exact solution
-   FunctionCoefficient exact_sol(ExactSolution);
+            int numEl = 0;
+            double unorm = 0.0, pnorm = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               Mesh *mk = test->GetMesh(k);
+               unorm += pow(ComputeLpNorm(2.0, exact_usol, *mk, irs), 2);
+               pnorm += pow(ComputeLpNorm(2.0, exact_psol, *mk, irs), 2);
+               numEl += mk->GetNE();
+            }
+            unorm = sqrt(unorm);
+            pnorm = sqrt(pnorm);
 
-   printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
+            double uerror = 0.0, perror = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *uk = test->GetVelGridFunction(k);
+               GridFunction *pk = test->GetPresGridFunction(k);
+               uerror += pow(uk->ComputeLpError(2, exact_usol), 2);
+               perror += pow(pk->ComputeLpError(2, exact_psol), 2);
+            }
+            uerror = sqrt(uerror);
+            perror = sqrt(perror);
 
-   Vector conv_rate(num_refine);
-   conv_rate = 0.0;
-   double error1 = 0.0;
-   for (int r = base_refine; r < num_refine; r++)
+            uerror /= unorm;
+            perror /= pnorm;
+
+            if (r > base_refine)
+            {
+               uconv_rate(r) = uerror1 / uerror;
+               pconv_rate(r) = perror1 / perror;
+            }
+            printf("%10d\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
+
+            // reported convergence rate
+            if (r > base_refine)
+            {
+               EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder + 1) - threshold);
+               EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder + 1) - threshold);
+            }
+
+            uerror1 = uerror;
+            perror1 = perror;
+
+            delete test;
+         }
+
+         return;
+      }
+
+   } // namespace steady_ns
+
+   namespace linelast
    {
-      LinelastSolver *test = SolveWithRefinement(r);
 
-      int order = test->GetDiscretizationOrder();
-      int order_quad = max(2, 2*order+1);
-      const IntegrationRule *irs[Geometry::NumGeom];
-      for (int i=0; i < Geometry::NumGeom; ++i)
+      void InitDisplacement2(const Vector &x, Vector &u)
       {
-         irs[i] = &(IntRules.Get(i, order_quad));
+         for (size_t i = 0; i < u.Size(); i++)
+         {
+            u(i) = x(i);
+         }
       }
 
-      int numEl = 0;
-      double norm = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      void ExactSolution(const Vector &x, Vector &u)
       {
-         Mesh *mk = test->GetMesh(k);
-         norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
-         numEl += mk->GetNE();
+         u = 0.0;
+         u(0) = sin(pi * x(0)); //+ x(0) * pow(x(1), 2);
+         u(1) = sin(pi * x(1)); //+ x(1) * pow(x(0), 2);
+         if (dim == 3)
+         {
+            //u(0) += x(0) * pow(x(2), 2);
+            //u(1) += x(1) * pow(x(2), 2);
+            u(2) = sin(pi * x(2)); // + x(2) * pow(x(0), 2) + x(2) * pow(x(1), 2);
+         }
       }
-      norm = sqrt(norm);
 
-      double error = 0.0;
-      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      void ExactRHS(const Vector &x, Vector &u)
       {
-         GridFunction *uk = test->GetGridFunction(k);
-         error += pow(uk->ComputeLpError(2, exact_sol), 2);
+         double pi_2 = pow(pi, 2);
+
+         for (size_t i = 0; i < dim; i++)
+         {
+            u(i) = sin(pi * x(i));
+         }
+
+         u *= -mu * pi_2;
+         u(0) += (-pi_2 * sin(pi * x(0)) /* + 2 * x(1)) */)* (lambda + mu);
+         u(1) += (-pi_2 * sin(pi * x(1)) /* + 2 * x(0)) */) * (lambda + mu);
+         if (dim == 3)
+         {
+            //u(0) += 2 * x(2) * (lambda + mu);
+            //u(1) += 2 * x(2) * (lambda + mu);
+            u(2) += (-pi_2 * sin(pi * x(2)) /* + 2 * x(0) + 2 * x(1) */) * (lambda + mu);
+         }
+         //u *= -1.0;
       }
-      error = sqrt(error);
-      error /= norm;
-      
-      if (r > base_refine)
+
+      LinElastSolver *SolveWithRefinement(const int num_refinement)
       {
-         conv_rate(r) = error1 / error;
+         config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+         LinElastSolver *test = new LinElastSolver();
+
+         dim = test->GetDim();
+
+         test->InitVariables();
+         test->InitVisualization();
+
+         test->AddBCFunction(ExactSolution, 1);
+         test->AddBCFunction(ExactSolution, 2);
+         test->AddRHSFunction(ExactRHS);
+
+         test->BuildOperators();
+
+         test->SetupBCOperators();
+
+         test->Assemble();
+
+         test->Solve();
+
+         return test;
       }
-      printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
 
-      // reported convergence rate
-      if (r > base_refine)
-         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
+      void CheckConvergence()
+      {
+         int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+         int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
 
-      error1 = error;
-   }
+         // Compare with exact solution
+         int dim = 2; // only check two dimensions
+         VectorFunctionCoefficient exact_sol(dim, ExactSolution);
 
-   return;
-}
+         printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
 
-}  // namespace linelast
+         Vector conv_rate(num_refine);
+         conv_rate = 0.0;
+         double error1 = 0.0;
+         for (int r = base_refine; r < num_refine; r++)
+         {
+            LinElastSolver *test = SolveWithRefinement(r);
 
+            int order = test->GetDiscretizationOrder();
+            int order_quad = max(2, 2 * order + 1);
+            const IntegrationRule *irs[Geometry::NumGeom];
+            for (int i = 0; i < Geometry::NumGeom; ++i)
+            {
+               irs[i] = &(IntRules.Get(i, order_quad));
+            }
 
-namespace fem
-{
+            int numEl = 0;
+            double norm = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               Mesh *mk = test->GetMesh(k);
+               norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
+               numEl += mk->GetNE();
+            }
+            norm = sqrt(norm);
 
-namespace dg_bdr_normal_lf
-{
+            double error = 0.0;
+            for (int k = 0; k < test->GetNumSubdomains(); k++)
+            {
+               GridFunction *uk = test->GetGridFunction(k);
+               error += pow(uk->ComputeLpError(2, exact_sol), 2);
+            }
+            error = sqrt(error);
+            error /= norm;
 
-void uFun_ex(const Vector & x, Vector & u)
-{
-   double xi(x(0));
-   double yi(x(1));
-   assert(x.Size() == 2);
+            if (r > base_refine)
+            {
+               conv_rate(r) = error1 / error;
+            }
 
-   u(0) = cos(xi)*sin(yi);
-   u(1) = - sin(xi)*cos(yi);
-}
+            printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
 
-double pFun_ex(const Vector & x)
-{
-   double xi(x(0));
-   double yi(x(1));
+            // reported convergence rate
+            if (r > base_refine)
+               EXPECT_TRUE(conv_rate(r) > pow(2.0, order + 1) - 0.5);
 
-   assert(x.Size() == 2);
+            error1 = error;
+         }
 
-   return 2.0 * sin(xi)*sin(yi);
-}
+         return;
+      }
 
-double EvalWithRefinement(const int num_refinement, int &order_out)
-{  
-   // 1. Parse command-line options.
-   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
-   bool use_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
-   int order = config.GetOption<int>("discretization/order", 1);
-   order_out = order;
+   } // namespace linelast
 
-   Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
-   int dim = mesh->Dimension();
-
-   for (int l = 0; l < num_refinement; l++)
+   namespace fem
    {
-      mesh->UniformRefinement();
-   }
 
-   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
-   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+      namespace dg_bdr_normal_lf
+      {
 
-   FiniteElementSpace *fes;
-   if (use_dg)
-   {
-      fes = new FiniteElementSpace(mesh, dg_coll);
-   }
-   else
-   {
-      fes = new FiniteElementSpace(mesh, h1_coll);
-   }
+         void uFun_ex(const Vector &x, Vector &u)
+         {
+            double xi(x(0));
+            double yi(x(1));
+            assert(x.Size() == 2);
 
-   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
-   // this array of integer essentially acts as the array of boolean:
-   // If value is 0, then it is not Dirichlet.
-   // If value is 1, then it is Dirichlet.
-   p_ess_attr = 0;
-   p_ess_attr[1] = 1;
+            u(0) = cos(xi) * sin(yi);
+            u(1) = -sin(xi) * cos(yi);
+         }
 
-   VectorFunctionCoefficient ucoeff(dim, uFun_ex);
-   FunctionCoefficient pcoeff(pFun_ex);
+         double pFun_ex(const Vector &x)
+         {
+            double xi(x(0));
+            double yi(x(1));
 
-   // 12. Create the grid functions u and p. Compute the L2 error norms.
-   GridFunction p(fes);
+            assert(x.Size() == 2);
 
-   p.ProjectCoefficient(pcoeff);
+            return 2.0 * sin(xi) * sin(yi);
+         }
 
-   LinearForm *gform = new LinearForm(fes);
-   // gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), p_ess_attr);
-   gform->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), p_ess_attr);
-   gform->Assemble();
+         double EvalWithRefinement(const int num_refinement, int &order_out)
+         {
+            // 1. Parse command-line options.
+            std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+            bool use_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+            int order = config.GetOption<int>("discretization/order", 1);
+            order_out = order;
 
-   double product = p * (*gform);
+            Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
+            int dim = mesh->Dimension();
 
-   // 17. Free the used memory.
-   delete gform;
-   delete fes;
-   delete dg_coll;
-   delete h1_coll;
-   delete mesh;
+            for (int l = 0; l < num_refinement; l++)
+            {
+               mesh->UniformRefinement();
+            }
 
-   return product;
-}
+            FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+            FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
 
-void CheckConvergence()
-{
-   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+            FiniteElementSpace *fes;
+            if (use_dg)
+            {
+               fes = new FiniteElementSpace(mesh, dg_coll);
+            }
+            else
+            {
+               fes = new FiniteElementSpace(mesh, h1_coll);
+            }
 
-   double Lx = 1.0, Ly = 1.0;
-   double product_ex = sin(Lx) * cos(Lx) * (Ly - 0.5 * sin(2.0 * Ly));
-   printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
+            Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+            // this array of integer essentially acts as the array of boolean:
+            // If value is 0, then it is not Dirichlet.
+            // If value is 1, then it is Dirichlet.
+            p_ess_attr = 0;
+            p_ess_attr[1] = 1;
 
-   printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
+            VectorFunctionCoefficient ucoeff(dim, uFun_ex);
+            FunctionCoefficient pcoeff(pFun_ex);
 
-   Vector conv_rate(num_refine);
-   conv_rate = 0.0;
-   double error1 = 0.0;
-   for (int r = 0; r < num_refine; r++)
-   {
-      int order = -1;
-      double product = EvalWithRefinement(r, order);
+            // 12. Create the grid functions u and p. Compute the L2 error norms.
+            GridFunction p(fes);
 
-      double error = abs(product - product_ex) / abs(product_ex);
-      
-      if (r > 0)
-         conv_rate(r) = error1 / error;
-      printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\n", r, error, conv_rate(r), product, product_ex);
+            p.ProjectCoefficient(pcoeff);
 
-      // reported convergence rate
-      if (r > 0)
-         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
+            LinearForm *gform = new LinearForm(fes);
+            // gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), p_ess_attr);
+            gform->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), p_ess_attr);
+            gform->Assemble();
 
-      error1 = error;
-   }
+            double product = p * (*gform);
 
-   return;
-}
+            // 17. Free the used memory.
+            delete gform;
+            delete fes;
+            delete dg_coll;
+            delete h1_coll;
+            delete mesh;
 
-}  // namespace dg_bdr_normal_lf
+            return product;
+         }
 
-}  // namespace fem
+         void CheckConvergence()
+         {
+            int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
 
-}  // namespace mms
+            double Lx = 1.0, Ly = 1.0;
+            double product_ex = sin(Lx) * cos(Lx) * (Ly - 0.5 * sin(2.0 * Ly));
+            printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
+
+            printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
+
+            Vector conv_rate(num_refine);
+            conv_rate = 0.0;
+            double error1 = 0.0;
+            for (int r = 0; r < num_refine; r++)
+            {
+               int order = -1;
+               double product = EvalWithRefinement(r, order);
+
+               double error = abs(product - product_ex) / abs(product_ex);
+
+               if (r > 0)
+                  conv_rate(r) = error1 / error;
+               printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\n", r, error, conv_rate(r), product, product_ex);
+
+               // reported convergence rate
+               if (r > 0)
+                  EXPECT_TRUE(conv_rate(r) > pow(2.0, order + 1) - 0.1);
+
+               error1 = error;
+            }
+
+            return;
+         }
+
+      } // namespace dg_bdr_normal_lf
+
+   } // namespace fem
+
+} // namespace mms
