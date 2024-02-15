@@ -74,7 +74,7 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   //rhs_coeffs.SetSize(numBdr); // TODO: For now the right hand side function works like the BC functions
+   //rhs_coeffs.SetSize(1); // TODO: For now the right hand side function works like the BC functions
 //rhs_coeffs = NULL;
 
    // Set up the Lame constants for the two materials.
@@ -161,7 +161,9 @@ void LinElastSolver::BuildRHSOperators()
    {
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
       for (int r = 0; r < rhs_coeffs.Size(); r++)
-         bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));
+      {
+      cout<<"yes"<<endl;
+         bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));}
    }
 }
 
