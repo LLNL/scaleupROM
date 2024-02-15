@@ -7,7 +7,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace mms::poisson;
+using namespace mms::linelast;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -22,6 +22,7 @@ TEST(DDSerialTest, Test_convergence_DG)
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
    config.dict_["discretization"]["full-discrete-galerkin"] = true;
+   config.dict_["domain-decomposition"]["type"] = "none";
    CheckConvergence();
 
    return;
@@ -33,27 +34,30 @@ TEST(DDSerialTest, Test_direct_solver_DG)
    config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
    config.dict_["solver"]["direct_solve"] = true;
    config.dict_["discretization"]["full-discrete-galerkin"] = true;
+   config.dict_["domain-decomposition"]["type"] = "none";
    CheckConvergence();
 
    return;
 }
 
-TEST(DDSerialTest, Test_convergence_NoDG)
+TEST(DDSerialTest, Test_convergence_DG_DD)
 {
    config = InputParser("inputs/dd_mms.yml");
-   //config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tet.mesh";
-   config.dict_["discretization"]["full-discrete-galerkin"] = false;
+   config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
+   config.dict_["discretization"]["full-discrete-galerkin"] = true;
+   config.dict_["domain-decomposition"]["type"] = "interior_penalty";
    CheckConvergence();
 
    return;
 }
 
-TEST(DDSerialTest, Test_direct_solver_NoDG)
+TEST(DDSerialTest, Test_direct_solver_DG_DD)
 {
    config = InputParser("inputs/dd_mms.yml");
-   //config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tet.mesh";
+   config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
    config.dict_["solver"]["direct_solve"] = true;
-   config.dict_["discretization"]["full-discrete-galerkin"] = false;
+   config.dict_["discretization"]["full-discrete-galerkin"] = true;
+   config.dict_["domain-decomposition"]["type"] = "interior_penalty";
    CheckConvergence();
 
    return;

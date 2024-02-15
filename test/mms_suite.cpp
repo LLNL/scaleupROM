@@ -493,17 +493,18 @@ namespace mms
          }
       }
 
-      void ExactSolution(const Vector &x, Vector &u)
+      /* void ExactSolution(const Vector &x, Vector &u)
       {
          u = 0.0;
-         u(0) = sin(pi * x(0))+ x(0) * pow(x(1), 2);
-         u(1) = sin(pi * x(1))+ x(1) * pow(x(0), 2);
+         u(0) = sin(pi * x(0))/*+  x(0) * pow(x(1), 2) ;
+         u(1) = sin(pi * x(1))/* + x(1) * pow(x(0), 2) ;
          if (dim == 3)
          {
-            u(0) += x(0) * pow(x(2), 2);
-            u(1) += x(1) * pow(x(2), 2);
-            u(2) = sin(pi * x(2)) + x(2) * pow(x(0), 2) + x(2) * pow(x(1), 2);
+            /* u(0) += x(0) * pow(x(2), 2);
+            u(1) += x(1) * pow(x(2), 2); 
+            u(2) = sin(pi * x(2)) /* + x(2) * pow(x(0), 2) + x(2) * pow(x(1), 2);
          }
+
       }
 
       void ExactRHS(const Vector &x, Vector &u)
@@ -516,18 +517,36 @@ namespace mms
          }
 
          u *= -mu * pi_2;
-         u(0) += (-pi_2 * sin(pi * x(0)) + 2 * x(1))* (lambda + mu);
-         u(1) += (-pi_2 * sin(pi * x(1)) + 2 * x(0)) * (lambda + mu);
+         u(0) += (-pi_2 * sin(pi * x(0)) /* + 2 * x(1) )* (lambda + mu);
+         u(1) += (-pi_2 * sin(pi * x(1)) /* + 2 * x(0) ) * (lambda + mu);
          if (dim == 3)
          {
-            u(0) += 2 * x(2) * (lambda + mu);
-            u(1) += 2 * x(2) * (lambda + mu);
-            u(2) += (-pi_2 * sin(pi * x(2)) + 2 * x(0) + 2 * x(1)) * (lambda + mu);
+            //u(0) += 2 * x(2) * (lambda + mu);
+           // u(1) += 2 * x(2) * (lambda + mu);
+            u(2) += (-pi_2 * sin(pi * x(2)) /* + 2 * x(0) + 2 * x(1) ) * (lambda + mu);
+         }
+         //u *= -1.0;
+         
+      } */
+
+      void ExactSolution(const Vector &x, Vector &u)
+      {
+         u = 0.0;
+         for (size_t i = 0; i < dim; i++)
+         {
+            u(i) = pow(x(i), 3.0);
+         }
+
+      }
+
+      void ExactRHS(const Vector &x, Vector &u)
+      {
+         u = 0.0;
+         for (size_t i = 0; i < dim; i++)
+         {
+            u(i) = 6.0 * x(i) * (lambda + 2.0 * mu);
          }
          u *= -1.0;
-
-            cout<<":("<<endl;
-
          
       }
 
@@ -539,10 +558,12 @@ namespace mms
          dim = test->GetDim();
 
          test->InitVariables();
+         //test->SetupIC(ExactSolution);
          test->InitVisualization();
 
          test->AddBCFunction(ExactSolution, 1);
          test->AddBCFunction(ExactSolution, 2);
+         test->AddBCFunction(ExactSolution, 3);
          test->AddRHSFunction(ExactRHS);
 
          test->BuildOperators();
@@ -551,6 +572,9 @@ namespace mms
 
          test->Assemble();
 
+         //test->PrintOperators();
+
+         //MFEM_ABORT("test");
          test->Solve();
 
          return test;

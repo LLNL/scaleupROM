@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#include<gtest/gtest.h>
+#include <gtest/gtest.h>
 #include "mms_suite.hpp"
 #include "topology_handler.hpp"
 
@@ -12,7 +12,8 @@ using namespace mfem;
 /**
  * Simple smoke test to make sure Google Test is properly linked
  */
-TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
+TEST(GoogleTestFramework, GoogleTestFrameworkFound)
+{
    SUCCEED();
 }
 
@@ -35,6 +36,32 @@ TEST(DG_BDR_NORMAL_LF_Test, Test_Tri)
    return;
 }
 
+
+void _PrintMatrix(string filename, DenseMatrix &mat)
+{
+   std::ofstream outfile(filename);
+
+   double tol = 1e-7;
+   double val = 0.0;
+
+   for (size_t i = 0; i < mat.Height(); i++)
+   {
+      for (size_t j = 0; j < mat.Width(); j++)
+      {
+         val = mat(i, j);
+         if (abs(val) < tol)
+         {
+            val = 0.0;
+         }
+
+         outfile << setprecision(2) << val << " ";
+      }
+      outfile << endl;
+   }
+   outfile.close();
+   cout << "done printing matrix" << endl;
+}
+
 // TODO(axel) : test for InterfaceDGElasticityIntegrator.
 /* In essence, check the consistency with DGElasticityIntegrator*/
 TEST(InterfaceDGElasticityIntegrator, Test_Quad)
@@ -44,6 +71,8 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
    const int order = 1;
    config.dict_["discretization"]["order"] = order;
    config.dict_["mesh"]["filename"] = "meshes/test.2x1.mesh";
+   
+   const int numBdr = 4; // hacky way to set the number of boundary attributes
 
    SubMeshTopologyHandler *submesh = new SubMeshTopologyHandler;
    Mesh *pmesh = submesh->GetGlobalMesh();
@@ -52,17 +81,22 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
    Array<Mesh *> meshes;
    TopologyData topol_data;
    submesh->ExportInfo(meshes, topol_data);
-
    FiniteElementCollection *fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
    FiniteElementSpace *pfes = new FiniteElementSpace(pmesh, fec, udim);
    Array<FiniteElementSpace *> fes(meshes.Size());
    for (int k = 0; k < meshes.Size(); k++)
       fes[k] = new FiniteElementSpace(meshes[k], fec, udim);
-
    /* will have to initialize this coefficient */
+   double alpha = -1.0, kappa = (order + 1) * (order + 1);
    PWConstCoefficient *lambda_cs, *mu_cs;
-   double alpha, kappa;
 
+   Vector lambda(numBdr), mu(numBdr);
+   lambda = 1.0; // Set lambda = 1 for all element attributes.
+
+   mu = 1.0; // Set mu = 1 for all element attributes.
+
+   lambda_cs = new PWConstCoefficient(lambda);
+   mu_cs = new PWConstCoefficient(mu);
    /* assemble standard DGElasticityIntegrator Assemble */
    BilinearForm pform(pfes);
    pform.AddInteriorFaceIntegrator(new DGElasticityIntegrator(*lambda_cs, *mu_cs, alpha, kappa));
@@ -71,40 +105,44 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
 
    /* assemble InterfaceDGElasticityIntegrator Assemble */
    InterfaceForm a_itf(meshes, fes, submesh);
-   a_itf.AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs, mu_cs,alpha, kappa));
-
+   a_itf.AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs, mu_cs, alpha, kappa));
    Array2D<SparseMatrix *> mats;
    mats.SetSize(topol_data.numSub, topol_data.numSub);
    for (int i = 0; i < topol_data.numSub; i++)
       for (int j = 0; j < topol_data.numSub; j++)
          mats(i, j) = new SparseMatrix(fes[i]->GetTrueVSize(), fes[j]->GetTrueVSize());
-
    a_itf.AssembleInterfaceMatrixes(mats);
-   
    for (int i = 0; i < topol_data.numSub; i++)
       for (int j = 0; j < topol_data.numSub; j++)
          mats(i, j)->Finalize();
-
-   /* 
+   /*
       Assembled matrix from two integrators should have identical non-zero entries.
       (but their indices might be different)
       Right now their is only one interface with two elements.
       Easiest way might be visualizing matrices after changing them into DenseMatrix.
     */
    DenseMatrix *pmat = pform.SpMat().ToDenseMatrix();
-   Array2D<DenseMatrix *> smats(topol_data.numSub, topol_data.numSub);
+   _PrintMatrix("mfem_mat.txt",*pmat);
+   Array<int> offsets(3);
+   offsets[0] = 0;
+   offsets[1] = 8; 
+   offsets[2] = 16; 
+   BlockMatrix smats(offsets);
    for (int i = 0; i < topol_data.numSub; i++)
       for (int j = 0; j < topol_data.numSub; j++)
-         smats(i, j) = mats(i, j)->ToDenseMatrix();
+      {
+         smats.SetBlock(i, j, mats(i, j));
+      }
+         std::string filename = "scaleup_mat.txt";
+         _PrintMatrix(filename,*(smats.CreateMonolithic()->ToDenseMatrix()));
    // print out or compare the entries...
-
 
    /* clean up variables */
    // delete ..
    return;
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
    MPI_Init(&argc, &argv);
    ::testing::InitGoogleTest(&argc, argv);

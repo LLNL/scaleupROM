@@ -162,8 +162,8 @@ void LinElastSolver::BuildRHSOperators()
       bs[m] = new LinearForm(fes[m], RHS->GetBlock(m).GetData());
       for (int r = 0; r < rhs_coeffs.Size(); r++)
       {
-      cout<<"yes"<<endl;
-         bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));}
+         bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));
+         }
    }
 }
 
@@ -419,7 +419,7 @@ void PrintMatrix(string filename, DenseMatrix &mat)
             val = 0.0;
          }
 
-         outfile << setprecision(8) << val << " ";
+         outfile << setprecision(2) << val << " ";
       }
       outfile << endl;
    }
@@ -447,6 +447,7 @@ void LinElastSolver::PrintOperators()
 {
    PrintMatrix("scaleuprom_a.txt", *(as[0]->SpMat().ToDenseMatrix()));
    PrintVector("scaleuprom_b.txt", *bs[0]);
+   PrintVector("scaleuprom_u0.txt", *U);
 }
 
 void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
