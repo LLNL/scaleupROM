@@ -326,7 +326,7 @@ void PoissonSolver::AssembleOperator()
       sys_glob_size = globalMat_mono->NumRows();
       sys_row_starts[0] = 0;
       sys_row_starts[1] = globalMat_mono->NumRows();
-      globalMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, globalMat_mono);
+      globalMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, globalMat_mono);
 
       mumps = new MUMPSSolver();
       mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
@@ -463,7 +463,7 @@ bool PoissonSolver::Solve()
          // Initializating HypreParMatrix needs the monolithic sparse matrix.
          assert(globalMat_mono != NULL);
 
-         solver = new CGSolver(MPI_COMM_WORLD);
+         solver = new CGSolver(MPI_COMM_SELF);
 
          M = new HypreBoomerAMG(*globalMat_hypre);
          M->SetPrintLevel(print_level);

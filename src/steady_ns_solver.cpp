@@ -122,7 +122,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    mono_jac = system_jac->CreateMonolithic();
    if (direct_solve)
    {
-      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, mono_jac);
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
       return *jac_hypre;
    }  
    else
@@ -203,7 +203,7 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
    
    if (direct_solve)
    {
-      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, jac_mono);
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, jac_mono);
       return *jac_hypre;
    }
    else
@@ -249,7 +249,7 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
    
    if (direct_solve)
    {
-      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, jac_mono);
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, jac_mono);
       return *jac_hypre;
    }
    else

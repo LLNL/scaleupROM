@@ -229,6 +229,7 @@ const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_ta
 void SampleGenerator::ReportStatus(const int &sample_idx)
 {
    if (sample_idx % report_freq != 0) return;
+   if (proc_rank != 0) return;
 
    printf("==========  SampleGenerator Status  ==========\n");
    printf("%d-th sample is collected.\n", sample_idx);

@@ -546,7 +546,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
          // TODO: need to change when the actual parallelization is implemented.
          HYPRE_BigInt glob_size = rom_block_offsets.Last();
          HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-         parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
+         parRomMat = new HypreParMatrix(MPI_COMM_SELF, glob_size, row_starts, romMat_mono);
          K = parRomMat;
       }
       else if ((prec_str == "gs") || (prec_str == "none"))
@@ -1001,19 +1001,19 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
    {
       case (SolverType::CG):
       {
-         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_SELF);
          else                    solver = new CGSolver();
          break;
       }
       case (SolverType::MINRES):
       {
-         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
+         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_SELF);
          else                    solver = new MINRESSolver();
          break;
       }
       case (SolverType::GMRES):
       {
-         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_WORLD);
+         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_SELF);
          else                    solver = new GMRESSolver();
          break;
       }
@@ -1040,7 +1040,7 @@ void MFEMROMHandler::SetupDirectSolver()
    sys_glob_size = romMat_mono->NumRows();
    sys_row_starts[0] = 0;
    sys_row_starts[1] = romMat_mono->NumRows();
-   romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, romMat_mono);
+   romMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, romMat_mono);
 
    mumps = new MUMPSSolver();
    mumps->SetMatrixSymType(mat_type);
