@@ -1275,7 +1275,7 @@ namespace mfem
          DeletePointers(jmats);
    }
 
-   // static method
+   /* // static method
    void InterfaceDGElasticityIntegrator::AssembleBlock(const int dim, const int row_ndofs,
                                                        const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef,
                                                        const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape,
@@ -1299,6 +1299,67 @@ namespace mfem
          return;
       }
 
+      for (int d = 0; d < dim; ++d)
+      {
+         const int jo = d * col_ndofs;
+         const int io = d * row_ndofs;
+         for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
+         {
+            const double sj = jmatcoef * col_shape(jdof);
+            int i_start = (io + row_offset > j + col_offset) ? io : j;
+            for (int i = i_start, idof = i - io; idof < row_ndofs; ++idof, ++i)
+            {
+               jmat(i, j) += row_shape(idof) * sj;
+            }
+         }
+      }
+
+   } */
+   // static method
+   void InterfaceDGElasticityIntegrator::AssembleBlock(
+       const int dim, const int row_ndofs, const int col_ndofs,
+       const int row_offset, const int col_offset,
+       const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
+       const Vector &row_shape, const Vector &col_shape,
+       const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
+       DenseMatrix &elmat, DenseMatrix &jmat)
+   {
+      for (int jm = 0, j = 0; jm < dim; ++jm)
+      {
+         for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+         {
+            const double t2 = col_dshape_dnM(jdof);
+            for (int im = 0, i = 0; im < dim; ++im)
+            {
+               const double t1 = col_dshape(jdof, jm) * col_nL(im);
+               const double t3 = col_dshape(jdof, im) * col_nM(jm);
+               const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
+               for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+               {
+                  elmat(i, j) += row_shape(idof) * tt;
+               }
+            }
+         }
+      }
+
+      if (jmatcoef == 0.0)
+      {
+         return;
+      }
+
+      /* for (int d = 0; d < dim; ++d)
+      {
+         const int jo = col_offset + d * col_ndofs;
+         const int io = row_offset + d * row_ndofs;
+         for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
+         {
+            const double sj = jmatcoef * col_shape(jdof);
+            for (int i = max(io, j), idof = i - io; idof < row_ndofs; ++idof, ++i)
+            {
+               jmat(i, j) += row_shape(idof) * sj;
+            }
+         }
+      } */
       for (int d = 0; d < dim; ++d)
       {
          const int jo = d * col_ndofs;
