@@ -1021,14 +1021,12 @@ namespace mfem
       DenseMatrix jmat;
 #endif
 
-      cout << "1" << endl;
       bool boundary = false;
       const int dim = el1.GetDim();
       const int ndofs1 = el1.GetDof();
-      //const int ndofs2 = (Trans2.Elem1No >= 0) ? 0 : el2.GetDof();
+      // const int ndofs2 = (Trans2.Elem1No >= 0) ? 0 : el2.GetDof();
       const int ndofs2 = (boundary) ? 0 : el2.GetDof();
       // const int nvdofs = dim * (ndofs1 + ndofs2);
-      cout << "2" << endl;
       const int nvdofs1 = dim * ndofs1;
       const int nvdofs2 = dim * ndofs2;
       // Initially 'elmat' corresponds to the term:
@@ -1046,7 +1044,6 @@ namespace mfem
       // elmat.SetSize(ndofs);
       // elmat = 0.0;
       const bool kappa_is_nonzero = (kappa != 0.0);
-      cout << "3" << endl;
       jmats.SetSize(2, 2);
       if (kappa_is_nonzero)
       {
@@ -1061,7 +1058,6 @@ namespace mfem
          // jmat.SetSize(ndofs);
          // jmat = 0.;
       }
-      cout << "4" << endl;
       adjJ.SetSize(dim);
       shape1.SetSize(ndofs1);
       dshape1.SetSize(ndofs1, dim);
@@ -1070,7 +1066,6 @@ namespace mfem
       nL1.SetSize(dim);
       nM1.SetSize(dim);
       dshape1_dnM.SetSize(ndofs1);
-      cout << "5" << endl;
 
       if (ndofs2)
       {
@@ -1081,7 +1076,6 @@ namespace mfem
          nL2.SetSize(dim);
          nM2.SetSize(dim);
          dshape2_dnM.SetSize(ndofs2);
-      cout << "6" << endl;
       }
 
       const IntegrationRule *ir = IntRule;
@@ -1092,7 +1086,6 @@ namespace mfem
          ir = &IntRules.Get(Trans1.GetGeometryType(), order);
          assert(Trans1.GetGeometryType() == Trans2.GetGeometryType());
       }
-      cout << "7" << endl;
       for (int pind = 0; pind < ir->GetNPoints(); ++pind)
       {
          const IntegrationPoint &ip = ir->IntPoint(pind);
@@ -1100,7 +1093,6 @@ namespace mfem
          // Set the integration point in the face and the neighboring elements
          Trans1.SetAllIntPoints(&ip);
          Trans2.SetAllIntPoints(&ip);
-cout << "71" << endl;
          // Access the neighboring elements' integration points
          // Note: eip1 and eip2 come from Element1 of Trans1 and Trans2 respectively.
          const IntegrationPoint &eip1 = Trans1.GetElement1IntPoint();
@@ -1116,7 +1108,6 @@ cout << "71" << endl;
             CalcOrtho(Trans1.Jacobian(), nor1);
             CalcOrtho(Trans2.Jacobian(), nor2);
          }
-cout << "72" << endl;
          el1.CalcShape(eip1, shape1);
          el1.CalcDShape(eip1, dshape1);
 
@@ -1141,13 +1132,11 @@ cout << "72" << endl;
             wLM = (wL2 + 2.0 * wM2);
             // wLM = wM2;
             dshape2_ps.Mult(nM2, dshape2_dnM);
-            cout << "73a" << endl;
          }
          else
          {
             w = ip.weight;
             wLM = 0.0;
-            cout << "73b" << endl;
          }
 
          {
@@ -1160,15 +1149,13 @@ cout << "72" << endl;
             // wLM+= wM1;
             dshape1_ps.Mult(nM1, dshape1_dnM);
          }
-cout << "74" << endl;
          // const double jmatcoef = kappa * (nor1 * nor2) * wLM;
          const double jmatcoef = kappa * (nor1 * nor1) * wLM;
 
          // (1,1) block
-         AssembleBlock(
+         /* AssembleBlock(
              dim, ndofs1, ndofs1, 0, 0, jmatcoef, nL1, nM1,
-             shape1, shape1, dshape1_dnM, dshape1_ps, *elmats(0, 0), *jmats(0, 0));
-cout << "75" << endl;
+             shape1, shape1, dshape1_dnM, dshape1_ps, *elmats(0, 0), *jmats(0, 0)); */
          if (ndofs2 == 0)
          {
             continue;
@@ -1185,11 +1172,11 @@ cout << "75" << endl;
          AssembleBlock(
              dim, ndofs2, ndofs1, dim * ndofs1, 0, jmatcoef, nL1, nM1,
              shape2, shape1, dshape1_dnM, dshape1_ps, *elmats(1, 0), *jmats(1, 0));
-         // (2,2) block
+         /* // (2,2) block
          AssembleBlock(
              dim, ndofs2, ndofs2, dim * ndofs1, dim * ndofs1, jmatcoef, nL2, nM2,
-             shape2, shape2, dshape2_dnM, dshape2_ps, *elmats(1, 1), *jmats(1, 1));
-cout << "76" << endl;
+             shape2, shape2, dshape2_dnM, dshape2_ps, *elmats(1, 1), *jmats(1, 1)); */
+
          /*          // (1,1) block
                   AssembleBlock(
                       dim, ndofs1, ndofs1, 0, 0, jmatcoef,
@@ -1217,8 +1204,6 @@ cout << "76" << endl;
                       dim, ndofs2, ndofs2, nvdofs1, nvdofs1, jmatcoef,
                       shape2, shape2, dshape2_dnM, *elmats(1, 1), *jmats(1, 1)); */
       }
-      cout << "8" << endl;
-
       // elmat := -elmat + sigma*elmat^t + jmat
       Array<int> ndof_array(2);
       ndof_array[0] = nvdofs1;
@@ -1285,7 +1270,6 @@ cout << "76" << endl;
             } // for (int j = 0; j < ndofs1; j++)
          }    // for (int i = 0; i < ndofs2; i++)
       }       // not if (kappa_is_nonzero)
-      cout << "9" << endl;
 
       if (kappa_is_nonzero)
          DeletePointers(jmats);
