@@ -1153,9 +1153,9 @@ namespace mfem
          const double jmatcoef = kappa * (nor1 * nor1) * wLM;
 
          // (1,1) block
-         /* AssembleBlock(
+         AssembleBlock(
              dim, ndofs1, ndofs1, 0, 0, jmatcoef, nL1, nM1,
-             shape1, shape1, dshape1_dnM, dshape1_ps, *elmats(0, 0), *jmats(0, 0)); */
+             shape1, shape1, dshape1_dnM, dshape1_ps, *elmats(0, 0), *jmats(0, 0));
          if (ndofs2 == 0)
          {
             continue;
@@ -1172,10 +1172,10 @@ namespace mfem
          AssembleBlock(
              dim, ndofs2, ndofs1, dim * ndofs1, 0, jmatcoef, nL1, nM1,
              shape2, shape1, dshape1_dnM, dshape1_ps, *elmats(1, 0), *jmats(1, 0));
-         /* // (2,2) block
+         // (2,2) block
          AssembleBlock(
              dim, ndofs2, ndofs2, dim * ndofs1, dim * ndofs1, jmatcoef, nL2, nM2,
-             shape2, shape2, dshape2_dnM, dshape2_ps, *elmats(1, 1), *jmats(1, 1)); */
+             shape2, shape2, dshape2_dnM, dshape2_ps, *elmats(1, 1), *jmats(1, 1));
 
          /*          // (1,1) block
                   AssembleBlock(
