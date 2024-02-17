@@ -74,10 +74,7 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   //rhs_coeffs.SetSize(1); // TODO: For now the right hand side function works like the BC functions
-//rhs_coeffs = NULL;
-
-   // Set up the Lame constants for the two materials.
+   // Set up the Lame constants for the two materials. //TODO: add possibility to change materials
    Vector lambda(numBdr);
    lambda = 1.0;     // Set lambda = 1 for all element attributes.
    //lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
@@ -430,19 +427,3 @@ void LinElastSolver::ProjectOperatorOnReducedBasis() { "LinElastSolver::ProjectO
 void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
 
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem) { "LinElastSolver::SetParameterizedProblem is not implemented yet!\n"; }
-
-
-/*Todo: add force vector
- VectorArrayCoefficient f(dim);
-   for (int i = 0; i < dim - 1; i++)
-   {
-      f.Set(i, new ConstantCoefficient(0.0));
-   }
-   {
-      Vector pull_force(NumBdr);
-      pull_force = 0.0;
-      pull_force(1) = -1.0e-2;
-      f.Set(dim - 1, new PWConstCoefficient(pull_force));
-   }
-   b.AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(f));
-*/

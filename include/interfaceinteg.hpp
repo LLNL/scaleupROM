@@ -200,13 +200,6 @@ namespace mfem
                                          Array2D<DenseMatrix *> &elmats);
    };
 
-   // DGElasticityIntegrator
-   // TODO(axel): you'll need to implement this class for dg interface for two different meshes.
-   /* This is pretty much the copy version of MFEM DGElasticityIntegrator class,
-      which works for two different meshes.
-      For reference, the Poisson equation uses InterfaceDGDiffusionIntegrator,
-      which is the copy version of DGDiffusionIntegrator.
-    */
    class InterfaceDGElasticityIntegrator : public InterfaceNonlinearFormIntegrator
    {
    protected:
