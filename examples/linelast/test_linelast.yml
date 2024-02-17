@@ -22,4 +22,4 @@ visualization:
   enabled: true
   unified_paraview: true
   file_path:
-    prefix: test_paraview_output
+    prefix: paraview_output
