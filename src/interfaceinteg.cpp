@@ -1003,34 +1003,6 @@ namespace mfem
       } // for (int pind = 0; pind < ir->GetNPoints(); ++pind)
    }
 
-   void _PrintMatrix(string filename, DenseMatrix &mat)
-   {
-      std::ofstream outfile(filename);
-
-      double tol = 1e-7;
-      double val = 0.0;
-
-      int nonzeros = 0;
-      for (size_t i = 0; i < mat.Height(); i++)
-      {
-         for (size_t j = 0; j < mat.Width(); j++)
-         {
-            val = mat(i, j);
-            if (abs(val) < tol)
-            {
-               val = 0.0;
-               nonzeros++;
-            }
-
-            outfile << setprecision(2) << val << " ";
-         }
-         outfile << endl;
-      }
-      outfile.close();
-      cout << "done printing matrix" << endl;
-      cout << "number of nonzeros:" << nonzeros << endl;
-   }
-
    void InterfaceDGElasticityIntegrator::AssembleInterfaceMatrix(
        const FiniteElement &el1, const FiniteElement &el2,
        FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
@@ -1042,7 +1014,7 @@ namespace mfem
       DenseMatrix dshape1, dshape2;
       DenseMatrix adjJ;
       DenseMatrix dshape1_ps, dshape2_ps;
-      Vector nor1, nor2;
+      Vector nor;
       Vector nL1, nL2;
       Vector nM1, nM2;
       Vector dshape1_dnM, dshape2_dnM;
@@ -1052,9 +1024,7 @@ namespace mfem
       bool boundary = false;
       const int dim = el1.GetDim();
       const int ndofs1 = el1.GetDof();
-      // const int ndofs2 = (Trans2.Elem1No >= 0) ? 0 : el2.GetDof();
       const int ndofs2 = (boundary) ? 0 : el2.GetDof();
-      // const int nvdofs = dim * (ndofs1 + ndofs2);
       const int nvdofs1 = dim * ndofs1;
       const int nvdofs2 = dim * ndofs2;
       // Initially 'elmat' corresponds to the term:
@@ -1069,8 +1039,7 @@ namespace mfem
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
             *elmats(i, j) = 0.0;
-      // elmat.SetSize(ndofs);
-      // elmat = 0.0;
+
       const bool kappa_is_nonzero = (kappa != 0.0);
       jmats.SetSize(2, 2);
       if (kappa_is_nonzero)
@@ -1083,14 +1052,12 @@ namespace mfem
          for (int i = 0; i < 2; i++)
             for (int j = 0; j <= i; j++)
                *jmats(i, j) = 0.0;
-         // jmat.SetSize(ndofs);
-         // jmat = 0.;
       }
       adjJ.SetSize(dim);
       shape1.SetSize(ndofs1);
       dshape1.SetSize(ndofs1, dim);
       dshape1_ps.SetSize(ndofs1, dim);
-      nor1.SetSize(dim);
+      nor.SetSize(dim);
       nL1.SetSize(dim);
       nM1.SetSize(dim);
       dshape1_dnM.SetSize(ndofs1);
@@ -1100,7 +1067,6 @@ namespace mfem
          shape2.SetSize(ndofs2);
          dshape2.SetSize(ndofs2, dim);
          dshape2_ps.SetSize(ndofs2, dim);
-         nor2.SetSize(dim);
          nL2.SetSize(dim);
          nM2.SetSize(dim);
          dshape2_dnM.SetSize(ndofs2);
@@ -1129,13 +1095,11 @@ namespace mfem
          //  computing outward normal vectors.
          if (dim == 1)
          {
-            nor1(0) = 2 * eip1.x - 1.0;
-            // nor2(0) = 2 * eip2.x - 1.0;
+            nor(0) = 2 * eip1.x - 1.0;
          }
          else
          {
-            CalcOrtho(Trans1.Jacobian(), nor1);
-            // CalcOrtho(Trans2.Jacobian(), nor2);
+            CalcOrtho(Trans1.Jacobian(), nor);
          }
          el1.CalcShape(eip1, shape1);
          el1.CalcDShape(eip1, dshape1);
@@ -1155,11 +1119,9 @@ namespace mfem
             const double w2 = w / Trans2.Elem1->Weight();
             const double wL2 = w2 * lambda->Eval(*Trans2.Elem1, eip2);
             const double wM2 = w2 * mu->Eval(*Trans2.Elem1, eip2);
-            nL2.Set(wL2, nor1);
-            nM2.Set(wM2, nor1);
-            // nM2.Set(wM2, nor1);
+            nL2.Set(wL2, nor);
+            nM2.Set(wM2, nor);
             wLM = (wL2 + 2.0 * wM2);
-            // wLM = wM2;
             dshape2_ps.Mult(nM2, dshape2_dnM);
          }
          else
@@ -1172,14 +1134,12 @@ namespace mfem
             const double w1 = w / Trans1.Elem1->Weight();
             const double wL1 = w1 * lambda->Eval(*Trans1.Elem1, eip1);
             const double wM1 = w1 * mu->Eval(*Trans1.Elem1, eip1);
-            nL1.Set(wL1, nor1);
-            nM1.Set(wM1, nor1);
+            nL1.Set(wL1, nor);
+            nM1.Set(wM1, nor);
             wLM += (wL1 + 2.0 * wM1);
-            // wLM+= wM1;
             dshape1_ps.Mult(nM1, dshape1_dnM);
          }
-         const double jmatcoef = kappa * (nor1 * nor1) * wLM;
-         // const double jmatcoef = kappa * (nor1 * nor1) * wLM;
+         const double jmatcoef = kappa * (nor * nor) * wLM;
 
          // (1,1) block
          AssembleBlock(
@@ -1205,34 +1165,6 @@ namespace mfem
          AssembleBlock(
              dim, ndofs2, ndofs2, dim * ndofs1, dim * ndofs1, jmatcoef, nL2, nM2,
              shape2, shape2, dshape2_dnM, dshape2_ps, *elmats(1, 1), *jmats(1, 1));
-
-         /*          // (1,1) block
-                  AssembleBlock(
-                      dim, ndofs1, ndofs1, 0, 0, jmatcoef,
-                      shape1, shape1, dshape1_dnM, *elmats(0, 0), *jmats(0, 0));
-
-                  if (ndofs2 == 0)
-                  {
-                     continue;
-                  }
-
-                  // In both elmat and jmat, shape2 appears only with a minus sign.
-                  shape2.Neg();
-
-                  // (1,2) block
-                  // jmats(0,1) is never used. set jmatcoef = 0 for this case only.
-                  AssembleBlock(
-                      dim, ndofs1, ndofs2, 0, nvdofs1, 0.0,
-                      shape1, shape2, dshape2_dnM, *elmats(0, 1), *jmats(0, 1));
-                  // (2,1) block
-                  AssembleBlock(
-                      dim, ndofs2, ndofs1, nvdofs1, 0, jmatcoef,
-                      shape2, shape1, dshape1_dnM, *elmats(1, 0), *jmats(1, 0));
-                  // (2,2) block
-                  AssembleBlock(
-                      dim, ndofs2, ndofs2, nvdofs1, nvdofs1, jmatcoef,
-                      shape2, shape2, dshape2_dnM, *elmats(1, 1), *jmats(1, 1)); */
-
       }
 
       // elmat := -elmat + sigma*elmat^t + jmat
@@ -1242,7 +1174,7 @@ namespace mfem
       DenseMatrix *elmat = NULL;
       DenseMatrix *jmat = NULL;
       DenseMatrix *elmat12 = NULL;
-       if (kappa_is_nonzero)
+      if (kappa_is_nonzero)
       {
          for (int I = 0; I < 2; I++)
          {
@@ -1253,7 +1185,6 @@ namespace mfem
                for (int j = 0; j < i; j++)
                {
                   double aij = (*elmat)(i, j), aji = (*elmat)(j, i), mij = (*jmat)(i, j);
-                  //mij = 0.0;
                   (*elmat)(i, j) = alpha * aji - aij + mij;
                   (*elmat)(j, i) = alpha * aij - aji + mij;
                }
@@ -1269,7 +1200,6 @@ namespace mfem
             for (int j = 0; j < nvdofs1; j++)
             {
                double aij = (*elmat)(i, j), aji = (*elmat12)(j, i), mij = (*jmat)(i, j);
-               //mij = 0.0;
                (*elmat)(i, j) = alpha * aji - aij + mij;
                (*elmat12)(j, i) = alpha * aij - aji + mij;
             } // for (int j = 0; j < ndofs1; j++)
@@ -1304,72 +1234,12 @@ namespace mfem
                (*elmat12)(j, i) = alpha * aij - aji;
             } // for (int j = 0; j < ndofs1; j++)
          }    // for (int i = 0; i < ndofs2; i++)
-      } // not if (kappa_is_nonzero)
- 
+      }       // not if (kappa_is_nonzero)
 
-      // Print out the entire elmat
-      /* DenseMatrix elmat_big(nvdofs1 + nvdofs2);
-      DenseMatrix *elmat_small = NULL;
-      for (size_t I = 0; I < 2; I++)
-      {
-         for (size_t J = 0; J < 2; J++)
-         {
-            elmat_small = elmats(I, J);
-            for (size_t i = 0; i < elmat_small->NumRows(); i++)
-            {
-               for (size_t j = 0; j < elmat_small->NumCols(); j++)
-               {
-                  elmat_big(i + I * nvdofs1, j + J * nvdofs1) = elmat_small->Elem(i, j);
-               }
-            }
-         }
-      }
-      std::string filename = "scaleup_inside_mat.txt";
-      _PrintMatrix(filename, elmat_big); */
       if (kappa_is_nonzero)
          DeletePointers(jmats);
    }
 
-   /* // static method
-   void InterfaceDGElasticityIntegrator::AssembleBlock(const int dim, const int row_ndofs,
-                                                       const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef,
-                                                       const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape,
-                                                       const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat)
-   {
-      // row_offset and col_offset are not needed for elmat.
-      for (int d = 0; d < dim; ++d)
-      {
-         int j = d * col_ndofs;
-         for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
-         {
-            int i = d * row_ndofs;
-            const double t2 = col_dshape_dnM(jdof);
-            for (int idof = 0; idof < row_ndofs; ++idof, ++i)
-               elmat(i, j) += row_shape(idof) * t2;
-         }
-      }
-
-      if (jmatcoef == 0.0)
-      {
-         return;
-      }
-
-      for (int d = 0; d < dim; ++d)
-      {
-         const int jo = d * col_ndofs;
-         const int io = d * row_ndofs;
-         for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
-         {
-            const double sj = jmatcoef * col_shape(jdof);
-            int i_start = (io + row_offset > j + col_offset) ? io : j;
-            for (int i = i_start, idof = i - io; idof < row_ndofs; ++idof, ++i)
-            {
-               jmat(i, j) += row_shape(idof) * sj;
-            }
-         }
-      }
-
-   } */
    // static method
    void InterfaceDGElasticityIntegrator::AssembleBlock(
        const int dim, const int row_ndofs, const int col_ndofs,
@@ -1402,19 +1272,6 @@ namespace mfem
          return;
       }
 
-      /* for (int d = 0; d < dim; ++d)
-      {
-         const int jo = col_offset + d * col_ndofs;
-         const int io = row_offset + d * row_ndofs;
-         for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
-         {
-            const double sj = jmatcoef * col_shape(jdof);
-            for (int i = (io + row_offset > j + col_offset) ? io : j, idof = i - io; idof < row_ndofs; ++idof, ++i)
-            {
-               jmat(i, j) += row_shape(idof) * sj;
-            }
-         }
-      } */
       for (int d = 0; d < dim; ++d)
       {
          const int jo = d * col_ndofs;

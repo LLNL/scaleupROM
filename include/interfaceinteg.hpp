@@ -224,7 +224,7 @@ namespace mfem
       // coordinates, scaled by det(J):
       //    dshape_ps(jdof,jm) = sum_{t} adjJ(t,jm)*dshape(jdof,t)
       DenseMatrix dshape1_ps, dshape2_ps;
-      Vector nor1, nor2; // nor = |weight(J_face)| n
+      Vector nor; // nor = |weight(J_face)| n
       Vector nM1, nM2;   // nM1 = (mu1     * ip.weight / detJ1) nor
       Vector nL1, nL2;
       Vector dshape1_dnM, dshape2_dnM; // dshape1_dnM = dshape1_ps . nM1

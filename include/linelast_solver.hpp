@@ -64,11 +64,6 @@ public:
       return varnames;
    }
 
-   static void ZeroDisplacement(const Vector &x, Vector &u)
-   {
-      u = 0.0;
-   }
-
    virtual void InitVariables();
 
    virtual void BuildOperators();
@@ -83,9 +78,6 @@ public:
    virtual void AssembleInterfaceMatrixes();
 
    virtual bool Solve();
-
-   // For testing operators
-   virtual void PrintOperators();
 
    virtual void SetupBCVariables() override;
    virtual void SetupIC(std::function<void(const Vector &, Vector &)> F);

@@ -648,24 +648,16 @@ void OutputOperators()
    LinElastSolver test;
    test.InitVariables();
    test.SetupIC(InitDisplacement);
-   cout<<"hej3"<<endl;
    const std::string visual_path = "test_"+ test.GetVisualizationPrefix();
    std::string sol_file = "test_"+ test.GetSolutionFilePrefix();
    sol_file += ".h5";
 
-   cout<<"sol_file is: "<<sol_file<<endl;
-   cout<<"visual_path is: "<<visual_path<<endl;
    test.InitVisualization(visual_path);
-   cout<<"op done"<<endl;
    test.AddBCFunction(InitDisplacement, 1);
    test.AddBCFunction(InitDisplacement, 2);
    test.BuildOperators();
    test.SetupBCOperators();
-   cout<<"bc done"<<endl;
    test.Assemble();
-   cout<<"assembly done"<<endl;
-
-   test.PrintOperators();
 
    bool converged = test.Solve();
    if (!converged)

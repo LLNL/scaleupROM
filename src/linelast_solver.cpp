@@ -110,10 +110,8 @@ void LinElastSolver::InitVariables()
    block_offsets.PartialSum();
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
-   cout << "1" << endl;
 
    SetupBCVariables();
-   cout << "2" << endl;
 
    // Set up solution/rhs variables/
    U = new BlockVector(var_offsets);
@@ -127,7 +125,6 @@ void LinElastSolver::InitVariables()
       U_blocks does not own the data.
       These are system-specific, therefore not defining it now.
    */
-   cout << "3" << endl;
    us.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
    {
@@ -137,7 +134,6 @@ void LinElastSolver::InitVariables()
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
-   cout << "4" << endl;
    // if (use_rom)  //Off for now
    //   MultiBlockSolver::InitROMHandler();
 }
@@ -220,9 +216,7 @@ void LinElastSolver::AssembleRHS()
    for (int m = 0; m < numSub; m++)
    {
       MFEM_ASSERT(bs[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
-      cout << bs[m]->GetFLFI()[0] << endl;
       bs[m]->Assemble();
-      cout << "linear form norm: " << bs[m]->Norml2() << endl;
    }
 
    for (int m = 0; m < numSub; m++)
@@ -238,10 +232,6 @@ void LinElastSolver::AssembleOperator()
    {
       MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
       as[m]->Assemble();
-      //as[m]->Finalize();
-      //double binorm = as[m]->SpMat().ToDenseMatrix()->FNorm();
-
-      //cout << "bilinear form norm: " << binorm << endl;
    }
    mats.SetSize(numSub, numSub);
    for (int i = 0; i < numSub; i++)
@@ -309,11 +299,7 @@ bool LinElastSolver::Solve()
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
-   for (size_t i = 0; i < U->NumBlocks(); i++)
-   {
-      cout << "Unorm " << i << ": " << U->GetBlock(i).Norml2() << endl;
-   }
-   cout << "RHSnorm: " << RHS->Norml2() << endl;
+
    // TODO: need to change when the actual parallelization is implemented.
    cout << "direct_solve is: " << direct_solve << endl;
    if (direct_solve)
@@ -381,73 +367,6 @@ bool LinElastSolver::Solve()
    }
 
    return converged;
-}
-
-void PrintVector(string filename, Vector &vec)
-{
-   std::ofstream outfile(filename);
-   double tol = 1e-7;
-   double val = 0.0;
-   for (size_t i = 0; i < vec.Size(); i++)
-   {
-      val = vec[i];
-      if (abs(val) < tol)
-      {
-         val = 0.0;
-      }
-
-      outfile << setprecision(8) << val << endl;
-   }
-   outfile.close();
-   cout << "done printing vector" << endl;
-}
-
-void PrintMatrix(string filename, DenseMatrix &mat)
-{
-   std::ofstream outfile(filename);
-
-   double tol = 1e-7;
-   double val = 0.0;
-
-   for (size_t i = 0; i < mat.Height(); i++)
-   {
-      for (size_t j = 0; j < mat.Width(); j++)
-      {
-         val = mat(i, j);
-         if (abs(val) < tol)
-         {
-            val = 0.0;
-         }
-
-         outfile << setprecision(2) << val << " ";
-      }
-      outfile << endl;
-   }
-   outfile.close();
-   cout << "done printing matrix" << endl;
-}
-
-void PrintBlockVector(string filename, BlockVector &bvec)
-{
-   std::ofstream outfile(filename);
-
-   for (size_t i = 0; i < bvec.GetBlock(0).Size(); i++)
-   {
-      for (size_t j = 0; j < bvec.NumBlocks(); j++)
-      {
-         outfile << setprecision(1) << bvec.GetBlock(j)[i] << " ";
-      }
-      outfile << endl;
-   }
-   outfile.close();
-   cout << "done printing blockvector" << endl;
-}
-
-void LinElastSolver::PrintOperators()
-{
-   PrintMatrix("scaleuprom_a.txt", *(as[0]->SpMat().ToDenseMatrix()));
-   PrintVector("scaleuprom_b.txt", *bs[0]);
-   PrintVector("scaleuprom_u0.txt", *U);
 }
 
 void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
