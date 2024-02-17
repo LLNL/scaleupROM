@@ -36,7 +36,6 @@ TEST(DG_BDR_NORMAL_LF_Test, Test_Tri)
    return;
 }
 
-
 void _PrintMatrix(string filename, DenseMatrix &mat)
 {
    std::ofstream outfile(filename);
@@ -44,6 +43,7 @@ void _PrintMatrix(string filename, DenseMatrix &mat)
    double tol = 1e-7;
    double val = 0.0;
 
+   int nonzeros = 0;
    for (size_t i = 0; i < mat.Height(); i++)
    {
       for (size_t j = 0; j < mat.Width(); j++)
@@ -52,6 +52,7 @@ void _PrintMatrix(string filename, DenseMatrix &mat)
          if (abs(val) < tol)
          {
             val = 0.0;
+            nonzeros++;
          }
 
          outfile << setprecision(2) << val << " ";
@@ -60,6 +61,7 @@ void _PrintMatrix(string filename, DenseMatrix &mat)
    }
    outfile.close();
    cout << "done printing matrix" << endl;
+   cout << "number of nonzeros:" << nonzeros << endl;
 }
 
 // TODO(axel) : test for InterfaceDGElasticityIntegrator.
@@ -122,19 +124,19 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
       Easiest way might be visualizing matrices after changing them into DenseMatrix.
     */
    DenseMatrix *pmat = pform.SpMat().ToDenseMatrix();
-   _PrintMatrix("mfem_mat.txt",*pmat);
+   //_PrintMatrix("mfem_mat.txt", *pmat);
    Array<int> offsets(3);
    offsets[0] = 0;
-   offsets[1] = 8; 
-   offsets[2] = 16; 
+   offsets[1] = 8;
+   offsets[2] = 16;
    BlockMatrix smats(offsets);
    for (int i = 0; i < topol_data.numSub; i++)
       for (int j = 0; j < topol_data.numSub; j++)
       {
          smats.SetBlock(i, j, mats(i, j));
       }
-         std::string filename = "scaleup_mat.txt";
-         _PrintMatrix(filename,*(smats.CreateMonolithic()->ToDenseMatrix()));
+   std::string filename = "scaleup_mat.txt";
+   _PrintMatrix(filename, *(smats.CreateMonolithic()->ToDenseMatrix()));
    // print out or compare the entries...
 
    /* clean up variables */

@@ -238,10 +238,10 @@ void LinElastSolver::AssembleOperator()
    {
       MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
       as[m]->Assemble();
-      as[m]->Finalize();
-      double binorm = as[m]->SpMat().ToDenseMatrix()->FNorm();
+      //as[m]->Finalize();
+      //double binorm = as[m]->SpMat().ToDenseMatrix()->FNorm();
 
-      cout << "bilinear form norm: " << binorm << endl;
+      //cout << "bilinear form norm: " << binorm << endl;
    }
    mats.SetSize(numSub, numSub);
    for (int i = 0; i < numSub; i++)
