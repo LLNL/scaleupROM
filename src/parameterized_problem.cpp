@@ -244,6 +244,10 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new StokesFlowPastArray();
    }
+   else if (problem_name == "linelast_disp")
+   {
+      problem = new LinElastDisp();
+   }
    else
    {
       mfem_error("Unknown parameterized problem name!\n");
@@ -524,4 +528,39 @@ void StokesFlowPastArray::SetBattr()
       bdr_type[2] = StokesProblem::DIRICHLET;
       bdr_type[0] = StokesProblem::NEUMANN;
    }
+}
+
+/*
+   LinElastDisp
+*/
+
+LinElastDisp::LinElastDisp()
+    : LinElastProblem()
+{
+   param_num = 2;
+   battr = -1;
+   bdr_type = LinElastProblem::ZERO;
+
+   scalar_bdr_ptr.SetSize(1);
+   vector_bdr_ptr.SetSize(1);
+
+   // pointer to static function.
+   scalar_bdr_ptr = NULL;
+   scalar_rhs_ptr = &(function_factory::linelast_disp::rhs);
+
+   // Default values.
+   function_factory::linelast_disp::rdisp_f = 1.0;
+
+   param_map["rdisp_f"] = 0;
+   param_map["lambda_l"] = 1;
+   param_map["lambda_r"] = 2;
+   param_map["mu_l"] = 3;
+   param_map["mu_r"] = 4;
+
+   param_ptr.SetSize(5);
+   param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
+   param_ptr[1] = &(function_factory::linelast_disp::lambda_l);
+   param_ptr[2] = &(function_factory::linelast_disp::lambda_r);
+   param_ptr[3] = &(function_factory::linelast_disp::mu_l);
+   param_ptr[4] = &(function_factory::linelast_disp::mu_r);
 }

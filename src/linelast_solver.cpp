@@ -417,6 +417,23 @@ void LinElastSolver::SetupDomainBCOperators()
    }
 }
 
+void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   // Set lambda and mu coeffs
+   nu = function_factory::linelast_problem::lambda;
+   delete lambda_c;
+   lambda_c = new PWConstCoefficient(lambda);
+
+   nu = function_factory::linelast_problem::mu;
+   delete mu_c;
+   mu_c = new PWConstCoefficient(mu);
+
+   // Set bcs
+   SetupIC(*(problem->vector_bdr_ptr[0]));
+   AddBCFunction(*(problem->vector_bdr_ptr[0]), 1);
+   AddBCFunction(*(problem->vector_bdr_ptr[0]), 2);
+}
+
 // Component-wise assembly
 void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildCompROMElement is not implemented yet!\n"; }
 void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildBdrROMElement is not implemented yet!\n"; }
@@ -425,5 +442,3 @@ void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_c
 void LinElastSolver::ProjectOperatorOnReducedBasis() { "LinElastSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"; }
 
 void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
-
-void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem) { "LinElastSolver::SetParameterizedProblem is not implemented yet!\n"; }
