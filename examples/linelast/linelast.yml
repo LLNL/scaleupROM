@@ -1,5 +1,5 @@
 main:
-  mode: output_operators
+  mode: single_run
   use_rom: false
   solver: linelast
 
@@ -8,8 +8,7 @@ mesh:
   uniform_refinement: 0
 
 domain-decomposition:
-  type: none
-  #type: interior_penalty
+  type: interior_penalty
 
 solver:
   direct_solve: true
@@ -23,3 +22,14 @@ visualization:
   unified_paraview: true
   file_path:
     prefix: paraview_output
+
+parameterized_problem:
+  name: linelast_disp
+
+single_run:
+  linelast_disp:
+    r_dispf: 1.0
+
+
+
+

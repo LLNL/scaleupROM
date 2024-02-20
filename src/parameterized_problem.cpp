@@ -158,13 +158,13 @@ void ubdr(const Vector &x, Vector &y)
 }  // namespace linelast_problem
 namespace linelast_problem
 {
-double lambda_l, lambda_r;
-double mu_l, mu_r;
 
 namespace linelast_disp
 {
 
 double rdisp_f;
+double lambda_l, lambda_r;
+double mu_l, mu_r;
 
 void fill_vec(Vector &y, const double l_param,const double r_param)
 {
@@ -578,6 +578,10 @@ LinElastDisp::LinElastDisp()
 
    // Default values.
    function_factory::linelast_disp::rdisp_f = 1.0;
+   function_factory::linelast_disp::lambda_l = 1.0;
+   function_factory::linelast_disp::lambda_r = 50.0;
+   function_factory::linelast_disp::mu_l = 1.0;
+   function_factory::linelast_disp::mu_r = 50.0;
 
    param_map["rdisp_f"] = 0;
    param_map["lambda_l"] = 1;
