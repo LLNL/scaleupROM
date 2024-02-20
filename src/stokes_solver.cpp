@@ -429,7 +429,7 @@ void StokesSolver::AssembleOperatorBase()
          }
       }
 
-   AssembleInterfaceMatrixes();
+   AssembleInterfaceMatrices();
 
    for (int m = 0; m < numSub; m++)
    {
@@ -508,10 +508,10 @@ void StokesSolver::SetupPressureMassMatrix()
    pM = pmMat->CreateMonolithic();
 }
 
-void StokesSolver::AssembleInterfaceMatrixes()
+void StokesSolver::AssembleInterfaceMatrices()
 {
-   m_itf->AssembleInterfaceMatrixes(m_mats);
-   b_itf->AssembleInterfaceMatrixes(b_mats);
+   m_itf->AssembleInterfaceMatrices(m_mats);
+   b_itf->AssembleInterfaceMatrices(b_mats);
 }
 
 void StokesSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)

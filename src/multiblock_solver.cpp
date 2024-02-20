@@ -270,10 +270,10 @@ void MultiBlockSolver::BuildROMElements()
 
    BuildCompROMElement(fes_comp);
 
-   // Boundary penalty matrixes
+   // Boundary penalty matrices
    BuildBdrROMElement(fes_comp);
 
-   // Port penalty matrixes
+   // Port penalty matrices
    BuildInterfaceROMElement(fes_comp);
 
    for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
@@ -526,7 +526,7 @@ void MultiBlockSolver::AssembleROM()
       MatrixBlocks *comp_mat = comp_mats[c_type];
       AddToBlockMatrix(midx, midx, *comp_mat, *romMat);
 
-      // boundary matrixes of each component.
+      // boundary matrices of each component.
       Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
 
       for (int b = 0; b < bdr_c2g->Size(); b++)
@@ -540,7 +540,7 @@ void MultiBlockSolver::AssembleROM()
       }  // for (int b = 0; b < bdr_c2g->Size(); b++)
    }  // for (int m = 0; m < numSub; m++)
 
-   // interface matrixes.
+   // interface matrices.
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);

@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 // }
    }
 
-   // Set up block matrixes, based on domain offsets.
+   // Set up block matrices, based on domain offsets.
    Array2D<SparseMatrix*> mats(numSub, numSub);
    for (int i = 0; i < numSub; i++)
    {

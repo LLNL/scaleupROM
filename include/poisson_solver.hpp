@@ -85,7 +85,7 @@ public:
    virtual void AssembleOperator();
    // For bilinear case.
    // system-specific.
-   virtual void AssembleInterfaceMatrixes();
+   virtual void AssembleInterfaceMatrices();
 
    // Component-wise assembly
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);

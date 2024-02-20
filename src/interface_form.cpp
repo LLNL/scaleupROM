@@ -28,7 +28,7 @@ InterfaceForm::~InterfaceForm()
    DeletePointers(fnfi);
 }
 
-void InterfaceForm::AssembleInterfaceMatrixes(Array2D<SparseMatrix *> &mats) const
+void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const
 {
    assert(mats.NumRows() == numSub);
    assert(mats.NumCols() == numSub);
@@ -341,7 +341,7 @@ MixedInterfaceForm::~MixedInterfaceForm()
    DeletePointers(fnfi);
 }
 
-void MixedInterfaceForm::AssembleInterfaceMatrixes(Array2D<SparseMatrix *> &mats) const
+void MixedInterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const
 {
    const PortInfo *pInfo;
    Array<int> midx(2);

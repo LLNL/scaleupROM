@@ -54,7 +54,7 @@ public:
    const Array<InterfaceNonlinearFormIntegrator*> &GetIntefaceIntegrators() const
    { return fnfi; }
 
-   void AssembleInterfaceMatrixes(Array2D<SparseMatrix *> &mats) const;
+   void AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const;
 
    void AssembleInterfaceMatrixAtPort(const int p, Array<FiniteElementSpace *> &fes_comp, Array2D<SparseMatrix *> &mats_p) const;
 
@@ -127,7 +127,7 @@ public:
    const Array<InterfaceNonlinearFormIntegrator*> &GetIntefaceIntegrators() const
    { return fnfi; }
 
-   void AssembleInterfaceMatrixes(Array2D<SparseMatrix *> &mats) const;
+   void AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const;
 
    void AssembleInterfaceMatrixAtPort(const int p, Array<FiniteElementSpace *> &trial_fes_comp, 
                                       Array<FiniteElementSpace *> &test_fes_comp, Array2D<SparseMatrix *> &mats_p) const;

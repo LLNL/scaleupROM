@@ -298,7 +298,7 @@ void PoissonSolver::AssembleOperator()
          }
       }
    }
-   AssembleInterfaceMatrixes();
+   AssembleInterfaceMatrices();
 
    for (int m = 0; m < numSub; m++)
       as[m]->Finalize();
@@ -334,10 +334,10 @@ void PoissonSolver::AssembleOperator()
    }
 }
 
-void PoissonSolver::AssembleInterfaceMatrixes()
+void PoissonSolver::AssembleInterfaceMatrices()
 {
    assert(a_itf);
-   a_itf->AssembleInterfaceMatrixes(mats);
+   a_itf->AssembleInterfaceMatrices(mats);
 }
 
 void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
