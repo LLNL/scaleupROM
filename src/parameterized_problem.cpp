@@ -166,8 +166,8 @@ double mu_l, mu_r;
 
 void fill_vec(Vector &y, const double l_param,const double r_param)
 {
-   y = r_param;
-   y(0) = l_param;
+   y = l_param;
+   //y(0) = l_param;
 }
 
 void fill_lambda(Vector &y)
@@ -567,7 +567,7 @@ void StokesFlowPastArray::SetBattr()
 */
 
 LinElastDisp::LinElastDisp()
-    : LinElastProblem()
+    : ParameterizedProblem()
 {
    // pointer to static function.
    vector_bdr_ptr.SetSize(1);

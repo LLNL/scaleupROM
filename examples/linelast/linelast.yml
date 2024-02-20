@@ -5,10 +5,10 @@ main:
 
 mesh:
   filename: meshes/beam-tri.mesh
-  uniform_refinement: 0
+  uniform_refinement: 1
 
 domain-decomposition:
-  type: interior_penalty
+  type: none
 
 solver:
   direct_solve: true
@@ -23,13 +23,13 @@ visualization:
   file_path:
     prefix: paraview_output
 
+save_solution:
+  enabled: true
+
 parameterized_problem:
   name: linelast_disp
 
 single_run:
   linelast_disp:
     rdisp_f: 1.0
-
-
-
 

@@ -202,16 +202,14 @@ private:
    Vector *u0;
    void SetBattr();
 };
-class LinElastProblem : public ParameterizedProblem
+class LinElastDisp : public ParameterizedProblem
 {
 friend class LinElastSolver;
 
-public:
-   virtual ~LinElastProblem() {};
-};
+protected:
+   enum BoundaryType
+   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
 
-class LinElastDisp : public LinElastProblem
-{
 public:
    LinElastDisp();
    virtual ~LinElastDisp() {};

@@ -205,6 +205,7 @@ void LinElastSolver::Assemble()
 {
    AssembleRHS();
    AssembleOperator();
+
 }
 
 void LinElastSolver::AssembleRHS()
@@ -426,7 +427,7 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
    function_factory::linelast_disp::fill_lambda(lambda);
    function_factory::linelast_disp::fill_mu(mu);
-
+   
    delete lambda_c;
    lambda_c = new PWConstCoefficient(lambda);
 
@@ -434,6 +435,7 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    mu_c = new PWConstCoefficient(mu);
 
    // Set bcs
+   delete init_x;
    SetupIC(*(problem->vector_bdr_ptr[0]));
    AddBCFunction(*(problem->vector_bdr_ptr[0]), 1);
    AddBCFunction(*(problem->vector_bdr_ptr[0]), 2);
