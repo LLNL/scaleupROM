@@ -423,8 +423,8 @@ void LinElastSolver::SetParameterizedProblem(LinElastDisp *problem)
    Vector lambda(numBdr);
    Vector mu(numBdr);
 
-   function_factory::linelast_problem::fill_lambda(lambda);
-   function_factory::linelast_problem::fill_mu(mu);
+   function_factory::linelast_disp::fill_lambda(lambda);
+   function_factory::linelast_disp::fill_mu(mu);
 
    delete lambda_c;
    lambda_c = new PWConstCoefficient(lambda);

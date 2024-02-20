@@ -155,7 +155,42 @@ void ubdr(const Vector &x, Vector &y)
 
 }  // namespace stokes_component
 
-}  // namespace stokes_problem
+}  // namespace linelast_problem
+namespace linelast_problem
+{
+double lambda_l, lambda_r;
+double mu_l, mu_r;
+
+namespace linelast_disp
+{
+
+double rdisp_f;
+
+void fill_vec(Vector &y, const double l_param,const double r_param)
+{
+   y = r_param;
+   y(0) = l_param;
+}
+
+void fill_lambda(Vector &y)
+{
+   fill_vec(y, lambda_l, lambda_r);
+}
+
+void fill_mu(Vector &y)
+{
+   fill_vec(y, mu_l, mu_r);
+}
+
+void init_disp(const Vector &x, Vector &u)
+{
+   u = 0.0;
+   u(u.Size()-1) = -0.2*x(0)*rdisp_f;
+}
+
+}  // namespace linelast_disp
+
+}  // namespace linelast_problem
 
 }  // namespace function_factory
 
