@@ -6,6 +6,7 @@
 #include "component_topology_handler.hpp"
 #include "multiblock_solver.hpp"
 #include "poisson_solver.hpp"
+#include "linelast_solver.hpp"
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
 #include "etc.hpp"
@@ -53,6 +54,7 @@ MultiBlockSolver* InitSolver()
    if (solver_type == "poisson")       { solver = new PoissonSolver; }
    else if (solver_type == "stokes")   { solver = new StokesSolver; }
    else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
+   else if (solver_type == "linelast")   { solver = new LinElastSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
@@ -126,6 +128,7 @@ std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_
       if (solver_type == "poisson")          var_list = PoissonSolver::GetVariableNames();
       else if (solver_type == "stokes")      var_list = StokesSolver::GetVariableNames();
       else if (solver_type == "steady-ns")   var_list = SteadyNSSolver::GetVariableNames();
+      else if (solver_type == "linelast")   var_list = LinElastSolver::GetVariableNames();
       else
       {
          printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
@@ -586,4 +589,3 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    // return the maximum error over all variables.
    return error.Max();
 }
-

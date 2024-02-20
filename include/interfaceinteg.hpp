@@ -11,7 +11,7 @@
 namespace mfem
 {
 
-class InterfaceNonlinearFormIntegrator : virtual public HyperReductionIntegrator
+   class InterfaceNonlinearFormIntegrator : virtual public HyperReductionIntegrator
 {
 protected:
   InterfaceNonlinearFormIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)
@@ -190,11 +190,54 @@ public:
                                        Vector &elvect1, Vector &elvect2);
 
    virtual void AssembleInterfaceGrad(const FiniteElement &el1,
-                                      const FiniteElement &el2,
-                                      FaceElementTransformations &Tr1,
-                                      FaceElementTransformations &Tr2,
-                                      const Vector &elfun1, const Vector &elfun2,
-                                      Array2D<DenseMatrix*> &elmats);
+                                       const FiniteElement &el2,
+                                       FaceElementTransformations &Tr1,
+                                       FaceElementTransformations &Tr2,
+                                       const Vector &elfun1, const Vector &elfun2,
+                                       Array2D<DenseMatrix *> &elmats);
+};
+
+class InterfaceDGElasticityIntegrator : public InterfaceNonlinearFormIntegrator
+{
+protected:
+   double alpha, kappa;
+
+   // values of all scalar basis functions for one component of u (which is a
+   // vector) at the integration point in the reference space
+   Vector shape1, shape2;
+   // values of derivatives of all scalar basis functions for one component
+   // of u (which is a vector) at the integration point in the reference space
+   DenseMatrix dshape1, dshape2;
+   // Adjugate of the Jacobian of the transformation: adjJ = det(J) J^{-1}
+   DenseMatrix adjJ;
+   // gradient of shape functions in the real (physical, not reference)
+   // coordinates, scaled by det(J):
+   //    dshape_ps(jdof,jm) = sum_{t} adjJ(t,jm)*dshape(jdof,t)
+   DenseMatrix dshape1_ps, dshape2_ps;
+   Vector nor; // nor = |weight(J_face)| n
+   Vector nM1, nM2;   // nM1 = (mu1     * ip.weight / detJ1) nor
+   Vector nL1, nL2;
+   Vector dshape1_dnM, dshape2_dnM; // dshape1_dnM = dshape1_ps . nM1
+   // 'jmat' corresponds to the term: kappa <h^{-1} {lambda + 2 mu} [u], [v]>
+   Array2D<DenseMatrix *> jmats;
+
+   PWConstCoefficient *lambda, *mu;
+
+   static void AssembleBlock(const int dim, const int row_ndofs,
+                              const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef,
+                              const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape,
+                              const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat);
+public:
+   InterfaceDGElasticityIntegrator(PWConstCoefficient *lambda_, PWConstCoefficient *mu_, double alpha_, double kappa_) : lambda(lambda_), mu(mu_), alpha(alpha_), kappa(kappa_) {};
+
+
+         virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
+                                             const FiniteElement &el2,
+                                             FaceElementTransformations &Trans1,
+                                             FaceElementTransformations &Trans2,
+                                             Array2D<DenseMatrix *> &elmats);
+
+   using InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix;
 };
 
 } // namespace mfem
