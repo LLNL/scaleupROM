@@ -205,7 +205,6 @@ void LinElastSolver::Assemble()
 {
    AssembleRHS();
    AssembleOperator();
-
 }
 
 void LinElastSolver::AssembleRHS()
