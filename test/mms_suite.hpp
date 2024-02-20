@@ -83,7 +83,6 @@ static const double pi = 4.0 * atan(1.0);
 static const double mu = 1.0; //only test case when mu = 1.0 (homogenous material)
 static double lambda = 1.0;
 static int dim;
-static void InitDisplacement2(const Vector &x, Vector &u);
 static void ExactSolution(const Vector & x, Vector & u);
 static void ExactRHS(const Vector & x, Vector & u);
 LinElastSolver *SolveWithRefinement(const int num_refinement);

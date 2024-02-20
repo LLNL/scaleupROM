@@ -12,8 +12,7 @@ using namespace mfem;
 /**
  * Simple smoke test to make sure Google Test is properly linked
  */
-TEST(GoogleTestFramework, GoogleTestFrameworkFound)
-{
+TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
@@ -64,8 +63,6 @@ void _PrintMatrix(string filename, DenseMatrix &mat)
    cout << "number of nonzeros:" << nonzeros << endl;
 }
 
-// TODO(axel) : test for InterfaceDGElasticityIntegrator.
-/* In essence, check the consistency with DGElasticityIntegrator*/
 TEST(InterfaceDGElasticityIntegrator, Test_Quad)
 {
    config = InputParser("inputs/dd_mms.yml");
@@ -124,7 +121,7 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
       Easiest way might be visualizing matrices after changing them into DenseMatrix.
     */
    DenseMatrix *pmat = pform.SpMat().ToDenseMatrix();
-   //_PrintMatrix("mfem_mat.txt", *pmat);
+   _PrintMatrix("mfem_mat.txt", *pmat);
    Array<int> offsets(3);
    offsets[0] = 0;
    offsets[1] = 8;
@@ -138,9 +135,6 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
    std::string filename = "scaleup_mat.txt";
    _PrintMatrix(filename, *(smats.CreateMonolithic()->ToDenseMatrix()));
    // print out or compare the entries...
-
-   /* clean up variables */
-   // delete ..
    return;
 }
 

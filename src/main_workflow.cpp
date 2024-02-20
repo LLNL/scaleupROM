@@ -47,26 +47,14 @@ void RunExample()
    test.SaveVisualization();
 }
 
-MultiBlockSolver *InitSolver()
+MultiBlockSolver* InitSolver()
 {
    std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    MultiBlockSolver *solver = NULL;
-   if (solver_type == "poisson")
-   {
-      solver = new PoissonSolver;
-   }
-   else if (solver_type == "stokes")
-   {
-      solver = new StokesSolver;
-   }
-   else if (solver_type == "steady-ns")
-   {
-      solver = new SteadyNSSolver;
-   }
-   else if (solver_type == "linelast")
-   {
-      solver = new LinElastSolver;
-   }
+   if (solver_type == "poisson")       { solver = new PoissonSolver; }
+   else if (solver_type == "stokes")   { solver = new StokesSolver; }
+   else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
+   else if (solver_type == "linelast")   { solver = new LinElastSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
@@ -76,9 +64,9 @@ MultiBlockSolver *InitSolver()
    return solver;
 }
 
-SampleGenerator *InitSampleGenerator(MPI_Comm comm)
+SampleGenerator* InitSampleGenerator(MPI_Comm comm)
 {
-   SampleGenerator *generator = NULL;
+   SampleGenerator* generator = NULL;
 
    std::string type = config.GetOption<std::string>("sample_generation/type", "base");
 
@@ -106,10 +94,8 @@ std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_
    if (train_mode == TrainMode::INDIVIDUAL)
    {
       TopologyHandler *topol_handler;
-      if (topol_mode == TopologyHandlerMode::SUBMESH)
-         topol_handler = new SubMeshTopologyHandler();
-      else if (topol_mode == TopologyHandlerMode::COMPONENT)
-         topol_handler = new ComponentTopologyHandler();
+      if (topol_mode == TopologyHandlerMode::SUBMESH)          topol_handler = new SubMeshTopologyHandler();
+      else if (topol_mode == TopologyHandlerMode::COMPONENT)   topol_handler = new ComponentTopologyHandler();
       else
          mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
 
@@ -118,7 +104,7 @@ std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_
 
       delete topol_handler;
    }
-   else // if (train_mode == TrainMode::UNIVERSAL)
+   else  // if (train_mode == TrainMode::UNIVERSAL)
    {
       if (topol_mode == TopologyHandlerMode::SUBMESH)
       {
@@ -129,22 +115,20 @@ std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_
          YAML::Node component_dict = config.FindNode("mesh/component-wise/components");
          assert(component_dict);
          for (int p = 0; p < component_dict.size(); p++)
-            component_list.push_back(config.GetRequiredOptionFromDict<std::string>("name", component_dict[p]));
+         component_list.push_back(config.GetRequiredOptionFromDict<std::string>("name", component_dict[p]));
       }
       else
          mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
-   } // if (train_mode == TrainMode::UNIVERSAL)
+   }  // if (train_mode == TrainMode::UNIVERSAL)
 
    std::vector<std::string> var_list(0);
    if (separate_variable_basis)
    {
       std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
-      if (solver_type == "poisson")
-         var_list = PoissonSolver::GetVariableNames();
-      else if (solver_type == "stokes")
-         var_list = StokesSolver::GetVariableNames();
-      else if (solver_type == "steady-ns")
-         var_list = SteadyNSSolver::GetVariableNames();
+      if (solver_type == "poisson")          var_list = PoissonSolver::GetVariableNames();
+      else if (solver_type == "stokes")      var_list = StokesSolver::GetVariableNames();
+      else if (solver_type == "steady-ns")   var_list = SteadyNSSolver::GetVariableNames();
+      else if (solver_type == "linelast")   var_list = LinElastSolver::GetVariableNames();
       else
       {
          printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
@@ -177,8 +161,7 @@ void GenerateSamples(MPI_Comm comm)
    int s = 0;
    while (s < sample_generator->GetTotalSampleSize())
    {
-      if (!sample_generator->IsMyJob(s))
-         continue;
+      if (!sample_generator->IsMyJob(s)) continue;
 
       // NOTE: this will change config.dict_
       sample_generator->SetSampleParams(s);
@@ -212,7 +195,7 @@ void GenerateSamples(MPI_Comm comm)
             continue;
          }
       }
-
+         
       test->SaveSolution(sol_file);
       test->SaveVisualization();
 
@@ -267,7 +250,7 @@ void TrainROM(MPI_Comm comm)
       {
          // Find if additional inputs are specified for basis_tags[p].
          YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[p], basis_list);
-
+         
          // If basis_tags[p] has additional inputs, parse them.
          if (basis_tag_input)
          {
@@ -276,14 +259,14 @@ void TrainROM(MPI_Comm comm)
 
             // parse the sample snapshot file list.
             file_list = config.GetOptionFromDict<std::vector<std::string>>(
-                "snapshot_files", std::vector<std::string>(0), basis_tag_input);
+                        "snapshot_files", std::vector<std::string>(0), basis_tag_input);
             YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_tag_input);
             if (snapshot_format)
             {
                FilenameParam snapshot_param("", snapshot_format);
                snapshot_param.ParseFilenames(file_list);
             }
-         } // if (basis_tag_input)
+         }  // if (basis_tag_input)
          else
             num_basis = num_basis_default;
       }
@@ -302,7 +285,7 @@ void TrainROM(MPI_Comm comm)
       }
 
       sample_generator->FormReducedBasis(basis_prefix, basis_tags[p], file_list, num_basis);
-   } // for (int p = 0; p < basis_tags.size(); p++)
+   }  // for (int p = 0; p < basis_tags.size(); p++)
 
    delete sample_generator;
 
@@ -319,17 +302,10 @@ void AuxiliaryTrainROM(MPI_Comm comm)
    {
       ParameterizedProblem *problem = InitParameterizedProblem();
       StokesSolver *solver = NULL;
-      if (solver_type == "stokes")
-      {
-         solver = new StokesSolver;
-      }
-      else if (solver_type == "steady-ns")
-      {
-         solver = new SteadyNSSolver;
-      }
+      if (solver_type == "stokes")           { solver = new StokesSolver; }
+      else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
 
-      if (!solver->UseRom())
-         mfem_error("ROM must be enabled for supremizer enrichment!\n");
+      if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
 
       solver->InitVariables();
       // This time needs to be ROMHandler, in order not to run StokesSolver::LoadSupremizer.
@@ -350,8 +326,7 @@ void BuildROM(MPI_Comm comm)
    MultiBlockSolver *test = NULL;
 
    test = InitSolver();
-   if (!test->UseRom())
-      mfem_error("ROM must be enabled for BuildROM!\n");
+   if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
    test->InitVariables();
    // test->InitVisualization();
 
@@ -362,9 +337,9 @@ void BuildROM(MPI_Comm comm)
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
    test->SetupBCOperators();
-
+   
    test->LoadReducedBasis();
-
+   
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
    ROMBuildingLevel save_operator = test->GetROMHandler()->GetBuildingLevel();
 
@@ -374,29 +349,29 @@ void BuildROM(MPI_Comm comm)
 
    switch (save_operator)
    {
-   case ROMBuildingLevel::COMPONENT:
-   {
-      if (topol_mode == TopologyHandlerMode::SUBMESH)
-         mfem_error("Submesh does not support component rom building level!\n");
+      case ROMBuildingLevel::COMPONENT:
+      {
+         if (topol_mode == TopologyHandlerMode::SUBMESH)
+            mfem_error("Submesh does not support component rom building level!\n");
 
-      test->AllocateROMElements();
-      test->BuildROMElements();
-      std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
-      test->SaveROMElements(filename);
-      break;
-   }
-   case ROMBuildingLevel::GLOBAL:
-   {
-      test->ProjectOperatorOnReducedBasis();
-      test->SaveROMOperator();
-      break;
-   }
-   case ROMBuildingLevel::NONE:
-   {
-      printf("BuildROM - ROM building level is set to none. No ROM is saved.\n");
-      break;
-   }
-   } // switch (save_operator)
+         test->AllocateROMElements();
+         test->BuildROMElements();
+         std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
+         test->SaveROMElements(filename);
+         break;
+      }
+      case ROMBuildingLevel::GLOBAL:
+      {
+         test->ProjectOperatorOnReducedBasis();
+         test->SaveROMOperator();
+         break;
+      }
+      case ROMBuildingLevel::NONE:
+      {
+         printf("BuildROM - ROM building level is set to none. No ROM is saved.\n");
+         break;
+      }
+   }  // switch (save_operator)
 
    test->SaveBasisVisualization();
 
@@ -410,7 +385,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    {
       RandomSampleGenerator *generator = new RandomSampleGenerator(comm);
       generator->SetParamSpaceSizes();
-      int idx = UniformRandom(0, generator->GetTotalSampleSize() - 1);
+      int idx = UniformRandom(0, generator->GetTotalSampleSize()-1);
       // NOTE: this will change config.dict_
       generator->SetSampleParams(idx);
       delete generator;
@@ -434,10 +409,8 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
    const int num_var = test->GetNumVar();
    Vector rom_assemble(1), rom_solve(1), fom_assemble(1), fom_solve(1), error(num_var);
-   rom_assemble = -1.0;
-   rom_solve = -1.0;
-   fom_assemble = -1.0;
-   fom_solve = -1.0;
+   rom_assemble = -1.0; rom_solve = -1.0;
+   fom_assemble = -1.0; fom_solve = -1.0;
    error = -1.0;
 
    ROMHandlerBase *rom = NULL;
@@ -463,46 +436,46 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
       switch (save_operator)
       {
-      case ROMBuildingLevel::COMPONENT:
-      {
-         if (topol_mode == TopologyHandlerMode::SUBMESH)
-            mfem_error("Submesh does not support component rom building level!\n");
+         case ROMBuildingLevel::COMPONENT:
+         {
+            if (topol_mode == TopologyHandlerMode::SUBMESH)
+               mfem_error("Submesh does not support component rom building level!\n");
 
-         printf("Loading component operator file.. ");
-         test->AllocateROMElements();
-         std::string filename = rom->GetOperatorPrefix() + ".h5";
-         test->LoadROMElements(filename);
-         test->AssembleROM();
-         break;
-      }
-      case ROMBuildingLevel::GLOBAL:
-      {
-         printf("Loading global operator file.. ");
-         test->LoadROMOperatorFromFile();
-         break;
-      }
-      case ROMBuildingLevel::NONE:
-      {
-         printf("Building operator file all the way from FOM.. ");
-         test->BuildDomainOperators();
-         test->SetupDomainBCOperators();
-         test->AssembleOperator();
-         test->ProjectOperatorOnReducedBasis();
-         break;
-      }
+            printf("Loading component operator file.. ");
+            test->AllocateROMElements();
+            std::string filename = rom->GetOperatorPrefix() + ".h5";
+            test->LoadROMElements(filename);
+            test->AssembleROM();
+            break;
+         }
+         case ROMBuildingLevel::GLOBAL:
+         {
+            printf("Loading global operator file.. ");
+            test->LoadROMOperatorFromFile();
+            break;
+         }
+         case ROMBuildingLevel::NONE:
+         {
+            printf("Building operator file all the way from FOM.. ");
+            test->BuildDomainOperators();
+            test->SetupDomainBCOperators();
+            test->AssembleOperator();
+            test->ProjectOperatorOnReducedBasis();
+            break;
+         }
       }
       printf("Done!\n");
 
       printf("Projecting RHS to ROM.. ");
       test->ProjectRHSOnReducedBasis();
       printf("Done!\n");
-   } // if (test->UseRom())
+   }  // if (test->UseRom())
    else
    {
       test->BuildDomainOperators();
       test->SetupDomainBCOperators();
       test->AssembleOperator();
-   } // not if (test->UseRom())
+   }  // not if (test->UseRom())
    solveTimer.Stop();
    printf("%s-assemble time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
 
@@ -601,16 +574,10 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    // Save solution and visualization.
    test->SaveSolution();
    test->SaveVisualization();
-
+   
    delete test;
    delete problem;
 
    // return the maximum error over all variables.
    return error.Max();
 }
-
-static void InitDisplacement(const Vector &x, Vector &u)
-   {
-      u = 0.0;
-      u(u.Size() - 1) = -0.2 * x(0);
-   }
