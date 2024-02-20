@@ -537,16 +537,9 @@ void StokesFlowPastArray::SetBattr()
 LinElastDisp::LinElastDisp()
     : LinElastProblem()
 {
-   param_num = 2;
-   battr = -1;
-   bdr_type = LinElastProblem::ZERO;
-
-   scalar_bdr_ptr.SetSize(1);
-   vector_bdr_ptr.SetSize(1);
-
    // pointer to static function.
-   scalar_bdr_ptr = NULL;
-   scalar_rhs_ptr = &(function_factory::linelast_disp::rhs);
+   vector_bdr_ptr.SetSize(1);
+   vector_bdr_ptr = &(function_factory::linelast_disp::init_disp);
 
    // Default values.
    function_factory::linelast_disp::rdisp_f = 1.0;
@@ -559,8 +552,8 @@ LinElastDisp::LinElastDisp()
 
    param_ptr.SetSize(5);
    param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
-   param_ptr[1] = &(function_factory::linelast_disp::lambda_l);
-   param_ptr[2] = &(function_factory::linelast_disp::lambda_r);
-   param_ptr[3] = &(function_factory::linelast_disp::mu_l);
-   param_ptr[4] = &(function_factory::linelast_disp::mu_r);
+   param_ptr[1] = &(function_factory::linelast_problem::lambda_l);
+   param_ptr[2] = &(function_factory::linelast_problem::lambda_r);
+   param_ptr[3] = &(function_factory::linelast_problem::mu_l);
+   param_ptr[4] = &(function_factory::linelast_problem::mu_r);
 }

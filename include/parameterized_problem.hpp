@@ -190,6 +190,20 @@ private:
    Vector *u0;
    void SetBattr();
 };
+class LinElastProblem : public ParameterizedProblem
+{
+friend class LinElastSolver;
+
+public:
+   virtual ~LinElastProblem() {};
+};
+
+class LinElastDisp : public LinElastProblem
+{
+public:
+   LinElastDisp();
+   virtual ~LinElastDisp() {};
+};
 
 ParameterizedProblem* InitParameterizedProblem();
 

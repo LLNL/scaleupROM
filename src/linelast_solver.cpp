@@ -417,14 +417,18 @@ void LinElastSolver::SetupDomainBCOperators()
    }
 }
 
-void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+void LinElastSolver::SetParameterizedProblem(LinElastDisp *problem)
 {
    // Set lambda and mu coeffs
-   nu = function_factory::linelast_problem::lambda;
+   Vector lambda(numBdr);
+   Vector mu(numBdr);
+
+   function_factory::linelast_problem::fill_lambda(lambda);
+   function_factory::linelast_problem::fill_mu(mu);
+
    delete lambda_c;
    lambda_c = new PWConstCoefficient(lambda);
 
-   nu = function_factory::linelast_problem::mu;
    delete mu_c;
    mu_c = new PWConstCoefficient(mu);
 
