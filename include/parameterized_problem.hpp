@@ -69,6 +69,18 @@ namespace stokes_component
 
 }
 
+namespace linelast_disp
+{
+extern double rdisp_f;
+extern double lambda_l, lambda_r;
+extern double mu_l, mu_r;
+
+void fill_vec(Vector &y, const double l_param,const double r_param);
+void fill_lambda(Vector &y);
+void fill_mu(Vector &y);
+void init_disp(const Vector &x, Vector &u);
+}
+
 }
 
 class ParameterizedProblem

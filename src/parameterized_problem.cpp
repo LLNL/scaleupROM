@@ -155,9 +155,7 @@ void ubdr(const Vector &x, Vector &y)
 
 }  // namespace stokes_component
 
-}  // namespace linelast_problem
-namespace linelast_problem
-{
+} 
 
 namespace linelast_disp
 {
@@ -190,7 +188,6 @@ void init_disp(const Vector &x, Vector &u)
 
 }  // namespace linelast_disp
 
-}  // namespace linelast_problem
 
 }  // namespace function_factory
 
@@ -591,8 +588,8 @@ LinElastDisp::LinElastDisp()
 
    param_ptr.SetSize(5);
    param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
-   param_ptr[1] = &(function_factory::linelast_problem::lambda_l);
-   param_ptr[2] = &(function_factory::linelast_problem::lambda_r);
-   param_ptr[3] = &(function_factory::linelast_problem::mu_l);
-   param_ptr[4] = &(function_factory::linelast_problem::mu_r);
+   param_ptr[1] = &(function_factory::linelast_disp::lambda_l);
+   param_ptr[2] = &(function_factory::linelast_disp::lambda_r);
+   param_ptr[3] = &(function_factory::linelast_disp::mu_l);
+   param_ptr[4] = &(function_factory::linelast_disp::mu_r);
 }

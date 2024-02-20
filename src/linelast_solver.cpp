@@ -56,6 +56,7 @@ LinElastSolver::~LinElastSolver()
    delete globalMat;
    delete globalMat_hypre;
    delete mumps;
+   delete init_x;
 }
 
 void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
@@ -417,7 +418,7 @@ void LinElastSolver::SetupDomainBCOperators()
    }
 }
 
-void LinElastSolver::SetParameterizedProblem(LinElastDisp *problem)
+void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    // Set lambda and mu coeffs
    Vector lambda(numBdr);
