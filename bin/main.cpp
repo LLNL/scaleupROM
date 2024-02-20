@@ -32,8 +32,6 @@ int main(int argc, char *argv[])
       else if (mode == "build_rom")    BuildROM(MPI_COMM_WORLD);
       else if (mode == "train_rom")    TrainROM(MPI_COMM_WORLD);
       else if (mode == "single_run")   double dump = SingleRun(MPI_COMM_WORLD, output_file);
-      else if (mode == "test")    TEMPRunAndCompare();
-      else if (mode == "output_operators")    OutputOperators();
       else
       {
          if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());

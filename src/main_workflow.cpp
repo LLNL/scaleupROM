@@ -609,63 +609,8 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    return error.Max();
 }
 
-void TEMPRunAndCompare()
-{
-   LinElastSolver test;
-   test.InitVariables();
-   const std::string visual_path = "test_"+ test.GetVisualizationPrefix();
-   std::string sol_file = "test_"+ test.GetSolutionFilePrefix();
-   sol_file += ".h5";
-
-   cout<<"sol_file is: "<<sol_file<<endl;
-   cout<<"visual_path is: "<<visual_path<<endl;
-   test.InitVisualization(visual_path);
-   test.BuildOperators();
-   cout<<"op done"<<endl;
-   test.Assemble();
-   cout<<"assembly done"<<endl;
-
-   bool converged = test.Solve();
-   if (!converged)
-   {
-         // if random, try another sample.
-         mfem_warning("Solver failed to converge");
-   }
-
-   test.SaveSolution(sol_file);
-   test.SaveVisualization();
-
-}
-
 static void InitDisplacement(const Vector &x, Vector &u)
    {
       u = 0.0;
       u(u.Size() - 1) = -0.2 * x(0);
    }
-
-void OutputOperators()
-{
-   LinElastSolver test;
-   test.InitVariables();
-   test.SetupIC(InitDisplacement);
-   const std::string visual_path = "test_"+ test.GetVisualizationPrefix();
-   std::string sol_file = "test_"+ test.GetSolutionFilePrefix();
-   sol_file += ".h5";
-
-   test.InitVisualization(visual_path);
-   test.AddBCFunction(InitDisplacement, 1);
-   test.AddBCFunction(InitDisplacement, 2);
-   test.BuildOperators();
-   test.SetupBCOperators();
-   test.Assemble();
-
-   bool converged = test.Solve();
-   if (!converged)
-   {
-         // if random, try another sample.
-         mfem_warning("Solver failed to converge");
-   }
-
-   test.SaveSolution(sol_file);
-   test.SaveVisualization();
-}
