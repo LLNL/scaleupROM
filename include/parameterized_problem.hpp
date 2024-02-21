@@ -72,8 +72,8 @@ namespace stokes_component
 namespace linelast_disp
 {
 extern double rdisp_f;
-extern double lambda_l, lambda_r;
-extern double mu_l, mu_r;
+extern double lambda;
+extern double mu;
 
 void fill_vec(Vector &y, const double l_param,const double r_param);
 void fill_lambda(Vector &y);
@@ -202,7 +202,8 @@ private:
    Vector *u0;
    void SetBattr();
 };
-class LinElastDisp : public ParameterizedProblem
+
+class LinElastProblem : public ParameterizedProblem
 {
 friend class LinElastSolver;
 
@@ -210,6 +211,11 @@ protected:
    enum BoundaryType
    { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
 
+public:
+   virtual ~LinElastProblem() {};
+};
+class LinElastDisp : public LinElastProblem
+{
 public:
    LinElastDisp();
    virtual ~LinElastDisp() {};

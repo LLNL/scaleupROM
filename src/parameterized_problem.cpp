@@ -161,23 +161,22 @@ namespace linelast_disp
 {
 
 double rdisp_f;
-double lambda_l, lambda_r;
-double mu_l, mu_r;
+double lambda;
+double mu;
 
-void fill_vec(Vector &y, const double l_param,const double r_param)
+void fill_vec(Vector &y, const double param)
 {
-   y = l_param;
-   //y(0) = l_param;
+   y = param;
 }
 
 void fill_lambda(Vector &y)
 {
-   fill_vec(y, lambda_l, lambda_r);
+   fill_vec(y, lambda);
 }
 
 void fill_mu(Vector &y)
 {
-   fill_vec(y, mu_l, mu_r);
+   fill_vec(y, mu);
 }
 
 void init_disp(const Vector &x, Vector &u)
@@ -567,7 +566,7 @@ void StokesFlowPastArray::SetBattr()
 */
 
 LinElastDisp::LinElastDisp()
-    : ParameterizedProblem()
+    : LinElastProblem()
 {
    // pointer to static function.
    vector_bdr_ptr.SetSize(1);
@@ -575,21 +574,15 @@ LinElastDisp::LinElastDisp()
 
    // Default values.
    function_factory::linelast_disp::rdisp_f = 1.0;
-   function_factory::linelast_disp::lambda_l = 1.0;
-   function_factory::linelast_disp::lambda_r = 50.0;
-   function_factory::linelast_disp::mu_l = 1.0;
-   function_factory::linelast_disp::mu_r = 50.0;
+   function_factory::linelast_disp::lambda = 1.0;
+   function_factory::linelast_disp::mu = 1.0;
 
    param_map["rdisp_f"] = 0;
-   param_map["lambda_l"] = 1;
-   param_map["lambda_r"] = 2;
-   param_map["mu_l"] = 3;
-   param_map["mu_r"] = 4;
+   param_map["lambda"] = 1;
+   param_map["mu"] = 2;
 
-   param_ptr.SetSize(5);
+   param_ptr.SetSize(3);
    param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
-   param_ptr[1] = &(function_factory::linelast_disp::lambda_l);
-   param_ptr[2] = &(function_factory::linelast_disp::lambda_r);
-   param_ptr[3] = &(function_factory::linelast_disp::mu_l);
-   param_ptr[4] = &(function_factory::linelast_disp::mu_r);
+   param_ptr[1] = &(function_factory::linelast_disp::lambda);
+   param_ptr[2] = &(function_factory::linelast_disp::mu);
 }
