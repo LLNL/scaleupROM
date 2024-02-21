@@ -155,7 +155,7 @@ void ubdr(const Vector &x, Vector &y)
 
 }  // namespace stokes_component
 
-} 
+} // namespace stokes_problem
 
 namespace linelast_disp
 {

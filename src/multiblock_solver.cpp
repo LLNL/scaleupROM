@@ -658,7 +658,7 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
 void MultiBlockSolver::SaveVisualization()
 {
    if (!save_visual) return;
-   
+
    if (unified_paraview)
    {
       mfem_warning("Paraview is unified. Any overlapped interface dof data will not be shown.\n");

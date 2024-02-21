@@ -66,7 +66,6 @@ namespace stokes_component
    extern DenseMatrix k;
    void ubdr(const Vector &x, Vector &y);
 }
-
 }
 
 namespace linelast_disp
