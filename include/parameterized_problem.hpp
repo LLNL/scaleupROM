@@ -68,15 +68,20 @@ namespace stokes_component
 }
 }
 
+namespace linelast_problem
+{
+extern double _lambda;
+extern double _mu;
+
+double lambda(const Vector &x);
+double mu(const Vector &x);
+
+}
+
 namespace linelast_disp
 {
 extern double rdisp_f;
-extern double lambda;
-extern double mu;
 
-void fill_vec(Vector &y, const double l_param,const double r_param);
-void fill_lambda(Vector &y);
-void fill_mu(Vector &y);
 void init_disp(const Vector &x, Vector &u);
 }
 
@@ -117,6 +122,9 @@ public:
    Array<function_factory::GeneralVectorFunction *> vector_bdr_ptr;
    Array<int> battr;
    Array<int> bdr_type; // abstract boundary type
+
+   Array<function_factory::GeneralScalarFunction *> general_scalar_ptr;
+   Array<function_factory::GeneralVectorFunction *> general_vector_ptr;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
@@ -209,6 +217,7 @@ friend class LinElastSolver;
 protected:
    enum BoundaryType
    { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
+   Vector lambda, mu;
 
 public:
    virtual ~LinElastProblem() {};
@@ -217,7 +226,6 @@ class LinElastDisp : public LinElastProblem
 {
 public:
    LinElastDisp();
-   virtual ~LinElastDisp() {};
 };
 
 ParameterizedProblem* InitParameterizedProblem();

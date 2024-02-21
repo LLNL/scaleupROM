@@ -157,33 +157,28 @@ void ubdr(const Vector &x, Vector &y)
 
 } // namespace stokes_problem
 
+namespace linelast_problem
+{
+
+double _lambda;
+double _mu;
+
+double lambda(const Vector &x){return _lambda;};
+double mu(const Vector &x){return _mu;};
+
+}
+
 namespace linelast_disp
 {
 
 double rdisp_f;
-double lambda;
-double mu;
-
-void fill_vec(Vector &y, const double param)
-{
-   y = param;
-}
-
-void fill_lambda(Vector &y)
-{
-   fill_vec(y, lambda);
-}
-
-void fill_mu(Vector &y)
-{
-   fill_vec(y, mu);
-}
 
 void init_disp(const Vector &x, Vector &u)
 {
    u = 0.0;
    u(u.Size()-1) = -0.2*x(0)*rdisp_f;
 }
+
 
 }  // namespace linelast_disp
 
@@ -569,13 +564,31 @@ LinElastDisp::LinElastDisp()
     : LinElastProblem()
 {
    // pointer to static function.
-   vector_bdr_ptr.SetSize(1);
-   vector_bdr_ptr = &(function_factory::linelast_disp::init_disp);
+   bdr_type.SetSize(2);
+   battr.SetSize(2);
+   vector_bdr_ptr.SetSize(2);
+   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+   {
+   bdr_type[i] = LinElastProblem::DIRICHLET;
+   battr[i] = i+1;
+   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+   }
+   
+   // Set materials
+   cout<<1<<endl;
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
+   // Set IC
+   cout<<2<<endl;
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = function_factory::linelast_disp::init_disp;
+cout<<3<<endl;
    // Default values.
    function_factory::linelast_disp::rdisp_f = 1.0;
-   function_factory::linelast_disp::lambda = 1.0;
-   function_factory::linelast_disp::mu = 1.0;
+   function_factory::linelast_problem::_lambda = 1.0;
+   function_factory::linelast_problem::_mu = 1.0;
 
    param_map["rdisp_f"] = 0;
    param_map["lambda"] = 1;
@@ -583,6 +596,7 @@ LinElastDisp::LinElastDisp()
 
    param_ptr.SetSize(3);
    param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
-   param_ptr[1] = &(function_factory::linelast_disp::lambda);
-   param_ptr[2] = &(function_factory::linelast_disp::mu);
+   param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[2] = &(function_factory::linelast_problem::_mu);
+   cout<<4<<endl;
 }

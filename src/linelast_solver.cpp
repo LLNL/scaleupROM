@@ -40,7 +40,6 @@ LinElastSolver::LinElastSolver()
    {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
-
 }
 
 LinElastSolver::~LinElastSolver()
@@ -77,12 +76,12 @@ void LinElastSolver::SetupBCVariables()
 
    // Set up the Lame constants for the two materials. //TODO: add possibility to change materials
    Vector lambda(numBdr);
-   lambda = 1.0;     // Set lambda = 1 for all element attributes.
-   //lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
+   lambda = 1.0; // Set lambda = 1 for all element attributes.
+   // lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
 
    Vector mu(numBdr);
-   mu = 1.0;     // Set mu = 1 for all element attributes.
-   //mu(0) = 50.0; // Set mu = 50 for element attribute 1.
+   mu = 1.0; // Set mu = 1 for all element attributes.
+   // mu(0) = 50.0; // Set mu = 50 for element attribute 1.
 
    lambda_c = new PWConstCoefficient(lambda);
    mu_c = new PWConstCoefficient(mu);
@@ -157,7 +156,7 @@ void LinElastSolver::BuildRHSOperators()
       for (int r = 0; r < rhs_coeffs.Size(); r++)
       {
          bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));
-         }
+      }
    }
 }
 
@@ -389,7 +388,7 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
 
 void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
 {
-         rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
+   rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
 }
 
 void LinElastSolver::SetupBCOperators()
@@ -418,26 +417,53 @@ void LinElastSolver::SetupDomainBCOperators()
    }
 }
 
+
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
-   // Set lambda and mu coeffs
-   Vector lambda(numBdr);
-   Vector mu(numBdr);
-
-   function_factory::linelast_disp::fill_lambda(lambda);
-   function_factory::linelast_disp::fill_mu(mu);
-   
+   // Set materials
    delete lambda_c;
-   lambda_c = new PWConstCoefficient(lambda);
-
    delete mu_c;
+   Vector lambda(2), mu(2);
+
+   for (size_t i = 0; i < lambda.Size(); i++)
+      lambda(i) = (problem->general_scalar_ptr[0])(lambda);
+
+
+   for (size_t i = 0; i < mu.Size(); i++)
+      mu(i) = (problem->general_scalar_ptr[1])(mu);
+
+
+   lambda_c = new PWConstCoefficient(lambda);
    mu_c = new PWConstCoefficient(mu);
 
-   // Set bcs
-   delete init_x;
-   SetupIC(*(problem->vector_bdr_ptr[0]));
-   AddBCFunction(*(problem->vector_bdr_ptr[0]), 1);
-   AddBCFunction(*(problem->vector_bdr_ptr[0]), 2);
+   // Set BCs
+   for (int b = 0; b < problem->battr.Size(); b++)
+   {
+      switch (problem->bdr_type[b])
+      {
+      case LinElastProblem::BoundaryType::NEUMANN: break;
+      case LinElastProblem::BoundaryType::ZERO: break;
+
+      default:
+      case LinElastProblem::BoundaryType::DIRICHLET:
+      {
+         assert(problem->vector_bdr_ptr[b]);
+         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+         break;
+      }
+      }
+   }
+
+   // Set RHS
+   if (problem->vector_rhs_ptr != NULL){
+      AddRHSFunction(*(problem->vector_rhs_ptr));
+   }
+
+   // Add initial condition
+   if (problem->general_vector_ptr[0] != NULL)
+   {
+      SetupIC(*(problem->general_vector_ptr[0]));
+   }
 }
 
 // Component-wise assembly
