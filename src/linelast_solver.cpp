@@ -57,6 +57,7 @@ LinElastSolver::~LinElastSolver()
    delete globalMat_hypre;
    delete mumps;
    delete init_x;
+
 }
 
 void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
