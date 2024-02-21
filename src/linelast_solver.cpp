@@ -85,7 +85,6 @@ void LinElastSolver::SetupBCVariables()
       lambda_c[i] = new ConstantCoefficient(1.0);
       mu_c[i] = new ConstantCoefficient(1.0);
    }
-   
 }
 
 void LinElastSolver::InitVariables()
@@ -175,7 +174,7 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[b], *mu_c[b], alpha, kappa), *bdr_markers[b]);
+         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
       }
    }
 }
@@ -412,12 +411,11 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[b]), *(mu_c[b]), alpha, kappa), *(bdr_markers[b]));
+            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
    }
 }
-
 
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
@@ -434,7 +432,7 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       double lambda_i = (problem->general_scalar_ptr[0])(_x);
       lambda_c[i] = new ConstantCoefficient(lambda_i);
-   
+
       double mu_i = (problem->general_scalar_ptr[1])(_x);
       mu_c[i] = new ConstantCoefficient(mu_i);
    }

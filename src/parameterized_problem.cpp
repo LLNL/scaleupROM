@@ -575,16 +575,14 @@ LinElastDisp::LinElastDisp()
    }
    
    // Set materials
-   cout<<1<<endl;
    general_scalar_ptr.SetSize(2);
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
    general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
    // Set IC
-   cout<<2<<endl;
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = function_factory::linelast_disp::init_disp;
-cout<<3<<endl;
+   
    // Default values.
    function_factory::linelast_disp::rdisp_f = 1.0;
    function_factory::linelast_problem::_lambda = 1.0;
@@ -598,5 +596,4 @@ cout<<3<<endl;
    param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
    param_ptr[1] = &(function_factory::linelast_problem::_lambda);
    param_ptr[2] = &(function_factory::linelast_problem::_mu);
-   cout<<4<<endl;
 }

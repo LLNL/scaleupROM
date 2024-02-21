@@ -12,8 +12,7 @@ using namespace mfem;
 /**
  * Simple smoke test to make sure Google Test is properly linked
  */
-TEST(GoogleTestFramework, GoogleTestFrameworkFound)
-{
+TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
@@ -98,14 +97,10 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
    mu_c.SetSize(meshes.Size());
    mu_c = NULL;
 
-   ector lambda_vec(dim), mu_vec(dim);
-   lambda_vec = 1.0;
-   mu_vec = 1.0;
-
-   for (size_t i = 0; i < numSub; i++)
+   for (size_t i = 0; i < meshes.Size(); i++)
    {
-      lambda_c[i] = new VectorConstantCoefficient(lambda_vec);
-      mu_c[i] = new VectorConstantCoefficient(mu_vec);
+      lambda_c[i] = new ConstantCoefficient(1.0);
+      mu_c[i] = new ConstantCoefficient(1.0);
    }
    /* assemble standard DGElasticityIntegrator Assemble */
    BilinearForm pform(pfes);
