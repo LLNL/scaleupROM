@@ -80,14 +80,10 @@ void LinElastSolver::SetupBCVariables()
    mu_c.SetSize(numSub);
    mu_c = NULL;
 
-   Vector lambda_vec(dim), mu_vec(dim);
-   lambda_vec = 1.0;
-   mu_vec = 1.0;
-
    for (size_t i = 0; i < numSub; i++)
    {
-      lambda_c[i] = new VectorConstantCoefficient(lambda_vec);
-      mu_c[i] = new VectorConstantCoefficient(mu_vec);
+      lambda_c[i] = new ConstantCoefficient(1.0);
+      mu_c[i] = new ConstantCoefficient(1.0);
    }
    
 }
@@ -432,20 +428,16 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    mu_c.SetSize(numSub);
    mu_c = NULL;
 
-   Vector x(dim), lambda_vec(dim), mu_vec(dim);
+   Vector _x(1);
 
-   double lambda_i = (problem->general_scalar_ptr[0])(x);
-   double mu_i = (problem->general_scalar_ptr[1])(x);
-
-   lambda_vec = lambda_i;
-   mu_vec = mu_i;
-   
    for (size_t i = 0; i < numSub; i++)
    {
-      lambda_c[i] = new VectorConstantCoefficient(lambda_vec);
-      mu_c[i] = new VectorConstantCoefficient(mu_vec);
+      double lambda_i = (problem->general_scalar_ptr[0])(_x);
+      lambda_c[i] = new ConstantCoefficient(lambda_i);
+   
+      double mu_i = (problem->general_scalar_ptr[1])(_x);
+      mu_c[i] = new ConstantCoefficient(mu_i);
    }
-
 
    // Set BCs
    for (int b = 0; b < problem->battr.Size(); b++)
