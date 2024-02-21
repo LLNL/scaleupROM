@@ -48,8 +48,8 @@ LinElastSolver::~LinElastSolver()
 
    DeletePointers(bs);
    DeletePointers(as);
-   delete lambda_c;
-   delete mu_c;
+   DeletePointers(lambda_c);
+   DeletePointers(mu_c);
 
    delete globalMat_mono;
    delete globalMat;
@@ -74,17 +74,22 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   // Set up the Lame constants for the two materials. //TODO: add possibility to change materials
-   Vector lambda(numBdr);
-   lambda = 1.0; // Set lambda = 1 for all element attributes.
-   // lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
 
-   Vector mu(numBdr);
-   mu = 1.0; // Set mu = 1 for all element attributes.
-   // mu(0) = 50.0; // Set mu = 50 for element attribute 1.
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
 
-   lambda_c = new PWConstCoefficient(lambda);
-   mu_c = new PWConstCoefficient(mu);
+   Vector lambda_vec(dim), mu_vec(dim);
+   lambda_vec = 1.0;
+   mu_vec = 1.0;
+
+   for (size_t i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new VectorConstantCoefficient(lambda_vec);
+      mu_c[i] = new VectorConstantCoefficient(mu_vec);
+   }
+   
 }
 
 void LinElastSolver::InitVariables()
@@ -174,7 +179,7 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c, *mu_c, alpha, kappa), *bdr_markers[b]);
+         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[b], *mu_c[b], alpha, kappa), *bdr_markers[b]);
       }
    }
 }
@@ -187,17 +192,17 @@ void LinElastSolver::BuildDomainOperators()
    for (int m = 0; m < numSub; m++)
    {
       as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c), *(mu_c)));
+      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c[m]), *(mu_c[m])));
 
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
-             new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa));
+             new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa));
       }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
 }
 
 void LinElastSolver::Assemble()
@@ -411,7 +416,7 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa), *(bdr_markers[b]));
+            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[b]), *(mu_c[b]), alpha, kappa), *(bdr_markers[b]));
          }
       }
    }
@@ -421,20 +426,26 @@ void LinElastSolver::SetupDomainBCOperators()
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    // Set materials
-   delete lambda_c;
-   delete mu_c;
-   Vector lambda(2), mu(2);
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
 
-   for (size_t i = 0; i < lambda.Size(); i++)
-      lambda(i) = (problem->general_scalar_ptr[0])(lambda);
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
 
+   Vector x(dim), lambda_vec(dim), mu_vec(dim);
 
-   for (size_t i = 0; i < mu.Size(); i++)
-      mu(i) = (problem->general_scalar_ptr[1])(mu);
+   double lambda_i = (problem->general_scalar_ptr[0])(x);
+   double mu_i = (problem->general_scalar_ptr[1])(x);
 
+   lambda_vec = lambda_i;
+   mu_vec = mu_i;
+   
+   for (size_t i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new VectorConstantCoefficient(lambda_vec);
+      mu_c[i] = new VectorConstantCoefficient(mu_vec);
+   }
 
-   lambda_c = new PWConstCoefficient(lambda);
-   mu_c = new PWConstCoefficient(mu);
 
    // Set BCs
    for (int b = 0; b < problem->battr.Size(); b++)

@@ -12,7 +12,8 @@ using namespace mfem;
 /**
  * Simple smoke test to make sure Google Test is properly linked
  */
-TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
+TEST(GoogleTestFramework, GoogleTestFrameworkFound)
+{
    SUCCEED();
 }
 
@@ -70,7 +71,7 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
    const int order = 1;
    config.dict_["discretization"]["order"] = order;
    config.dict_["mesh"]["filename"] = "meshes/test.2x1.mesh";
-   
+
    const int numBdr = 4; // hacky way to set the number of boundary attributes
 
    SubMeshTopologyHandler *submesh = new SubMeshTopologyHandler;
@@ -87,24 +88,34 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
       fes[k] = new FiniteElementSpace(meshes[k], fec, udim);
    /* will have to initialize this coefficient */
    double alpha = -1.0, kappa = (order + 1) * (order + 1);
-   PWConstCoefficient *lambda_cs, *mu_cs;
 
-   Vector lambda(numBdr), mu(numBdr);
-   lambda = 1.0; // Set lambda = 1 for all element attributes.
+   Array<ConstantCoefficient *> lambda_c;
+   Array<ConstantCoefficient *> mu_c;
 
-   mu = 1.0; // Set mu = 1 for all element attributes.
+   lambda_c.SetSize(meshes.Size());
+   lambda_c = NULL;
 
-   lambda_cs = new PWConstCoefficient(lambda);
-   mu_cs = new PWConstCoefficient(mu);
+   mu_c.SetSize(meshes.Size());
+   mu_c = NULL;
+
+   ector lambda_vec(dim), mu_vec(dim);
+   lambda_vec = 1.0;
+   mu_vec = 1.0;
+
+   for (size_t i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new VectorConstantCoefficient(lambda_vec);
+      mu_c[i] = new VectorConstantCoefficient(mu_vec);
+   }
    /* assemble standard DGElasticityIntegrator Assemble */
    BilinearForm pform(pfes);
-   pform.AddInteriorFaceIntegrator(new DGElasticityIntegrator(*lambda_cs, *mu_cs, alpha, kappa));
+   pform.AddInteriorFaceIntegrator(new DGElasticityIntegrator(*lambda_c[0], *mu_c[0], alpha, kappa));
    pform.Assemble();
    pform.Finalize();
 
    /* assemble InterfaceDGElasticityIntegrator Assemble */
    InterfaceForm a_itf(meshes, fes, submesh);
-   a_itf.AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_cs, mu_cs, alpha, kappa));
+   a_itf.AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
    Array2D<SparseMatrix *> mats;
    mats.SetSize(topol_data.numSub, topol_data.numSub);
    for (int i = 0; i < topol_data.numSub; i++)
