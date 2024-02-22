@@ -116,7 +116,7 @@ TEST(InterfaceDGElasticityIntegrator, Test_Quad)
    for (int i = 0; i < topol_data.numSub; i++)
       for (int j = 0; j < topol_data.numSub; j++)
          mats(i, j) = new SparseMatrix(fes[i]->GetTrueVSize(), fes[j]->GetTrueVSize());
-   a_itf.AssembleInterfaceMatrixes(mats);
+   a_itf.AssembleInterfaceMatrices(mats);
    for (int i = 0; i < topol_data.numSub; i++)
       for (int j = 0; j < topol_data.numSub; j++)
          mats(i, j)->Finalize();
