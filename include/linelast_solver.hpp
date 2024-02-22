@@ -75,7 +75,7 @@ public:
    virtual void AssembleOperator();
    // For bilinear case.
    // system-specific.
-   virtual void AssembleInterfaceMatrixes();
+   virtual void AssembleInterfaceMatrices();
 
    virtual bool Solve();
 

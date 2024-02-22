@@ -245,7 +245,7 @@ void LinElastSolver::AssembleOperator()
          }
       }
    }
-   AssembleInterfaceMatrixes();
+   AssembleInterfaceMatrices();
    for (int m = 0; m < numSub; m++)
       as[m]->Finalize();
 
@@ -281,10 +281,10 @@ void LinElastSolver::AssembleOperator()
    }
 }
 
-void LinElastSolver::AssembleInterfaceMatrixes()
+void LinElastSolver::AssembleInterfaceMatrices()
 {
    assert(a_itf);
-   a_itf->AssembleInterfaceMatrixes(mats);
+   a_itf->AssembleInterfaceMatrices(mats);
 }
 
 bool LinElastSolver::Solve()
