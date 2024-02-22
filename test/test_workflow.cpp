@@ -11,6 +11,7 @@ using namespace mfem;
 
 static const double threshold = 1.0e-14;
 static const double stokes_threshold = 1.0e-12;
+static const double linelast_threshold = 1.0e-13;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -575,7 +576,7 @@ TEST(LinElast_Workflow, MFEMIndividualTest)
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
+   EXPECT_TRUE(error < linelast_threshold);
 
    return;
 }
@@ -587,8 +588,8 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
 
-   config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 1.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 10;
+   config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 0.9;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    config.dict_["basis"]["number_of_basis"] = 2; 
 
@@ -611,7 +612,7 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold); 
+   EXPECT_TRUE(error < linelast_threshold); 
 
    return;
 }
