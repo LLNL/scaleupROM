@@ -594,9 +594,9 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
    config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 1.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 2;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
+   config.dict_["basis"]["number_of_basis"] = 2; //5.34783E+00
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -614,11 +614,11 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    config.dict_["save_solution"]["enabled"] = false;
    config.dict_["main"]["mode"] = "single_run";
-   /*double error = SingleRun(MPI_COMM_WORLD);
+   double error = SingleRun(MPI_COMM_WORLD);
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold); */
+   EXPECT_TRUE(error < threshold); 
 
    return;
 }

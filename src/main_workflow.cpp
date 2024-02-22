@@ -371,9 +371,7 @@ void BuildROM(MPI_Comm comm)
       }
    }  // switch (save_operator)
 
-cout << 7<<endl;
    test->SaveBasisVisualization();
-   cout << 8<<endl;
 
    delete test;
    delete problem;
