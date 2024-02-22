@@ -554,14 +554,16 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
 }
  */
 
-/* TEST(Poisson_Workflow, MFEMIndividualTest)
+TEST(LinElast_Workflow, MFEMIndividualTest)
 {
-   config = InputParser("inputs/test.base.yml"); // Change to linelast component
+   config = InputParser("inputs/linelast.base.yml");
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
-   for (int k = 0; k < 4; k++)
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 2;
+   config.dict_["basis"]["number_of_basis"] = 2; 
+   for (int k = 0; k < 2; k++)
       config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["main"]["mode"] = "sample_generation";
@@ -569,10 +571,8 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
-
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
-
    config.dict_["main"]["mode"] = "single_run";
    double error = SingleRun(MPI_COMM_WORLD);
 
@@ -581,12 +581,11 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
    EXPECT_TRUE(error < threshold);
 
    return;
-} */
+}
 
 TEST(LinElast_Workflow, MFEMUniversalTest)
 {
-   config = InputParser("inputs/linelast.base.yml"); // Change to linelast version
-
+   config = InputParser("inputs/linelast.base.yml");
    config.dict_["visualization"]["enabled"] = true;
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
@@ -596,7 +595,7 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
    config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 1.0;
    config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 2; //5.34783E+00
+   config.dict_["basis"]["number_of_basis"] = 2; 
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
@@ -608,7 +607,6 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
-
    config.dict_["main"]["mode"] = "build_rom";
    BuildROM(MPI_COMM_WORLD);
 
