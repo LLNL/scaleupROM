@@ -131,8 +131,8 @@ void LinElastSolver::InitVariables()
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
-   // if (use_rom)  //Off for now
-   //   MultiBlockSolver::InitROMHandler();
+   if (use_rom)
+     MultiBlockSolver::InitROMHandler();
 }
 
 void LinElastSolver::BuildOperators()
@@ -467,11 +467,18 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    }
 }
 
+void LinElastSolver::ProjectOperatorOnReducedBasis()
+{ 
+   Array2D<Operator *> tmp(mats.NumRows(), mats.NumCols());
+   for (int i = 0; i < tmp.NumRows(); i++)
+      for (int j = 0; j < tmp.NumCols(); j++)
+         tmp(i, j) = mats(i, j);
+         
+   rom_handler->ProjectOperatorOnReducedBasis(tmp);
+}
+
 // Component-wise assembly
 void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildCompROMElement is not implemented yet!\n"; }
 void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildBdrROMElement is not implemented yet!\n"; }
 void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) { "LinElastSolver::BuildInterfaceROMElement is not implemented yet!\n"; }
-
-void LinElastSolver::ProjectOperatorOnReducedBasis() { "LinElastSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"; }
-
 void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
