@@ -589,9 +589,9 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
 
    config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 0.9;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 2;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 2; 
+   config.dict_["basis"]["number_of_basis"] = 4; 
 
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
