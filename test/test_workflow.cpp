@@ -18,7 +18,7 @@ static const double stokes_threshold = 1.0e-12;
 TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
-/* 
+
 TEST(Poisson_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
@@ -552,7 +552,6 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
 
    return;
 }
- */
 
 TEST(LinElast_Workflow, MFEMIndividualTest)
 {
@@ -620,7 +619,6 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    return;
 }
-
 
 int main(int argc, char* argv[])
 {
