@@ -221,7 +221,7 @@ protected:
    // 'jmat' corresponds to the term: kappa <h^{-1} {lambda + 2 mu} [u], [v]>
    Array2D<DenseMatrix *> jmats;
 
-   ConstantCoefficient *lambda, *mu;
+   Coefficient *lambda, *mu;
 
    static void AssembleBlock(const int dim, const int row_ndofs,
                               const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef,
