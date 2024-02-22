@@ -228,7 +228,7 @@ protected:
                               const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape,
                               const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat);
 public:
-   InterfaceDGElasticityIntegrator(ConstantCoefficient *lambda_, ConstantCoefficient *mu_, double alpha_, double kappa_) : lambda(lambda_), mu(mu_), alpha(alpha_), kappa(kappa_) {};
+   InterfaceDGElasticityIntegrator(Coefficient *lambda_, Coefficient *mu_, double alpha_, double kappa_) : lambda(lambda_), mu(mu_), alpha(alpha_), kappa(kappa_) {};
 
 
          virtual void AssembleInterfaceMatrix(const FiniteElement &el1,
