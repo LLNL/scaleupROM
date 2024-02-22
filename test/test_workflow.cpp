@@ -558,9 +558,7 @@ TEST(LinElast_Workflow, MFEMIndividualTest)
    config = InputParser("inputs/linelast.base.yml");
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
-   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 2;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 4;
    config.dict_["basis"]["number_of_basis"] = 2; 
    for (int k = 0; k < 2; k++)
       config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
@@ -588,11 +586,9 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
    config.dict_["visualization"]["enabled"] = true;
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
-   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
    config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 1.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 10;
    config.dict_["model_reduction"]["subdomain_training"] = "universal";
    config.dict_["basis"]["number_of_basis"] = 2; 
 

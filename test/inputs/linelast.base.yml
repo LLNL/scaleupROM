@@ -39,8 +39,8 @@ sample_generation:
     - key: single_run/linelast_disp/rdisp_f
       type: double
       sample_size: 1
-      minimum: 1.0
-      maximum: 1.0
+      minimum: 0.99999
+      maximum: 1.00001
 
 basis:
   prefix: "linelast_disp"
