@@ -1,0 +1,35 @@
+main:
+  mode: single_run
+  use_rom: false
+  solver: linelast
+
+mesh:
+  filename: meshes/beam-tri.mesh
+  uniform_refinement: 1
+
+domain-decomposition:
+  type: none
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: true
+  unified_paraview: true
+  file_path:
+    prefix: paraview_output
+
+save_solution:
+  enabled: true
+
+parameterized_problem:
+  name: linelast_disp
+
+single_run:
+  linelast_disp:
+    rdisp_f: 1.0
+

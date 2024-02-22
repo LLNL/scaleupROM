@@ -221,14 +221,14 @@ protected:
    // 'jmat' corresponds to the term: kappa <h^{-1} {lambda + 2 mu} [u], [v]>
    Array2D<DenseMatrix *> jmats;
 
-   PWConstCoefficient *lambda, *mu;
+   Coefficient *lambda, *mu;
 
    static void AssembleBlock(const int dim, const int row_ndofs,
                               const int col_ndofs, const int row_offset, const int col_offset, const double jmatcoef,
                               const Vector &col_nL, const Vector &col_nM, const Vector &row_shape, const Vector &col_shape,
                               const Vector &col_dshape_dnM, const DenseMatrix &col_dshape, DenseMatrix &elmat, DenseMatrix &jmat);
 public:
-   InterfaceDGElasticityIntegrator(PWConstCoefficient *lambda_, PWConstCoefficient *mu_, double alpha_, double kappa_) : lambda(lambda_), mu(mu_), alpha(alpha_), kappa(kappa_) {};
+   InterfaceDGElasticityIntegrator(Coefficient *lambda_, Coefficient *mu_, double alpha_, double kappa_) : lambda(lambda_), mu(mu_), alpha(alpha_), kappa(kappa_) {};
 
 
          virtual void AssembleInterfaceMatrix(const FiniteElement &el1,

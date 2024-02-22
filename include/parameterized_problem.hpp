@@ -66,7 +66,23 @@ namespace stokes_component
    extern DenseMatrix k;
    void ubdr(const Vector &x, Vector &y);
 }
+}
 
+namespace linelast_problem
+{
+extern double _lambda;
+extern double _mu;
+
+double lambda(const Vector &x);
+double mu(const Vector &x);
+
+}
+
+namespace linelast_disp
+{
+extern double rdisp_f;
+
+void init_disp(const Vector &x, Vector &u);
 }
 
 }
@@ -106,6 +122,9 @@ public:
    Array<function_factory::GeneralVectorFunction *> vector_bdr_ptr;
    Array<int> battr;
    Array<int> bdr_type; // abstract boundary type
+
+   Array<function_factory::GeneralScalarFunction *> general_scalar_ptr;
+   Array<function_factory::GeneralVectorFunction *> general_vector_ptr;
 
    // TODO: use variadic function? what would be the best format?
    // TODO: support other datatypes such as integer?
@@ -189,6 +208,24 @@ public:
 private:
    Vector *u0;
    void SetBattr();
+};
+
+class LinElastProblem : public ParameterizedProblem
+{
+friend class LinElastSolver;
+
+protected:
+   enum BoundaryType
+   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
+   Vector lambda, mu;
+
+public:
+   virtual ~LinElastProblem() {};
+};
+class LinElastDisp : public LinElastProblem
+{
+public:
+   LinElastDisp();
 };
 
 ParameterizedProblem* InitParameterizedProblem();

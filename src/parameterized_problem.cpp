@@ -155,7 +155,33 @@ void ubdr(const Vector &x, Vector &y)
 
 }  // namespace stokes_component
 
-}  // namespace stokes_problem
+} // namespace stokes_problem
+
+namespace linelast_problem
+{
+
+double _lambda;
+double _mu;
+
+double lambda(const Vector &x){return _lambda;};
+double mu(const Vector &x){return _mu;};
+
+}
+
+namespace linelast_disp
+{
+
+double rdisp_f;
+
+void init_disp(const Vector &x, Vector &u)
+{
+   u = 0.0;
+   u(u.Size()-1) = -0.2*x(0)*rdisp_f;
+}
+
+
+}  // namespace linelast_disp
+
 
 }  // namespace function_factory
 
@@ -243,6 +269,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "stokes_flow_past_array")
    {
       problem = new StokesFlowPastArray();
+   }
+   else if (problem_name == "linelast_disp")
+   {
+      problem = new LinElastDisp();
    }
    else
    {
@@ -524,4 +554,46 @@ void StokesFlowPastArray::SetBattr()
       bdr_type[2] = StokesProblem::DIRICHLET;
       bdr_type[0] = StokesProblem::NEUMANN;
    }
+}
+
+/*
+   LinElastDisp
+*/
+
+LinElastDisp::LinElastDisp()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(2);
+   battr.SetSize(2);
+   vector_bdr_ptr.SetSize(2);
+   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+   {
+   bdr_type[i] = LinElastProblem::DIRICHLET;
+   battr[i] = i+1;
+   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+   }
+   
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+   // Set IC
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = function_factory::linelast_disp::init_disp;
+   
+   // Default values.
+   function_factory::linelast_disp::rdisp_f = 1.0;
+   function_factory::linelast_problem::_lambda = 1.0;
+   function_factory::linelast_problem::_mu = 1.0;
+
+   param_map["rdisp_f"] = 0;
+   param_map["lambda"] = 1;
+   param_map["mu"] = 2;
+
+   param_ptr.SetSize(3);
+   param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
+   param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[2] = &(function_factory::linelast_problem::_mu);
 }

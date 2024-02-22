@@ -40,7 +40,6 @@ LinElastSolver::LinElastSolver()
    {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
-
 }
 
 LinElastSolver::~LinElastSolver()
@@ -49,13 +48,14 @@ LinElastSolver::~LinElastSolver()
 
    DeletePointers(bs);
    DeletePointers(as);
-   delete lambda_c;
-   delete mu_c;
+   DeletePointers(lambda_c);
+   DeletePointers(mu_c);
 
    delete globalMat_mono;
    delete globalMat;
    delete globalMat_hypre;
    delete mumps;
+   delete init_x;
 }
 
 void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
@@ -74,17 +74,17 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   // Set up the Lame constants for the two materials. //TODO: add possibility to change materials
-   Vector lambda(numBdr);
-   lambda = 1.0;     // Set lambda = 1 for all element attributes.
-   //lambda(0) = 50.0; // Set lambda = 50 for element attribute 1.
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
 
-   Vector mu(numBdr);
-   mu = 1.0;     // Set mu = 1 for all element attributes.
-   //mu(0) = 50.0; // Set mu = 50 for element attribute 1.
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
 
-   lambda_c = new PWConstCoefficient(lambda);
-   mu_c = new PWConstCoefficient(mu);
+   for (size_t i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new ConstantCoefficient(1.0);
+      mu_c[i] = new ConstantCoefficient(1.0);
+   }
 }
 
 void LinElastSolver::InitVariables()
@@ -156,7 +156,7 @@ void LinElastSolver::BuildRHSOperators()
       for (int r = 0; r < rhs_coeffs.Size(); r++)
       {
          bs[m]->AddDomainIntegrator(new VectorDomainLFIntegrator(*rhs_coeffs[r]));
-         }
+      }
    }
 }
 
@@ -174,7 +174,7 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c, *mu_c, alpha, kappa), *bdr_markers[b]);
+         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
       }
    }
 }
@@ -187,17 +187,17 @@ void LinElastSolver::BuildDomainOperators()
    for (int m = 0; m < numSub; m++)
    {
       as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c), *(mu_c)));
+      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c[m]), *(mu_c[m])));
 
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
-             new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa));
+             new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa));
       }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
 }
 
 void LinElastSolver::Assemble()
@@ -388,7 +388,7 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
 
 void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
 {
-         rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
+   rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
 }
 
 void LinElastSolver::SetupBCOperators()
@@ -411,9 +411,59 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c), *(mu_c), alpha, kappa), *(bdr_markers[b]));
+            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
+   }
+}
+
+void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   // Set materials
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
+
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
+
+   Vector _x(1);
+
+   for (size_t i = 0; i < numSub; i++)
+   {
+      double lambda_i = (problem->general_scalar_ptr[0])(_x);
+      lambda_c[i] = new ConstantCoefficient(lambda_i);
+
+      double mu_i = (problem->general_scalar_ptr[1])(_x);
+      mu_c[i] = new ConstantCoefficient(mu_i);
+   }
+
+   // Set BCs
+   for (int b = 0; b < problem->battr.Size(); b++)
+   {
+      switch (problem->bdr_type[b])
+      {
+      case LinElastProblem::BoundaryType::NEUMANN: break;
+      case LinElastProblem::BoundaryType::ZERO: break;
+
+      default:
+      case LinElastProblem::BoundaryType::DIRICHLET:
+      {
+         assert(problem->vector_bdr_ptr[b]);
+         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+         break;
+      }
+      }
+   }
+
+   // Set RHS
+   if (problem->vector_rhs_ptr != NULL){
+      AddRHSFunction(*(problem->vector_rhs_ptr));
+   }
+
+   // Add initial condition
+   if (problem->general_vector_ptr[0] != NULL)
+   {
+      SetupIC(*(problem->general_vector_ptr[0]));
    }
 }
 
@@ -425,5 +475,3 @@ void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_c
 void LinElastSolver::ProjectOperatorOnReducedBasis() { "LinElastSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"; }
 
 void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
-
-void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem) { "LinElastSolver::SetParameterizedProblem is not implemented yet!\n"; }
