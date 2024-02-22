@@ -584,7 +584,6 @@ TEST(LinElast_Workflow, MFEMIndividualTest)
 TEST(LinElast_Workflow, MFEMUniversalTest)
 {
    config = InputParser("inputs/linelast.base.yml");
-   config.dict_["visualization"]["enabled"] = true;
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
 
