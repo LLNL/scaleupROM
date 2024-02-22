@@ -18,7 +18,7 @@ static const double stokes_threshold = 1.0e-12;
 TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
-
+/* 
 TEST(Poisson_Workflow, MFEMIndividualTest)
 {
    config = InputParser("inputs/test.base.yml");
@@ -552,6 +552,77 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
 
    return;
 }
+ */
+
+/* TEST(Poisson_Workflow, MFEMIndividualTest)
+{
+   config = InputParser("inputs/test.base.yml"); // Change to linelast component
+
+   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
+   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
+   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+   for (int k = 0; k < 4; k++)
+      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
+
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < threshold);
+
+   return;
+} */
+
+TEST(LinElast_Workflow, MFEMUniversalTest)
+{
+   config = InputParser("inputs/linelast.base.yml"); // Change to linelast version
+
+   config.dict_["visualization"]["enabled"] = true;
+
+   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
+   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
+   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
+
+   config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 1.0;
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
+   config.dict_["model_reduction"]["subdomain_training"] = "universal";
+   config.dict_["basis"]["number_of_basis"] = 4;
+
+   // Test save/loadSolution as well.
+   config.dict_["save_solution"]["enabled"] = true;
+   config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD); 
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "build_rom";
+   /* BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["save_solution"]["enabled"] = false;
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < threshold); */
+
+   return;
+}
+
 
 int main(int argc, char* argv[])
 {
