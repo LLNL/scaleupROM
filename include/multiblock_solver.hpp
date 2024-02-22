@@ -165,7 +165,7 @@ public:
    virtual void AssembleOperator() = 0;
    // For bilinear case.
    // system-specific.
-   virtual void AssembleInterfaceMatrixes() = 0;
+   virtual void AssembleInterfaceMatrices() = 0;
 
    // Global ROM operator Loading.
    virtual void SaveROMOperator(const std::string input_prefix="")

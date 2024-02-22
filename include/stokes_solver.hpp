@@ -178,7 +178,7 @@ public:
    virtual void AssembleOperatorBase();   // base function that NS solver inherits.
    // For bilinear case.
    // system-specific.
-   virtual void AssembleInterfaceMatrixes();
+   virtual void AssembleInterfaceMatrices();
    virtual void SetupMUMPSSolver();
    virtual void SetupPressureMassMatrix();
 
