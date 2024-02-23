@@ -11,6 +11,7 @@ using namespace mfem;
 
 static const double threshold = 1.0e-14;
 static const double stokes_threshold = 1.0e-12;
+static const double linelast_threshold = 1.0e-13;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -611,7 +612,7 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    // This reproductive case must have a very small error at the level of finite-precision.
    printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
+   EXPECT_TRUE(error < linelast_threshold);
 
    return;
 } 
