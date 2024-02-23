@@ -1,0 +1,86 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: true
+  solver: linelast
+
+mesh:
+  filename: meshes/test.2x2.mesh
+  type: component-wise
+  component-wise:
+    global_config: "meshes/test.global.h5"
+    components:
+      - name: "square"
+        file: "meshes/test.1x1.mesh"
+    ports:
+      - name: "port1"
+        file: "meshes/test.port1.h5"
+        comp1:
+          name: "square"
+          attr: 3
+        comp2:
+          name: "square"
+          attr: 1
+        comp2_configuration: [0., 1., 0., 0., 0., 0.]
+      - name: "port2"
+        file: "meshes/test.port2.h5"
+        comp1:
+          name: "square"
+          attr: 2
+        comp2:
+          name: "square"
+          attr: 4
+        comp2_configuration: [1., 0., 0., 0., 0., 0.]
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: sample_gen_output
+
+parameterized_problem:
+  name: linelast_disp
+
+single_run:
+  linelast_disp:
+    rdisp_f: 1.0
+
+sample_generation:
+  maximum_number_of_snapshots: 400
+  component_sampling: false
+  file_path:
+    prefix: "linelast_disp"
+  parameters:
+    - key: single_run/linelast_disp/rdisp_f
+      type: double
+      sample_size: 1
+      minimum: 1.0
+      maximum: 1.0
+
+basis:
+  prefix: "linelast_disp"
+  number_of_basis: 4
+  tags:
+    - name: "comp0"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  # individual/universal
+  subdomain_training: universal
+  save_operator:
+    level: component
+    prefix: "linelast.rom_elem"
+  compare_solution:
+    enabled: true
