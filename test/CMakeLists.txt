@@ -42,6 +42,7 @@ file(COPY meshes/test.1x1.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/test.global.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 
 file(COPY inputs/linelast.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
+file(COPY inputs/linelast.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 
 add_executable(test_hdf5 test_hdf5_utils.cpp $<TARGET_OBJECTS:scaleupROMObj>)
