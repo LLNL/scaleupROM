@@ -229,7 +229,7 @@ void ROMHandlerBase::LoadReducedBasis()
          basis_tags[k] = GetBasisTagForComponent(k, train_mode, topol_handler);
       basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k]);
 
-      carom_ref_basis[k] = basis_reader->getSpatialBasis(0.0, num_ref_basis[k]);
+      carom_ref_basis[k] = basis_reader->getSpatialBasis(num_ref_basis[k]);
       numRowRB = carom_ref_basis[k]->numRows();
       numColumnRB = carom_ref_basis[k]->numColumns();
       printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);

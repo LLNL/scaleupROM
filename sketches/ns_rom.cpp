@@ -1016,9 +1016,9 @@ int main(int argc, char *argv[])
                mfem_error("Failed to converge in sampling!\n");
          }
 
-         snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
-         u_snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
-         p_snapshot_generator.takeSample(temp.GetSolution()->GetData() + udim, 0.0, 0.01);
+         snapshot_generator.takeSample(temp.GetSolution()->GetData());
+         u_snapshot_generator.takeSample(temp.GetSolution()->GetData());
+         p_snapshot_generator.takeSample(temp.GetSolution()->GetData() + udim);
 
          // GridFunction *u = temp.GetVelocityGridFunction();
          // GridFunction *p = temp.GetPressureGridFunction();
@@ -1101,7 +1101,7 @@ int main(int argc, char *argv[])
 
       DenseMatrix basis;
       CAROM::BasisReader basis_reader(filename);
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
       CAROM::CopyMatrix(*carom_basis, basis);
 
       const int fom_vdofs = oper.Height();
@@ -1162,10 +1162,10 @@ int main(int argc, char *argv[])
          tmp1.MakeRef(proj_res, 0, udim);
          S.Mult(tmp1, projres_div);
 
-         sol_snapshot.takeSample(fom_sol->GetData(), 0.0, 0.01);
-         proj_sol_snapshot.takeSample(fom_proj.GetData(), 0.0, 0.01);
-         residual_snapshot.takeSample(fom_res.GetData(), 0.0, 0.01);
-         proj_residual_snapshot.takeSample(proj_res.GetData(), 0.0, 0.01);
+         sol_snapshot.takeSample(fom_sol->GetData());
+         proj_sol_snapshot.takeSample(fom_proj.GetData());
+         residual_snapshot.takeSample(fom_res.GetData());
+         proj_residual_snapshot.takeSample(proj_res.GetData());
 
          Array<GridFunction *> ugf(4), pgf(4), divgf(4);
          for (int k = 0; k < 4; k++) ugf[k] = new GridFunction;
@@ -1252,7 +1252,7 @@ int main(int argc, char *argv[])
 
             CAROM::BasisGenerator basis_generator(option, false, filename);
             for (int j = 0; j < wgted_snapshots.NumCols(); j++)
-               basis_generator.takeSample(wgted_snapshots.GetColumn(j), 0.0, 0.01);
+               basis_generator.takeSample(wgted_snapshots.GetColumn(j));
             basis_generator.endSamples();
 
             const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
@@ -1283,7 +1283,7 @@ int main(int argc, char *argv[])
       else
       {
          CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_basis, basis);
       }
 
@@ -1311,7 +1311,7 @@ int main(int argc, char *argv[])
       {
          DenseMatrix ubasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
 
          DenseTensor *nlin_rom = oper.GetReducedTensor(ubasis, ubasis);
@@ -1337,8 +1337,8 @@ int main(int argc, char *argv[])
          DenseMatrix ubasis, pbasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1535,8 +1535,8 @@ int main(int argc, char *argv[])
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1553,7 +1553,7 @@ int main(int argc, char *argv[])
       else if (rom_mode == RomMode::TENSOR3)
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
 
          basis.SetSize(ubasis.NumRows() + pdim, ubasis.NumCols());
@@ -1582,7 +1582,7 @@ int main(int argc, char *argv[])
          }
 
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
          basis.SetSize(ubasis.NumRows() + pbasis.NumRows(), ubasis.NumCols() + pbasis.NumCols());
@@ -1599,8 +1599,8 @@ int main(int argc, char *argv[])
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1646,7 +1646,7 @@ int main(int argc, char *argv[])
       else
       {
          CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_basis, basis);
       }
 

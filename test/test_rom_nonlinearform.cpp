@@ -293,12 +293,13 @@ TEST(ROMNonlinearForm, SetupEQPSystemForDomainIntegrator)
          snapshots(i, j) = 2.0 * UniformRandom() - 1.0;
 
    CAROM::Options options(ndofs, num_snap, 1, true);
+   options.static_svd_preserve_snapshot = true;
    CAROM::BasisGenerator basis_generator(options, false, "test_basis");
    Vector snapshot(ndofs);
    for (int s = 0; s < num_snap; s++)
    {
       snapshots.GetColumnReference(s, snapshot);
-      basis_generator.takeSample(snapshot.GetData(), 0.0, 0.01);
+      basis_generator.takeSample(snapshot.GetData());
    }
    basis_generator.endSamples();
    const CAROM::Matrix *carom_snapshots = basis_generator.getSnapshotMatrix();
