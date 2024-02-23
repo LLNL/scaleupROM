@@ -4,3 +4,6 @@
 file(COPY linelast.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/joint2D.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/rod2D_H.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/rod2D_V.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
