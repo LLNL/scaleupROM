@@ -648,6 +648,34 @@ TEST(LinElast_Workflow, ComponentWiseWithDirectSolve)
    return;
 }
 
+TEST(LinElast_Workflow, ComponentWiseTest)
+{
+   config = InputParser("inputs/linelast.component.yml");
+
+   printf("\nSample Generation \n\n");
+
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["mesh"]["type"] = "component-wise";
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < threshold);
+
+   return;
+}
+
 int main(int argc, char *argv[])
 {
    ::testing::InitGoogleTest(&argc, argv);
