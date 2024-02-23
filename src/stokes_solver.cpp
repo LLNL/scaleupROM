@@ -483,7 +483,7 @@ void StokesSolver::SetupMUMPSSolver()
    sys_glob_size = systemOp_mono->NumRows();
    sys_row_starts[0] = 0;
    sys_row_starts[1] = systemOp_mono->NumRows();
-   systemOp_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, systemOp_mono);
+   systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
    mumps = new MUMPSSolver();
    mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
@@ -751,7 +751,7 @@ bool StokesSolver::Solve()
       if (use_amg)
       {
          // velocity amg preconditioner
-         Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
+         Mop = new HypreParMatrix(MPI_COMM_SELF, glob_size, row_starts, M);
          amg_prec = new HypreBoomerAMG(*Mop);
          amg_prec->SetPrintLevel(0);
          amg_prec->SetSystemsOptions(vdim[0], true);
@@ -844,7 +844,7 @@ void StokesSolver::Solve_obsolete()
    HYPRE_BigInt row_starts[2] = {0, M->NumRows()};
    if (use_amg)
    {
-      Mop = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, M);
+      Mop = new HypreParMatrix(MPI_COMM_SELF, glob_size, row_starts, M);
       amg_prec = new HypreBoomerAMG(*Mop);
       amg_prec->SetPrintLevel(print_level);
    }

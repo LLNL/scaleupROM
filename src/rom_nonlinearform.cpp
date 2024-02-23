@@ -21,6 +21,7 @@ ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f)
 ROMNonlinearForm::~ROMNonlinearForm()
 {
    delete Grad;
+   delete basis;
 
    for (int i = 0; i <  dnfi.Size(); i++)
    {
@@ -651,6 +652,621 @@ void ROMNonlinearForm::PrecomputeCoefficients()
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
+}
+
+void ROMNonlinearForm::SetBasis(DenseMatrix &basis_, const int offset)
+{
+   assert(basis_.NumCols() == height);
+   assert(basis_.NumRows() >= fes->GetTrueVSize() + offset);
+   if (basis) delete basis;
+
+   const int nrow = fes->GetTrueVSize();
+   basis = new DenseMatrix(nrow, height);
+   basis_.GetSubMatrix(offset, offset+nrow, 0, height, *basis);
+}
+
+void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol)
+{
+   // NOTE(kevin): these will be resized within the routines as needed.
+   // just initializing with distribute option.
+   CAROM::Matrix Gt(1,1, true);
+   CAROM::Vector rhs_Gw(1, false);
+
+   Array<int> el, qp;
+   Array<double> qw;
+   Array<int> fidxs;
+   Mesh *mesh = fes->GetMesh();
+
+   for (int k = 0; k < dnfi.Size(); k++)
+   {
+      SetupEQPSystemForDomainIntegrator(snapshots, dnfi[k], Gt, rhs_Gw);
+      TrainEQPForIntegrator(dnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      UpdateDomainIntegratorSampling(k, el, qp, qw);
+   }
+
+   for (int k = 0; k < fnfi.Size(); k++)
+   {
+      SetupEQPSystemForInteriorFaceIntegrator(snapshots, fnfi[k], Gt, rhs_Gw, fidxs);
+      TrainEQPForIntegrator(fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      for (int s = 0; s < el.Size(); s++)
+         el[s] = fidxs[el[s]];
+      UpdateInteriorFaceIntegratorSampling(k, el, qp, qw);
+   }
+
+   // Which boundary attributes need to be processed?
+   Array<int> bdr_attr_marker(mesh->bdr_attributes.Size() ?
+                              mesh->bdr_attributes.Max() : 0);
+
+   for (int k = 0; k < bfnfi.Size(); k++)
+   {
+      // Determine the boundary attributes to process for k-th boundary face integrator.
+      bdr_attr_marker = 0;
+      if (bfnfi_marker[k] == NULL)
+         bdr_attr_marker = 1;
+      Array<int> &bdr_marker = *bfnfi_marker[k];
+      MFEM_ASSERT(bdr_marker.Size() == bdr_attr_marker.Size(),
+                  "invalid boundary marker for boundary face integrator #"
+                  << k << ", counting from zero");
+      for (int i = 0; i < bdr_attr_marker.Size(); i++)
+      {
+         bdr_attr_marker[i] |= bdr_marker[i];
+      }
+
+      SetupEQPSystemForBdrFaceIntegrator(snapshots, bfnfi[k], bdr_attr_marker, Gt, rhs_Gw, fidxs);
+      TrainEQPForIntegrator(bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      for (int s = 0; s < el.Size(); s++)
+         el[s] = fidxs[el[s]];
+      UpdateBdrFaceIntegratorSampling(k, el, qp, qw);
+   }
+}
+
+void ROMNonlinearForm::TrainEQPForIntegrator(
+   HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw,
+   const double eqp_tol, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw)
+{
+   const IntegrationRule *ir = nlfi->GetIntegrationRule();
+
+   // TODO(kevin): extension for mixed mesh elements.
+   const int vdim = fes->GetVDim();
+   const int nqe = ir->GetNPoints();
+
+   //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
+   // CAROM::Vector const& w, CAROM::Matrix & Gt,
+   // CAROM::Vector & sol)
+   double nnls_tol = 1.0e-11;
+   int maxNNLSnnz = 0;
+   CAROM::Vector eqpSol(Gt.numRows(), true);
+   int nnz = 0;
+   {
+      CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
+
+      CAROM::Vector rhs_ub(rhs_Gw);
+      CAROM::Vector rhs_lb(rhs_Gw);
+
+      double delta;
+      for (int i = 0; i < rhs_ub.dim(); ++i)
+      {
+         delta = eqp_tol * abs(rhs_Gw(i));
+         rhs_lb(i) -= delta;
+         rhs_ub(i) += delta;
+      }
+
+      /*
+         NOTE(kevin): turn off the normalization now.
+         The termination criterion of solve_parallel_with_scalapack
+         is currently unnecessarily complicated and redundant.
+      */
+      // nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
+
+      /*
+         The optimization will continue until
+            max_i || rhs_Gw(i) - eqp_Gw(i) || / || rhs_Gw(i) || < eqp_tol
+      */
+      nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
+
+      nnz = 0;
+      for (int i = 0; i < eqpSol.dim(); ++i)
+      {
+         if (eqpSol(i) != 0.0)
+            nnz++;
+      }
+
+      // TODO(kevin): parallel case.
+      // std::cout << rank << ": Number of nonzeros in NNLS solution: " << nnz
+      //       << ", out of " << eqpSol.dim() << std::endl;
+
+      // MPI_Allreduce(MPI_IN_PLACE, &nnz, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+      // if (rank == 0)
+      std::cout << "Global number of nonzeros in NNLS solution: " << nnz << std::endl;
+
+      // Check residual of NNLS solution
+      CAROM::Vector res(Gt.numColumns(), false);
+      Gt.transposeMult(eqpSol, res);
+
+      const double normGsol = res.norm();
+      const double normRHS = rhs_Gw.norm();
+
+      res -= rhs_Gw;
+      const double relNorm = res.norm() / std::max(normGsol, normRHS);
+      // cout << rank << ": relative residual norm for NNLS solution of Gs = Gw: " <<
+      //       relNorm << endl;
+      std::cout << "Relative residual norm for NNLS solution of Gs = Gw: " <<
+                  relNorm << std::endl;
+   }
+
+   sample_el.SetSize(0);
+   sample_qp.SetSize(0);
+   sample_qw.SetSize(0);
+   for (int i = 0; i < eqpSol.dim(); ++i)
+   {
+      if (eqpSol(i) > 1.0e-12)
+      {
+         const int e = i / nqe;  // Element index
+         sample_el.Append(i / nqe);
+         sample_qp.Append(i % nqe);
+         sample_qw.Append(eqpSol(i));
+      }
+   }
+   printf("Size of sampled qp: %d\n", sample_el.Size());
+   if (nnz != sample_el.Size())
+      printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
+}
+
+void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
+   const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+   CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw)
+{
+   assert(basis);
+   assert(snapshots.numRows() >= fes->GetTrueVSize());
+   if (snapshots.numRows() > fes->GetTrueVSize())
+      mfem_warning("ROMNonlinearForm::SetupEQPSystemForDomainIntegrator- snapshot vector has a larger dimension than finite element space vector dimension. Neglecting the rest of snapshot.\n");
+
+   const IntegrationRule *ir = nlfi->GetIntegrationRule();
+
+   // TODO(kevin): extension for mixed mesh elements.
+   const int vdim = fes->GetVDim();
+   const int nqe = ir->GetNPoints();
+   const int NB = basis->NumCols();
+   const int nsnap = snapshots.numColumns();
+   const int ne = fes->GetNE();
+   const int NQ = ne * nqe;
+
+   // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
+   Gt.setSize(NQ, NB * nsnap);
+   assert(Gt.distributed());
+   // For 0 <= j < NB, 0 <= i < nsnap, 0 <= e < ne, 0 <= m < nqe,
+   // G(j + (i*NB), (e*nqe) + m)
+   // is the coefficient of v_j^T M(p_i) V v_i at point m of element e,
+   // with respect to the integration rule weight at that point,
+   // where the "exact" quadrature solution is ir0->GetWeights().
+
+   Vector v_i(fes->GetTrueVSize());
+   Vector r(nqe);
+
+   Array<int> vdofs;
+   Vector el_x, el_tr;
+   DenseMatrix el_quad;
+   const FiniteElement *fe;
+   ElementTransformation *T;
+   DofTransformation *doftrans;
+
+   /* fill out quadrature evaluation of all snapshot-basis weak forms */
+   for (int i = 0; i < nsnap; ++i)
+   {
+      // NOTE(kevin): have to copy the vector since libROM matrix is row-major.
+      for (int k = 0; k < fes->GetTrueVSize(); ++k)
+         v_i[k] = snapshots(k, i);
+
+      for (int e = 0; e < ne; ++e)
+      {
+         fe = fes->GetFE(e);
+         doftrans = fes->GetElementVDofs(e, vdofs);
+         T = fes->GetElementTransformation(e);
+         v_i.GetSubVector(vdofs, el_x);
+
+         if (doftrans) { doftrans->InvTransformPrimal(el_x); }
+
+         const int nd = fe->GetDof();
+         el_quad.SetSize(nd * vdim, nqe);
+         for (int i = 0; i < ir->GetNPoints(); i++)
+         {
+            Vector EQ(el_quad.GetColumn(i), nd * vdim);
+
+            const IntegrationPoint &ip = ir->IntPoint(i);
+            nlfi->AssembleQuadratureVector(*fe, *T, ip, 1.0, el_x, EQ);
+            if (doftrans) { doftrans->TransformDual(EQ); }
+         }
+         // nlfi->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
+
+         for (int j = 0; j < NB; ++j)
+         {
+            Vector v_j(basis->GetColumn(j), fes->GetVSize());
+            v_j.GetSubVector(vdofs, el_tr);
+
+            el_quad.MultTranspose(el_tr, r);
+
+            for (int m = 0; m < nqe; ++m)
+               Gt(m + (e * nqe), j + (i * NB)) = r[m];
+         }  // for (int j = 0; j < NB; ++j)
+      }  // for (int e = 0; e < ne; ++e)
+
+      // if (precondition)
+      // {
+         // // Preconditioning is done by (V^T M(p_i) V)^{-1} (of size NB x NB).
+         // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
+      // }
+   }  // for (int i = 0; i < nsnap; ++i)
+
+   /* Fill out FOM quadrature weights */
+   Array<double> const& w_el = ir->GetWeights();
+   CAROM::Vector w(ne * nqe, true);
+   for (int i = 0; i < ne; ++i)
+      for (int j = 0; j < nqe; ++j)
+         w(j + (i * nqe)) = w_el[j];
+
+   rhs_Gw.setSize(Gt.numColumns());
+   assert(!rhs_Gw.distributed());
+   // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
+   Gt.transposeMult(w, rhs_Gw);
+
+   return;
+}
+
+void ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator(
+   const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+   CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &fidxs)
+{
+   mfem_warning("ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator- this routine is not tested. Set up a test routine in test/test_rom_nonlinearform.cpp.\n");
+
+   assert(basis);
+   assert(snapshots.numRows() >= fes->GetTrueVSize());
+   if (snapshots.numRows() > fes->GetTrueVSize())
+      mfem_warning("ROMNonlinearForm::SetupEQPSystemForDomainIntegrator- snapshot vector has a larger dimension than finite element space vector dimension. Neglecting the rest of snapshot.\n");
+
+   const IntegrationRule *ir = nlfi->GetIntegrationRule();
+   Mesh *mesh = fes->GetMesh();
+
+   // TODO(kevin): extension for mixed mesh elements.
+   const int vdim = fes->GetVDim();
+   const int nqe = ir->GetNPoints();
+   const int NB = basis->NumCols();
+   const int nsnap = snapshots.numColumns();
+
+   /* get faces with non-trivial interfaces. */
+   fidxs.SetSize(0);
+   FaceElementTransformations *tr;
+   for (int f = 0; f < mesh->GetNumFaces(); f++)
+   {
+      tr = mesh->GetInteriorFaceTransformations(f);
+      if (tr != NULL) fidxs.Append(f);
+   }
+   const int ne = fidxs.Size();
+   const int NQ = ne * nqe;
+
+   // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
+   Gt.setSize(NQ, NB * nsnap);
+   assert(Gt.distributed());
+   // For 0 <= j < NB, 0 <= i < nsnap, 0 <= e < ne, 0 <= m < nqe,
+   // G(j + (i*NB), (e*nqe) + m)
+   // is the coefficient of v_j^T M(p_i) V v_i at point m of element e,
+   // with respect to the integration rule weight at that point,
+   // where the "exact" quadrature solution is ir0->GetWeights().
+
+   Vector v_i(fes->GetTrueVSize());
+   Vector r(nqe);
+
+   Array<int> vdofs, vdofs2;
+   Vector el_x, el_tr;
+   DenseMatrix el_quad;
+   
+   const FiniteElement *fe1, *fe2;
+
+   /* fill out quadrature evaluation of all snapshot-basis weak forms */
+   for (int i = 0; i < nsnap; ++i)
+   {
+      // NOTE(kevin): have to copy the vector since libROM matrix is row-major.
+      for (int k = 0; k < fes->GetTrueVSize(); ++k)
+         v_i[k] = snapshots(k, i);
+
+      for (int e = 0; e < ne; ++e)
+      {
+         tr = mesh->GetInteriorFaceTransformations(fidxs[e]);
+         assert(tr != NULL);
+
+         fes->GetElementVDofs(tr->Elem1No, vdofs);
+         fes->GetElementVDofs(tr->Elem2No, vdofs2);
+         vdofs.Append (vdofs2);
+
+         v_i.GetSubVector(vdofs, el_x);
+
+         fe1 = fes->GetFE(tr->Elem1No);
+         fe2 = fes->GetFE(tr->Elem2No);
+
+         const int nd = fe1->GetDof() + fe2->GetDof();
+         el_quad.SetSize(nd * vdim, nqe);
+         for (int i = 0; i < ir->GetNPoints(); i++)
+         {
+            Vector EQ(el_quad.GetColumn(i), nd * vdim);
+
+            const IntegrationPoint &ip = ir->IntPoint(i);
+            nlfi->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, 1.0, el_x, EQ);
+         }
+
+         for (int j = 0; j < NB; ++j)
+         {
+            Vector v_j(basis->GetColumn(j), fes->GetVSize());
+            v_j.GetSubVector(vdofs, el_tr);
+
+            el_quad.MultTranspose(el_tr, r);
+
+            for (int m = 0; m < nqe; ++m)
+               Gt(m + (e * nqe), j + (i * NB)) = r[m];
+         }  // for (int j = 0; j < NB; ++j)
+      }  // for (int e = 0; e < ne; ++e)
+
+      // if (precondition)
+      // {
+         // // Preconditioning is done by (V^T M(p_i) V)^{-1} (of size NB x NB).
+         // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
+      // }
+   }  // for (int i = 0; i < nsnap; ++i)
+
+   /* Fill out FOM quadrature weights */
+   Array<double> const& w_el = ir->GetWeights();
+   CAROM::Vector w(ne * nqe, true);
+   for (int i = 0; i < ne; ++i)
+      for (int j = 0; j < nqe; ++j)
+         w(j + (i * nqe)) = w_el[j];
+
+   rhs_Gw.setSize(Gt.numColumns());
+   assert(!rhs_Gw.distributed());
+   // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
+   Gt.transposeMult(w, rhs_Gw);
+
+   return;
+}
+
+void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
+   const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, const Array<int> &bdr_attr_marker,
+   CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs)
+{
+   mfem_warning("ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator- this routine is not tested. Set up a test routine in test/test_rom_nonlinearform.cpp.\n");
+
+   assert(basis);
+   assert(snapshots.numRows() >= fes->GetTrueVSize());
+   if (snapshots.numRows() > fes->GetTrueVSize())
+      mfem_warning("ROMNonlinearForm::SetupEQPSystemForDomainIntegrator- snapshot vector has a larger dimension than finite element space vector dimension. Neglecting the rest of snapshot.\n");
+
+   const IntegrationRule *ir = nlfi->GetIntegrationRule();
+   Mesh *mesh = fes->GetMesh();
+
+   // TODO(kevin): extension for mixed mesh elements.
+   const int vdim = fes->GetVDim();
+   const int nqe = ir->GetNPoints();
+   const int NB = basis->NumCols();
+   const int nsnap = snapshots.numColumns();
+
+   /* get BEs with non-trivial boundary face. */
+   bidxs.SetSize(0);
+   FaceElementTransformations *tr;
+   for (int b = 0; b < fes->GetNBE(); b++)
+   {
+      const int bdr_attr = mesh->GetBdrAttribute(b);
+      if (bdr_attr_marker[bdr_attr-1] == 0) { continue; }
+
+      tr = mesh->GetBdrFaceTransformations (b);
+      if (tr != NULL) bidxs.Append(b);
+   }
+   const int ne = bidxs.Size();
+   const int NQ = ne * nqe;
+
+   // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
+   Gt.setSize(NQ, NB * nsnap);
+   assert(Gt.distributed());
+   // For 0 <= j < NB, 0 <= i < nsnap, 0 <= e < ne, 0 <= m < nqe,
+   // G(j + (i*NB), (e*nqe) + m)
+   // is the coefficient of v_j^T M(p_i) V v_i at point m of element e,
+   // with respect to the integration rule weight at that point,
+   // where the "exact" quadrature solution is ir0->GetWeights().
+
+   Vector v_i(fes->GetTrueVSize());
+   Vector r(nqe);
+
+   Array<int> vdofs, vdofs2;
+   Vector el_x, el_tr;
+   DenseMatrix el_quad;
+   
+   const FiniteElement *fe1, *fe2;
+
+   /* fill out quadrature evaluation of all snapshot-basis weak forms */
+   for (int i = 0; i < nsnap; ++i)
+   {
+      // NOTE(kevin): have to copy the vector since libROM matrix is row-major.
+      for (int k = 0; k < fes->GetTrueVSize(); ++k)
+         v_i[k] = snapshots(k, i);
+
+      for (int e = 0; e < ne; ++e)
+      {
+         const int bdr_attr = mesh->GetBdrAttribute(bidxs[e]);
+         tr = mesh->GetBdrFaceTransformations(bidxs[e]);
+         assert(tr != NULL);
+         assert(bdr_attr_marker[bdr_attr-1] != 0);
+
+         fes->GetElementVDofs(tr->Elem1No, vdofs);
+
+         v_i.GetSubVector(vdofs, el_x);
+
+         fe1 = fes->GetFE(tr->Elem1No);
+         // The fe2 object is really a dummy and not used on the boundaries,
+         // but we can't dereference a NULL pointer, and we don't want to
+         // actually make a fake element.
+         fe2 = fe1;
+
+         const int nd = fe1->GetDof();
+         el_quad.SetSize(nd * vdim, nqe);
+         for (int i = 0; i < ir->GetNPoints(); i++)
+         {
+            Vector EQ(el_quad.GetColumn(i), nd * vdim);
+
+            const IntegrationPoint &ip = ir->IntPoint(i);
+            nlfi->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, 1.0, el_x, EQ);
+         }
+
+         for (int j = 0; j < NB; ++j)
+         {
+            Vector v_j(basis->GetColumn(j), fes->GetVSize());
+            v_j.GetSubVector(vdofs, el_tr);
+
+            el_quad.MultTranspose(el_tr, r);
+
+            for (int m = 0; m < nqe; ++m)
+               Gt(m + (e * nqe), j + (i * NB)) = r[m];
+         }  // for (int j = 0; j < NB; ++j)
+      }  // for (int e = 0; e < ne; ++e)
+
+      // if (precondition)
+      // {
+         // // Preconditioning is done by (V^T M(p_i) V)^{-1} (of size NB x NB).
+         // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
+      // }
+   }  // for (int i = 0; i < nsnap; ++i)
+
+   /* Fill out FOM quadrature weights */
+   Array<double> const& w_el = ir->GetWeights();
+   CAROM::Vector w(ne * nqe, true);
+   for (int i = 0; i < ne; ++i)
+      for (int j = 0; j < nqe; ++j)
+         w(j + (i * nqe)) = w_el[j];
+
+   rhs_Gw.setSize(Gt.numColumns());
+   assert(!rhs_Gw.distributed());
+   // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
+   Gt.transposeMult(w, rhs_Gw);
+
+   return;
+}
+
+void ROMNonlinearForm::GetEQPForIntegrator(
+   const IntegratorType type, const int k, Array<int> &el, Array<int> &qp, Array<double> &qw)
+{
+   Array<SampleInfo> *sample = NULL;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:
+      {
+         assert((k >= 0) && (k < dnfi.Size()));
+         assert(dnfi.Size() == dnfi_sample.Size());
+         sample = dnfi_sample[k];
+      }
+      break;
+      case IntegratorType::INTERIORFACE:
+      {
+         assert((k >= 0) && (k < fnfi.Size()));
+         assert(fnfi.Size() == fnfi_sample.Size());
+         sample = fnfi_sample[k];
+      }
+      break;
+      case IntegratorType::BDRFACE:
+      {
+         assert((k >= 0) && (k < bfnfi.Size()));
+         assert(bfnfi.Size() == bfnfi_sample.Size());
+         sample = bfnfi_sample[k];
+      }
+      break;
+      default:
+         mfem_error("Unknown Integrator type!\n");
+   }
+
+   el.SetSize(0);
+   qp.SetSize(0);
+   qw.SetSize(0);
+
+   for (int s = 0; s < sample->Size(); s++)
+   {
+      switch (type)
+      {
+         case IntegratorType::DOMAIN:        el.Append((*sample)[s].el); break;
+         case IntegratorType::INTERIORFACE:  el.Append((*sample)[s].face); break;
+         case IntegratorType::BDRFACE:       el.Append((*sample)[s].be); break;
+      }
+      qp.Append((*sample)[s].qp);
+      qw.Append((*sample)[s].qw);
+   }
+}
+
+void ROMNonlinearForm::SaveEQPForIntegrator(
+   const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      default:
+         mfem_error("ROMNonlinearForm::SaveEQPForIntegrator- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+   GetEQPForIntegrator(type, k, el, qp, qw);
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::WriteDataset(grp_id, eldset, el);
+   hdf5_utils::WriteDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::WriteDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+   return;
+}
+
+void ROMNonlinearForm::LoadEQPForIntegrator(
+   const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      default:
+         mfem_error("ROMNonlinearForm::LoadEQPForIntegrator- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::ReadDataset(grp_id, eldset, el);
+   hdf5_utils::ReadDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::ReadDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        UpdateDomainIntegratorSampling(k, el, qp, qw); break;
+      case IntegratorType::INTERIORFACE:  UpdateInteriorFaceIntegratorSampling(k, el, qp, qw); break;
+      case IntegratorType::BDRFACE:       UpdateBdrFaceIntegratorSampling(k, el, qp, qw); break;
+      default:
+         mfem_error("ROMNonlinearForm::LoadEQPForIntegrator- Unknown IntegratorType!\n");
+   }
+   return;
 }
 
 }

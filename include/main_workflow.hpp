@@ -21,7 +21,9 @@ void GenerateSamples(MPI_Comm comm);
 void BuildROM(MPI_Comm comm);
 void TrainROM(MPI_Comm comm);
 // supremizer-enrichment, hypre-reduction optimization, etc..
-void AuxiliaryTrainROM(MPI_Comm comm);
+void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator);
+// Input parsing routine to list out all snapshot files for training a basis.
+void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list);
 // return relative error if comparing solution.
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
 

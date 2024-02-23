@@ -173,7 +173,7 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::st
       }
 
       int index = basis_tag2idx[snapshot_basis_tags[s]];
-      bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData(), 0.0, 0.01);
+      bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
       assert(addSample);
    }
 }
@@ -183,6 +183,7 @@ void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::stri
    const std::string filename = GetBaseFilename(prefix, basis_tag);
 
    snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
+   snapshot_options.Last()->static_svd_preserve_snapshot = true;
    snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename));
 
    basis_tag2idx[basis_tag] = basis_tags.size();
@@ -204,9 +205,32 @@ void SampleGenerator::WriteSnapshots()
    }
 }
 
+const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_tag)
+{
+   assert(snapshot_generators.Size() > 0);
+   assert(snapshot_generators.Size() == basis_tags.size());
+
+   int idx = -1;
+   for (int k = 0; k < basis_tags.size(); k++)
+      if (basis_tags[k] == basis_tag)
+      {
+         idx = k;
+         break;
+      }
+
+   if (idx < 0)
+   {
+      printf("basis tag: %s\n", basis_tag.c_str());
+      mfem_error("SampleGenerator::LookUpSnapshot- basis tag does not exist in snapshot list!\n");
+   }
+
+   return snapshot_generators[idx]->getSnapshotMatrix();
+}
+
 void SampleGenerator::ReportStatus(const int &sample_idx)
 {
    if (sample_idx % report_freq != 0) return;
+   if (proc_rank != 0) return;
 
    printf("==========  SampleGenerator Status  ==========\n");
    printf("%d-th sample is collected.\n", sample_idx);
@@ -242,7 +266,7 @@ const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
 {
    CAROM::BasisReader d_basis_reader(filename);
    // time is currently always 0.0
-   return d_basis_reader.getDim("snapshot", 0.0);
+   return d_basis_reader.getDim("snapshot");
 }
 
 void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int& ref_num_basis)

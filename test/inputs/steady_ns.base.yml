@@ -63,6 +63,7 @@ model_reduction:
   rom_handler_type: mfem
   # individual/universal
   subdomain_training: individual
+  nonlinear_handling: tensor
   save_operator:
     level: global
     prefix: "proj_inv"

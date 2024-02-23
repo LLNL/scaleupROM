@@ -7,9 +7,19 @@
 
 #include "mfem.hpp"
 #include "hyperreduction_integ.hpp"
+#include "linalg/NNLS.h"
+#include "hdf5_utils.hpp"
 
 namespace mfem
 {
+
+enum IntegratorType
+{
+   DOMAIN,
+   INTERIORFACE,
+   BDRFACE,
+   NUM_INTEG_TYPE
+};
 
 class ROMNonlinearForm : public NonlinearForm
 {
@@ -20,7 +30,7 @@ private:
 protected:
    /// ROM basis for projection.
    /// Needs to be converted to MFEM DenseMatrix.
-   DenseMatrix *basis = NULL;   // not owned
+   DenseMatrix *basis = NULL;   // owned
 
    /// Projection ROM's jacobian matrix is dense most of time.
    mutable DenseMatrix *Grad = NULL;
@@ -51,16 +61,27 @@ public:
        NonlinearFormIntegrator%s and gradient Operator. */
    virtual ~ROMNonlinearForm();
 
+   const bool PrecomputeMode() { return precompute; }
    void SetPrecomputeMode(const bool precompute_) { precompute = precompute_; }
 
    void PrecomputeCoefficients();
 
-   void SetBasis(DenseMatrix &basis_)
-   {
-      assert(basis_.NumCols() == height);
-      assert(basis_.NumRows() == fes->GetTrueVSize());
-      basis = &basis_;
-   }
+   void SetBasis(DenseMatrix &basis_, const int offset=0);
+
+   void TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol = 1.0e-2);
+   void TrainEQPForIntegrator(HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt,
+                              const CAROM::Vector &rhs_Gw, const double eqp_tol,
+                              Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   void SetupEQPSystemForDomainIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+                                          CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
+   void SetupEQPSystemForInteriorFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+                                                CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &fidxs);
+   void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
+                                           const Array<int> &bdr_attr_marker, CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs);
+
+   void GetEQPForIntegrator(const IntegratorType type, const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   void SaveEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
+   void LoadEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
 
    /// Adds new Domain Integrator.
    void AddDomainIntegrator(HyperReductionIntegrator *nlfi)

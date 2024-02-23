@@ -122,7 +122,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    mono_jac = system_jac->CreateMonolithic();
    if (direct_solve)
    {
-      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, mono_jac);
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
       return *jac_hypre;
    }  
    else
@@ -130,13 +130,13 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 }
 
 /*
-   SteadyNSTensorROM
+   SteadyNSROM
 */
 
-SteadyNSTensorROM::SteadyNSTensorROM(
-   SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_)
-   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_),
-     numSub(hs_.Size()), block_offsets(block_offsets_), direct_solve(direct_solve_)
+SteadyNSROM::SteadyNSROM(
+   SparseMatrix *linearOp_, const int numSub_, const Array<int> &block_offsets_, const bool direct_solve_)
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_),
+     numSub(numSub_), block_offsets(block_offsets_), direct_solve(direct_solve_)
 {
    separate_variable = (block_offsets.Size() == num_var * numSub + 1);
    assert(separate_variable || (block_offsets.Size() == numSub + 1));
@@ -156,10 +156,14 @@ SteadyNSTensorROM::SteadyNSTensorROM(
    }
 }
 
-SteadyNSTensorROM::~SteadyNSTensorROM()
+SteadyNSROM::~SteadyNSROM()
 {
    DeletePointers(block_idxs);
 }
+
+/*
+   SteadyNSTensorROM
+*/
 
 void SteadyNSTensorROM::Mult(const Vector &x, Vector &y) const
 {
@@ -199,7 +203,53 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
    
    if (direct_solve)
    {
-      jac_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, jac_mono);
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, jac_mono);
+      return *jac_hypre;
+   }
+   else
+      return *jac_mono;
+}
+
+/*
+   SteadyNSTensorROM
+*/
+
+void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
+{
+   y = 0.0;
+   linearOp->Mult(x, y);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int midx = (separate_variable) ? m * num_var : m;
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+      y_comp.MakeRef(y, block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+
+      hs[m]->AddMult(x_comp, y_comp);
+   }
+}
+
+Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
+{
+   delete jac_mono;
+   delete jac_hypre;
+   jac_mono = new SparseMatrix(*linearOp);
+   DenseMatrix *jac_comp;
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int midx = (separate_variable) ? m * num_var : m;
+      x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
+
+      // NOTE(kevin): jac_comp is owned by hs[m]. No need of deleting it.
+      jac_comp = dynamic_cast<DenseMatrix *>(&hs[m]->GetGradient(x_comp));
+      jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], *jac_comp);
+   }
+   jac_mono->Finalize();
+   
+   if (direct_solve)
+   {
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, jac_mono);
       return *jac_hypre;
    }
    else
@@ -213,6 +263,8 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 SteadyNSSolver::SteadyNSSolver()
    : StokesSolver()
 {
+   nonlinear_mode = true;
+
    // StokesSolver reads viscosity from stokes/nu.
    nu = config.GetOption<double>("stokes/nu", 1.0);
    delete nu_coeff;
@@ -253,9 +305,14 @@ SteadyNSSolver::~SteadyNSSolver()
 
    if (use_rom)
    {
-      DeletePointers(comp_tensors);
-      if (rom_handler->GetBuildingLevel() != ROMBuildingLevel::COMPONENT)
-         DeletePointers(subdomain_tensors);
+      if (rom_handler->GetNonlinearHandling() == NonlinearHandling::TENSOR)
+      {
+         DeletePointers(comp_tensors);
+         if (rom_handler->GetBuildingLevel() != ROMBuildingLevel::COMPONENT)
+            DeletePointers(subdomain_tensors);
+      }
+      else if (rom_handler->GetNonlinearHandling() == NonlinearHandling::EQP)
+         DeletePointers(comp_eqps);
    }
 }
 
@@ -264,9 +321,11 @@ void SteadyNSSolver::InitVariables()
    StokesSolver::InitVariables();
    if (use_rom)
    {
-      rom_handler->SetNonlinearMode(true);
+      rom_handler->SetNonlinearMode(nonlinear_mode);
       subdomain_tensors.SetSize(numSub);
       subdomain_tensors = NULL;
+      subdomain_eqps.SetSize(numSub);
+      subdomain_eqps = NULL;
    }
 }
 
@@ -379,6 +438,9 @@ void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
 {
    MultiBlockSolver::SaveROMOperator(input_prefix);
 
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
+
    std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
    assert(FileExists(filename));
 
@@ -406,6 +468,9 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    assert(rom_handler->GetBuildingLevel() == ROMBuildingLevel::GLOBAL);
 
    rom_handler->LoadOperatorFromFile(input_prefix);
+
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
    
    subdomain_tensors.SetSize(numSub);
    subdomain_tensors = NULL;
@@ -442,6 +507,9 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    StokesSolver::BuildCompROMElement(fes_comp);
 
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
+
    DenseMatrix *basis = NULL;
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
@@ -459,6 +527,9 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 void SteadyNSSolver::SaveCompBdrROMElement(hid_t &file_id)
 {
    MultiBlockSolver::SaveCompBdrROMElement(file_id);
+
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
 
    const int num_comp = topol_handler->GetNumComponents();
    assert(comp_tensors.Size() == num_comp);
@@ -492,6 +563,9 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
 {
    MultiBlockSolver::LoadCompBdrROMElement(file_id);
 
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
+
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
    comp_tensors = NULL;
@@ -523,7 +597,7 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
    subdomain_tensors.SetSize(numSub);
    subdomain_tensors = NULL;
    for (int m = 0; m < numSub; m++)
-      subdomain_tensors[m] = comp_tensors[rom_handler->GetBasisIndexForSubdomain(m)];
+      subdomain_tensors[m] = comp_tensors[rom_handler->GetRefIndexForSubdomain(m)];
 }
 
 bool SteadyNSSolver::Solve()
@@ -617,6 +691,9 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
 {
    StokesSolver::ProjectOperatorOnReducedBasis();
 
+   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
+      return;
+
    subdomain_tensors.SetSize(numSub);
    subdomain_tensors = NULL;
 
@@ -631,9 +708,6 @@ void SteadyNSSolver::ProjectOperatorOnReducedBasis()
 
 void SteadyNSSolver::SolveROM()
 {
-   assert(subdomain_tensors.Size() == numSub);
-   for (int m = 0; m < numSub; m++) assert(subdomain_tensors[m]);
-
    // View vector for U.
    BlockVector *U_domain = NULL;
    if (separate_variable_basis)
@@ -650,8 +724,104 @@ void SteadyNSSolver::SolveROM()
    }
 
    // NOTE(kevin): currently assumes direct solve.
-   SteadyNSTensorROM rom_oper(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
-   rom_handler->NonlinearSolve(rom_oper, U_domain);
+   SteadyNSROM *rom_oper = NULL;
+   if (rom_handler->GetNonlinearHandling() == NonlinearHandling::TENSOR)
+   {
+      assert(subdomain_tensors.Size() == numSub);
+      for (int m = 0; m < numSub; m++) assert(subdomain_tensors[m]);
+      rom_oper = new SteadyNSTensorROM(rom_handler->GetOperator(), subdomain_tensors, *(rom_handler->GetBlockOffsets()));
+   }
+   else if (rom_handler->GetNonlinearHandling() == NonlinearHandling::EQP)
+   {
+      assert(subdomain_eqps.Size() == numSub);
+      for (int m = 0; m < numSub; m++) assert(subdomain_eqps[m]);
+      rom_oper = new SteadyNSEQPROM(rom_handler->GetOperator(), subdomain_eqps, *(rom_handler->GetBlockOffsets()));
+   }
+   
+   rom_handler->NonlinearSolve(*rom_oper, U_domain);
+
+   delete rom_oper;
+}
+
+void SteadyNSSolver::TrainEQP(SampleGenerator *sample_generator)
+{
+   assert(sample_generator);
+   assert(rom_handler);
+   assert(rom_handler->BasisLoaded());
+
+   double eqp_tol = config.GetOption<double>("model_reduction/eqp/relative_tolerance", 1.0e-2);
+
+   SetupEQPOperators();
+
+   /* EQP NNLS for each reference ROM component */
+   const int num_comp = rom_handler->GetNumROMRefComps();
+   std::string basis_tag;
+   for (int c = 0; c < num_comp; c++)
+   {
+      int idx = (separate_variable_basis) ? c * num_var : c;
+      basis_tag = rom_handler->GetRefBasisTag(idx);
+
+      const CAROM::Matrix *snapshots = sample_generator->LookUpSnapshot(basis_tag);
+      comp_eqps[c]->TrainEQP(*snapshots, eqp_tol);
+   }
+}
+
+void SteadyNSSolver::SaveEQP()
+{
+   std::string filename = rom_handler->GetBasisPrefix();
+   filename += ".eqp.h5";
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   const int num_comp = rom_handler->GetNumROMRefComps();
+   assert(comp_eqps.Size() == num_comp);
+   std::string dset_name;
+   for (int c = 0; c < num_comp; c++)
+   {
+      assert(comp_eqps[c]);
+      dset_name = GetBasisTagForComponent(c, train_mode, topol_handler);
+      // only one integrator exists in each nonlinear form.
+      comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, dset_name);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
+}
+
+void SteadyNSSolver::LoadEQP()
+{
+   assert(rom_handler->BasisLoaded());
+
+   SetupEQPOperators();
+
+   const int num_comp = rom_handler->GetNumROMRefComps();
+
+   std::string filename = rom_handler->GetBasisPrefix();
+   filename += ".eqp.h5";
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   std::string dset_name;
+   for (int c = 0; c < num_comp; c++)
+   {
+      assert(comp_eqps[c]);
+      dset_name = GetBasisTagForComponent(c, train_mode, topol_handler);
+      // only one integrator exists in each nonlinear form.
+      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, dset_name);
+
+      if (comp_eqps[c]->PrecomputeMode())
+         comp_eqps[c]->PrecomputeCoefficients();
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
 }
 
 DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)
@@ -699,4 +869,52 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    }  // for (int i = 0; i < num_basis_c; i++)
 
    return tensor;
+}
+
+void SteadyNSSolver::SetupEQPOperators()
+{
+   assert(rom_handler);
+   assert(rom_handler->BasisLoaded());
+
+   bool precompute = config.GetOption<bool>("model_reduction/eqp/precompute", false);
+
+   const int num_comp = rom_handler->GetNumROMRefComps();
+   comp_eqps.SetSize(num_comp);
+   comp_fes.SetSize(num_comp);
+   comp_eqps = NULL;
+   comp_fes = NULL;
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      int midx = -1;
+      for (int m = 0; m < numSub; m++)
+         if (rom_handler->GetRefIndexForSubdomain(m) == c)
+         {
+            midx = m;
+            break;
+         }
+      assert((midx >= 0) && (midx < numSub));
+
+      comp_fes[c] = ufes[midx];
+   }
+
+   DenseMatrix *basis;
+   for (int c = 0; c < num_comp; c++)
+   {
+      int idx = (separate_variable_basis) ? c * num_var : c;
+      rom_handler->GetReferenceBasis(idx, basis);
+
+      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+      nl_integ_tmp->SetIntRule(ir_nl);
+
+      comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c]);
+      comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+      comp_eqps[c]->SetBasis(*basis);
+      comp_eqps[c]->SetPrecomputeMode(precompute);
+   }
+
+   subdomain_eqps.SetSize(numSub);
+   subdomain_eqps = NULL;
+   for (int m = 0; m < numSub; m++)
+      subdomain_eqps[m] = comp_eqps[rom_handler->GetRefIndexForSubdomain(m)];
 }

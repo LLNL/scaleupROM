@@ -243,6 +243,11 @@ void TrainROM(MPI_Comm comm)
    for (int p = 0; p < basis_tags.size(); p++)
    {
       std::vector<std::string> file_list(0);
+      std::string default_filename = sample_generator->GetBaseFilename(sample_generator->GetSamplePrefix(), basis_tags[p]);
+      default_filename += "_snapshot";
+      FindSnapshotFilesForBasis(basis_tags[p], default_filename, file_list);
+      assert(file_list.size() > 0);
+
       int num_basis;
 
       // if optional inputs are specified, parse them first.
@@ -252,21 +257,9 @@ void TrainROM(MPI_Comm comm)
          YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[p], basis_list);
          
          // If basis_tags[p] has additional inputs, parse them.
+         // parse tag-specific number of basis.
          if (basis_tag_input)
-         {
-            // parse tag-specific number of basis.
             num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_tag_input);
-
-            // parse the sample snapshot file list.
-            file_list = config.GetOptionFromDict<std::vector<std::string>>(
-                        "snapshot_files", std::vector<std::string>(0), basis_tag_input);
-            YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_tag_input);
-            if (snapshot_format)
-            {
-               FilenameParam snapshot_param("", snapshot_format);
-               snapshot_param.ParseFilenames(file_list);
-            }
-         }  // if (basis_tag_input)
          else
             num_basis = num_basis_default;
       }
@@ -276,23 +269,15 @@ void TrainROM(MPI_Comm comm)
 
       assert(num_basis > 0);
 
-      // if additional inputs are not specified for snapshot files, set default snapshot file name.
-      if (file_list.size() == 0)
-      {
-         std::string filename = sample_generator->GetBaseFilename(sample_generator->GetSamplePrefix(), basis_tags[p]);
-         filename += "_snapshot";
-         file_list.push_back(filename);
-      }
-
       sample_generator->FormReducedBasis(basis_prefix, basis_tags[p], file_list, num_basis);
    }  // for (int p = 0; p < basis_tags.size(); p++)
 
-   delete sample_generator;
+   AuxiliaryTrainROM(comm, sample_generator);
 
-   AuxiliaryTrainROM(comm);
+   delete sample_generator;
 }
 
-void AuxiliaryTrainROM(MPI_Comm comm)
+void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
 {
    std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
@@ -317,7 +302,64 @@ void AuxiliaryTrainROM(MPI_Comm comm)
       delete solver;
    }
 
-   // TODO: EQP weight optimization procedure.
+   /* EQP NNLS procedure */
+   std::string eqp_str = config.GetOption<std::string>("model_reduction/nonlinear_handling", "none");
+   if (eqp_str == "eqp")
+   {
+      MultiBlockSolver *test = NULL;
+      test = InitSolver();
+      test->InitVariables();
+
+      if (!test->IsNonlinear())
+      {
+         delete test;
+         return;
+      }
+
+      if (!test->UseRom()) mfem_error("ROM must be enabled for EQP training!\n");
+
+      test->LoadReducedBasis();
+
+      test->TrainEQP(sample_generator);
+
+      test->SaveEQP();
+
+      delete test;
+   }
+}
+
+void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
+{
+   file_list.clear();
+
+   // tag-specific optional inputs.
+   YAML::Node basis_list = config.FindNode("basis/tags");
+
+   // if optional inputs are specified, parse them first.
+   if (basis_list)
+   {
+      // Find if additional inputs are specified for basis_tag.
+      YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tag, basis_list);
+      
+      // If basis_tag has additional inputs, parse them.
+      if (basis_tag_input)
+      {
+         // parse the sample snapshot file list.
+         file_list = config.GetOptionFromDict<std::vector<std::string>>(
+                     "snapshot_files", std::vector<std::string>(0), basis_tag_input);
+         YAML::Node snapshot_format = config.FindNodeFromDict("snapshot_format", basis_tag_input);
+         // if file list is specified with a format, parse through the format.
+         if (snapshot_format)
+         {
+            FilenameParam snapshot_param("", snapshot_format);
+            snapshot_param.ParseFilenames(file_list);
+         }
+      }  // if (basis_tag_input)
+   }
+
+   // if additional inputs are not specified for snapshot files, set default snapshot file name.
+   if (file_list.size() == 0)
+      file_list.push_back(default_filename);
 }
 
 void BuildROM(MPI_Comm comm)
@@ -416,6 +458,9 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    {
       rom = test->GetROMHandler();
       test->LoadReducedBasis();
+
+      if ((test->IsNonlinear()) && (rom->GetNonlinearHandling() == NonlinearHandling::EQP))
+         test->LoadEQP();
    }
 
    solveTimer.Start();

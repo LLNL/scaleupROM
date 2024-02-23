@@ -31,12 +31,13 @@ int main(int argc, char *argv[])
       bool addSample;
 
       rom_options = new CAROM::Options(dim, max_num_snapshots, 1, update_right_SV);
+      rom_options->static_svd_preserve_snapshot = true;
       basis_generator = new CAROM::BasisGenerator(*rom_options, incremental, filename);
-      addSample = basis_generator->takeSample(sample1, 0.0, 0.01);
+      addSample = basis_generator->takeSample(sample1);
       // basis_generator->writeSnapshot();
-      addSample = basis_generator->takeSample(sample2, 0.0, 0.01);
+      addSample = basis_generator->takeSample(sample2);
       // basis_generator->writeSnapshot();
-      addSample = basis_generator->takeSample(sample3, 0.0, 0.01);
+      addSample = basis_generator->takeSample(sample3);
       // basis_generator->writeSnapshot();
 
       basis_generator->endSamples();
