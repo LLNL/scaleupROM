@@ -16,6 +16,7 @@
 #include "linalg/NNLS.h"
 #include "rom_nonlinearform.hpp"
 #include "hdf5_utils.hpp"
+#include "steady_ns_solver.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -1015,9 +1016,9 @@ int main(int argc, char *argv[])
                mfem_error("Failed to converge in sampling!\n");
          }
 
-         snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
-         u_snapshot_generator.takeSample(temp.GetSolution()->GetData(), 0.0, 0.01);
-         p_snapshot_generator.takeSample(temp.GetSolution()->GetData() + udim, 0.0, 0.01);
+         snapshot_generator.takeSample(temp.GetSolution()->GetData());
+         u_snapshot_generator.takeSample(temp.GetSolution()->GetData());
+         p_snapshot_generator.takeSample(temp.GetSolution()->GetData() + udim);
 
          // GridFunction *u = temp.GetVelocityGridFunction();
          // GridFunction *p = temp.GetPressureGridFunction();
@@ -1100,7 +1101,7 @@ int main(int argc, char *argv[])
 
       DenseMatrix basis;
       CAROM::BasisReader basis_reader(filename);
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
       CAROM::CopyMatrix(*carom_basis, basis);
 
       const int fom_vdofs = oper.Height();
@@ -1161,10 +1162,10 @@ int main(int argc, char *argv[])
          tmp1.MakeRef(proj_res, 0, udim);
          S.Mult(tmp1, projres_div);
 
-         sol_snapshot.takeSample(fom_sol->GetData(), 0.0, 0.01);
-         proj_sol_snapshot.takeSample(fom_proj.GetData(), 0.0, 0.01);
-         residual_snapshot.takeSample(fom_res.GetData(), 0.0, 0.01);
-         proj_residual_snapshot.takeSample(proj_res.GetData(), 0.0, 0.01);
+         sol_snapshot.takeSample(fom_sol->GetData());
+         proj_sol_snapshot.takeSample(fom_proj.GetData());
+         residual_snapshot.takeSample(fom_res.GetData());
+         proj_residual_snapshot.takeSample(proj_res.GetData());
 
          Array<GridFunction *> ugf(4), pgf(4), divgf(4);
          for (int k = 0; k < 4; k++) ugf[k] = new GridFunction;
@@ -1251,7 +1252,7 @@ int main(int argc, char *argv[])
 
             CAROM::BasisGenerator basis_generator(option, false, filename);
             for (int j = 0; j < wgted_snapshots.NumCols(); j++)
-               basis_generator.takeSample(wgted_snapshots.GetColumn(j), 0.0, 0.01);
+               basis_generator.takeSample(wgted_snapshots.GetColumn(j));
             basis_generator.endSamples();
 
             const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
@@ -1282,7 +1283,7 @@ int main(int argc, char *argv[])
       else
       {
          CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_basis, basis);
       }
 
@@ -1310,7 +1311,7 @@ int main(int argc, char *argv[])
       {
          DenseMatrix ubasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
 
          DenseTensor *nlin_rom = oper.GetReducedTensor(ubasis, ubasis);
@@ -1336,8 +1337,8 @@ int main(int argc, char *argv[])
          DenseMatrix ubasis, pbasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1422,159 +1423,21 @@ int main(int argc, char *argv[])
          // TODO: what happen if we do not deep-copy?
          const CAROM::Matrix *snapshots = snapshot_generator.getSnapshotMatrix();
 
+         DenseMatrix u_basis;
+         u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
+
          const IntegrationRule *ir = oper.GetNonlinearIntRule();
          auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
          nl_integ->SetIntRule(ir);
 
-         const int nqe = ir->GetNPoints();
-         const int ne = ufes->GetNE();
-         const int NB = basis.NumCols();
-         const int NQ = ne * nqe;
-         const int nsnap = min(1000, snapshots->numColumns());
+         ROMNonlinearForm *rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
+         rom_nlinf->AddDomainIntegrator(nl_integ);
+         rom_nlinf->SetBasis(u_basis);
 
-         assert(basis.NumRows() == snapshots->numRows());
-         assert(basis.NumRows() == (ufes->GetTrueVSize() + pfes->GetTrueVSize()));
-
-         // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
-         CAROM::Matrix Gt(NQ, NB * nsnap, true);
-         // For 0 <= j < NB, 0 <= i < nsnap, 0 <= e < ne, 0 <= m < nqe,
-         // G(j + (i*NB), (e*nqe) + m)
-         // is the coefficient of v_j^T M(p_i) V v_i at point m of element e,
-         // with respect to the integration rule weight at that point,
-         // where the "exact" quadrature solution is ir0->GetWeights().
-
-         Vector v_i(ufes->GetTrueVSize());
-         Vector r(nqe);
-
-         Array<int> vdofs;
-         Vector el_x, el_tr;
-         DenseMatrix el_quad;
-         const FiniteElement *fe;
-         ElementTransformation *T;
-         DofTransformation *doftrans;
-
-         for (int i = 0; i < nsnap; ++i)
-         {
-            for (int k = 0; k < ufes->GetTrueVSize(); ++k)
-                  v_i[k] = (*snapshots)(k, i);
-
-            for (int e = 0; e < ne; ++e)
-            {
-               fe = ufes->GetFE(e);
-               doftrans = ufes->GetElementVDofs(e, vdofs);
-               T = ufes->GetElementTransformation(e);
-               v_i.GetSubVector(vdofs, el_x);
-
-               const int nd = fe->GetDof();
-               el_quad.SetSize(nd * dim, nqe);
-               for (int i = 0; i < ir->GetNPoints(); i++)
-               {
-                  Vector EQ(el_quad.GetColumn(i), nd * dim);
-
-                  const IntegrationPoint &ip = ir->IntPoint(i);
-                  nl_integ->AssembleQuadratureVector(*fe, *T, ip, 1.0, el_x, EQ);
-               }
-               // nl_integ->AssembleElementQuadrature(*fe, *T, el_x, el_quad);
-
-               for (int j = 0; j < NB; ++j)
-               {
-                  Vector v_j(basis.GetColumn(j), ufes->GetVSize());
-                  v_j.GetSubVector(vdofs, el_tr);
-
-                  el_quad.MultTranspose(el_tr, r);
-
-                  for (int m = 0; m < nqe; ++m)
-                     Gt(m + (e * nqe), j + (i * NB)) = r[m];
-               }  // for (int j = 0; j < NB; ++j)
-            }  // for (int e = 0; e < ne; ++e)
-
-            // if (precondition)
-            // {
-               // // Preconditioning is done by (V^T M(p_i) V)^{-1} (of size NB x NB).
-               // PreconditionNNLS(fespace_R, new VectorFEMassIntegrator(a_coeff), BR, i, Gt);
-            // }
-         }  // for (int i = 0; i < nsnap; ++i)
-
-         Array<double> const& w_el = ir->GetWeights();
-         CAROM::Vector w(ne * nqe, true);
-
-         for (int i = 0; i < ne; ++i)
-            for (int j = 0; j < nqe; ++j)
-               w(j + (i * nqe)) = w_el[j];
-
-         //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
-         // CAROM::Vector const& w, CAROM::Matrix & Gt,
-         // CAROM::Vector & sol)
-         double nnls_tol = 1.0e-11;
-         int maxNNLSnnz = 0;
-         const double delta = eqp_tol;
-         CAROM::Vector eqpSol(ne * nqe, true);
-         CAROM::Vector rhs_Gw(Gt.numColumns(), false);
-         // G.mult(w, rhs_ub);  // rhs = Gw
-         // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
-         Gt.transposeMult(w, rhs_Gw);
-         int nnz = 0;
-         {
-            CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
-
-            CAROM::Vector rhs_ub(rhs_Gw);
-            CAROM::Vector rhs_lb(rhs_Gw);
-
-            for (int i = 0; i < rhs_ub.dim(); ++i)
-            {
-               rhs_lb(i) -= delta;
-               rhs_ub(i) += delta;
-            }
-
-            // nnls.normalize_constraints(Gt, rhs_lb, rhs_ub);
-            nnls.solve_parallel_with_scalapack(Gt, rhs_lb, rhs_ub, eqpSol);
-
-            nnz = 0;
-            for (int i = 0; i < eqpSol.dim(); ++i)
-            {
-               if (eqpSol(i) != 0.0)
-               {
-                     nnz++;
-               }
-            }
-
-            cout << rank << ": Number of nonzeros in NNLS solution: " << nnz
-                  << ", out of " << eqpSol.dim() << endl;
-
-            MPI_Allreduce(MPI_IN_PLACE, &nnz, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
-            if (rank == 0)
-               cout << "Global number of nonzeros in NNLS solution: " << nnz << endl;
-
-            // Check residual of NNLS solution
-            CAROM::Vector res(Gt.numColumns(), false);
-            Gt.transposeMult(eqpSol, res);
-
-            const double normGsol = res.norm();
-            const double normRHS = rhs_Gw.norm();
-
-            res -= rhs_Gw;
-            const double relNorm = res.norm() / std::max(normGsol, normRHS);
-            cout << rank << ": relative residual norm for NNLS solution of Gs = Gw: " <<
-                  relNorm << endl;
-
-         }
-
-         Array<int> sample_el(0), sample_qp(0);
-         Array<double> sample_qw(0);
-         for (int i = 0; i < eqpSol.dim(); ++i)
-         {
-            if (eqpSol(i) > 1.0e-12)
-            {
-               const int e = i / nqe;  // Element index
-               sample_el.Append(i / nqe);
-               sample_qp.Append(i % nqe);
-               sample_qw.Append(eqpSol(i));
-            }
-         }
-         printf("Size of sampled qp: %d\n", sample_el.Size());
-         if (nnz != sample_el.Size())
-            printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
+         rom_nlinf->TrainEQP(*snapshots, eqp_tol);
+         Array<int> sample_el, sample_qp;
+         Array<double> sample_qw;
+         rom_nlinf->GetEQPForIntegrator(IntegratorType::DOMAIN, 0, sample_el, sample_qp, sample_qw);
 
          {  // save empirical quadrature point locations.
             ElementTransformation *T;
@@ -1600,9 +1463,7 @@ int main(int argc, char *argv[])
             file_id = H5Fcreate(sample_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
             assert(file_id >= 0);
 
-            hdf5_utils::WriteDataset(file_id, "sample_element", sample_el);
-            hdf5_utils::WriteDataset(file_id, "sample_quadrature_point", sample_qp);
-            hdf5_utils::WriteDataset(file_id, "sample_quadrature_weight", sample_qw);
+            rom_nlinf->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, "sample");
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);
@@ -1630,8 +1491,8 @@ int main(int argc, char *argv[])
          problem::offsets = 0.0;
          problem::k = 0.0;
 
-         problem::u0(0) = 1.0;
-         problem::u0(1) = -1.0;
+         problem::u0(0) = -1.0;
+         problem::u0(1) = 1.0;
          printf("u0: (%f, %f)\n", problem::u0(0), problem::u0(1));
       }
 
@@ -1674,8 +1535,8 @@ int main(int argc, char *argv[])
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1692,7 +1553,7 @@ int main(int argc, char *argv[])
       else if (rom_mode == RomMode::TENSOR3)
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
 
          basis.SetSize(ubasis.NumRows() + pdim, ubasis.NumCols());
@@ -1721,7 +1582,7 @@ int main(int argc, char *argv[])
          }
 
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
          basis.SetSize(ubasis.NumRows() + pbasis.NumRows(), ubasis.NumCols() + pbasis.NumCols());
@@ -1738,8 +1599,8 @@ int main(int argc, char *argv[])
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(0.0, num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(0.0, num_pbasis);
+         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1785,7 +1646,7 @@ int main(int argc, char *argv[])
       else
       {
          CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(0.0, num_basis);
+         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_basis, basis);
       }
 
@@ -1805,6 +1666,17 @@ int main(int argc, char *argv[])
       Operator *rom_oper = NULL;
       TensorROM *tenrom = NULL;
       EQPROM *eqprom = NULL;
+      SteadyNSEQPROM *eqprom1 = NULL;
+      SparseMatrix lin_rom1(lin_rom.NumRows(), lin_rom.NumCols());
+      Array<int> idx(lin_rom.NumRows());
+      for (int k = 0; k < idx.Size(); k++) idx[k] = k;
+      lin_rom1.AddSubMatrix(idx, idx, lin_rom);
+      lin_rom1.Finalize();
+      Array<ROMNonlinearForm *> eqp_opers(1);
+      eqp_opers = NULL;
+      Array<int> block_offsets(2);
+      block_offsets[0] = 0;
+      block_offsets[1] = lin_rom.NumRows();
 
       if ((rom_mode == RomMode::TENSOR) || (rom_mode == RomMode::TENSOR3))
       {
@@ -1848,8 +1720,15 @@ int main(int argc, char *argv[])
       }  // if (rom_mode == RomMode::TENSOR2)
       else if (rom_mode == RomMode::EQP)
       {
-         Array<int> sample_el, sample_qp;
-         Array<double> sample_qw;
+         const IntegrationRule *ir = oper.GetNonlinearIntRule();
+         auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
+         nl_integ->SetIntRule(ir);
+
+         rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
+         rom_nlinf->AddDomainIntegrator(nl_integ);
+         rom_nlinf->SetBasis(u_basis);
+         rom_nlinf->SetPrecomputeMode(precompute);
+
          {  // load the sample from a hdf5 file.
             std::string sample_file = filename + "_sample.h5";
 
@@ -1858,29 +1737,20 @@ int main(int argc, char *argv[])
             file_id = H5Fopen(sample_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
             assert(file_id >= 0);
 
-            hdf5_utils::ReadDataset(file_id, "sample_element", sample_el);
-            hdf5_utils::ReadDataset(file_id, "sample_quadrature_point", sample_qp);
-            hdf5_utils::ReadDataset(file_id, "sample_quadrature_weight", sample_qw);
+            rom_nlinf->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, "sample");
 
             errf = H5Fclose(file_id);
             assert(errf >= 0);
          }
 
-         const IntegrationRule *ir = oper.GetNonlinearIntRule();
-         auto nl_integ = new VectorConvectionTrilinearFormIntegrator(*(oper.GetZeta()));
-         nl_integ->SetIntRule(ir);
-
-         rom_nlinf = new ROMNonlinearForm(num_basis, ufes);
-         rom_nlinf->AddDomainIntegrator(nl_integ);
-         rom_nlinf->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
-         rom_nlinf->SetBasis(u_basis);
-         rom_nlinf->SetPrecomputeMode(precompute);
-
          if (precompute)
             rom_nlinf->PrecomputeCoefficients();
 
          eqprom = new EQPROM(lin_rom, *rom_nlinf);
+         // eqp_opers[0] = rom_nlinf;
+         // eqprom1 = new SteadyNSEQPROM(&lin_rom1, eqp_opers, block_offsets);
          rom_oper = eqprom;
+         // rom_oper = eqprom1;
       }  // if (rom_mode == RomMode::EQP)
       else
          mfem_error("ROM Mode is not set!");

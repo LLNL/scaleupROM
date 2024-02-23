@@ -12,6 +12,7 @@
 #include "parameterized_problem.hpp"
 #include "rom_handler.hpp"
 #include "hdf5_utils.hpp"
+#include "sample_generator.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -29,6 +30,7 @@ protected:
 
    bool full_dg = true;
    int skip_zeros = 1;
+   bool nonlinear_mode = false;
 
    TopologyHandlerMode topol_mode = NUM_TOPOL_MODE;
    TopologyHandler *topol_handler = NULL;
@@ -114,6 +116,7 @@ public:
    Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    GridFunction* GetGridFunction(const int k) { return us[k]; }
    const int GetDiscretizationOrder() const { return order; }
+   const bool IsNonlinear() const { return nonlinear_mode; }
    const bool UseRom() const { return use_rom; }
    ROMHandlerBase* GetROMHandler() const { return rom_handler; }
    const TrainMode GetTrainMode() { return train_mode; }
@@ -209,6 +212,13 @@ public:
    void SaveSolution(std::string filename = "");
    void LoadSolution(const std::string &filename);
    void CopySolution(BlockVector *input_sol);
+
+   virtual void TrainEQP(SampleGenerator *sample_generator)
+   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
+   virtual void SaveEQP()
+   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
+   virtual void LoadEQP()
+   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
 
    void InitROMHandler();
    void GetBasisTags(std::vector<std::string> &basis_tags);

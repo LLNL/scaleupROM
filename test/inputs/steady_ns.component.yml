@@ -87,6 +87,7 @@ model_reduction:
   rom_handler_type: mfem
   # individual/universal
   subdomain_training: universal
+  nonlinear_handling: tensor
   save_operator:
     level: component
     prefix: "test.rom_elem"

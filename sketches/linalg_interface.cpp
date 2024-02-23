@@ -42,11 +42,12 @@ int main(int argc, char *argv[])
    // librom svd
    // SVD class constructors are protected, so using BasisGenerator.
    CAROM::Options options(fes->GetTrueVSize(), 100, 1, true);
+   options.static_svd_preserve_snapshot = true;
    std::string filename("test");
    CAROM::BasisGenerator *generator = new CAROM::BasisGenerator(options, false, filename);
    for (int s = 0; s < nsample; s++)
    {
-      bool addSample = generator->takeSample(snapshots[s]->getData(), 0.0, 0.01);
+      bool addSample = generator->takeSample(snapshots[s]->getData());
    }
 
    // librom snapshot matrix.
@@ -175,7 +176,7 @@ int main(int argc, char *argv[])
    generator = new CAROM::BasisGenerator(options, false, filename);
    for (int s = 0; s < nsample; s++)
    {
-      bool addSample = generator->takeSample(transformed_snapshots[s]->GetData(), 0.0, 0.01);
+      bool addSample = generator->takeSample(transformed_snapshots[s]->GetData());
    }
 
    // librom pod basis.
@@ -248,7 +249,7 @@ int main(int argc, char *argv[])
       generator = new CAROM::BasisGenerator(options, false, filename);
       for (int s = 0; s < nsample; s++)
       {
-         bool addSample = generator->takeSample(snapshots[s]->getData(), 0.0, 0.01);
+         bool addSample = generator->takeSample(snapshots[s]->getData());
       }
 
       basis = generator->getSpatialBasis();

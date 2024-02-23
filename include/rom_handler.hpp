@@ -30,6 +30,13 @@ enum ROMBuildingLevel
    NUM_BLD_LVL
 };
 
+enum NonlinearHandling
+{
+   TENSOR,
+   EQP,
+   NUM_NLNHNDL
+};
+
 const TrainMode SetTrainMode();
 
 const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
@@ -57,6 +64,7 @@ protected:
    TrainMode train_mode = NUM_TRAINMODE;
    bool nonlinear_mode = false;
    bool separate_variable = false;
+   NonlinearHandling nlin_handle = NUM_NLNHNDL;
    // ProjectionMode proj_mode = NUM_PROJMODE;
 
    // file names.
@@ -77,6 +85,7 @@ protected:
    Array<int> num_ref_basis;
    Array<const CAROM::Matrix*> carom_ref_basis;
    Array<int> rom_comp_block_offsets;
+   std::vector<std::string> basis_tags;
    bool basis_loaded;
    bool operator_loaded;
 
@@ -113,28 +122,36 @@ public:
    // access
    const int GetNumSubdomains() { return numSub; }
    const TrainMode GetTrainMode() { return train_mode; }
+   const int GetNumROMRefComps() { return num_rom_comp; }
    const int GetNumROMRefBlocks() { return num_rom_ref_blocks; }
    const int GetRefNumBasis(const int &basis_idx) { return num_ref_basis[basis_idx]; }
    const ROMBuildingLevel GetBuildingLevel() { return save_operator; }
    const bool BasisLoaded() { return basis_loaded; }
    const bool OperatorLoaded() { return operator_loaded; }
+   const bool SeparateVariable() { return separate_variable; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const std::string GetBasisPrefix() { return basis_prefix; }
+   const std::string GetRefBasisTag(const int ref_idx) { return basis_tags[ref_idx]; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
    const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
    virtual SparseMatrix* GetOperator() = 0;
    const bool GetNonlinearMode() { return nonlinear_mode; }
-   void SetNonlinearMode(const bool nl_mode) { nonlinear_mode = nl_mode; }
+   void SetNonlinearMode(const bool nl_mode)
+   {
+      if (nlin_handle == NonlinearHandling::NUM_NLNHNDL)
+         mfem_error("ROMHandler::SetNonlinearMode - nonlinear handling is not set!\n");
+      nonlinear_mode = nl_mode;
+   }
+   const NonlinearHandling GetNonlinearHandling() { return nlin_handle; }
 
    /* parse inputs for supremizer. only for Stokes/SteadyNS Solver. */
    void ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme);
 
    virtual void LoadReducedBasis();
 
-   int GetBasisIndexForSubdomain(const int &subdomain_index);
+   int GetRefIndexForSubdomain(const int &subdomain_index);
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) = 0;
    virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis) = 0;
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) = 0;
    virtual void SetBlockSizes();
 
    // P_i^T * mat * P_j
@@ -220,7 +237,6 @@ public:
    virtual void LoadReducedBasis();
    virtual void GetReferenceBasis(const int &basis_index, DenseMatrix* &basis) override;
    virtual void GetDomainBasis(const int &basis_index, DenseMatrix* &basis);
-   virtual void GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis) override;
 
    // P_i^T * mat * P_j
    virtual SparseMatrix* ProjectToRefBasis(const int &i, const int &j, const Operator *mat);

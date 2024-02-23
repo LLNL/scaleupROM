@@ -83,6 +83,7 @@ ROMHandlerBase::ROMHandlerBase(
      numSub(input_topol->GetNumSubdomains()),
      fom_var_names(var_names),
      fom_var_offsets(input_var_offsets),
+     basis_tags(0),
      basis_loaded(false),
      operator_loaded(false),
      separate_variable(separate_variable_basis)
@@ -173,6 +174,11 @@ void ROMHandlerBase::ParseInputs()
    save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
 
    save_basis_visual = config.GetOption<bool>("basis/visualization/enabled", false);
+
+   std::string nlin_handle_str = config.GetOption<std::string>("model_reduction/nonlinear_handling", "none");
+   if (nlin_handle_str == "tensor")    nlin_handle = NonlinearHandling::TENSOR;
+   else if (nlin_handle_str == "eqp")  nlin_handle = NonlinearHandling::EQP;
+   assert((!nonlinear_mode) || (nlin_handle != NonlinearHandling::NUM_NLNHNDL));
 }
 
 void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme)
@@ -210,19 +216,20 @@ void ROMHandlerBase::LoadReducedBasis()
 {
    if (basis_loaded) return;
 
-   std::string basis_name;
+   std::string basis_name = basis_prefix + "_";
    int numRowRB, numColumnRB;
 
    carom_ref_basis.SetSize(num_rom_ref_blocks);
+   basis_tags.resize(num_rom_ref_blocks);
    for (int k = 0; k < num_rom_ref_blocks; k++)
    {
-      basis_name = basis_prefix + "_";
       if (separate_variable)
-         basis_name += GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
+         basis_tags[k] = GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
       else
-         basis_name += GetBasisTagForComponent(k, train_mode, topol_handler);
-      basis_reader = new CAROM::BasisReader(basis_name);
-      carom_ref_basis[k] = basis_reader->getSpatialBasis(0.0, num_ref_basis[k]);
+         basis_tags[k] = GetBasisTagForComponent(k, train_mode, topol_handler);
+      basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k]);
+
+      carom_ref_basis[k] = basis_reader->getSpatialBasis(num_ref_basis[k]);
       numRowRB = carom_ref_basis[k]->numRows();
       numColumnRB = carom_ref_basis[k]->numColumns();
       printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
@@ -233,7 +240,7 @@ void ROMHandlerBase::LoadReducedBasis()
    basis_loaded = true;
 }
 
-int ROMHandlerBase::GetBasisIndexForSubdomain(const int &subdomain_index)
+int ROMHandlerBase::GetRefIndexForSubdomain(const int &subdomain_index)
 {
    int idx = -1;
    switch (train_mode)
@@ -390,14 +397,6 @@ void MFEMROMHandler::GetDomainBasis(const int &basis_index, DenseMatrix* &basis)
    basis = dom_basis[basis_index];
 }
 
-void MFEMROMHandler::GetBasisOnSubdomain(const int &subdomain_index, DenseMatrix* &basis)
-{
-   assert(basis_loaded);
-
-   int idx = GetBasisIndexForSubdomain(subdomain_index);
-   GetReferenceBasis(idx, basis);
-}
-
 void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats)
 {
    assert(mats.NumRows() == num_rom_blocks);
@@ -547,7 +546,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
          // TODO: need to change when the actual parallelization is implemented.
          HYPRE_BigInt glob_size = rom_block_offsets.Last();
          HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-         parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
+         parRomMat = new HypreParMatrix(MPI_COMM_SELF, glob_size, row_starts, romMat_mono);
          K = parRomMat;
       }
       else if ((prec_str == "gs") || (prec_str == "none"))
@@ -1002,19 +1001,19 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
    {
       case (SolverType::CG):
       {
-         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_SELF);
          else                    solver = new CGSolver();
          break;
       }
       case (SolverType::MINRES):
       {
-         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
+         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_SELF);
          else                    solver = new MINRESSolver();
          break;
       }
       case (SolverType::GMRES):
       {
-         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_WORLD);
+         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_SELF);
          else                    solver = new GMRESSolver();
          break;
       }
@@ -1041,7 +1040,7 @@ void MFEMROMHandler::SetupDirectSolver()
    sys_glob_size = romMat_mono->NumRows();
    sys_row_starts[0] = 0;
    sys_row_starts[1] = romMat_mono->NumRows();
-   romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, romMat_mono);
+   romMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, romMat_mono);
 
    mumps = new MUMPSSolver();
    mumps->SetMatrixSymType(mat_type);
