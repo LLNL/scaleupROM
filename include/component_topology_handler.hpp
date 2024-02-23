@@ -167,7 +167,7 @@ protected:
    void ReadPortsFromFile(const std::string filename);
    YAML::Node* ReadPortDict(hid_t grp_id, const std::string& port_name);
    // Read boundary attribute map between components and global.
-   void ReadBoundariesFromFile(const std::string filename);
+   bool ReadBoundariesFromFile(const std::string filename);
 
    // Reference port data
    void ReadPortDatasFromFile(const std::string filename);

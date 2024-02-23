@@ -50,7 +50,14 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    // Do we really need to copy all meshes?
    SetupMeshes();
 
-   ReadBoundariesFromFile(global_config);
+   bool success = ReadBoundariesFromFile(global_config);
+   if (!success)
+   {
+      std::string bdr_config = config.GetRequiredOption<std::string>("mesh/component-wise/bdr_config");
+      success = ReadBoundariesFromFile(bdr_config);
+      if (!success)
+         mfem_error("ComponentTopologyHandler: failed to read boundary! specify it either in global or boundary config file.\n");
+   }
    ReadPortsFromFile(global_config);
 
    if (num_ref_ports > 0)
@@ -374,13 +381,23 @@ YAML::Node* ComponentTopologyHandler::ReadPortDict(hid_t grp_id, const std::stri
    return port_dict;
 }
 
-void ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename)
+bool ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename)
 {
    hid_t file_id;
    hid_t grp_id;
    herr_t errf = 0;
    file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
    assert(file_id >= 0);
+
+   // Check if dataset exists. otherwise, return with false.
+   hid_t dset_id = H5Dopen(file_id, "boundary", H5P_DEFAULT);
+   if (dset_id >= 0)
+   {
+      errf = H5Dclose(dset_id);
+      assert(errf >= 0);
+   }
+   else
+      return false;
 
    {  // Boundary data.
       Array2D<int> tmp;
@@ -403,6 +420,7 @@ void ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
+   return true;
 }
 
 void ComponentTopologyHandler::ReadPortDatasFromFile(const std::string filename)
