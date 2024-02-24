@@ -8,8 +8,6 @@ import h5py
 def SimpleL():
     n_mesh = 3
     mesh_type = [0, 1, 2]
-    # n_mesh = 2
-    # mesh_type = [0, 1]
     mesh_configs = np.zeros([n_mesh, 6])
     mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
     mesh_configs[2,:] = [0., 1., 0., 0., 0., 0.]
@@ -39,15 +37,15 @@ def SimpleL():
     bdr_data = np.array(bdr_data)
     print(bdr_data.shape)
 
-    filename = "stokes.channel.h5"
+    filename = "linelast.simpleL.h5"
     with h5py.File(filename, 'w') as f:
         # c++ currently cannot read datasets of string.
         # change to multiple attributes, only as a temporary implementation.
         grp = f.create_group("components")
         grp.attrs["number_of_components"] = 3
-        grp.attrs["0"] = "joint"
-        grp.attrs["1"] = "rod_h"
-        grp.attrs["2"] = "rod_v"
+        grp.attrs["0"] = "joint2D"
+        grp.attrs["1"] = "rod2D_H"
+        grp.attrs["2"] = "rod2D_V"
         # component index of each mesh
         grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
         # 3-dimension vector for translation / rotation
