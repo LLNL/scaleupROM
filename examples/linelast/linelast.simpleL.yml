@@ -26,14 +26,14 @@ visualization:
   enabled: false
   unified_paraview: true
   file_path:
-    prefix: sample_gen_output
+    prefix: lcantilever_output
 
 parameterized_problem:
   name: linelast_disp_lcantilever
 
 single_run:
   linelast_disp_lcantilever:
-    rdisp_f: 1.0
+    rdisp_f: 10.0
 
 sample_generation:
   maximum_number_of_snapshots: 400
@@ -44,8 +44,8 @@ sample_generation:
     - key: single_run/linelast_disp/rdisp_f
       type: double
       sample_size: 6
-      minimum: 1.0
-      maximum: 1.0
+      minimum: 10.0
+      maximum: 10.0
 
 basis:
   prefix: "linelast_Lbeam"
