@@ -7,6 +7,7 @@
 #include "rom_handler.hpp"
 #include "hdf5_utils.hpp"
 #include "block_smoother.hpp"
+#include "utils/mpi_utils.h"  // this is from libROM/utils.
 // #include <cmath>
 // #include <algorithm>
 
@@ -143,6 +144,7 @@ void ROMHandlerBase::ParseInputs()
    num_ref_basis.SetSize(num_rom_ref_blocks);
    num_ref_basis = num_ref_basis_default;
    assert(num_ref_basis.Size() > 0);
+   dim_ref_basis.SetSize(num_rom_ref_blocks);
 
    YAML::Node basis_list = config.FindNode("basis/tags");
    if ((!basis_list) && (num_ref_basis_default <= 0))
@@ -150,12 +152,14 @@ void ROMHandlerBase::ParseInputs()
 
    for (int b = 0; b < num_rom_ref_blocks; b++)
    {
+      /* determine basis tag */
       std::string basis_tag;
       if (separate_variable)
          basis_tag = GetBasisTagForComponent(b / num_var, train_mode, topol_handler, fom_var_names[b % num_var]);
       else
          basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler);
 
+      /* determine number of basis */
       num_ref_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", num_ref_basis_default, basis_list);
 
       if (num_ref_basis[b] < 0)
@@ -163,10 +167,40 @@ void ROMHandlerBase::ParseInputs()
          printf("Cannot find the number of basis for %s!\n", basis_tag.c_str());
          mfem_error("Or specify the default number of basis!\n");
       }
-   }
+
+      /* parse the dimension of basis */
+      if (train_mode == TrainMode::INDIVIDUAL)
+      {
+         if (separate_variable)
+            dim_ref_basis[b] = fom_var_offsets[b+1] - fom_var_offsets[b];
+         else
+            dim_ref_basis[b] = fom_num_vdofs[b];
+      }  // if (train_mode == TrainMode::INDIVIDUAL)
+      else  // if (train_mode == TrainMode::UNIVERSAL)
+      {
+         int midx = -1;
+         int vidx = (separate_variable) ? b % num_var : 0;
+         for (int m = 0; m < numSub; m++)
+            if (topol_handler->GetMeshType(m) == (separate_variable ? b / num_var : b))
+            {
+               midx = m;
+               break;
+            }
+         assert(midx >= 0);
+
+         int idx = (separate_variable) ? midx * num_var + vidx : midx;
+         if (separate_variable)
+            dim_ref_basis[b] = fom_var_offsets[idx + 1] - fom_var_offsets[idx];
+         else
+            dim_ref_basis[b] = fom_num_vdofs[idx];
+      }  // if (train_mode == TrainMode::UNIVERSAL)
+   }  // for (int b = 0; b < num_rom_ref_blocks; b++)
    
    for (int k = 0; k < num_ref_basis.Size(); k++)
+   {
       assert(num_ref_basis[k] > 0);
+      assert(dim_ref_basis[k] > 0);
+   }
 
    max_num_snapshots = config.GetOption<int>("sample_generation/maximum_number_of_snapshots", 100);
    update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
@@ -227,9 +261,19 @@ void ROMHandlerBase::LoadReducedBasis()
          basis_tags[k] = GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
       else
          basis_tags[k] = GetBasisTagForComponent(k, train_mode, topol_handler);
-      basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k]);
 
-      carom_ref_basis[k] = basis_reader->getSpatialBasis(num_ref_basis[k]);
+      /*
+         TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+         We load the basis in parallel, and gather at all processes again.
+         Once fully parallelized, each process will load only local part of the basis.
+      */
+      {
+         int local_dim = CAROM::split_dimension(dim_ref_basis[k], MPI_COMM_WORLD);
+         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k], CAROM::Database::HDF5_MPIO, local_dim);
+
+         carom_ref_basis[k] = new CAROM::Matrix(*basis_reader->getSpatialBasis(num_ref_basis[k]));
+         carom_ref_basis[k]->gather();
+      }
       numRowRB = carom_ref_basis[k]->numRows();
       numColumnRB = carom_ref_basis[k]->numColumns();
       printf("spatial basis-%d dimension is %d x %d\n", k, numRowRB, numColumnRB);
