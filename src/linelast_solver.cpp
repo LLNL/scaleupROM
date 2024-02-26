@@ -524,14 +524,17 @@ void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          bdr_marker = 0;
          bdr_marker[comp->bdr_attributes[b] - 1] = 1;
          BilinearForm a_comp(fes_comp[c]);
-         a_comp.AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[c]), *(mu_c[c]), alpha, kappa), *(bdr_markers[b]));
 
+         if (b<bdr_markers.Size()) // TODO: Remove this when we have homogenous neumann conditions. This requires last battr to be homogenous
+         {
+         a_comp.AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[c]), *(mu_c[c]), alpha, kappa), *(bdr_markers[b]));
          a_comp.Assemble();
          a_comp.Finalize();
 
          bdr_mat = (*bdr_mats[c])[b];
          bdr_mat->SetSize(1, 1);
          (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
+         }
       }
    }
 }

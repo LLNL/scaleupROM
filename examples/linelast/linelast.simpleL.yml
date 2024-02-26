@@ -1,5 +1,4 @@
 main:
-#mode: run_example/sample_generation/build_rom/single_run
   mode: single_run
   use_rom: true
   solver: linelast
@@ -30,11 +29,11 @@ visualization:
     prefix: sample_gen_output
 
 parameterized_problem:
-  name: linelast_Lbeam
+  name: linelast_disp
 
 single_run:
-  linelast_Lbeam:
-    s_fy: 1.0
+  linelast_disp:
+    rdisp_f: 1.0
 
 sample_generation:
   maximum_number_of_snapshots: 400
@@ -42,15 +41,15 @@ sample_generation:
   file_path:
     prefix: "linelast_Lbeam"
   parameters:
-    - key: single_run/linelast_Lbeam/s_fy
+    - key: single_run/linelast_disp/rdisp_f
       type: double
-      sample_size: 1
+      sample_size: 6
       minimum: 1.0
       maximum: 1.0
 
 basis:
   prefix: "linelast_Lbeam"
-  number_of_basis: 4
+  number_of_basis: 2
   tags:
     - name: "comp0"
   svd:

@@ -14,7 +14,7 @@ def SimpleL():
 
     # interface data
     # mesh1 / mesh2 / battr1 / battr2 / port_idx
-    if_data = np.zeros([4, 5])
+    if_data = np.zeros([2, 5])
     if_data[0, :] = [0, 1, 2, 4, 0]
     if_data[1, :] = [0, 2, 3, 1, 1]
 
@@ -56,6 +56,20 @@ def SimpleL():
         grp.attrs["0"] = "port1"
         grp.attrs["1"] = "port2"
         grp.create_dataset("interface", if_data.shape, data=if_data)
+
+        port = grp.create_group("port1")
+        port.attrs["comp1"] = "joint2D"
+        port.attrs["comp2"] = "rod2D_H"
+        port.attrs["attr1"] = 2
+        port.attrs["attr2"] = 4
+        port.create_dataset("comp2_configuration", (6,), data=[1., 0., 0., 0., 0., 0.])
+
+        port = grp.create_group("port2")
+        port.attrs["comp1"] = "joint2D"
+        port.attrs["comp2"] = "rod2D_V"
+        port.attrs["attr1"] = 3
+        port.attrs["attr2"] = 1
+        port.create_dataset("comp2_configuration", (6,), data=[0., 1., 0., 0., 0., 0.])
 
         # boundary attributes
         f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
