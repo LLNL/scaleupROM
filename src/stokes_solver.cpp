@@ -1322,6 +1322,11 @@ void StokesSolver::EnrichSupremizer()
 
       // Save the supremizer basis.
       std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      /*
+         TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+         In full parallelization, all processes will participate in this supremizer writing procedure.
+      */
+      if (rank == 0)
       {
          hid_t file_id;
          herr_t errf = 0;
