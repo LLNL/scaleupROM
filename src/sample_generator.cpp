@@ -184,7 +184,7 @@ void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::stri
 
    snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
    snapshot_options.Last()->static_svd_preserve_snapshot = true;
-   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename));
+   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename, CAROM::Database::HDF5_MPIO));
 
    basis_tag2idx[basis_tag] = basis_tags.size();
    basis_tags.push_back(basis_tag);
