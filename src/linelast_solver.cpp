@@ -55,7 +55,11 @@ LinElastSolver::~LinElastSolver()
    delete globalMat;
    delete globalMat_hypre;
    delete mumps;
+   if (init_x != NULL)
+   {
    delete init_x;
+   }
+   
 }
 
 void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
@@ -133,6 +137,7 @@ void LinElastSolver::InitVariables()
    }
    if (use_rom)
      MultiBlockSolver::InitROMHandler();
+   init_x = NULL;
 }
 
 void LinElastSolver::BuildOperators()

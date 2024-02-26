@@ -228,6 +228,12 @@ public:
    LinElastDisp();
 };
 
+class LinElastDispLCantilever : public LinElastProblem
+{
+public:
+   LinElastDispLCantilever();
+};
+
 ParameterizedProblem* InitParameterizedProblem();
 
 #endif

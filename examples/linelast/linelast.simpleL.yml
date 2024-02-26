@@ -29,10 +29,10 @@ visualization:
     prefix: sample_gen_output
 
 parameterized_problem:
-  name: linelast_disp
+  name: linelast_disp_lcantilever
 
 single_run:
-  linelast_disp:
+  linelast_disp_lcantilever:
     rdisp_f: 1.0
 
 sample_generation:
