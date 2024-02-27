@@ -4,6 +4,7 @@
 
 #include "rom_nonlinearform.hpp"
 #include "linalg_utils.hpp"
+#include "utils/mpi_utils.h"  // this is from libROM/utils.
 
 using namespace std;
 
@@ -667,6 +668,19 @@ void ROMNonlinearForm::SetBasis(DenseMatrix &basis_, const int offset)
 
 void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol)
 {
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.
+   */
+   assert(snapshots.distributed());
+   CAROM::Matrix snapshots_work(snapshots);
+   snapshots_work.gather();
+   const int nrow_global = snapshots_work.numRows();
+   assert(basis);
+   assert(nrow_global >= fes->GetTrueVSize());
+   if (nrow_global > fes->GetTrueVSize())
+      mfem_warning("ROMNonlinearForm::TrainEQP- snapshot vector has a larger dimension than finite element space vector dimension. Neglecting the rest of snapshot.\n");
+
    // NOTE(kevin): these will be resized within the routines as needed.
    // just initializing with distribute option.
    CAROM::Matrix Gt(1,1, true);
@@ -679,14 +693,14 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
 
    for (int k = 0; k < dnfi.Size(); k++)
    {
-      SetupEQPSystemForDomainIntegrator(snapshots, dnfi[k], Gt, rhs_Gw);
+      SetupEQPSystemForDomainIntegrator(snapshots_work, dnfi[k], Gt, rhs_Gw);
       TrainEQPForIntegrator(dnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
       UpdateDomainIntegratorSampling(k, el, qp, qw);
    }
 
    for (int k = 0; k < fnfi.Size(); k++)
    {
-      SetupEQPSystemForInteriorFaceIntegrator(snapshots, fnfi[k], Gt, rhs_Gw, fidxs);
+      SetupEQPSystemForInteriorFaceIntegrator(snapshots_work, fnfi[k], Gt, rhs_Gw, fidxs);
       TrainEQPForIntegrator(fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
       for (int s = 0; s < el.Size(); s++)
          el[s] = fidxs[el[s]];
@@ -712,7 +726,7 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
          bdr_attr_marker[i] |= bdr_marker[i];
       }
 
-      SetupEQPSystemForBdrFaceIntegrator(snapshots, bfnfi[k], bdr_attr_marker, Gt, rhs_Gw, fidxs);
+      SetupEQPSystemForBdrFaceIntegrator(snapshots_work, bfnfi[k], bdr_attr_marker, Gt, rhs_Gw, fidxs);
       TrainEQPForIntegrator(bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
       for (int s = 0; s < el.Size(); s++)
          el[s] = fidxs[el[s]];
@@ -795,17 +809,29 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
                   relNorm << std::endl;
    }
 
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will treat EQ points/weights locally per each process.
+   */
+   std::vector<int> eqp_sol_offsets, eqp_sol_cnts;
+   int eqp_sol_dim = CAROM::get_global_offsets(eqpSol.dim(), eqp_sol_offsets, MPI_COMM_WORLD);
+   for (int k = 0; k < eqp_sol_offsets.size() - 1; k++)
+      eqp_sol_cnts.push_back(eqp_sol_offsets[k + 1] - eqp_sol_offsets[k]);
+   CAROM::Vector eqpSol_global(eqp_sol_dim, false);
+   MPI_Allgatherv(eqpSol.getData(), eqpSol.dim(), MPI_DOUBLE, eqpSol_global.getData(),
+                  eqp_sol_cnts.data(), eqp_sol_offsets.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+
    sample_el.SetSize(0);
    sample_qp.SetSize(0);
    sample_qw.SetSize(0);
-   for (int i = 0; i < eqpSol.dim(); ++i)
+   for (int i = 0; i < eqpSol_global.dim(); ++i)
    {
-      if (eqpSol(i) > 1.0e-12)
+      if (eqpSol_global(i) > 1.0e-12)
       {
          const int e = i / nqe;  // Element index
          sample_el.Append(i / nqe);
          sample_qp.Append(i % nqe);
-         sample_qw.Append(eqpSol(i));
+         sample_qw.Append(eqpSol_global(i));
       }
    }
    printf("Size of sampled qp: %d\n", sample_el.Size());
@@ -817,6 +843,16 @@ void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
    const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
    CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw)
 {
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.
+      Also, while snapshot/basis are distributed according to vdofs,
+      EQP system will be distributed according to elements.
+   */
+   int rank;
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+   assert(!snapshots.distributed());
    assert(basis);
    assert(snapshots.numRows() >= fes->GetTrueVSize());
    if (snapshots.numRows() > fes->GetTrueVSize())
@@ -829,7 +865,13 @@ void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
    const int nqe = ir->GetNPoints();
    const int NB = basis->NumCols();
    const int nsnap = snapshots.numColumns();
-   const int ne = fes->GetNE();
+
+   const int ne_global = fes->GetNE();
+   const int ne = CAROM::split_dimension(ne_global, MPI_COMM_WORLD);
+   std::vector<int> elem_offsets;
+   int dummy = CAROM::get_global_offsets(ne, elem_offsets, MPI_COMM_WORLD);
+   assert(dummy == ne_global);
+
    const int NQ = ne * nqe;
 
    // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
@@ -858,7 +900,7 @@ void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
       for (int k = 0; k < fes->GetTrueVSize(); ++k)
          v_i[k] = snapshots(k, i);
 
-      for (int e = 0; e < ne; ++e)
+      for (int e = elem_offsets[rank], eidx = 0; e < elem_offsets[rank+1]; e++, eidx++)
       {
          fe = fes->GetFE(e);
          doftrans = fes->GetElementVDofs(e, vdofs);
@@ -887,7 +929,7 @@ void ROMNonlinearForm::SetupEQPSystemForDomainIntegrator(
             el_quad.MultTranspose(el_tr, r);
 
             for (int m = 0; m < nqe; ++m)
-               Gt(m + (e * nqe), j + (i * NB)) = r[m];
+               Gt(m + (eidx * nqe), j + (i * NB)) = r[m];
          }  // for (int j = 0; j < NB; ++j)
       }  // for (int e = 0; e < ne; ++e)
 
@@ -919,6 +961,16 @@ void ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator(
 {
    mfem_warning("ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator- this routine is not tested. Set up a test routine in test/test_rom_nonlinearform.cpp.\n");
 
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.
+      Also, while snapshot/basis are distributed according to vdofs,
+      EQP system will be distributed according to elements.
+   */
+   int rank;
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+   assert(!snapshots.distributed());
    assert(basis);
    assert(snapshots.numRows() >= fes->GetTrueVSize());
    if (snapshots.numRows() > fes->GetTrueVSize())
@@ -941,7 +993,13 @@ void ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator(
       tr = mesh->GetInteriorFaceTransformations(f);
       if (tr != NULL) fidxs.Append(f);
    }
-   const int ne = fidxs.Size();
+
+   const int ne_global = fidxs.Size();
+   const int ne = CAROM::split_dimension(ne_global, MPI_COMM_WORLD);
+   std::vector<int> elem_offsets;
+   int dummy = CAROM::get_global_offsets(ne, elem_offsets, MPI_COMM_WORLD);
+   assert(dummy == ne_global);
+
    const int NQ = ne * nqe;
 
    // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
@@ -969,7 +1027,7 @@ void ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator(
       for (int k = 0; k < fes->GetTrueVSize(); ++k)
          v_i[k] = snapshots(k, i);
 
-      for (int e = 0; e < ne; ++e)
+      for (int e = elem_offsets[rank], eidx = 0; e < elem_offsets[rank+1]; e++, eidx++)
       {
          tr = mesh->GetInteriorFaceTransformations(fidxs[e]);
          assert(tr != NULL);
@@ -1001,7 +1059,7 @@ void ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator(
             el_quad.MultTranspose(el_tr, r);
 
             for (int m = 0; m < nqe; ++m)
-               Gt(m + (e * nqe), j + (i * NB)) = r[m];
+               Gt(m + (eidx * nqe), j + (i * NB)) = r[m];
          }  // for (int j = 0; j < NB; ++j)
       }  // for (int e = 0; e < ne; ++e)
 
@@ -1033,6 +1091,16 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
 {
    mfem_warning("ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator- this routine is not tested. Set up a test routine in test/test_rom_nonlinearform.cpp.\n");
 
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.
+      Also, while snapshot/basis are distributed according to vdofs,
+      EQP system will be distributed according to elements.
+   */
+   int rank;
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+   assert(!snapshots.distributed());
    assert(basis);
    assert(snapshots.numRows() >= fes->GetTrueVSize());
    if (snapshots.numRows() > fes->GetTrueVSize())
@@ -1058,7 +1126,13 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
       tr = mesh->GetBdrFaceTransformations (b);
       if (tr != NULL) bidxs.Append(b);
    }
-   const int ne = bidxs.Size();
+
+   const int ne_global = bidxs.Size();
+   const int ne = CAROM::split_dimension(ne_global, MPI_COMM_WORLD);
+   std::vector<int> elem_offsets;
+   int dummy = CAROM::get_global_offsets(ne, elem_offsets, MPI_COMM_WORLD);
+   assert(dummy == ne_global);
+
    const int NQ = ne * nqe;
 
    // Compute G of size (NB * nsnap) x NQ, but only store its transpose Gt.
@@ -1086,7 +1160,7 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
       for (int k = 0; k < fes->GetTrueVSize(); ++k)
          v_i[k] = snapshots(k, i);
 
-      for (int e = 0; e < ne; ++e)
+      for (int e = elem_offsets[rank], eidx = 0; e < elem_offsets[rank+1]; e++, eidx++)
       {
          const int bdr_attr = mesh->GetBdrAttribute(bidxs[e]);
          tr = mesh->GetBdrFaceTransformations(bidxs[e]);
@@ -1121,7 +1195,7 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
             el_quad.MultTranspose(el_tr, r);
 
             for (int m = 0; m < nqe; ++m)
-               Gt(m + (e * nqe), j + (i * NB)) = r[m];
+               Gt(m + (eidx * nqe), j + (i * NB)) = r[m];
          }  // for (int j = 0; j < NB; ++j)
       }  // for (int e = 0; e < ne; ++e)
 
