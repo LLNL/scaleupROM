@@ -283,6 +283,10 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new LinElastDispLCantilever();
    }
+   else if (problem_name == "linelast_disp_lattice")
+   {
+      problem = new LinElastDispLattice();
+   }
    else
    {
       mfem_error("Unknown parameterized problem name!\n");
@@ -642,4 +646,42 @@ LinElastDispLCantilever::LinElastDispLCantilever()
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL;
+}
+
+LinElastDispLattice::LinElastDispLattice()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(2);
+   battr.SetSize(2);
+   vector_bdr_ptr.SetSize(2);
+   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+   {
+   bdr_type[i] = LinElastProblem::DIRICHLET;
+   battr[i] = i+1;
+   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+   }
+   
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+   // Default values.
+   function_factory::linelast_disp::rdisp_f = 1.0;
+   function_factory::linelast_problem::_lambda = 1.0;
+   function_factory::linelast_problem::_mu = 1.0;
+
+   param_map["rdisp_f"] = 0;
+   param_map["lambda"] = 1;
+   param_map["mu"] = 2;
+
+   param_ptr.SetSize(3);
+   param_ptr[0] = &(function_factory::linelast_disp::rdisp_f);
+   param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[2] = &(function_factory::linelast_problem::_mu);
+
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = NULL;
+
 }
