@@ -112,10 +112,10 @@ jobs:
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
             ./test_ns_parallel --gtest_filter=NSTensor.Sampling
-            mpirun -n 3 ./test_ns_parallel --gtest_filter=NSTensor.Train
+            mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSTensor.Train
             ./test_ns_parallel --gtest_filter=NSTensor.Build_SingleRun
             ./test_ns_parallel --gtest_filter=NSEQP.Sampling
-            mpirun -n 3 ./test_ns_parallel --gtest_filter=NSEQP.Train
+            mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSEQP.Train
             ./test_ns_parallel --gtest_filter=NSEQP.Build_SingleRun
       # - name: Upload the compiled artifacts
       #   uses: actions/upload-artifact@master
