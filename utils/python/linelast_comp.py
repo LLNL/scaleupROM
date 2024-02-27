@@ -75,5 +75,153 @@ def SimpleL():
         f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
     return
 
+def grid_mesh_configs(nx, ny, l, w):
+    bdr_data = []
+    if_data = []
+    n_joint = (nx + 1) * (ny + 1)
+    n_rod_H = (ny + 1) * nx
+    n_rod_V = (nx + 1) * ny
+    n_rod = n_rod_H + n_rod_V
+    n_mesh = n_joint + n_rod
+    mesh_configs = np.zeros([n_mesh, 6])
+    
+    # Setup joints
+    for i in range(n_joint):
+        xi = (i + nx+1) % (nx+1)
+        yi = np.floor(i / (nx+1))
+        mesh_configs[i,:] = [xi*(l+w), yi*(l+w), 0., 0., 0., 0.]
+
+        # Boundary check
+        if xi == 0.0:
+            bdr_data += [[1, i, 4]] # constrain one end
+        elif xi == nx:
+            bdr_data += [[2, i, 2]] # constrain one end
+        elif yi==0.0:
+            bdr_data += [[3, i, 1]] # free boundary
+        elif yi==ny:
+            bdr_data += [[3, i, 3]] # free boundary
+        
+        # Interface check
+        # mesh1 / mesh2 / battr1 / battr2 / port_idx
+        # Case port idx = 0
+        if xi < nx:
+            if_data += [[i, i + n_joint - yi, 2, 4, 0]]
+        # Case port idx = 1
+        if xi > 0:
+            if_data += [[i, i + n_joint - yi - 1, 4, 2, 1]]
+        # Case port idx = 2
+        if yi < ny:
+            if_data += [[i, n_joint + n_rod_H + i, 3, 1, 2]]
+        # Case port idx = 3
+        if yi > 0:
+            if_data += [[i, n_joint + n_rod_H + i - (nx+1), 1, 3, 3]]
+
+    # Setup horizontal rods
+    for i in range(n_rod_H):
+        xi = (i + nx) % (nx)
+        yi = np.floor(i / (nx))
+        mesh_configs[n_joint + i,:] = [xi*(l+w) + w, yi*(l+w), 0., 0., 0., 0.]
+        # Boundary check
+        bdr_data += [[3, n_joint + i, 1]] # free boundary
+        bdr_data += [[3, n_joint + i, 3]] # free boundary
+    
+    # Setup vertical rods
+    for i in range(n_rod_V):
+        xi = (i + nx+1) % (nx+1)
+        yi = np.floor(i / (nx+1))
+        mesh_configs[n_joint + n_rod_H + i,:] = [xi*(l+w), yi*(l+w) + w, 0., 0., 0., 0.]
+
+        # Boundary check
+        if xi == 0.0:
+            bdr_data += [[1, n_joint + n_rod_H + i, 4]] # constrain one end
+            bdr_data += [[3, n_joint + n_rod_H + i, 2]] # free boundary
+        elif xi == nx:
+            bdr_data += [[2, n_joint + n_rod_H + i, 2]] # constrain one end
+            bdr_data += [[3, n_joint + n_rod_H + i, 4]] # free boundary
+        else:
+            bdr_data += [[3, n_joint + n_rod_H + i, 2]] # constrain one end
+            bdr_data += [[3, n_joint + n_rod_H + i, 4]] # free boundary
+
+    return mesh_configs, bdr_data, if_data
+
+
+def LatticeCantilever(nx, ny):
+    # nx and ny are the number of sections in x- and y-direction, respectively
+    n_mesh = 3
+    mesh_type = [0, 1, 2]
+    l = 4.0
+    w = 1.0
+    mesh_configs, bdr_data, if_data = grid_mesh_configs(nx, ny, l, w)
+
+    # interface data
+    if_data = np.array(if_data)
+
+    # boundary attributes
+    bdr_data = np.array(bdr_data)
+
+    filename = "linelast.lattice.h5"
+    with h5py.File(filename, 'w') as f:
+        # c++ currently cannot read datasets of string.
+        # change to multiple attributes, only as a temporary implementation.
+        grp = f.create_group("components")
+        grp.attrs["number_of_components"] = 3
+        grp.attrs["0"] = "joint2D"
+        grp.attrs["1"] = "rod2D_H"
+        grp.attrs["2"] = "rod2D_V"
+        # component index of each mesh
+        grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
+        # 3-dimension vector for translation / rotation
+        grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
+
+        grp = f.create_group("ports")
+        grp.attrs["number_of_references"] = 4
+        grp.attrs["0"] = "port1"
+        grp.attrs["1"] = "port2"
+        grp.attrs["2"] = "port3"
+        grp.attrs["3"] = "port4"
+        grp.create_dataset("interface", if_data.shape, data=if_data)
+
+        port = grp.create_group("port1")
+        port.attrs["comp1"] = "joint2D"
+        port.attrs["comp2"] = "rod2D_H"
+        port.attrs["attr1"] = 2
+        port.attrs["attr2"] = 4
+        port.create_dataset("comp2_configuration", (6,), data=[w, 0., 0., 0., 0., 0.])
+
+        port = grp.create_group("port2")
+        port.attrs["comp1"] = "joint2D"
+        port.attrs["comp2"] = "rod2D_H"
+        port.attrs["attr1"] = 4
+        port.attrs["attr2"] = 2
+        port.create_dataset("comp2_configuration", (6,), data=[-l, 0., 0., 0., 0., 0.])
+
+        port = grp.create_group("port3")
+        port.attrs["comp1"] = "joint2D"
+        port.attrs["comp2"] = "rod2D_V"
+        port.attrs["attr1"] = 3
+        port.attrs["attr2"] = 1
+        port.create_dataset("comp2_configuration", (6,), data=[0., w, 0., 0., 0., 0.])
+
+        port = grp.create_group("port4")
+        port.attrs["comp1"] = "joint2D"
+        port.attrs["comp2"] = "rod2D_V"
+        port.attrs["attr1"] = 1
+        port.attrs["attr2"] = 3
+        port.create_dataset("comp2_configuration", (6,), data=[0., -l, 0., 0., 0., 0.])
+
+        # boundary attributes
+        f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
+    return
+
 if __name__ == "__main__":
-    SimpleL()
+    import sys
+    if len(sys.argv) == 1:
+        SimpleL()
+    else:
+        name = sys.argv[1]
+        if name == "simple_l":
+            SimpleL()
+        elif name == "lattice_cantilever":
+            nx = int(sys.argv[2])
+            ny = int(sys.argv[3])
+            LatticeCantilever(nx, ny)
