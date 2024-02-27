@@ -84,7 +84,7 @@ def grid_mesh_configs(nx, ny, l, w):
     n_rod = n_rod_H + n_rod_V
     n_mesh = n_joint + n_rod
     mesh_configs = np.zeros([n_mesh, 6])
-    
+    mesh_type = np.concatenate((np.full((int(n_joint),), 0.0),np.full((int(n_rod_H),), 1.0),np.full((int(n_rod_V),), 2.0)))
     # Setup joints
     for i in range(n_joint):
         xi = (i + nx+1) % (nx+1)
@@ -92,11 +92,12 @@ def grid_mesh_configs(nx, ny, l, w):
         mesh_configs[i,:] = [xi*(l+w), yi*(l+w), 0., 0., 0., 0.]
 
         # Boundary check
+        # global_battr / mesh_idx / comp_battr
         if xi == 0.0:
             bdr_data += [[1, i, 4]] # constrain one end
         elif xi == nx:
             bdr_data += [[2, i, 2]] # constrain one end
-        elif yi==0.0:
+        if yi==0.0:
             bdr_data += [[3, i, 1]] # free boundary
         elif yi==ny:
             bdr_data += [[3, i, 3]] # free boundary
@@ -142,7 +143,7 @@ def grid_mesh_configs(nx, ny, l, w):
             bdr_data += [[3, n_joint + n_rod_H + i, 2]] # constrain one end
             bdr_data += [[3, n_joint + n_rod_H + i, 4]] # free boundary
 
-    return mesh_configs, bdr_data, if_data
+    return mesh_configs, bdr_data, if_data, mesh_type, n_mesh
 
 
 def LatticeCantilever(nx, ny):
@@ -151,7 +152,7 @@ def LatticeCantilever(nx, ny):
     mesh_type = [0, 1, 2]
     l = 4.0
     w = 1.0
-    mesh_configs, bdr_data, if_data = grid_mesh_configs(nx, ny, l, w)
+    mesh_configs, bdr_data, if_data, mesh_type, n_mesh = grid_mesh_configs(nx, ny, l, w)
 
     # interface data
     if_data = np.array(if_data)

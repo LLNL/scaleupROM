@@ -43,13 +43,13 @@ sample_generation:
   parameters:
     - key: single_run/linelast_disp/rdisp_f
       type: double
-      sample_size: 6
+      sample_size: 29
       minimum: 1.0
       maximum: 1.0
 
 basis:
   prefix: "linelast_lattice"
-  number_of_basis: 2
+  number_of_basis: 10
   tags:
     - name: "comp0"
   svd:
