@@ -178,13 +178,13 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         if (bdr_type[b] == -1 || bdr_type[b] == LinElastProblem::DIRICHLET)
-         {
+         if (bdr_type[b] == -1 || bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
+         { 
             bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
          }
-         else if (bdr_type[b] == LinElastProblem::NEUMANN)
+         else if (bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN)
          {
-            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]));
+            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
          } 
       }
    }
@@ -448,22 +448,17 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       mu_c[i] = new ConstantCoefficient(mu_i);
    }
 
-   // Set BCs
+   // Set BCs, the switch on BC type is done inside SetupRHSBCOperators
    for (int b = 0; b < problem->battr.Size(); b++)
    {
-      switch (problem->bdr_type[b])
-      {
-      case LinElastProblem::BoundaryType::NEUMANN: break;
-      case LinElastProblem::BoundaryType::ZERO: break;
+      bdr_type[b] = problem->bdr_type[b];
 
-      default:
-      case LinElastProblem::BoundaryType::DIRICHLET:
-      {
+      if (problem->bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN || problem->bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET )
+{ 
          assert(problem->vector_bdr_ptr[b]);
          AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
-         break;
       }
-      }
+      
    }
 
    // Set RHS

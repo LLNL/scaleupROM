@@ -615,14 +615,22 @@ LinElastDispLCantilever::LinElastDispLCantilever()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(2);
-   battr.SetSize(2);
-   vector_bdr_ptr.SetSize(2);
+   bdr_type.SetSize(3);
+   battr.SetSize(3);
+   vector_bdr_ptr.SetSize(3);
    for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
    {
-   bdr_type[i] = LinElastProblem::DIRICHLET;
    battr[i] = i+1;
-   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
+   if (i==2)
+   {
+      bdr_type[i] = LinElastProblem::ZERO;
+      vector_bdr_ptr[i] = NULL;
+   }
+   else
+   {
+      bdr_type[i] = LinElastProblem::DIRICHLET;
+      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
+   }
    }
    
    // Set materials
@@ -652,16 +660,25 @@ LinElastDispLattice::LinElastDispLattice()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(2);
-   battr.SetSize(2);
-   vector_bdr_ptr.SetSize(2);
-   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+   bdr_type.SetSize(3);
+   battr.SetSize(3); // Only works if size is 2
+   vector_bdr_ptr.SetSize(3);
+  for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+      {
+if (i<2)
    {
-   bdr_type[i] = LinElastProblem::DIRICHLET;
-   battr[i] = i+1;
-   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+      battr[i] = i+1;
+      bdr_type[i] = LinElastProblem::DIRICHLET;
+      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
-   
+   else
+   {
+      battr[i] = i+1;
+      bdr_type[i] = LinElastProblem::ZERO;
+      vector_bdr_ptr[i] = NULL;
+   } 
+
+   } 
    // Set materials
    general_scalar_ptr.SetSize(2);
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
