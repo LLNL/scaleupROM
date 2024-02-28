@@ -79,7 +79,7 @@ void LinElastSolver::SetupBCVariables()
    bdr_type = -1;
 
    type_idx.SetSize(numBdr);
-   type_idx = -1;
+   type_idx = 0;
 
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
