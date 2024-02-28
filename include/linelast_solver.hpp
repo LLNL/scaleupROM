@@ -50,7 +50,7 @@ protected:
    double kappa = -1.0;
 
    // Initial positions
-   VectorFunctionCoefficient *init_x;
+   VectorFunctionCoefficient *init_x = NULL;
 
 public:
    LinElastSolver();

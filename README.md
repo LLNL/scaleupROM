@@ -16,10 +16,10 @@ scaleupROM is mainly built upon [MFEM](https://mfem.org/) and [libROM](https://w
   - Poisson equation
   - Stokes flow
   - Steady Navier-Stokes flow
+  - Linear elasticity
 
 ## Features to be added
 
-- Linear elasticity
 - Nonlinear elasticity
 - Time-dependent Navier-Stokes flow
 
