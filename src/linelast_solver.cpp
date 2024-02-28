@@ -56,6 +56,7 @@ LinElastSolver::~LinElastSolver()
    delete globalMat_hypre;
    delete mumps;
    delete init_x;
+   
 }
 
 void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
@@ -524,8 +525,8 @@ void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          bdr_marker = 0;
          bdr_marker[comp->bdr_attributes[b] - 1] = 1;
          BilinearForm a_comp(fes_comp[c]);
-         a_comp.AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[c]), *(mu_c[c]), alpha, kappa), *(bdr_markers[b]));
 
+         a_comp.AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[c]), *(mu_c[c]), alpha, kappa), bdr_marker);
          a_comp.Assemble();
          a_comp.Finalize();
 
