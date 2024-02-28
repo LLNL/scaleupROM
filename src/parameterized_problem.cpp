@@ -661,7 +661,7 @@ LinElastDispLattice::LinElastDispLattice()
 {
    // pointer to static function.
    bdr_type.SetSize(3);
-   battr.SetSize(3); // Only works if size is 2
+   battr.SetSize(3);
    vector_bdr_ptr.SetSize(3);
   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
       {
