@@ -43,15 +43,20 @@ sample_generation:
   parameters:
     - key: single_run/linelast_disp/rdisp_f
       type: double
-      sample_size: 29
+      sample_size: 1
       minimum: 1.0
       maximum: 1.0
 
 basis:
   prefix: "linelast_lattice"
-  number_of_basis: 10
+  #number_of_basis: 8
   tags:
-    - name: "comp0"
+    - name: "joint2D"
+      number_of_basis: 12
+    - name: "rod2D_H"
+      number_of_basis: 8
+    - name: "rod2D_V"
+      number_of_basis: 9
   svd:
     save_spectrum: true
     update_right_sv: false
@@ -61,8 +66,10 @@ basis:
 model_reduction:
   rom_handler_type: mfem
   subdomain_training: universal
+  linear_solver_type: direct
   save_operator:
     level: component
     prefix: "linelast.rom_elem"
   compare_solution:
     enabled: true
+    

@@ -148,8 +148,6 @@ def grid_mesh_configs(nx, ny, l, w):
 
 def LatticeCantilever(nx, ny):
     # nx and ny are the number of sections in x- and y-direction, respectively
-    n_mesh = 3
-    mesh_type = [0, 1, 2]
     l = 4.0
     w = 1.0
     mesh_configs, bdr_data, if_data, mesh_type, n_mesh = grid_mesh_configs(nx, ny, l, w)
