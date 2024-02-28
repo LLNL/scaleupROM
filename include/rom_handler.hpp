@@ -83,7 +83,13 @@ protected:
          index = i * num_var + j
    */
    Array<int> num_ref_basis;
-   Array<const CAROM::Matrix*> carom_ref_basis;
+   /*
+      number of rows in the basis for a reference component.
+      For i-th reference component and j-th variable,
+         index = i * num_var + j
+   */
+   Array<int> dim_ref_basis;
+   Array<CAROM::Matrix*> carom_ref_basis;
    Array<int> rom_comp_block_offsets;
    std::vector<std::string> basis_tags;
    bool basis_loaded;

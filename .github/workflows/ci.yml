@@ -108,6 +108,15 @@ jobs:
             cd ${GITHUB_WORKSPACE}/build/test/gmsh
             echo 'if [ -f "./test_multi_comp_workflow" ]; then ./test_multi_comp_workflow; else echo "test_multi_comp_workflow does not exist. Passing the test."; fi' >> command.sh
             sh command.sh
+      - name: Test parallel POD/EQP
+        run: |
+            cd ${GITHUB_WORKSPACE}/build/test
+            ./test_ns_parallel --gtest_filter=NSTensor.Sampling
+            mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSTensor.Train
+            ./test_ns_parallel --gtest_filter=NSTensor.Build_SingleRun
+            ./test_ns_parallel --gtest_filter=NSEQP.Sampling
+            mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSEQP.Train
+            ./test_ns_parallel --gtest_filter=NSEQP.Build_SingleRun
       # - name: Upload the compiled artifacts
       #   uses: actions/upload-artifact@master
       #   with:

@@ -23,6 +23,10 @@ class MultiBlockSolver
 friend class ParameterizedProblem;
 
 protected:
+   /* MPI variables */
+   int nproc;
+   int rank;
+
    /*
       Base variables needed for all systems (potentially)
    */

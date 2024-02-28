@@ -771,6 +771,13 @@ void SteadyNSSolver::SaveEQP()
    std::string filename = rom_handler->GetBasisPrefix();
    filename += ".eqp.h5";
 
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will save EQ points/weights in a parallel way.
+   */
+   if (rank == 0)
+   {
+
    hid_t file_id;
    herr_t errf = 0;
    file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -789,6 +796,9 @@ void SteadyNSSolver::SaveEQP()
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
+
+   }
+   MPI_Barrier(MPI_COMM_WORLD);
    return;
 }
 

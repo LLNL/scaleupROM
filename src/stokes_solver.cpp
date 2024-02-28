@@ -962,6 +962,11 @@ void StokesSolver::LoadSupremizer()
    {
       // Load the supremizer basis.
       std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      /*
+         TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+         In full parallelization, all processes will participate in this supremizer reading procedure.
+      */
+      if (rank == 0)
       {
          hid_t file_id;
          herr_t errf = 0;
@@ -975,6 +980,13 @@ void StokesSolver::LoadSupremizer()
          errf = H5Fclose(file_id);
          assert(errf >= 0);
          printf("Done!\n");
+      }
+      {  /* broadcast to all processes */
+         int nrow = supreme_data.NumRows(), ncol = supreme_data.NumCols();
+         MPI_Bcast(&nrow, 1, MPI_INT, 0, MPI_COMM_WORLD);
+         MPI_Bcast(&ncol, 1, MPI_INT, 0, MPI_COMM_WORLD);
+         if (rank != 0) supreme_data.SetSize(nrow, ncol);
+         MPI_Bcast(supreme_data.GetData(), nrow * ncol, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       }
 
       if (num_ref_supreme[m] > supreme_data.NumCols())
@@ -1322,6 +1334,11 @@ void StokesSolver::EnrichSupremizer()
 
       // Save the supremizer basis.
       std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      /*
+         TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+         In full parallelization, all processes will participate in this supremizer writing procedure.
+      */
+      if (rank == 0)
       {
          hid_t file_id;
          herr_t errf = 0;

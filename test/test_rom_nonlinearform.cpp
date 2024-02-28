@@ -341,8 +341,15 @@ TEST(ROMNonlinearForm, SetupEQPSystemForDomainIntegrator)
       }
    }
 
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Will have to consider parallel-compatible test.
+   */
+   CAROM::Matrix carom_snapshots_work(*carom_snapshots);
+   carom_snapshots_work.gather();
+
    /* equivalent operation must happen within this routine */
-   rform->SetupEQPSystemForDomainIntegrator(*carom_snapshots, integ2, Gt, rhs2);
+   rform->SetupEQPSystemForDomainIntegrator(carom_snapshots_work, integ2, Gt, rhs2);
 
    for (int k = 0; k < rhs1.dim(); k++)
       EXPECT_NEAR(rhs1(k), rhs2(k), 1.0e-14);

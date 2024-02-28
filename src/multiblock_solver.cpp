@@ -12,6 +12,13 @@ using namespace mfem;
 
 MultiBlockSolver::MultiBlockSolver()
 {
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      In full parallelization, MultiBlockSolver will take MPI_Comm as an input argument.
+   */
+   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
    ParseInputs();
 
    TopologyData topol_data;
