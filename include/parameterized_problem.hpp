@@ -85,6 +85,13 @@ extern double rdisp_f;
 void init_disp(const Vector &x, Vector &u);
 }
 
+namespace linelast_force
+{
+extern double rforce_f;
+
+void tip_force(const Vector &x, Vector &u);
+}
+
 }
 
 class ParameterizedProblem
@@ -238,6 +245,12 @@ class LinElastDispLattice : public LinElastProblem
 {
 public:
    LinElastDispLattice();
+};
+
+class LinElastForceCantilever : public LinElastProblem
+{
+public:
+   LinElastForceCantilever();
 };
 
 ParameterizedProblem* InitParameterizedProblem();
