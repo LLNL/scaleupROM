@@ -52,6 +52,9 @@ protected:
    // Initial positions
    VectorFunctionCoefficient *init_x = NULL;
 
+   // Boundary condition types
+   Array<int> bdr_type;
+
 public:
    LinElastSolver();
 

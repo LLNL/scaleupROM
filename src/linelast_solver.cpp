@@ -75,6 +75,9 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
+   bdr_type.SetSize(numBdr);
+   bdr_type = -1;
+
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
 
@@ -175,7 +178,14 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+         if (bdr_type[b] == -1 || bdr_type[b] == LinElastProblem::DIRICHLET)
+         {
+            bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+         }
+         else if (bdr_type[b] == LinElastProblem::NEUMANN)
+         {
+            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]));
+         } 
       }
    }
 }
