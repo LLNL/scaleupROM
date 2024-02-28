@@ -1,0 +1,74 @@
+main:
+  mode: single_run
+  use_rom: true
+  solver: linelast
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "config/linelast.lattice.h5"
+    components:
+      - name: "joint2D"
+        file: "meshes/joint2D.mesh"
+      - name: "rod2D_H"
+        file: "meshes/rod2D_H.mesh"
+      - name: "rod2D_V"
+        file: "meshes/rod2D_V.mesh"
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: lattice_output
+
+parameterized_problem:
+  name: linelast_force_cantilever
+
+single_run:
+  linelast_force_cantilever:
+    rforce_f: 1.0
+
+sample_generation:
+  maximum_number_of_snapshots: 400
+  component_sampling: false
+  file_path:
+    prefix: "linelast_force_cantilever"
+  parameters:
+    - key: single_run/linelast_force/rforce_f
+      type: double
+      sample_size: 1
+      minimum: 1.0
+      maximum: 1.0
+
+basis:
+  prefix: "linelast_force_cantilever"
+  tags:
+    - name: "joint2D"
+      number_of_basis: 12
+    - name: "rod2D_H"
+      number_of_basis: 8
+    - name: "rod2D_V"
+      number_of_basis: 9
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  subdomain_training: universal
+  linear_solver_type: direct
+  save_operator:
+    level: component
+    prefix: "linelast.rom_elem"
+  compare_solution:
+    enabled: true
+    
