@@ -535,7 +535,10 @@ void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          bdr_marker[comp->bdr_attributes[b] - 1] = 1;
          BilinearForm a_comp(fes_comp[c]);
 
+         int gidx = global_bdr_attributes.Find(comp->bdr_attributes[b]);
+         if (bdr_type[type_idx[gidx]] != LinElastProblem::BoundaryType::NEUMANN)
          a_comp.AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[c]), *(mu_c[c]), alpha, kappa), bdr_marker);
+         
          a_comp.Assemble();
          a_comp.Finalize();
 
