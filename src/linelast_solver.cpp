@@ -181,7 +181,7 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         if ( bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
+         if ( bdr_type[type_idx[b]] == -1 || bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
          { 
                         bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
          }
@@ -425,6 +425,7 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
+            if (bdr_type[type_idx[b]] != LinElastProblem::BoundaryType::NEUMANN)
             as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
