@@ -195,7 +195,8 @@ double rforce_f;
 void tip_force(const Vector &x, Vector &f)
 {
    f = 0.0;
-   f(f.Size()-1) = -1.0e-2 * rforce_f;
+   //f(f.Size()-1) = -1.0e-2;// * rforce_f;
+   f(f.Size()-2) = 1.0e-2;// * rforce_f;
 }
 
 }  // namespace linelast_force

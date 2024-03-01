@@ -694,6 +694,8 @@ void MultiBlockSolver::SaveSolution(std::string filename)
    assert(file_id >= 0);
 
    // TODO: currently we only need solution vector. But we can add more data as we need.
+   cout<<"solution max = "<<U->GetBlock(0).Max()<<endl;
+      cout<<"solution min = "<<U->GetBlock(0).Min()<<endl;
    hdf5_utils::WriteDataset(file_id, "solution", *U);
 
    errf = H5Fclose(file_id);

@@ -181,14 +181,57 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         if (bdr_type[type_idx[b]] == -1 || bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
-         { 
+         if ( bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
+         {  cout<<"this"<<endl;
+         cout<<"global_bdr_attributes[b] is: "<<global_bdr_attributes[b]<<endl;
+         cout<<"bdr_type[type_idx[b]] is: "<<bdr_type[type_idx[b]]<<endl;
+         //*bdr_markers[b]=0;
+         /* for (size_t i = 0; i < bdr_markers[b]->Size()-1; i++) //hacky
+            {  //*(bdr_markers[b][i]) = i == 0 ? 1 : 0;
+               //cout<<*(bdr_markers[b][i])<<endl;
+            } */
             bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+            cout<<"Printing markers"<<endl;
+            cout<<"bdr_markers[b]->Size() is: "<<bdr_markers[b]->Size()<<endl;
+            
+            
          }
          else if (bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::NEUMANN)
          {
-            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
-         } 
+            //bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]));//, *bdr_markers[b]);
+
+            cout<<"that"<<endl;
+         cout<<"global_bdr_attributes[b] is: "<<global_bdr_attributes[b]<<endl;
+         cout<<"bdr_type[type_idx[b]] is: "<<bdr_type[type_idx[b]]<<endl;
+         /* for (size_t i = 0; i < bdr_markers[b]->Size(); i++) //hacky
+            {  //*(bdr_markers[b][i]) = i == 0 ? 1 : 0;
+            if (i==0 || i==1)
+            {
+               cout<<*(bdr_markers[b][i])<<endl;
+            }
+            
+            } */
+
+            f = new VectorArrayCoefficient(dim);
+         for (int i = 0; i < dim-1; i++)
+         {
+            f->Set(i, new ConstantCoefficient(0.0));
+         }
+
+            Vector pull_force(global_bdr_attributes.Size());
+            pull_force = 0.0;
+            //pull_force(type_idx[b]) = -1.0e-2;
+            pull_force(1) = -1.0e-2;
+            //pull_force(2) = -1.0e-2;
+            f->Set(dim-1, new PWConstCoefficient(pull_force));
+            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*f)); 
+         }  
+         else
+         {
+            cout<<"else"<<endl;
+         cout<<"global_bdr_attributes[b] is: "<<global_bdr_attributes[b]<<endl;
+         cout<<"bdr_type[type_idx[b]] is: "<<bdr_type[type_idx[b]]<<endl;
+         }
       }
    }
 }
@@ -233,6 +276,16 @@ void LinElastSolver::AssembleRHS()
    for (int m = 0; m < numSub; m++)
       // Do we really need SyncAliasMemory?
       bs[m]->SyncAliasMemory(*RHS); // Synchronize with block vector RHS. What is different from SyncMemory?
+   ofstream rhstxt("rhsdg_scaleup.txt");
+   rhstxt.precision(8);
+   for (size_t i = 0; i < RHS->Size(); i++)
+   {
+      rhstxt<<RHS->Elem(i)<<endl;
+   }
+   /* RHS->Elem(90) = 0.0;
+   RHS->Elem(92) = 0.0;
+   RHS->Elem(42) = -0.005;
+   RHS->Elem(44) = -0.005; */
 }
 
 void LinElastSolver::AssembleOperator()
@@ -293,6 +346,19 @@ void LinElastSolver::AssembleOperator()
       mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
       mumps->SetOperator(*globalMat_hypre);
    }
+
+   ofstream Atxt("Adg_scaleup.txt");
+   Atxt.precision(8);
+   DenseMatrix* A_out = as[0]->SpMat().ToDenseMatrix();
+   for (size_t i = 0; i < A_out->Size(); i++)
+   {
+      for (size_t j = 0; j < A_out->Size(); j++)
+      {
+      Atxt<<A_out->Elem(i,j)<< " ";
+
+      }
+      Atxt<<endl;
+   }
 }
 
 void LinElastSolver::AssembleInterfaceMatrices()
@@ -300,7 +366,7 @@ void LinElastSolver::AssembleInterfaceMatrices()
    assert(a_itf);
    a_itf->AssembleInterfaceMatrices(mats);
 }
-
+/* 
 bool LinElastSolver::Solve()
 {
    // If using direct solver, returns always true.
@@ -378,6 +444,31 @@ bool LinElastSolver::Solve()
    }
 
    return converged;
+} */
+bool LinElastSolver::Solve()
+{
+   SparseMatrix A;
+   Vector B, X;
+   Array<int> ess_tdof_list;
+   as[0]->FormLinearSystem(ess_tdof_list, U->GetBlock(0), *bs[0], A, X, B);
+   GSSmoother M(A);
+   const double rtol = 1e-6;
+   if (alpha == -1.0)
+   {
+      PCG(A, M, B, X, 3, 5000, rtol*rtol, 0.0);
+   }
+   /* for (size_t i = 0; i < X.Size(); i++)
+   {
+      U->GetBlock(0)[i] = X[i];
+   } */
+   ofstream Xtxt("Xdg_scaleup.txt");
+   Xtxt.precision(8);
+   for (size_t i = 0; i < B.Size(); i++)
+   {
+      Xtxt<<X[i]<<endl;
+   }
+
+   return true;
 }
 
 void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
@@ -393,6 +484,8 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
          mfem_warning(msg.c_str());
          return;
       }
+      cout<<"battr is: "<<battr<<endl;
+      cout<<"idx is: "<<idx<<endl;
       bdr_coeffs[idx] = new VectorFunctionCoefficient(dim, F);
    }
    else
@@ -425,6 +518,8 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
+            cout<<"idx dombc is: "<<idx<<endl;
+            if (bdr_type[type_idx[b]] != LinElastProblem::BoundaryType::NEUMANN)
             as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
@@ -458,11 +553,21 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       int ti = global_bdr_attributes.Find(problem->battr[b]);
       type_idx[ti] = b;
 
-      if (problem->bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN || problem->bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET )
+      if(problem->bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET )
 { 
+   cout<<"hej"<<endl;
+   cout<<"problem->battr[b] is: "<<problem->battr[b]<<endl;
          assert(problem->vector_bdr_ptr[b]);
          AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
       }
+      else if (problem->bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN)
+      {
+         cout<<"hej2"<<endl;
+   cout<<"problem->battr[b] is: "<<problem->battr[b]<<endl;
+         assert(problem->vector_bdr_ptr[b]);
+         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+      }
+      
       
    }
 
