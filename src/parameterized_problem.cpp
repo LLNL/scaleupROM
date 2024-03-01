@@ -634,20 +634,15 @@ LinElastDispLCantilever::LinElastDispLCantilever()
    bdr_type.SetSize(3);
    battr.SetSize(3);
    vector_bdr_ptr.SetSize(3);
-   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
-   {
-   battr[i] = i+1;
-   if (i==2)
-   {
-      bdr_type[i] = LinElastProblem::ZERO;
-      vector_bdr_ptr[i] = NULL;
-   }
-   else
+   for (size_t i = 0; i < 2; i++)
    {
       bdr_type[i] = LinElastProblem::DIRICHLET;
       vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
    }
-   }
+
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
    
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -679,22 +674,17 @@ LinElastDispLattice::LinElastDispLattice()
    bdr_type.SetSize(3);
    battr.SetSize(3);
    vector_bdr_ptr.SetSize(3);
-  for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+  for (size_t i = 0; i < 2; i++)
       {
-if (i<2)
-   {
       battr[i] = i+1;
       bdr_type[i] = LinElastProblem::DIRICHLET;
       vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
-   else
-   {
-      battr[i] = i+1;
-      bdr_type[i] = LinElastProblem::ZERO;
-      vector_bdr_ptr[i] = NULL;
-   } 
 
-   } 
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
+
    // Set materials
    general_scalar_ptr.SetSize(2);
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
@@ -727,27 +717,20 @@ LinElastForceCantilever::LinElastForceCantilever()
    bdr_type.SetSize(3);
    battr.SetSize(3);
    vector_bdr_ptr.SetSize(3);
-   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
-   {
-   battr[i] = i+1;
-   if (i==0)
-   {
-      bdr_type[i] = LinElastProblem::DIRICHLET;
-      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
-   }
-   else if (i==1)
-   {
-      bdr_type[i] = LinElastProblem::NEUMANN;
-      vector_bdr_ptr[i] = &(function_factory::linelast_force::tip_force);
 
-   }
-   else if (i==2)
-   {
-      bdr_type[i] = LinElastProblem::ZERO;
-      vector_bdr_ptr[i] = NULL;
-   }
-   
-   }
+   // Fixed end of cantilever
+   battr[0] = 1;
+   bdr_type[0] = LinElastProblem::DIRICHLET;
+   vector_bdr_ptr[0] = &(function_factory::linelast_disp::init_disp);
+
+   // Free end of cantilever
+   battr[1] = 2;
+   bdr_type[1] = LinElastProblem::NEUMANN;
+   vector_bdr_ptr[1] = &(function_factory::linelast_force::tip_force);
+
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
    
    // Set materials
    general_scalar_ptr.SetSize(2);
