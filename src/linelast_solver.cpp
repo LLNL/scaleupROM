@@ -75,11 +75,8 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   bdr_type.SetSize(numBdr);
-   bdr_type = -1;
-
    type_idx.SetSize(numBdr);
-   type_idx = 0;
+   type_idx = LinElastProblem::BoundaryType::DIRICHLET;
 
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
@@ -181,11 +178,11 @@ void LinElastSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b))
             continue;
 
-         if ( bdr_type[type_idx[b]] == -1 || bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
+         if (type_idx[b] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
          { 
-                        bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+            bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
          }
-         else if (bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::NEUMANN)
+         else if (type_idx[b] == LinElastProblem::BoundaryType::NEUMANN)
          {
             bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
          }  
@@ -425,7 +422,7 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            if (bdr_type[type_idx[b]] != LinElastProblem::BoundaryType::NEUMANN)
+            if (type_idx[b] != LinElastProblem::BoundaryType::NEUMANN)
             as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
@@ -453,16 +450,26 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    }
 
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators
-   for (int b = 0; b < problem->battr.Size(); b++)
+   for (int b = 0; b < global_bdr_attributes.Size(); b++)
    {
-      bdr_type[b] = problem->bdr_type[b];
-      int ti = global_bdr_attributes.Find(problem->battr[b]);
-      type_idx[ti] = b;
+      int ti = problem->battr.Find(global_bdr_attributes[b]);
+      assert(ti >=0);
+      type_idx[b] = (LinElastProblem::BoundaryType)problem->bdr_type[ti];
+;
+      switch (problem->bdr_type[ti])
+      {
+      case LinElastProblem::BoundaryType::DIRICHLET:
+         assert(problem->vector_bdr_ptr[ti]);
 
-      if(problem->bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET || problem->bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN)
-      {  assert(problem->vector_bdr_ptr[b]);
-         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
-      } 
+         AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
+         break;
+      case LinElastProblem::BoundaryType::NEUMANN:
+         assert(problem->vector_bdr_ptr[ti]);
+         AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
+      
+      default:
+         break;
+      }
    }
 
    // Set RHS
@@ -535,8 +542,7 @@ void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
          bdr_marker[comp->bdr_attributes[b] - 1] = 1;
          BilinearForm a_comp(fes_comp[c]);
 
-         int gidx = global_bdr_attributes.Find(comp->bdr_attributes[b]);
-         if (bdr_type[type_idx[gidx]] != LinElastProblem::BoundaryType::NEUMANN)
+         if ((LinElastProblem::BoundaryType)comp->bdr_attributes[b] != LinElastProblem::BoundaryType::NEUMANN)
          a_comp.AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[c]), *(mu_c[c]), alpha, kappa), bdr_marker);
          
          a_comp.Assemble();

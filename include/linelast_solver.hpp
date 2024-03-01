@@ -53,7 +53,7 @@ protected:
    VectorFunctionCoefficient *init_x = NULL;
 
    // Boundary condition types
-   Array<LinElastProblem::BoundaryType> bdr_type;
+   Array<LinElastProblem::BoundaryType> type_idx;
 
 public:
    LinElastSolver();
