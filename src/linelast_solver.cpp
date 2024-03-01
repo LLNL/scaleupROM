@@ -188,7 +188,6 @@ void LinElastSolver::SetupRHSBCOperators()
          else if (bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::NEUMANN)
          {
             bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
-
          }  
       }
    }
@@ -234,16 +233,6 @@ void LinElastSolver::AssembleRHS()
    for (int m = 0; m < numSub; m++)
       // Do we really need SyncAliasMemory?
       bs[m]->SyncAliasMemory(*RHS); // Synchronize with block vector RHS. What is different from SyncMemory?
-   ofstream rhstxt("rhsdg_scaleup.txt");
-   rhstxt.precision(8);
-   for (size_t i = 0; i < RHS->Size(); i++)
-   {
-      rhstxt<<RHS->Elem(i)<<endl;
-   }
-   /* RHS->Elem(90) = 0.0;
-   RHS->Elem(92) = 0.0;
-   RHS->Elem(42) = -0.005;
-   RHS->Elem(44) = -0.005; */
 }
 
 void LinElastSolver::AssembleOperator()
@@ -303,19 +292,6 @@ void LinElastSolver::AssembleOperator()
       mumps = new MUMPSSolver();
       mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
       mumps->SetOperator(*globalMat_hypre);
-   }
-
-   ofstream Atxt("Adg_scaleup.txt");
-   Atxt.precision(8);
-   DenseMatrix* A_out = as[0]->SpMat().ToDenseMatrix();
-   for (size_t i = 0; i < A_out->Size(); i++)
-   {
-      for (size_t j = 0; j < A_out->Size(); j++)
-      {
-      Atxt<<A_out->Elem(i,j)<< " ";
-
-      }
-      Atxt<<endl;
    }
 }
 
@@ -449,8 +425,6 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            cout<<"idx dombc is: "<<idx<<endl;
-            if (bdr_type[type_idx[b]] != LinElastProblem::BoundaryType::NEUMANN)
             as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }

@@ -55,7 +55,6 @@ protected:
    // Boundary condition types
    Array<int> bdr_type;
    Array<int> type_idx;
-   VectorArrayCoefficient* f;
 
 public:
    LinElastSolver();
