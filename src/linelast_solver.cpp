@@ -187,19 +187,8 @@ void LinElastSolver::SetupRHSBCOperators()
          }
          else if (bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::NEUMANN)
          {
-            //bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]));//, *bdr_markers[b]);
+            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
 
-            f = new VectorArrayCoefficient(dim);
-         for (int i = 0; i < dim-1; i++)
-         {
-            f->Set(i, new ConstantCoefficient(0.0));
-         }
-
-            Vector pull_force(global_bdr_attributes.Size());
-            pull_force = 0.0;
-            pull_force(1) = -1.0e-2;
-            f->Set(dim-1, new PWConstCoefficient(pull_force));
-            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*f)); 
          }  
       }
    }
@@ -428,8 +417,6 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
          mfem_warning(msg.c_str());
          return;
       }
-      cout<<"battr is: "<<battr<<endl;
-      cout<<"idx is: "<<idx<<endl;
       bdr_coeffs[idx] = new VectorFunctionCoefficient(dim, F);
    }
    else
@@ -497,22 +484,10 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       int ti = global_bdr_attributes.Find(problem->battr[b]);
       type_idx[ti] = b;
 
-      if(problem->bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET )
-{ 
-   cout<<"hej"<<endl;
-   cout<<"problem->battr[b] is: "<<problem->battr[b]<<endl;
-         assert(problem->vector_bdr_ptr[b]);
+      if(problem->bdr_type[b] == LinElastProblem::BoundaryType::DIRICHLET || problem->bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN)
+      {  assert(problem->vector_bdr_ptr[b]);
          AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
-      }
-      else if (problem->bdr_type[b] == LinElastProblem::BoundaryType::NEUMANN)
-      {
-         cout<<"hej2"<<endl;
-   cout<<"problem->battr[b] is: "<<problem->battr[b]<<endl;
-         assert(problem->vector_bdr_ptr[b]);
-         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
-      }
-      
-      
+      } 
    }
 
    // Set RHS
