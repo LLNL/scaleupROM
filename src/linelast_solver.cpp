@@ -182,35 +182,12 @@ void LinElastSolver::SetupRHSBCOperators()
             continue;
 
          if ( bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
-         {  cout<<"this"<<endl;
-         cout<<"global_bdr_attributes[b] is: "<<global_bdr_attributes[b]<<endl;
-         cout<<"bdr_type[type_idx[b]] is: "<<bdr_type[type_idx[b]]<<endl;
-         //*bdr_markers[b]=0;
-         /* for (size_t i = 0; i < bdr_markers[b]->Size()-1; i++) //hacky
-            {  //*(bdr_markers[b][i]) = i == 0 ? 1 : 0;
-               //cout<<*(bdr_markers[b][i])<<endl;
-            } */
-            bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
-            cout<<"Printing markers"<<endl;
-            cout<<"bdr_markers[b]->Size() is: "<<bdr_markers[b]->Size()<<endl;
-            
-            
+         { 
+                        bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
          }
          else if (bdr_type[type_idx[b]] == LinElastProblem::BoundaryType::NEUMANN)
          {
             //bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]));//, *bdr_markers[b]);
-
-            cout<<"that"<<endl;
-         cout<<"global_bdr_attributes[b] is: "<<global_bdr_attributes[b]<<endl;
-         cout<<"bdr_type[type_idx[b]] is: "<<bdr_type[type_idx[b]]<<endl;
-         /* for (size_t i = 0; i < bdr_markers[b]->Size(); i++) //hacky
-            {  //*(bdr_markers[b][i]) = i == 0 ? 1 : 0;
-            if (i==0 || i==1)
-            {
-               cout<<*(bdr_markers[b][i])<<endl;
-            }
-            
-            } */
 
             f = new VectorArrayCoefficient(dim);
          for (int i = 0; i < dim-1; i++)
@@ -220,18 +197,10 @@ void LinElastSolver::SetupRHSBCOperators()
 
             Vector pull_force(global_bdr_attributes.Size());
             pull_force = 0.0;
-            //pull_force(type_idx[b]) = -1.0e-2;
             pull_force(1) = -1.0e-2;
-            //pull_force(2) = -1.0e-2;
             f->Set(dim-1, new PWConstCoefficient(pull_force));
             bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*f)); 
          }  
-         else
-         {
-            cout<<"else"<<endl;
-         cout<<"global_bdr_attributes[b] is: "<<global_bdr_attributes[b]<<endl;
-         cout<<"bdr_type[type_idx[b]] is: "<<bdr_type[type_idx[b]]<<endl;
-         }
       }
    }
 }
@@ -366,7 +335,7 @@ void LinElastSolver::AssembleInterfaceMatrices()
    assert(a_itf);
    a_itf->AssembleInterfaceMatrices(mats);
 }
-/* 
+
 bool LinElastSolver::Solve()
 {
    // If using direct solver, returns always true.
@@ -444,32 +413,7 @@ bool LinElastSolver::Solve()
    }
 
    return converged;
-} */
-bool LinElastSolver::Solve()
-{
-   SparseMatrix A;
-   Vector B, X;
-   Array<int> ess_tdof_list;
-   as[0]->FormLinearSystem(ess_tdof_list, U->GetBlock(0), *bs[0], A, X, B);
-   GSSmoother M(A);
-   const double rtol = 1e-6;
-   if (alpha == -1.0)
-   {
-      PCG(A, M, B, X, 3, 5000, rtol*rtol, 0.0);
-   }
-   /* for (size_t i = 0; i < X.Size(); i++)
-   {
-      U->GetBlock(0)[i] = X[i];
-   } */
-   ofstream Xtxt("Xdg_scaleup.txt");
-   Xtxt.precision(8);
-   for (size_t i = 0; i < B.Size(); i++)
-   {
-      Xtxt<<X[i]<<endl;
-   }
-
-   return true;
-}
+} 
 
 void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
 {
