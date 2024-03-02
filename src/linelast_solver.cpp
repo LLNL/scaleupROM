@@ -183,7 +183,7 @@ void LinElastSolver::SetupRHSBCOperators()
          {
             bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
          }  
-         
+
          if (!BCExistsOnBdr(b))
             continue;
 
@@ -460,23 +460,13 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
       if (ti >=0)
       {
-      type_idx[b] = (LinElastProblem::BoundaryType)problem->bdr_type[ti];
-      switch (problem->bdr_type[ti])
-      {
-      case LinElastProblem::BoundaryType::DIRICHLET:
-         assert(problem->vector_bdr_ptr[ti]);
-
-         AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
-         break;
-      case LinElastProblem::BoundaryType::NEUMANN:
-         assert(problem->vector_bdr_ptr[ti]);
-         AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
-      
-      default:
-         break;
+         type_idx[b] = (LinElastProblem::BoundaryType)problem->bdr_type[ti];
+         if (problem->bdr_type[ti] == LinElastProblem::BoundaryType::DIRICHLET || problem->bdr_type[ti] == LinElastProblem::BoundaryType::NEUMANN)
+         {
+            assert(problem->vector_bdr_ptr[ti]);
+            AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
+         }
       }
-      }
-
    }
 
    // Set RHS
