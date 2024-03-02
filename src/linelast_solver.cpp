@@ -75,9 +75,6 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   type_idx.SetSize(numBdr);
-   type_idx = LinElastProblem::BoundaryType::DIRICHLET;
-
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
 
@@ -177,17 +174,23 @@ void LinElastSolver::SetupRHSBCOperators()
          if (idx < 0)
             continue;
 
-         if (type_idx[b] == LinElastProblem::BoundaryType::NEUMANN)
-         {
-            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
-         }  
-
          if (!BCExistsOnBdr(b))
             continue;
 
-         if (type_idx[b] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
-         { 
-            bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+         switch (bdr_type[b])
+         {
+            case ParameterizedProblem::BoundaryType::DIRICHLET:
+               bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
+                  *bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+               break;
+            case ParameterizedProblem::BoundaryType::NEUMANN:
+               bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
+               break;
+            default:
+               printf("LinElastSolver::SetupRHSBCOperators - ");
+               printf("boundary attribute %d has a non-zero function, but does not have boundary type. will not be enforced.",
+                      global_bdr_attributes[b]);
+               break;
          }
       }
    }
@@ -425,7 +428,10 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+
+            if (bdr_type[b] == ParameterizedProblem::BoundaryType::DIRICHLET)
+               as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
+                  *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
    }

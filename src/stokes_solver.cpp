@@ -324,8 +324,11 @@ void StokesSolver::SetupRHSBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         // TODO: Non-homogeneous Neumann stress bc
          if (!BCExistsOnBdr(b)) continue;
+
+         // TODO: Non-homogeneous Neumann stress bc
+         if (bdr_type[b] == ParameterizedProblem::BoundaryType::NEUMANN)
+            continue;
 
          fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*ud_coeffs[b], *nu_coeff, sigma, kappa), *bdr_markers[b]);
 
@@ -355,6 +358,10 @@ void StokesSolver::SetupDomainBCOperators()
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
          if (!BCExistsOnBdr(b)) continue;
+
+         // TODO: Non-homogeneous Neumann stress bc
+         if (bdr_type[b] == ParameterizedProblem::BoundaryType::NEUMANN)
+            continue;
 
          ms[m]->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), *bdr_markers[b]);
          bs[m]->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, *bdr_markers[b]);
