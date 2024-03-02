@@ -52,9 +52,6 @@ protected:
    // Initial positions
    VectorFunctionCoefficient *init_x = NULL;
 
-   // Boundary condition types
-   Array<ParameterizedProblem::BoundaryType> type_idx;
-
 public:
    LinElastSolver();
 

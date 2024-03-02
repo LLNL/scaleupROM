@@ -218,6 +218,9 @@ void MultiBlockSolver::SetupBCVariables()
       (*bdr_markers[k]) = 0;
       (*bdr_markers[k])[bdr_attr-1] = 1;
    }
+
+   bdr_type.SetSize(global_bdr_attributes.Size());
+   bdr_type = ParameterizedProblem::BoundaryType::NUM_BDR_TYPE;
 }
 
 void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes)
@@ -684,6 +687,18 @@ void MultiBlockSolver::SaveVisualization()
       paraviewColls[m]->Save();
    }
 };
+
+void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   assert(bdr_type.Size() == global_bdr_attributes.Size());
+   for (int b = 0; b < global_bdr_attributes.Size(); b++)
+   {
+      int idx = problem->battr.Find(global_bdr_attributes[b]);
+      if (idx < 0) continue;
+
+      bdr_type[b] = problem->bdr_type[idx];
+   }
+}
 
 void MultiBlockSolver::SaveSolution(std::string filename)
 {

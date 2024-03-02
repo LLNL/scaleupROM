@@ -144,14 +144,12 @@ void LinElastSolver::BuildOperators()
    BuildRHSOperators();
    BuildDomainOperators();
 }
+
 bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx)
 {
    assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
    assert(bdr_coeffs.Size() == global_bdr_attributes.Size());
-   if(type_idx[global_battr_idx] == LinElastProblem::BoundaryType::NEUMANN)
-      return false;
-   else
-      return (bdr_coeffs[global_battr_idx]);
+   return (bdr_coeffs[global_battr_idx]);
 }
 
 void LinElastSolver::BuildRHSOperators()
@@ -435,6 +433,9 @@ void LinElastSolver::SetupDomainBCOperators()
 
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   /* set up boundary types */
+   MultiBlockSolver::SetParameterizedProblem(problem);
+
    // Set materials
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
@@ -454,18 +455,17 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    }
 
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators
-   for (int b = 0; b < global_bdr_attributes.Size(); b++)
+   for (int b = 0; b < problem->battr.Size(); b++)
    {
-      int ti = problem->battr.Find(global_bdr_attributes[b]);
-
-      if (ti >=0)
+      switch (problem->bdr_type[b])
       {
-         type_idx[b] = problem->bdr_type[ti];
-         if (problem->bdr_type[ti] == ParameterizedProblem::BoundaryType::DIRICHLET || problem->bdr_type[ti] == ParameterizedProblem::BoundaryType::NEUMANN)
-         {
-            assert(problem->vector_bdr_ptr[ti]);
-            AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
-         }
+         case ParameterizedProblem::BoundaryType::DIRICHLET:
+         case ParameterizedProblem::BoundaryType::NEUMANN:
+            assert(problem->vector_bdr_ptr[b]);
+            AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+            break;
+         default:
+            break;
       }
    }
 

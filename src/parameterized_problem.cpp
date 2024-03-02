@@ -598,9 +598,9 @@ LinElastDisp::LinElastDisp()
    vector_bdr_ptr.SetSize(3);
    for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
    {
-   bdr_type[i] = BoundaryType::DIRICHLET;
-   battr[i] = i+1;
-   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+      bdr_type[i] = BoundaryType::DIRICHLET;
+      battr[i] = i+1;
+      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
 
    battr[2] = 3;

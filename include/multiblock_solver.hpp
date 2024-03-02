@@ -68,6 +68,7 @@ protected:
    int max_bdr_attr;
    int numBdr;
    Array<Array<int> *> bdr_markers;
+   Array<ParameterizedProblem::BoundaryType> bdr_type; // Boundary condition types of (numBdr) array
 
    // MFEM solver options
    bool use_amg;
@@ -235,7 +236,7 @@ public:
    virtual void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes, var_names); }
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem) = 0;
+   virtual void SetParameterizedProblem(ParameterizedProblem *problem);
 
    void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
    void ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error);
