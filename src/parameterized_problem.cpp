@@ -645,8 +645,9 @@ LinElastDispLCantilever::LinElastDispLCantilever()
       vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
    }
 
+   /* homogeneous Neumann bc */
    battr[2] = 3;
-   bdr_type[2] = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
    
    // Set materials
@@ -686,8 +687,9 @@ LinElastDispLattice::LinElastDispLattice()
       vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
 
+   /* homogeneous Neumann bc */
    battr[2] = 3;
-   bdr_type[2] = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
 
    // Set materials
@@ -733,8 +735,9 @@ LinElastForceCantilever::LinElastForceCantilever()
    bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_force::tip_force);
 
+   /* homogeneous Neumann bc */
    battr[2] = 3;
-   bdr_type[2] = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
    
    // Set materials
