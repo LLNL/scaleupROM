@@ -40,7 +40,7 @@ PoissonSolver *SolveWithRefinement(const int num_refinement)
    test->InitVisualization();
 
    test->AddBCFunction(ExactSolution);
-   test->SetBdrType(ParameterizedProblem::BoundaryType::DIRICHLET);
+   test->SetBdrType(BoundaryType::DIRICHLET);
    test->AddRHSFunction(ExactRHS);
 
    test->BuildOperators();
@@ -179,7 +179,7 @@ StokesSolver *SolveWithRefinement(const int num_refinement)
    test->InitVisualization();
 
    test->AddBCFunction(uFun_ex);
-   test->SetBdrType(ParameterizedProblem::BoundaryType::DIRICHLET);
+   test->SetBdrType(BoundaryType::DIRICHLET);
    test->AddRHSFunction(fFun);
    // NOTE(kevin): uFun_ex already satisfies zero divergence.
    //              no need to set complementary flux.
@@ -359,7 +359,7 @@ SteadyNSSolver *SolveWithRefinement(const int num_refinement)
    test->InitVisualization();
 
    test->AddBCFunction(uFun_ex);
-   test->SetBdrType(ParameterizedProblem::BoundaryType::DIRICHLET);
+   test->SetBdrType(BoundaryType::DIRICHLET);
    test->AddRHSFunction(fFun);
    // NOTE(kevin): uFun_ex already satisfies zero divergence.
    //              no need to set complementary flux.
@@ -519,7 +519,7 @@ namespace linelast
       test->AddBCFunction(ExactSolution, 1);
       test->AddBCFunction(ExactSolution, 2);
       test->AddBCFunction(ExactSolution, 3);
-      test->SetBdrType(ParameterizedProblem::BoundaryType::DIRICHLET);
+      test->SetBdrType(BoundaryType::DIRICHLET);
       test->AddRHSFunction(ExactRHS);
 
       test->BuildOperators();

@@ -220,10 +220,10 @@ void MultiBlockSolver::SetupBCVariables()
    }
 
    bdr_type.SetSize(global_bdr_attributes.Size());
-   bdr_type = ParameterizedProblem::BoundaryType::NUM_BDR_TYPE;
+   bdr_type = BoundaryType::NUM_BDR_TYPE;
 }
 
-void MultiBlockSolver::SetBdrType(const ParameterizedProblem::BoundaryType type, const int &global_battr_idx)
+void MultiBlockSolver::SetBdrType(const BoundaryType type, const int &global_battr_idx)
 {
    assert(bdr_type.Size() == global_bdr_attributes.Size());
    if (global_battr_idx < 0)
@@ -558,7 +558,7 @@ void MultiBlockSolver::AssembleROM()
          if (!BCExistsOnBdr(global_idx)) continue;
 
          /* we assume only Neumann condition would not add an operator. */
-         if (bdr_type[global_idx] == ParameterizedProblem::BoundaryType::NEUMANN)
+         if (bdr_type[global_idx] == BoundaryType::NEUMANN)
             continue;
 
          MatrixBlocks *bdr_mat = (*bdr_mats[c_type])[b];

@@ -179,11 +179,11 @@ void LinElastSolver::SetupRHSBCOperators()
 
          switch (bdr_type[b])
          {
-            case ParameterizedProblem::BoundaryType::DIRICHLET:
+            case BoundaryType::DIRICHLET:
                bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
                   *bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
                break;
-            case ParameterizedProblem::BoundaryType::NEUMANN:
+            case BoundaryType::NEUMANN:
                bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
                break;
             default:
@@ -429,7 +429,7 @@ void LinElastSolver::SetupDomainBCOperators()
             if (!BCExistsOnBdr(b))
                continue;
 
-            if (bdr_type[b] == ParameterizedProblem::BoundaryType::DIRICHLET)
+            if (bdr_type[b] == BoundaryType::DIRICHLET)
                as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
                   *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
@@ -465,8 +465,8 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       switch (problem->bdr_type[b])
       {
-         case ParameterizedProblem::BoundaryType::DIRICHLET:
-         case ParameterizedProblem::BoundaryType::NEUMANN:
+         case BoundaryType::DIRICHLET:
+         case BoundaryType::NEUMANN:
             assert(problem->vector_bdr_ptr[b]);
             AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
             break;

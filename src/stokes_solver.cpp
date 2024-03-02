@@ -327,7 +327,7 @@ void StokesSolver::SetupRHSBCOperators()
          if (!BCExistsOnBdr(b)) continue;
 
          // TODO: Non-homogeneous Neumann stress bc
-         if (bdr_type[b] == ParameterizedProblem::BoundaryType::NEUMANN)
+         if (bdr_type[b] == BoundaryType::NEUMANN)
             continue;
 
          fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*ud_coeffs[b], *nu_coeff, sigma, kappa), *bdr_markers[b]);
@@ -360,7 +360,7 @@ void StokesSolver::SetupDomainBCOperators()
          if (!BCExistsOnBdr(b)) continue;
 
          // TODO: Non-homogeneous Neumann stress bc
-         if (bdr_type[b] == ParameterizedProblem::BoundaryType::NEUMANN)
+         if (bdr_type[b] == BoundaryType::NEUMANN)
             continue;
 
          ms[m]->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), *bdr_markers[b]);
@@ -1100,15 +1100,15 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       switch (problem->bdr_type[b])
       {
-         case ParameterizedProblem::BoundaryType::DIRICHLET:
+         case BoundaryType::DIRICHLET:
          { 
             assert(problem->vector_bdr_ptr[b]);
             AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
             break;
          }
-         case ParameterizedProblem::BoundaryType::NEUMANN: break;
+         case BoundaryType::NEUMANN: break;
          default:
-         case ParameterizedProblem::BoundaryType::ZERO:
+         case BoundaryType::ZERO:
          { AddBCFunction(zero, problem->battr[b]); break; }
       }
    }
@@ -1127,7 +1127,7 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       nz_dbcs = true;
       for (int b = 0; b < problem->battr.Size(); b++)
       {
-         if (problem->bdr_type[b] == ParameterizedProblem::BoundaryType::ZERO)
+         if (problem->bdr_type[b] == BoundaryType::ZERO)
          {
             if (problem->battr[b] == -1)
             { nz_dbcs = false; break; }

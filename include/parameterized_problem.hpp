@@ -94,14 +94,18 @@ void tip_force(const Vector &x, Vector &u);
 
 }
 
+enum BoundaryType
+{ 
+   ZERO,
+   DIRICHLET,
+   NEUMANN,
+   NUM_BDR_TYPE
+};
+
 class ParameterizedProblem
 {
 friend class SampleGenerator;
 friend class RandomSampleGenerator;
-
-public:
-   enum BoundaryType
-   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
 
 protected:
    std::string problem_name;

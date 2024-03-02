@@ -68,7 +68,7 @@ protected:
    int max_bdr_attr;
    int numBdr;
    Array<Array<int> *> bdr_markers;
-   Array<ParameterizedProblem::BoundaryType> bdr_type; // Boundary condition types of (numBdr) array
+   Array<BoundaryType> bdr_type; // Boundary condition types of (numBdr) array
 
    // MFEM solver options
    bool use_amg;
@@ -154,7 +154,7 @@ public:
    virtual void BuildRHSOperators() = 0;
    virtual void BuildDomainOperators() = 0;
    
-   void SetBdrType(const ParameterizedProblem::BoundaryType type, const int &global_battr_idx=-1);
+   void SetBdrType(const BoundaryType type, const int &global_battr_idx=-1);
    virtual bool BCExistsOnBdr(const int &global_battr_idx) = 0;
    virtual void SetupBCOperators() = 0;
    virtual void SetupRHSBCOperators() = 0;
