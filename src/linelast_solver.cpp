@@ -460,8 +460,8 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
       if (ti >=0)
       {
-         type_idx[b] = (LinElastProblem::BoundaryType)problem->bdr_type[ti];
-         if (problem->bdr_type[ti] == LinElastProblem::BoundaryType::DIRICHLET || problem->bdr_type[ti] == LinElastProblem::BoundaryType::NEUMANN)
+         type_idx[b] = problem->bdr_type[ti];
+         if (problem->bdr_type[ti] == ParameterizedProblem::BoundaryType::DIRICHLET || problem->bdr_type[ti] == ParameterizedProblem::BoundaryType::NEUMANN)
          {
             assert(problem->vector_bdr_ptr[ti]);
             AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);

@@ -565,15 +565,15 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       switch (problem->bdr_type[b])
       {
-         case PoissonProblem::BoundaryType::DIRICHLET:
+         case ParameterizedProblem::BoundaryType::DIRICHLET:
          { 
             assert(problem->scalar_bdr_ptr[b]);
             AddBCFunction(*(problem->scalar_bdr_ptr[b]), problem->battr[b]);
             break;
          }
-         case PoissonProblem::BoundaryType::NEUMANN: break;
+         case ParameterizedProblem::BoundaryType::NEUMANN: break;
          default:
-         case PoissonProblem::BoundaryType::ZERO:
+         case ParameterizedProblem::BoundaryType::ZERO:
          { AddBCFunction(0.0, problem->battr[b]); break; }
       }
    }
