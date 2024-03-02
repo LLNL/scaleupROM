@@ -187,6 +187,18 @@ void init_disp_lcantilever(const Vector &x, Vector &u)
 
 }  // namespace linelast_disp
 
+namespace linelast_force
+{
+
+double rforce_f;
+
+void tip_force(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(f.Size()-1) = -1.0e-2* rforce_f;
+}
+
+}  // namespace linelast_force
 
 }  // namespace function_factory
 
@@ -286,6 +298,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "linelast_disp_lattice")
    {
       problem = new LinElastDispLattice();
+   }
+   else if (problem_name == "linelast_force_cantilever")
+   {
+      problem = new LinElastForceCantilever();
    }
    else
    {
@@ -577,15 +593,19 @@ LinElastDisp::LinElastDisp()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(2);
-   battr.SetSize(2);
-   vector_bdr_ptr.SetSize(2);
+   bdr_type.SetSize(3);
+   battr.SetSize(3);
+   vector_bdr_ptr.SetSize(3);
    for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
    {
    bdr_type[i] = LinElastProblem::DIRICHLET;
    battr[i] = i+1;
    vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
+
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
    
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -615,15 +635,19 @@ LinElastDispLCantilever::LinElastDispLCantilever()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(2);
-   battr.SetSize(2);
-   vector_bdr_ptr.SetSize(2);
-   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
+   bdr_type.SetSize(3);
+   battr.SetSize(3);
+   vector_bdr_ptr.SetSize(3);
+   for (size_t i = 0; i < 2; i++)
    {
-   bdr_type[i] = LinElastProblem::DIRICHLET;
-   battr[i] = i+1;
-   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
+      battr[i] = i+1;
+      bdr_type[i] = LinElastProblem::DIRICHLET;
+      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
    }
+
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
    
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -652,16 +676,20 @@ LinElastDispLattice::LinElastDispLattice()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(2);
-   battr.SetSize(2);
-   vector_bdr_ptr.SetSize(2);
-   for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
-   {
-   bdr_type[i] = LinElastProblem::DIRICHLET;
-   battr[i] = i+1;
-   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+   bdr_type.SetSize(3);
+   battr.SetSize(3);
+   vector_bdr_ptr.SetSize(3);
+  for (size_t i = 0; i < 2; i++)
+      {
+      battr[i] = i+1;
+      bdr_type[i] = LinElastProblem::DIRICHLET;
+      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
-   
+
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
+
    // Set materials
    general_scalar_ptr.SetSize(2);
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
@@ -684,4 +712,50 @@ LinElastDispLattice::LinElastDispLattice()
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL;
 
+}
+
+
+LinElastForceCantilever::LinElastForceCantilever()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(3);
+   battr.SetSize(3);
+   vector_bdr_ptr.SetSize(3);
+
+   // Fixed end of cantilever
+   battr[0] = 1;
+   bdr_type[0] = LinElastProblem::DIRICHLET;
+   vector_bdr_ptr[0] = &(function_factory::linelast_disp::init_disp);
+
+   // Free end of cantilever
+   battr[1] = 2;
+   bdr_type[1] = LinElastProblem::NEUMANN;
+   vector_bdr_ptr[1] = &(function_factory::linelast_force::tip_force);
+
+   battr[2] = 3;
+   bdr_type[2] = LinElastProblem::ZERO;
+   vector_bdr_ptr[2] = NULL;
+   
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+   
+   // Default values.
+   function_factory::linelast_force::rforce_f = 1.0;
+   function_factory::linelast_problem::_lambda = 1.0;
+   function_factory::linelast_problem::_mu = 1.0;
+
+   param_map["rforce_f"] = 0;
+   param_map["lambda"] = 1;
+   param_map["mu"] = 2;
+
+   param_ptr.SetSize(3);
+   param_ptr[0] = &(function_factory::linelast_force::rforce_f);
+   param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[2] = &(function_factory::linelast_problem::_mu);
+
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = NULL;
 }

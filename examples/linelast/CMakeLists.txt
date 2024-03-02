@@ -6,6 +6,7 @@ file(COPY linelast.simpleL.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast
 file(COPY config/linelast.simpleL.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY linelast.lattice.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY config/linelast.lattice.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY linelast.force_cantilever.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
