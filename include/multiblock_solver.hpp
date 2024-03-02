@@ -154,6 +154,7 @@ public:
    virtual void BuildRHSOperators() = 0;
    virtual void BuildDomainOperators() = 0;
    
+   void SetBdrType(const ParameterizedProblem::BoundaryType type, const int &global_battr_idx=-1);
    virtual bool BCExistsOnBdr(const int &global_battr_idx) = 0;
    virtual void SetupBCOperators() = 0;
    virtual void SetupRHSBCOperators() = 0;

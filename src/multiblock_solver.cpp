@@ -223,6 +223,18 @@ void MultiBlockSolver::SetupBCVariables()
    bdr_type = ParameterizedProblem::BoundaryType::NUM_BDR_TYPE;
 }
 
+void MultiBlockSolver::SetBdrType(const ParameterizedProblem::BoundaryType type, const int &global_battr_idx)
+{
+   assert(bdr_type.Size() == global_bdr_attributes.Size());
+   if (global_battr_idx < 0)
+      bdr_type = type;
+   else
+   {
+      assert(global_battr_idx < global_bdr_attributes.Size());
+      bdr_type[global_battr_idx] = type;
+   }
+}
+
 void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes)
 {
    assert(fec.Size() == num_var);
@@ -544,6 +556,10 @@ void MultiBlockSolver::AssembleROM()
          int global_idx = global_bdr_attributes.Find((*bdr_c2g)[b]);
          if (global_idx < 0) continue;
          if (!BCExistsOnBdr(global_idx)) continue;
+
+         /* we assume only Neumann condition would not add an operator. */
+         if (bdr_type[global_idx] == ParameterizedProblem::BoundaryType::NEUMANN)
+            continue;
 
          MatrixBlocks *bdr_mat = (*bdr_mats[c_type])[b];
          AddToBlockMatrix(midx, midx, *bdr_mat, *romMat);
