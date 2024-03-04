@@ -463,16 +463,13 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators
    for (int b = 0; b < problem->battr.Size(); b++)
    {
-      switch (problem->bdr_type[b])
-      {
-         case BoundaryType::DIRICHLET:
-         case BoundaryType::NEUMANN:
-            assert(problem->vector_bdr_ptr[b]);
-            AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
-            break;
-         default:
-            break;
-      }
+      /* Dirichlet bc requires a function specified, even for zero. */
+      if (problem->bdr_type[b] == BoundaryType::DIRICHLET)
+         assert(problem->vector_bdr_ptr[b]);
+      
+      /* Neumann bc does not require a function specified for zero */
+      if (problem->vector_bdr_ptr[b])
+         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
    }
 
    // Set RHS
