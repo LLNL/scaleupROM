@@ -225,6 +225,8 @@ void PoissonSolver::SetupRHSBCOperators()
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
          if (!BCExistsOnBdr(b)) continue;
+         if (bdr_type[b] == BoundaryType::NEUMANN)
+            continue;
 
          bs[m]->AddBdrFaceIntegrator(new DGDirichletLFIntegrator(*bdr_coeffs[b], sigma, kappa), *bdr_markers[b]);
       }
@@ -245,6 +247,8 @@ void PoissonSolver::SetupDomainBCOperators()
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
          if (!BCExistsOnBdr(b)) continue;
+         if (bdr_type[b] == BoundaryType::NEUMANN)
+            continue;
 
          as[m]->AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), *bdr_markers[b]);
       }
@@ -565,15 +569,15 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       switch (problem->bdr_type[b])
       {
-         case PoissonProblem::BoundaryType::DIRICHLET:
+         case BoundaryType::DIRICHLET:
          { 
             assert(problem->scalar_bdr_ptr[b]);
             AddBCFunction(*(problem->scalar_bdr_ptr[b]), problem->battr[b]);
             break;
          }
-         case PoissonProblem::BoundaryType::NEUMANN: break;
+         case BoundaryType::NEUMANN: break;
          default:
-         case PoissonProblem::BoundaryType::ZERO:
+         case BoundaryType::ZERO:
          { AddBCFunction(0.0, problem->battr[b]); break; }
       }
    }

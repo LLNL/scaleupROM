@@ -324,8 +324,11 @@ void StokesSolver::SetupRHSBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         // TODO: Non-homogeneous Neumann stress bc
          if (!BCExistsOnBdr(b)) continue;
+
+         // TODO: Non-homogeneous Neumann stress bc
+         if (bdr_type[b] == BoundaryType::NEUMANN)
+            continue;
 
          fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*ud_coeffs[b], *nu_coeff, sigma, kappa), *bdr_markers[b]);
 
@@ -355,6 +358,10 @@ void StokesSolver::SetupDomainBCOperators()
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
          if (!BCExistsOnBdr(b)) continue;
+
+         // TODO: Non-homogeneous Neumann stress bc
+         if (bdr_type[b] == BoundaryType::NEUMANN)
+            continue;
 
          ms[m]->AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), *bdr_markers[b]);
          bs[m]->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, *bdr_markers[b]);
@@ -1093,15 +1100,15 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       switch (problem->bdr_type[b])
       {
-         case StokesProblem::BoundaryType::DIRICHLET:
+         case BoundaryType::DIRICHLET:
          { 
             assert(problem->vector_bdr_ptr[b]);
             AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
             break;
          }
-         case StokesProblem::BoundaryType::NEUMANN: break;
+         case BoundaryType::NEUMANN: break;
          default:
-         case StokesProblem::BoundaryType::ZERO:
+         case BoundaryType::ZERO:
          { AddBCFunction(zero, problem->battr[b]); break; }
       }
    }
@@ -1120,7 +1127,7 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       nz_dbcs = true;
       for (int b = 0; b < problem->battr.Size(); b++)
       {
-         if (problem->bdr_type[b] == StokesProblem::BoundaryType::ZERO)
+         if (problem->bdr_type[b] == BoundaryType::ZERO)
          {
             if (problem->battr[b] == -1)
             { nz_dbcs = false; break; }

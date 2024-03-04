@@ -94,6 +94,14 @@ void tip_force(const Vector &x, Vector &u);
 
 }
 
+enum BoundaryType
+{ 
+   ZERO,
+   DIRICHLET,
+   NEUMANN,
+   NUM_BDR_TYPE
+};
+
 class ParameterizedProblem
 {
 friend class SampleGenerator;
@@ -128,7 +136,7 @@ public:
    function_factory::GeneralVectorFunction *vector_rhs_ptr = NULL;
    Array<function_factory::GeneralVectorFunction *> vector_bdr_ptr;
    Array<int> battr;
-   Array<int> bdr_type; // abstract boundary type
+   Array<BoundaryType> bdr_type; // abstract boundary type
 
    Array<function_factory::GeneralScalarFunction *> general_scalar_ptr;
    Array<function_factory::GeneralVectorFunction *> general_vector_ptr;
@@ -144,10 +152,6 @@ public:
 class PoissonProblem : public ParameterizedProblem
 {
 friend class PoissonSolver;
-
-protected:
-   enum BoundaryType
-   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
 
 public:
    virtual ~PoissonProblem() {};
@@ -182,10 +186,6 @@ public:
 class StokesProblem : public ParameterizedProblem
 {
 friend class StokesSolver;
-
-protected:
-   enum BoundaryType
-   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
 
 public:
    virtual ~StokesProblem() {};
@@ -222,8 +222,6 @@ class LinElastProblem : public ParameterizedProblem
 friend class LinElastSolver;
 
 protected:
-   enum BoundaryType
-   { ZERO, DIRICHLET, NEUMANN, NUM_BDR_TYPE };
    Vector lambda, mu;
 
 public:

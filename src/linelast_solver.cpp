@@ -75,9 +75,6 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   type_idx.SetSize(numBdr);
-   type_idx = LinElastProblem::BoundaryType::DIRICHLET;
-
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
 
@@ -144,14 +141,12 @@ void LinElastSolver::BuildOperators()
    BuildRHSOperators();
    BuildDomainOperators();
 }
+
 bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx)
 {
    assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
    assert(bdr_coeffs.Size() == global_bdr_attributes.Size());
-   if(type_idx[global_battr_idx] == LinElastProblem::BoundaryType::NEUMANN)
-      return false;
-   else
-      return (bdr_coeffs[global_battr_idx]);
+   return (bdr_coeffs[global_battr_idx]);
 }
 
 void LinElastSolver::BuildRHSOperators()
@@ -179,17 +174,23 @@ void LinElastSolver::SetupRHSBCOperators()
          if (idx < 0)
             continue;
 
-         if (type_idx[b] == LinElastProblem::BoundaryType::NEUMANN)
-         {
-            bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
-         }  
-
          if (!BCExistsOnBdr(b))
             continue;
 
-         if (type_idx[b] == LinElastProblem::BoundaryType::DIRICHLET) // Default behavior
-         { 
-            bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+         switch (bdr_type[b])
+         {
+            case BoundaryType::DIRICHLET:
+               bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
+                  *bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+               break;
+            case BoundaryType::NEUMANN:
+               bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
+               break;
+            default:
+               printf("LinElastSolver::SetupRHSBCOperators - ");
+               printf("boundary attribute %d has a non-zero function, but does not have boundary type. will not be enforced.",
+                      global_bdr_attributes[b]);
+               break;
          }
       }
    }
@@ -427,7 +428,10 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
-            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+
+            if (bdr_type[b] == BoundaryType::DIRICHLET)
+               as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
+                  *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
    }
@@ -435,6 +439,9 @@ void LinElastSolver::SetupDomainBCOperators()
 
 void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   /* set up boundary types */
+   MultiBlockSolver::SetParameterizedProblem(problem);
+
    // Set materials
    lambda_c.SetSize(numSub);
    lambda_c = NULL;
@@ -454,19 +461,15 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    }
 
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators
-   for (int b = 0; b < global_bdr_attributes.Size(); b++)
+   for (int b = 0; b < problem->battr.Size(); b++)
    {
-      int ti = problem->battr.Find(global_bdr_attributes[b]);
-
-      if (ti >=0)
-      {
-         type_idx[b] = (LinElastProblem::BoundaryType)problem->bdr_type[ti];
-         if (problem->bdr_type[ti] == LinElastProblem::BoundaryType::DIRICHLET || problem->bdr_type[ti] == LinElastProblem::BoundaryType::NEUMANN)
-         {
-            assert(problem->vector_bdr_ptr[ti]);
-            AddBCFunction(*(problem->vector_bdr_ptr[ti]), problem->battr[ti]);
-         }
-      }
+      /* Dirichlet bc requires a function specified, even for zero. */
+      if (problem->bdr_type[b] == BoundaryType::DIRICHLET)
+         assert(problem->vector_bdr_ptr[b]);
+      
+      /* Neumann bc does not require a function specified for zero */
+      if (problem->vector_bdr_ptr[b])
+         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
    }
 
    // Set RHS

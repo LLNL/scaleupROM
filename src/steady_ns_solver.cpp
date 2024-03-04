@@ -394,8 +394,10 @@ void SteadyNSSolver::SetupRHSBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         // TODO: Non-homogeneous Neumann stress bc
          if (!BCExistsOnBdr(b)) continue;
+         // TODO: Non-homogeneous Neumann stress bc
+         if (bdr_type[b] == BoundaryType::NEUMANN)
+            continue;
 
          fs[m]->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(*ud_coeffs[b], minus_half_zeta), *bdr_markers[b]);
       }
@@ -418,7 +420,7 @@ void SteadyNSSolver::SetupDomainBCOperators()
          if (idx < 0) continue;
          
          // homogeneous Neumann boundary condition
-         if (!BCExistsOnBdr(b))
+         if (!BCExistsOnBdr(b) && (bdr_type[b] == BoundaryType::NEUMANN))
             hs[m]->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(*zeta_coeff), *bdr_markers[b]);
       }
    }

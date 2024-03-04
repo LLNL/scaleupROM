@@ -206,7 +206,7 @@ ParameterizedProblem::ParameterizedProblem()
    : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name"))
 { 
    battr.SetSize(1); battr = -1;
-   bdr_type.SetSize(1); bdr_type = -1;
+   bdr_type.SetSize(1); bdr_type = BoundaryType::NUM_BDR_TYPE;
 
    scalar_bdr_ptr.SetSize(1);
    vector_bdr_ptr.SetSize(1);
@@ -320,7 +320,7 @@ Poisson0::Poisson0()
 {
    param_num = 2;
    battr = -1;
-   bdr_type = PoissonProblem::ZERO;
+   bdr_type = BoundaryType::ZERO;
 
    scalar_bdr_ptr.SetSize(1);
    vector_bdr_ptr.SetSize(1);
@@ -351,7 +351,7 @@ PoissonComponent::PoissonComponent()
    // k (max 3) + offset (1) + bdr_k (max 3) + bdr_offset(1) + bdr_idx(1)
    param_num = 9;
    battr = -1;
-   bdr_type = PoissonProblem::DIRICHLET;
+   bdr_type = BoundaryType::DIRICHLET;
 
    // pointer to static function.
    scalar_rhs_ptr = &(function_factory::poisson_component::rhs);
@@ -417,7 +417,7 @@ PoissonSpiral::PoissonSpiral()
 {
    param_num = 4;
    battr = -1;
-   bdr_type = PoissonProblem::ZERO;
+   bdr_type = BoundaryType::ZERO;
 
    // pointer to static function.
    scalar_bdr_ptr = NULL;
@@ -454,8 +454,8 @@ StokesChannel::StokesChannel()
    battr[2] = 4;
    battr[3] = 5;
    bdr_type.SetSize(4);
-   bdr_type = StokesProblem::ZERO;
-   bdr_type[2] = StokesProblem::DIRICHLET;
+   bdr_type = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::DIRICHLET;
 
    // pointer to static function.
    vector_bdr_ptr.SetSize(4);
@@ -489,8 +489,8 @@ StokesComponent::StokesComponent()
    for (int b = 0; b < 5; b++)
       battr[b] = b+1;
    bdr_type.SetSize(5);
-   bdr_type = StokesProblem::DIRICHLET;
-   bdr_type[4] = StokesProblem::ZERO;
+   bdr_type = BoundaryType::DIRICHLET;
+   bdr_type[4] = BoundaryType::ZERO;
 
    // pointer to static function.
    vector_bdr_ptr.SetSize(5);
@@ -564,24 +564,24 @@ void StokesFlowPastArray::SetBattr()
 {
    if ((*u0)[0] > 0.0)
    {
-      bdr_type[3] = StokesProblem::DIRICHLET;
-      bdr_type[1] = StokesProblem::NEUMANN;
+      bdr_type[3] = BoundaryType::DIRICHLET;
+      bdr_type[1] = BoundaryType::NEUMANN;
    }
    else
    {
-      bdr_type[1] = StokesProblem::DIRICHLET;
-      bdr_type[3] = StokesProblem::NEUMANN;
+      bdr_type[1] = BoundaryType::DIRICHLET;
+      bdr_type[3] = BoundaryType::NEUMANN;
    }
 
    if ((*u0)[1] > 0.0)
    {
-      bdr_type[0] = StokesProblem::DIRICHLET;
-      bdr_type[2] = StokesProblem::NEUMANN;
+      bdr_type[0] = BoundaryType::DIRICHLET;
+      bdr_type[2] = BoundaryType::NEUMANN;
    }
    else
    {
-      bdr_type[2] = StokesProblem::DIRICHLET;
-      bdr_type[0] = StokesProblem::NEUMANN;
+      bdr_type[2] = BoundaryType::DIRICHLET;
+      bdr_type[0] = BoundaryType::NEUMANN;
    }
 }
 
@@ -598,13 +598,13 @@ LinElastDisp::LinElastDisp()
    vector_bdr_ptr.SetSize(3);
    for (size_t i = 0; i < vector_bdr_ptr.Size(); i++)
    {
-   bdr_type[i] = LinElastProblem::DIRICHLET;
-   battr[i] = i+1;
-   vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
+      bdr_type[i] = BoundaryType::DIRICHLET;
+      battr[i] = i+1;
+      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
 
    battr[2] = 3;
-   bdr_type[2] = LinElastProblem::ZERO;
+   bdr_type[2] = BoundaryType::ZERO;
    vector_bdr_ptr[2] = NULL;
    
    // Set materials
@@ -641,12 +641,13 @@ LinElastDispLCantilever::LinElastDispLCantilever()
    for (size_t i = 0; i < 2; i++)
    {
       battr[i] = i+1;
-      bdr_type[i] = LinElastProblem::DIRICHLET;
+      bdr_type[i] = BoundaryType::DIRICHLET;
       vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp_lcantilever);
    }
 
+   /* homogeneous Neumann bc */
    battr[2] = 3;
-   bdr_type[2] = LinElastProblem::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
    
    // Set materials
@@ -682,12 +683,13 @@ LinElastDispLattice::LinElastDispLattice()
   for (size_t i = 0; i < 2; i++)
       {
       battr[i] = i+1;
-      bdr_type[i] = LinElastProblem::DIRICHLET;
+      bdr_type[i] = BoundaryType::DIRICHLET;
       vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
    }
 
+   /* homogeneous Neumann bc */
    battr[2] = 3;
-   bdr_type[2] = LinElastProblem::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
 
    // Set materials
@@ -725,16 +727,17 @@ LinElastForceCantilever::LinElastForceCantilever()
 
    // Fixed end of cantilever
    battr[0] = 1;
-   bdr_type[0] = LinElastProblem::DIRICHLET;
+   bdr_type[0] = BoundaryType::DIRICHLET;
    vector_bdr_ptr[0] = &(function_factory::linelast_disp::init_disp);
 
    // Free end of cantilever
    battr[1] = 2;
-   bdr_type[1] = LinElastProblem::NEUMANN;
+   bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_force::tip_force);
 
+   /* homogeneous Neumann bc */
    battr[2] = 3;
-   bdr_type[2] = LinElastProblem::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
    
    // Set materials
