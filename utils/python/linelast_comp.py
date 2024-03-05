@@ -216,10 +216,10 @@ def ComponentWiseTrain():
     n_mesh = 5
     mesh_type = [0, 2, 1, 2, 1]
     mesh_configs = np.zeros([n_mesh, 6])
-    mesh_configs[1,:] = [0., -5., 0., 0., 0., 0.]
+    mesh_configs[1,:] = [0., -4., 0., 0., 0., 0.]
     mesh_configs[2,:] = [1., 0., 0., 0., 0., 0.]
     mesh_configs[3,:] = [0., 1., 0., 0., 0., 0.]
-    mesh_configs[4,:] = [-5., 0., 0., 0., 0., 0.]
+    mesh_configs[4,:] = [-4., 0., 0., 0., 0., 0.]
 
     # interface data
     # mesh1 / mesh2 / battr1 / battr2 / port_idx
@@ -279,7 +279,7 @@ def ComponentWiseTrain():
         port.attrs["comp2"] = "rod2D_V"
         port.attrs["attr1"] = 1
         port.attrs["attr2"] = 3
-        port.create_dataset("comp2_configuration", (6,), data=[0., -5., 0., 0., 0., 0.])
+        port.create_dataset("comp2_configuration", (6,), data=[0., -4., 0., 0., 0., 0.])
 
         port = grp.create_group("port2")
         port.attrs["comp1"] = "joint2D"
@@ -300,7 +300,7 @@ def ComponentWiseTrain():
         port.attrs["comp2"] = "rod2D_H"
         port.attrs["attr1"] = 4
         port.attrs["attr2"] = 2
-        port.create_dataset("comp2_configuration", (6,), data=[-5., 0., 0., 0., 0., 0.])
+        port.create_dataset("comp2_configuration", (6,), data=[-4., 0., 0., 0., 0., 0.])
 
         # boundary attributes
         f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
