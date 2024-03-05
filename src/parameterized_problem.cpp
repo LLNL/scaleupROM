@@ -237,6 +237,8 @@ double udisp_x;
 double udisp_y;
 double ldisp_x;
 double ldisp_y;
+double rdisp_x;
+double rdisp_y;
 
 void right_force(const Vector &x, Vector &f)
 {
@@ -260,6 +262,12 @@ void left_disp(const Vector &x, Vector &u)
 {
    u(0) = ldisp_x;
    u(1) = ldisp_y;
+}
+
+void right_disp(const Vector &x, Vector &u)
+{
+   u(0) = rdisp_x;
+   u(1) = rdisp_y;
 }
 
 }  // namespace linelast_cwtrain
@@ -367,7 +375,7 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new LinElastForceCantilever();
    }
-   else if (problem_name == "linelast_comptrain")
+   else if (problem_name == "linelast_cwtrain")
    {
       problem = new LinElastComponentWiseTrain();
    }
@@ -891,14 +899,17 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    vector_bdr_ptr.SetSize(5);
 
    // Down
-   battr[0] = 1;
+   /* battr[0] = 1;
    bdr_type[0] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::down_force);
+   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::down_force); */
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::ZERO;
+   vector_bdr_ptr[0] = NULL;
 
    // Right
    battr[1] = 2;
-   bdr_type[1] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[1] = &(function_factory::linelast_cwtrain::right_force);
+   bdr_type[1] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[1] = &(function_factory::linelast_cwtrain::right_disp);
 
    // Up
    battr[2] = 3;
@@ -921,7 +932,7 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
    general_scalar_ptr[1] = function_factory::linelast_problem::mu;
    
-   // Default values.
+   /* // Default values.
    function_factory::linelast_cwtrain::rforce_x = 0.0;
    function_factory::linelast_cwtrain::rforce_y = 0.0;
    function_factory::linelast_cwtrain::dforce_x = 0.0;
@@ -954,7 +965,36 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_ptr[6] = &(function_factory::linelast_cwtrain::ldisp_x);
    param_ptr[7] = &(function_factory::linelast_cwtrain::ldisp_y);
    param_ptr[8] = &(function_factory::linelast_problem::_lambda);
-   param_ptr[9] = &(function_factory::linelast_problem::_mu);
+   param_ptr[9] = &(function_factory::linelast_problem::_mu); */
+
+   // Default values.
+   function_factory::linelast_cwtrain::rdisp_x= 0.0;
+   function_factory::linelast_cwtrain::rdisp_y = 0.0;
+   function_factory::linelast_cwtrain::udisp_x = 0.0;
+   function_factory::linelast_cwtrain::udisp_y = 0.0;
+   function_factory::linelast_cwtrain::ldisp_x = 0.0;
+   function_factory::linelast_cwtrain::ldisp_y = 0.0;
+   function_factory::linelast_problem::_lambda = 1.0;
+   function_factory::linelast_problem::_mu = 1.0;
+
+   param_map["rdisp_x"] = 0;
+   param_map["rdisp_y"] = 1;
+   param_map["udisp_x"] = 2;
+   param_map["udisp_y"] = 3;
+   param_map["ldisp_x"] = 4;
+   param_map["ldisp_y"] = 5;
+   param_map["lambda"] = 6;
+   param_map["mu"] = 7;
+
+   param_ptr.SetSize(10);
+   param_ptr[0] = &(function_factory::linelast_cwtrain::rdisp_x);
+   param_ptr[1] = &(function_factory::linelast_cwtrain::rdisp_y);
+   param_ptr[2] = &(function_factory::linelast_cwtrain::udisp_x);
+   param_ptr[3] = &(function_factory::linelast_cwtrain::udisp_y);
+   param_ptr[4] = &(function_factory::linelast_cwtrain::ldisp_x);
+   param_ptr[5] = &(function_factory::linelast_cwtrain::ldisp_y);
+   param_ptr[6] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[7] = &(function_factory::linelast_problem::_mu);
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.

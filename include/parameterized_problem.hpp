@@ -102,11 +102,14 @@ extern double udisp_x;
 extern double udisp_y;
 extern double ldisp_x;
 extern double ldisp_y;
+extern double rdisp_x;
+extern double rdisp_y;
 
 void right_force(const Vector &x, Vector &f);
 void down_force(const Vector &x, Vector &f);
 void up_disp(const Vector &x, Vector &u);
 void left_disp(const Vector &x, Vector &u);
+void right_disp(const Vector &x, Vector &u);
 
 }
 

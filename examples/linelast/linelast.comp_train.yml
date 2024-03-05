@@ -14,9 +14,13 @@ mesh:
         file: "meshes/rod2D_H.mesh"
       - name: "rod2D_V"
         file: "meshes/rod2D_V.mesh"
+  uniform_refinement: 0
 
 domain-decomposition:
   type: interior_penalty
+
+solver:
+  direct_solve: true
 
 discretization:
   order: 1
@@ -29,14 +33,12 @@ visualization:
     prefix: paraview_output
 
 parameterized_problem:
-  name: linelast_comptrain
+  name: linelast_cwtrain
 
 single_run:
-  linelast_comptrain:
-    rforce_x: 1.0e-2
-    rforce_y: -1.0e-2
-    dforce_x: 1.0e-2
-    dforce_y: -1.0e-2
+  linelast_cwtrain:
+    rdisp_x: 0.0
+    rdisp_y: 0.0
     udisp_x: 0.0
     udisp_y: 0.0
     ldisp_x: 0.0
@@ -45,55 +47,62 @@ single_run:
 sample_generation:
   maximum_number_of_snapshots: 400
   component_sampling: true
+  type: random
+  random_sample_generator:
+    number_of_samples: 10
   file_path:
     prefix: "linelast_cwtrain"
   parameters:
-    - key: single_run/linelast_disp/rforce_x
+#    - key: single_run/linelast_cwtrain/rforce_x
+#      type: double
+#      minimum: -5.0e-0
+#      maximum: 5.0e-0
+#    - key: single_run/linelast_cwtrain/rforce_y
+#      type: double
+#      minimum: -5.0e-0
+#      maximum: 5.0e-0
+#    - key: single_run/linelast_cwtrain/dforce_x
+#      type: double
+#      minimum: -5.0e-0
+#      maximum: 5.0e-0
+#    - key: single_run/linelast_cwtrain/dforce_y
+#      type: double
+#      minimum: -5.0e-0
+#      maximum: 5.0e-0
+    - key: single_run/linelast_cwtrain/rdisp_x
       type: double
-      sample_size: 3
-      minimum: -1.0e-2
-      maximum: 1.0e-2
-    - key: single_run/linelast_disp/rforce_y
+      minimum: -10.0
+      maximum: 10.0
+    - key: single_run/linelast_cwtrain/rdisp_y
       type: double
-      sample_size: 3
-      minimum: -1.0e-2
-      maximum: 1.0e-2
-    - key: single_run/linelast_disp/dforce_x
+      minimum: -10.0
+      maximum: 10.0
+    - key: single_run/linelast_cwtrain/udisp_x
       type: double
-      sample_size: 3
-      minimum: -1.0e-2
-      maximum: 1.0e-2
-    - key: single_run/linelast_disp/dforce_y
+      minimum: -10.0
+      maximum: 10.0
+    - key: single_run/linelast_cwtrain/udisp_y
       type: double
-      sample_size: 3
-      minimum: -1.0e-2
-      maximum: 1.0e-2
-    - key: single_run/linelast_disp/udisp_x
+      minimum: -10.0
+      maximum: 10.0
+    - key: single_run/linelast_cwtrain/ldisp_x
       type: double
-      sample_size: 3
-      minimum: -1.0e-1
-      maximum: 1.0e-1
-    - key: single_run/linelast_disp/udisp_y
+      minimum: -10.0
+      maximum: 10.0
+    - key: single_run/linelast_cwtrain/ldisp_y
       type: double
-      sample_size: 3
-      minimum: -1.0e-1
-      maximum: 1.0e-1
-    - key: single_run/linelast_disp/ldisp_x
-      type: double
-      sample_size: 3
-      minimum: -1.0e-1
-      maximum: 1.0e-1
-    - key: single_run/linelast_disp/ldisp_y
-      type: double
-      sample_size: 3
-      minimum: -1.0e-1
-      maximum: 1.0e-1
+      minimum: -10.0
+      maximum: 10.0
 
 basis:
   prefix: "linelast_cwtrain"
-  number_of_basis: 2
   tags:
-    - name: "comp0"
+    - name: "joint2D"
+      number_of_basis: 1
+    - name: "rod2D_H"
+      number_of_basis: 1
+    - name: "rod2D_V"
+      number_of_basis: 1
   svd:
     save_spectrum: true
     update_right_sv: false
@@ -103,8 +112,9 @@ basis:
 model_reduction:
   rom_handler_type: mfem
   subdomain_training: universal
+  linear_solver_type: direct
   save_operator:
     level: component
-    prefix: "linelast.rom_elem"
+    prefix: "linelast_cw.rom_elem"
   compare_solution:
     enabled: true
