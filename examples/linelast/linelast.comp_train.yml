@@ -6,7 +6,7 @@ main:
 mesh:
   type: component-wise
   component-wise:
-    global_config: "config/linelast.simpleL.h5"
+    global_config: "config/linelast.comp_train.h5"
     components:
       - name: "joint2D"
         file: "meshes/joint2D.mesh"
@@ -26,29 +26,71 @@ visualization:
   enabled: false
   unified_paraview: true
   file_path:
-    prefix: lcantilever_output
+    prefix: paraview_output
 
 parameterized_problem:
-  name: linelast_disp_lcantilever
+  name: linelast_comptrain
 
 single_run:
-  linelast_disp_lcantilever:
-    rdisp_f: 10.0
+  linelast_comptrain:
+    rforce_x: 1.0e-2
+    rforce_y: -1.0e-2
+    dforce_x: 1.0e-2
+    dforce_y: -1.0e-2
+    udisp_x: 0.0
+    udisp_y: 0.0
+    ldisp_x: 0.0
+    ldisp_y: 0.0
 
 sample_generation:
   maximum_number_of_snapshots: 400
-  component_sampling: false
+  component_sampling: true
   file_path:
-    prefix: "linelast_Lbeam"
+    prefix: "linelast_cwtrain"
   parameters:
-    - key: single_run/linelast_disp/rdisp_f
+    - key: single_run/linelast_disp/rforce_x
       type: double
-      sample_size: 6
-      minimum: 10.0
-      maximum: 10.0
+      sample_size: 3
+      minimum: -1.0e-2
+      maximum: 1.0e-2
+    - key: single_run/linelast_disp/rforce_y
+      type: double
+      sample_size: 3
+      minimum: -1.0e-2
+      maximum: 1.0e-2
+    - key: single_run/linelast_disp/dforce_x
+      type: double
+      sample_size: 3
+      minimum: -1.0e-2
+      maximum: 1.0e-2
+    - key: single_run/linelast_disp/dforce_y
+      type: double
+      sample_size: 3
+      minimum: -1.0e-2
+      maximum: 1.0e-2
+    - key: single_run/linelast_disp/udisp_x
+      type: double
+      sample_size: 3
+      minimum: -1.0e-1
+      maximum: 1.0e-1
+    - key: single_run/linelast_disp/udisp_y
+      type: double
+      sample_size: 3
+      minimum: -1.0e-1
+      maximum: 1.0e-1
+    - key: single_run/linelast_disp/ldisp_x
+      type: double
+      sample_size: 3
+      minimum: -1.0e-1
+      maximum: 1.0e-1
+    - key: single_run/linelast_disp/ldisp_y
+      type: double
+      sample_size: 3
+      minimum: -1.0e-1
+      maximum: 1.0e-1
 
 basis:
-  prefix: "linelast_Lbeam"
+  prefix: "linelast_cwtrain"
   number_of_basis: 2
   tags:
     - name: "comp0"
