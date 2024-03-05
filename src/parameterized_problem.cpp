@@ -226,6 +226,44 @@ double qbdr(const Vector &x)
 
 }  // namespace advdiff_problem
 
+namespace linelast_cwtrain
+{
+
+double rforce_x;
+double rforce_y;
+double dforce_x;
+double dforce_y;
+double udisp_x;
+double udisp_y;
+double ldisp_x;
+double ldisp_y;
+
+void right_force(const Vector &x, Vector &f)
+{
+   f(0) = rforce_x;
+   f(1) = rforce_y;
+}
+
+void down_force(const Vector &x, Vector &f)
+{
+   f(0) = dforce_x;
+   f(1) = dforce_y;
+}
+
+void up_disp(const Vector &x, Vector &u)
+{
+   u(0) = udisp_x;
+   u(1) = udisp_y;
+}
+
+void left_disp(const Vector &x, Vector &u)
+{
+   u(0) = ldisp_x;
+   u(1) = ldisp_y;
+}
+
+}  // namespace linelast_cwtrain
+
 }  // namespace function_factory
 
 ParameterizedProblem::ParameterizedProblem()
@@ -328,6 +366,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "linelast_force_cantilever")
    {
       problem = new LinElastForceCantilever();
+   }
+   else if (problem_name == "linelast_comptrain")
+   {
+      problem = new LinElastComponentWiseTrain();
    }
    else if (problem_name == "advdiff_flow_past_array")
    {
@@ -746,7 +788,6 @@ LinElastDispLattice::LinElastDispLattice()
 
 }
 
-
 LinElastForceCantilever::LinElastForceCantilever()
     : LinElastProblem()
 {
@@ -839,4 +880,82 @@ AdvDiffFlowPastArray::AdvDiffFlowPastArray()
 AdvDiffFlowPastArray::~AdvDiffFlowPastArray()
 {
    delete flow_problem;
+}
+
+LinElastComponentWiseTrain::LinElastComponentWiseTrain()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
+
+   // Down
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::down_force);
+
+   // Right
+   battr[1] = 2;
+   bdr_type[1] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[1] = &(function_factory::linelast_cwtrain::right_force);
+
+   // Up
+   battr[2] = 3;
+   bdr_type[2] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[2] = &(function_factory::linelast_cwtrain::up_disp);
+
+   // Left
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::left_disp);
+
+
+   /* homogeneous Neumann bc */
+   battr[4] = 5;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
+   
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+   
+   // Default values.
+   function_factory::linelast_cwtrain::rforce_x = 0.0;
+   function_factory::linelast_cwtrain::rforce_y = 0.0;
+   function_factory::linelast_cwtrain::dforce_x = 0.0;
+   function_factory::linelast_cwtrain::dforce_y = 0.0;
+   function_factory::linelast_cwtrain::udisp_x = 0.0;
+   function_factory::linelast_cwtrain::udisp_y = 0.0;
+   function_factory::linelast_cwtrain::ldisp_x = 0.0;
+   function_factory::linelast_cwtrain::ldisp_y = 0.0;
+   function_factory::linelast_problem::_lambda = 1.0;
+   function_factory::linelast_problem::_mu = 1.0;
+
+   param_map["rforce_x"] = 0;
+   param_map["rforce_y"] = 1;
+   param_map["dforce_x"] = 2;
+   param_map["dforce_y"] = 3;
+   param_map["udisp_x"] = 4;
+   param_map["udisp_y"] = 5;
+   param_map["ldisp_x"] = 6;
+   param_map["ldisp_y"] = 7;
+   param_map["lambda"] = 8;
+   param_map["mu"] = 9;
+
+   param_ptr.SetSize(10);
+   param_ptr[0] = &(function_factory::linelast_cwtrain::rforce_x);
+   param_ptr[1] = &(function_factory::linelast_cwtrain::rforce_y);
+   param_ptr[2] = &(function_factory::linelast_cwtrain::dforce_x);
+   param_ptr[3] = &(function_factory::linelast_cwtrain::dforce_y);
+   param_ptr[4] = &(function_factory::linelast_cwtrain::udisp_x);
+   param_ptr[5] = &(function_factory::linelast_cwtrain::udisp_y);
+   param_ptr[6] = &(function_factory::linelast_cwtrain::ldisp_x);
+   param_ptr[7] = &(function_factory::linelast_cwtrain::ldisp_y);
+   param_ptr[8] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[9] = &(function_factory::linelast_problem::_mu);
+
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
 }
