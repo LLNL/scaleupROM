@@ -90,6 +90,10 @@ protected:
    Array<FiniteElementSpace *> global_fes;
    Array<GridFunction *> global_us_visual;
 
+   bool visualize_error = false;
+   Array<GridFunction *> error_visual;    // Size(num_var * numSub)
+   Array<GridFunction *> global_error_visual;   // point-wise error visualization
+
    // rom variables.
    ROMHandlerBase *rom_handler = NULL;
    TrainMode train_mode = NUM_TRAINMODE;
