@@ -94,21 +94,27 @@ void tip_force(const Vector &x, Vector &u);
 
 namespace linelast_cwtrain
 {
-extern double rforce_x;
-extern double rforce_y;
-extern double dforce_x;
-extern double dforce_y;
-extern double udisp_x;
-extern double udisp_y;
-extern double ldisp_x;
-extern double ldisp_y;
+extern double glob_disp_x;
+extern double glob_disp_y;
 extern double rdisp_x;
 extern double rdisp_y;
+extern double udisp_x;
+extern double udisp_y;
+extern double ddisp_x;
+extern double ddisp_y;
 
-void right_force(const Vector &x, Vector &f);
-void down_force(const Vector &x, Vector &f);
-void up_disp(const Vector &x, Vector &u);
+extern double lx;
+extern double ly;
+extern double rx;
+extern double ry;
+extern double dx;
+extern double dy;
+extern double ux;
+extern double uy;
+
 void left_disp(const Vector &x, Vector &u);
+void up_disp(const Vector &x, Vector &u);
+void down_disp(const Vector &x, Vector &u);
 void right_disp(const Vector &x, Vector &u);
 
 }

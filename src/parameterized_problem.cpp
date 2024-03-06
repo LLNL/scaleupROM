@@ -229,45 +229,54 @@ double qbdr(const Vector &x)
 namespace linelast_cwtrain
 {
 
-double rforce_x;
-double rforce_y;
-double dforce_x;
-double dforce_y;
-double udisp_x;
-double udisp_y;
-double ldisp_x;
-double ldisp_y;
+double glob_disp_x;
+double glob_disp_y;
 double rdisp_x;
 double rdisp_y;
+double udisp_x;
+double udisp_y;
+double ddisp_x;
+double ddisp_y;
 
-void right_force(const Vector &x, Vector &f)
-{
-   f(0) = rforce_x;
-   f(1) = rforce_y;
-}
-
-void down_force(const Vector &x, Vector &f)
-{
-   f(0) = dforce_x;
-   f(1) = dforce_y;
-}
-
-void up_disp(const Vector &x, Vector &u)
-{
-   u(0) = udisp_x;
-   u(1) = udisp_y;
-}
+double lx;
+double ly;
+double rx;
+double ry;
+double dx;
+double dy;
+double ux;
+double uy;
 
 void left_disp(const Vector &x, Vector &u)
 {
-   u(0) = ldisp_x;
-   u(1) = ldisp_y;
+   if (lx >= 0.5)
+      u(0) = glob_disp_x;
+   if (ly >= 0.5)
+      u(1) = glob_disp_y;
 }
 
 void right_disp(const Vector &x, Vector &u)
 {
-   u(0) = rdisp_x;
-   u(1) = rdisp_y;
+   if (rx >= 0.5)
+      u(0) = rdisp_x;
+   if (ry >= 0.5)
+      u(1) = rdisp_y;
+}
+
+void up_disp(const Vector &x, Vector &u)
+{
+   if (ux >= 0.5)
+      u(0) = udisp_x;
+   if (uy >= 0.5)
+      u(1) = udisp_y;
+}
+
+void down_disp(const Vector &x, Vector &u)
+{
+   if (dx >= 0.5)
+      u(0) = ddisp_x;
+   if (dy >= 0.5)
+      u(1) = ddisp_y;
 }
 
 }  // namespace linelast_cwtrain
@@ -898,103 +907,95 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    battr.SetSize(5);
    vector_bdr_ptr.SetSize(5);
 
-   // Down
-   /* battr[0] = 1;
-   bdr_type[0] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::down_force); */
+   // Left
    battr[0] = 1;
-   bdr_type[0] = BoundaryType::ZERO;
-   vector_bdr_ptr[0] = NULL;
+   bdr_type[0] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::left_disp);
 
    // Right
    battr[1] = 2;
-   bdr_type[1] = BoundaryType::DIRICHLET;
+   bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_cwtrain::right_disp);
 
+   // None
+   battr[2] = 5;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[2] = NULL;
+
    // Up
-   battr[2] = 3;
-   bdr_type[2] = BoundaryType::DIRICHLET;
-   vector_bdr_ptr[2] = &(function_factory::linelast_cwtrain::up_disp);
-
-   // Left
    battr[3] = 4;
-   bdr_type[3] = BoundaryType::DIRICHLET;
-   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::left_disp);
+   bdr_type[3] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::up_disp);
 
-
-   /* homogeneous Neumann bc */
-   battr[4] = 5;
+   // Down
+   battr[4] = 3;
    bdr_type[4] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[4] = NULL;
-   
+   vector_bdr_ptr[4] = &(function_factory::linelast_cwtrain::down_disp);
+
+
    // Set materials
    general_scalar_ptr.SetSize(2);
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
    general_scalar_ptr[1] = function_factory::linelast_problem::mu;
-   
-   /* // Default values.
-   function_factory::linelast_cwtrain::rforce_x = 0.0;
-   function_factory::linelast_cwtrain::rforce_y = 0.0;
-   function_factory::linelast_cwtrain::dforce_x = 0.0;
-   function_factory::linelast_cwtrain::dforce_y = 0.0;
-   function_factory::linelast_cwtrain::udisp_x = 0.0;
-   function_factory::linelast_cwtrain::udisp_y = 0.0;
-   function_factory::linelast_cwtrain::ldisp_x = 0.0;
-   function_factory::linelast_cwtrain::ldisp_y = 0.0;
-   function_factory::linelast_problem::_lambda = 1.0;
-   function_factory::linelast_problem::_mu = 1.0;
-
-   param_map["rforce_x"] = 0;
-   param_map["rforce_y"] = 1;
-   param_map["dforce_x"] = 2;
-   param_map["dforce_y"] = 3;
-   param_map["udisp_x"] = 4;
-   param_map["udisp_y"] = 5;
-   param_map["ldisp_x"] = 6;
-   param_map["ldisp_y"] = 7;
-   param_map["lambda"] = 8;
-   param_map["mu"] = 9;
-
-   param_ptr.SetSize(10);
-   param_ptr[0] = &(function_factory::linelast_cwtrain::rforce_x);
-   param_ptr[1] = &(function_factory::linelast_cwtrain::rforce_y);
-   param_ptr[2] = &(function_factory::linelast_cwtrain::dforce_x);
-   param_ptr[3] = &(function_factory::linelast_cwtrain::dforce_y);
-   param_ptr[4] = &(function_factory::linelast_cwtrain::udisp_x);
-   param_ptr[5] = &(function_factory::linelast_cwtrain::udisp_y);
-   param_ptr[6] = &(function_factory::linelast_cwtrain::ldisp_x);
-   param_ptr[7] = &(function_factory::linelast_cwtrain::ldisp_y);
-   param_ptr[8] = &(function_factory::linelast_problem::_lambda);
-   param_ptr[9] = &(function_factory::linelast_problem::_mu); */
 
    // Default values.
-   function_factory::linelast_cwtrain::rdisp_x= 0.0;
+   function_factory::linelast_cwtrain::glob_disp_x= 0.0;
+   function_factory::linelast_cwtrain::glob_disp_y = 0.0;
+   function_factory::linelast_cwtrain::rdisp_x = 0.0;
    function_factory::linelast_cwtrain::rdisp_y = 0.0;
    function_factory::linelast_cwtrain::udisp_x = 0.0;
    function_factory::linelast_cwtrain::udisp_y = 0.0;
-   function_factory::linelast_cwtrain::ldisp_x = 0.0;
-   function_factory::linelast_cwtrain::ldisp_y = 0.0;
+   function_factory::linelast_cwtrain::ddisp_x = 0.0;
+   function_factory::linelast_cwtrain::ddisp_y = 0.0;
+   function_factory::linelast_cwtrain::lx = 0.0;
+   function_factory::linelast_cwtrain::ly = 0.0;
+   function_factory::linelast_cwtrain::rx = 0.0;
+   function_factory::linelast_cwtrain::ry = 0.0;
+   function_factory::linelast_cwtrain::dx = 0.0;
+   function_factory::linelast_cwtrain::dy = 0.0;
+   function_factory::linelast_cwtrain::ux = 0.0;
+   function_factory::linelast_cwtrain::uy = 0.0;
    function_factory::linelast_problem::_lambda = 1.0;
    function_factory::linelast_problem::_mu = 1.0;
 
-   param_map["rdisp_x"] = 0;
-   param_map["rdisp_y"] = 1;
-   param_map["udisp_x"] = 2;
-   param_map["udisp_y"] = 3;
-   param_map["ldisp_x"] = 4;
-   param_map["ldisp_y"] = 5;
-   param_map["lambda"] = 6;
-   param_map["mu"] = 7;
+   param_map["glob_disp_x"] = 0;
+   param_map["glob_disp_y"] = 1;
+   param_map["rdisp_x"] = 2;
+   param_map["rdisp_y"] = 3;
+   param_map["udisp_x"] = 4;
+   param_map["udisp_y"] = 5;
+   param_map["ddisp_x"] = 6;
+   param_map["ddisp_y"] = 7;
+   param_map["lx"] = 8;
+   param_map["ly"] = 9;
+   param_map["rx"] = 10;
+   param_map["ry"] = 11;
+   param_map["dx"] = 12;
+   param_map["dy"] = 13;
+   param_map["ux"] = 14;
+   param_map["uy"] = 15;
+   param_map["lambda"] = 16;
+   param_map["mu"] = 17;
 
-   param_ptr.SetSize(10);
-   param_ptr[0] = &(function_factory::linelast_cwtrain::rdisp_x);
-   param_ptr[1] = &(function_factory::linelast_cwtrain::rdisp_y);
-   param_ptr[2] = &(function_factory::linelast_cwtrain::udisp_x);
-   param_ptr[3] = &(function_factory::linelast_cwtrain::udisp_y);
-   param_ptr[4] = &(function_factory::linelast_cwtrain::ldisp_x);
-   param_ptr[5] = &(function_factory::linelast_cwtrain::ldisp_y);
-   param_ptr[6] = &(function_factory::linelast_problem::_lambda);
-   param_ptr[7] = &(function_factory::linelast_problem::_mu);
+   param_ptr.SetSize(18);
+   param_ptr[0] = &(function_factory::linelast_cwtrain::glob_disp_x);
+   param_ptr[1] = &(function_factory::linelast_cwtrain::glob_disp_y);
+   param_ptr[2] = &(function_factory::linelast_cwtrain::rdisp_x);
+   param_ptr[3] = &(function_factory::linelast_cwtrain::rdisp_y);
+   param_ptr[4] = &(function_factory::linelast_cwtrain::udisp_x);
+   param_ptr[5] = &(function_factory::linelast_cwtrain::udisp_y);
+   param_ptr[6] = &(function_factory::linelast_cwtrain::ddisp_x);
+   param_ptr[7] = &(function_factory::linelast_cwtrain::ddisp_y);
+   param_ptr[8] = &(function_factory::linelast_cwtrain::lx);
+   param_ptr[9] = &(function_factory::linelast_cwtrain::ly);
+   param_ptr[10] = &(function_factory::linelast_cwtrain::rx);
+   param_ptr[11] = &(function_factory::linelast_cwtrain::ry);
+   param_ptr[12] = &(function_factory::linelast_cwtrain::dx);
+   param_ptr[13] = &(function_factory::linelast_cwtrain::dy);
+   param_ptr[14] = &(function_factory::linelast_cwtrain::ux);
+   param_ptr[15] = &(function_factory::linelast_cwtrain::uy);
+   param_ptr[16] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[17] = &(function_factory::linelast_problem::_mu);
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.

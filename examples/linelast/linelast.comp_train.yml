@@ -37,72 +37,106 @@ parameterized_problem:
 
 single_run:
   linelast_cwtrain:
+    glob_disp_x: 0.0
+    glob_disp_y: 0.0
     rdisp_x: 0.0
-    rdisp_y: 0.0
+    rdisp_y: -2.0e-2
     udisp_x: 0.0
     udisp_y: 0.0
-    ldisp_x: 0.0
-    ldisp_y: 0.0
+    ddisp_x: 0.0
+    ddisp_y: 0.0
+    lx: 0.5
+    ly: 0.5
+    rx: 0.0
+    ry: 0.5
+    dx: 0.0
+    dy: 0.0
+    ux: 0.0
+    uy: 0.0
 
 sample_generation:
-  maximum_number_of_snapshots: 400
+  maximum_number_of_snapshots: 20000
   component_sampling: true
   type: random
   random_sample_generator:
-    number_of_samples: 10
+    number_of_samples: 2000
   file_path:
     prefix: "linelast_cwtrain"
   parameters:
-#    - key: single_run/linelast_cwtrain/rforce_x
-#      type: double
-#      minimum: -5.0e-0
-#      maximum: 5.0e-0
-#    - key: single_run/linelast_cwtrain/rforce_y
-#      type: double
-#      minimum: -5.0e-0
-#      maximum: 5.0e-0
-#    - key: single_run/linelast_cwtrain/dforce_x
-#      type: double
-#      minimum: -5.0e-0
-#      maximum: 5.0e-0
-#    - key: single_run/linelast_cwtrain/dforce_y
-#      type: double
-#      minimum: -5.0e-0
-#      maximum: 5.0e-0
+    - key: single_run/linelast_cwtrain/glob_disp_x
+      type: double
+      minimum: 0.0
+      maximum: 10.0
+    - key: single_run/linelast_cwtrain/glob_disp_y
+      type: double
+      minimum: 0.0
+      maximum: 10.0
     - key: single_run/linelast_cwtrain/rdisp_x
       type: double
-      minimum: -10.0
-      maximum: 10.0
+      minimum: -2.0e-2
+      maximum: 2.0e-2
     - key: single_run/linelast_cwtrain/rdisp_y
       type: double
-      minimum: -10.0
-      maximum: 10.0
+      minimum: -2.0e-2
+      maximum: 2.0e-2
     - key: single_run/linelast_cwtrain/udisp_x
       type: double
-      minimum: -10.0
-      maximum: 10.0
+      minimum: -2.0e-2
+      maximum: 2.0e-2
     - key: single_run/linelast_cwtrain/udisp_y
       type: double
-      minimum: -10.0
-      maximum: 10.0
-    - key: single_run/linelast_cwtrain/ldisp_x
+      minimum: -2.0e-2
+      maximum: 2.0e-2
+    - key: single_run/linelast_cwtrain/ddisp_x
       type: double
-      minimum: -10.0
-      maximum: 10.0
-    - key: single_run/linelast_cwtrain/ldisp_y
+      minimum: -2.0e-2
+      maximum: 2.0e-2
+    - key: single_run/linelast_cwtrain/ddisp_y
       type: double
-      minimum: -10.0
-      maximum: 10.0
+      minimum: -2.0e-2
+      maximum: 2.0e-2
+    - key: single_run/linelast_cwtrain/rx
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/ry
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/lx
+      type: double
+      minimum: 0.5
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/ly
+      type: double
+      minimum: 0.5
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/dx
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/dy
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/ux
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/uy
+      type: double
+      minimum: 0.0
+      maximum: 1.0
 
 basis:
   prefix: "linelast_cwtrain"
   tags:
     - name: "joint2D"
-      number_of_basis: 1
+      number_of_basis: 15
     - name: "rod2D_H"
-      number_of_basis: 1
+      number_of_basis: 10
     - name: "rod2D_V"
-      number_of_basis: 1
+      number_of_basis: 10
   svd:
     save_spectrum: true
     update_right_sv: false
