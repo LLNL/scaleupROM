@@ -63,6 +63,8 @@ MultiBlockSolver::~MultiBlockSolver()
 
    for (int k = 0; k < global_fes.Size(); k++) delete global_fes[k];
    for (int k = 0; k < global_us_visual.Size(); k++) delete global_us_visual[k];
+   DeletePointers(error_visual);
+   DeletePointers(global_error_visual);
 
    for (int k = 0; k < bdr_markers.Size(); k++)
       delete bdr_markers[k];
@@ -110,7 +112,10 @@ void MultiBlockSolver::ParseInputs()
       {
          visual_offset = config.GetOption<int>("visualization/domain_offset", 0);
          visual_freq = config.GetOption<int>("visualization/domain_frequency", 1);
-      } 
+      }
+
+      // visualization type for pointwise error.
+      visualize_error = config.GetOption<bool>("visualization/visualize_error", false);
    }
 
    // rom inputs.
@@ -637,6 +642,17 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
    paraviewColls.SetSize(numSub);
    paraviewColls = NULL;
 
+   std::string error_type, tmp;
+   if (visualize_error)
+   {
+      error_visual.SetSize(num_var * numSub);
+      error_visual = NULL;
+      for (int k = 0; k < error_visual.Size(); k++)
+         error_visual[k] = new GridFunction(fes[k]);
+      
+      error_type = "_abs_error";
+   }
+
    for (int m = 0; m < numSub; m++) {
       if ((m < visual_offset) || (m % visual_freq != 0)) continue;
 
@@ -650,7 +666,14 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
       paraviewColls[m]->SetPrecision(8);
 
       for (int v = 0, idx = m * num_var; v < num_var; v++, idx++)
+      {
          paraviewColls[m]->RegisterField(var_names[v].c_str(), us[idx]);
+         if (visualize_error)
+         {
+            tmp = var_names[v] + error_type;
+            paraviewColls[m]->RegisterField(tmp.c_str(), error_visual[idx]);
+         }
+      }
       paraviewColls[m]->SetOwnData(false);
    }
 }
@@ -664,7 +687,22 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
    for (int v = 0; v < num_var; v++)
    {
       global_fes[v] = new FiniteElementSpace(pmesh, fec[v], vdim[v]);
-      global_us_visual[v] = new GridFunction(global_fes[v]);   
+      global_us_visual[v] = new GridFunction(global_fes[v]);
+   }
+
+   std::string error_type, tmp;
+   if (visualize_error)
+   {
+      error_visual.SetSize(num_var * numSub);
+      error_visual = NULL;
+      for (int k = 0; k < error_visual.Size(); k++)
+         error_visual[k] = new GridFunction(fes[k]);
+
+      global_error_visual.SetSize(num_var);
+      for (int v = 0; v < num_var; v++)
+         global_error_visual[v] = new GridFunction(global_fes[v]);
+
+      error_type = "_abs_error";
    }
 
    // TODO: For truly bottom-up case, when the parent mesh does not exist?
@@ -677,7 +715,14 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
    paraviewColls[0]->SetPrecision(8);
 
    for (int v = 0; v < num_var; v++)
+   {
       paraviewColls[0]->RegisterField(var_names[v].c_str(), global_us_visual[v]);
+      if (visualize_error)
+      {
+         tmp = var_names[v] + error_type;
+         paraviewColls[0]->RegisterField(tmp.c_str(), global_error_visual[v]);
+      }
+   }
    paraviewColls[0]->SetOwnData(false);
 }
 
@@ -689,6 +734,8 @@ void MultiBlockSolver::SaveVisualization()
    {
       mfem_warning("Paraview is unified. Any overlapped interface dof data will not be shown.\n");
       topol_handler->TransferToGlobal(us, global_us_visual, num_var);
+      if (visualize_error)
+         topol_handler->TransferToGlobal(error_visual, global_error_visual, num_var);
    }
    else
    {
@@ -929,6 +976,10 @@ void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
    // Maximum L2-error / L2-norm over all variables.
    error.SetSize(num_var);
    ComputeRelativeError(us, test_us, error);
+
+   if (visualize_error)
+      for (int k = 0; k < test_us.Size(); k++)
+         subtract(*test_us[k], *us[k], *error_visual[k]);
 
    DeletePointers(test_us);
 }
