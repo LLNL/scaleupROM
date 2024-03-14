@@ -1249,7 +1249,13 @@ boundary
 
 vertices
 616
-2
+
+nodes
+FiniteElementSpace
+FiniteElementCollection: H1_2D_P1
+VDim: 2
+Ordering: 1
+
 9.409016466887903e-15 17.0
 -0.6452152132987976 12.852381706237793
 -0.8477970361709595 8.429289817810059
