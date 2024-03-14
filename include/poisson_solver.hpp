@@ -99,6 +99,9 @@ public:
    void SanityCheckOnCoeffs();
 
    virtual void SetParameterizedProblem(ParameterizedProblem *problem);
+
+protected:
+   virtual void SetMUMPSSolver();
 };
 
 #endif
