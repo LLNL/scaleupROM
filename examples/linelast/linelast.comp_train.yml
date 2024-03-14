@@ -134,9 +134,9 @@ basis:
     - name: "joint2D"
       number_of_basis: 15
     - name: "rod2D_H"
-      number_of_basis: 10
+      number_of_basis: 15
     - name: "rod2D_V"
-      number_of_basis: 10
+      number_of_basis: 15
   svd:
     save_spectrum: true
     update_right_sv: false

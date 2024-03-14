@@ -224,7 +224,7 @@ def cwgrid_mesh_configs(nx, ny, l, w):
 
     return mesh_configs, bdr_data, if_data, mesh_type, n_mesh
 
-def LatticeCantilever(nx, ny):
+def LatticeCantilever(nx, ny, prefix = "linelast.lattice"):
     # nx and ny are the number of sections in x- and y-direction, respectively
     l = 4.0 
     w = 1.0
@@ -236,7 +236,7 @@ def LatticeCantilever(nx, ny):
     # boundary attributes
     bdr_data = np.array(bdr_data)
 
-    filename = "linelast.lattice.h5"
+    filename = prefix + ".h5"
     with h5py.File(filename, 'w') as f:
         # c++ currently cannot read datasets of string.
         # change to multiple attributes, only as a temporary implementation.
@@ -623,19 +623,59 @@ def ComponentWiseTrainOptFOM(nx, ny):
         f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
     return
 
-
 def ComponentWiseTrainOptROM():
-    nx = 2
-    ny = 2
+    n_mesh = 8
     l = 17.0
     w = 1.0
-    mesh_configs, bdr_data, if_data, mesh_type, n_mesh = cwgrid_mesh_configs(nx, ny, l, w)
+
+    mesh_type = [0, 1, 0, 2, 2, 0, 1, 0]
+    mesh_configs = np.zeros([n_mesh, 6])
+    mesh_configs[1,:] = [w, 0., 0., 0., 0., 0.]
+    mesh_configs[2,:] = [w+l, 0., 0., 0., 0., 0.]
+    mesh_configs[3,:] = [0., w, 0., 0., 0., 0.]
+    mesh_configs[4,:] = [w+l, w, 0., 0., 0., 0.]
+    mesh_configs[5,:] = [0., w+l, 0., 0., 0., 0.]
+    mesh_configs[6,:] = [w, w+l, 0., 0., 0., 0.]
+    mesh_configs[7,:] = [w+l, w+l, 0., 0., 0., 0.]
 
     # interface data
-    if_data = np.array(if_data)
+    # mesh1 / mesh2 / battr1 / battr2 / port_idx
+    if_data = np.zeros([8, 5])
+    if_data[0, :] = [0, 1, 2, 4, 0]
+    if_data[1, :] = [2, 1, 4, 2, 1]
+    if_data[2, :] = [0, 3, 3, 1, 2]
+    if_data[3, :] = [2, 4, 3, 1, 2]
+    if_data[4, :] = [5, 3, 1, 3, 3]
+    if_data[5, :] = [7, 4, 1, 3, 3]
+    if_data[6, :] = [5, 6, 2, 4, 0]
+    if_data[7, :] = [7, 6, 4, 2, 1]
 
     # boundary attributes
+    # global_battr / mesh_idx / comp_battr
+    bdr_data = []
+
+    # applied loads and displacements
+    bdr_data += [[1, 0, 1]]
+    bdr_data += [[1, 1, 1]]
+    bdr_data += [[1, 2, 1]]
+    bdr_data += [[2, 2, 2]]
+    bdr_data += [[2, 4, 2]]
+    bdr_data += [[2, 7, 2]]
+    bdr_data += [[3, 5, 3]]
+    bdr_data += [[3, 6, 3]]
+    bdr_data += [[3, 7, 3]]
+    bdr_data += [[4, 0, 4]]
+    bdr_data += [[4, 3, 4]]
+    bdr_data += [[4, 5, 4]]
+
+    # homogenous neumann
+    bdr_data += [[5, 1, 3]]
+    bdr_data += [[5, 4, 4]]
+    bdr_data += [[5, 6, 1]]
+    bdr_data += [[5, 3, 2]]
+
     bdr_data = np.array(bdr_data)
+    print(bdr_data.shape)
 
     filename = "linelast.cw_opt_rom.h5"
     with h5py.File(filename, 'w') as f:
@@ -702,6 +742,7 @@ if __name__ == "__main__":
         elif name == "lattice_cantilever":
             nx = int(sys.argv[2])
             ny = int(sys.argv[3])
+            #prefix = int(sys.argv[4])
             LatticeCantilever(nx, ny)
         elif name == "componentwise_train":
             ComponentWiseTrain()
