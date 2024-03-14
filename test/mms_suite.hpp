@@ -10,6 +10,7 @@
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
 #include "linelast_solver.hpp"
+#include "advdiff_solver.hpp"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -89,6 +90,30 @@ LinElastSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 
 }  // namespace linelast
+
+namespace advdiff
+{
+
+static const double pi = 4.0 * atan(1.0);
+// solution parameters
+static double amp[3];
+static double L[3];
+static double offset[3];
+static double constant;
+// flow parameters
+static double Pe;
+static double du;
+static double wn;
+static double uoffset[3];
+static double u0, v0;
+
+double ExactSolution(const Vector &);
+void ExactFlow(const Vector &, Vector &);
+double ExactRHS(const Vector &);
+AdvDiffSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence();
+
+}  // namespace advdiff
 
 namespace fem
 {

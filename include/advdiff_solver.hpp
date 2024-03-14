@@ -19,6 +19,15 @@ friend class ParameterizedProblem;
 protected:
    double Pe = 0.0;  // Peclet number
 
+   // coefficient for prescribed velocity field.
+   // can be analytic function or solution from Stokes/SteadyNS equation.
+   Array<VectorCoefficient *> flow_coeffs;
+
+   /*
+      flow solver to obtain the prescribed velocity field. both StokesSolver / SteadyNSSolver can be used.
+   */
+   StokesSolver *stokes_solver = NULL;
+
 public:
    AdvDiffSolver();
 
@@ -28,6 +37,10 @@ public:
 
    // Component-wise assembly
    void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) override;
+
+   void SetFlowAtSubdomain(std::function<void(const Vector &, Vector &)> F, const int m=-1);
+
+   void SetParameterizedProblem(ParameterizedProblem *problem) override;
 
 protected:
    void SetMUMPSSolver() override;

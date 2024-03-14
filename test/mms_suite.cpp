@@ -597,6 +597,167 @@ namespace linelast
 
 } // namespace linelast
 
+namespace advdiff
+{
+
+double ExactSolution(const Vector &x)
+{
+   double result = constant;
+   for (int d = 0; d < x.Size(); d++)
+      result += amp[d] * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
+   return result;
+}
+
+void ExactFlow(const Vector &x, Vector &y)
+{
+   y.SetSize(x.Size());
+   y = 0.0;
+   y(0) = u0; y(1) = v0;
+
+   double xi = 2.0 * pi * wn * (x(0) - uoffset[0]);
+   double yi = 2.0 * pi * wn * (x(1) - uoffset[1]);
+
+   // incompressible flow field
+   y(0) += du * cos(xi) * sin(yi);
+   y(1) += -du * sin(xi) * cos(yi);
+
+   return;
+}
+
+double ExactRHS(const Vector &x)
+{
+   Vector flow;
+   ExactFlow(x, flow);
+
+   double result = 0.0;
+   for (int d = 0; d < x.Size(); d++)
+   {
+      result += amp[d] * (2.0 * pi / L[d]) * (2.0 * pi / L[d]) * sin(2.0 * pi / L[d] * (x(d) - offset[d]));
+      result += Pe * flow(d) * amp[d] * (2.0 * pi / L[d]) * cos(2.0 * pi / L[d] * (x(d) - offset[d]));
+   }
+   return result;
+}
+
+AdvDiffSolver *SolveWithRefinement(const int num_refinement)
+{
+   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+   AdvDiffSolver *test = new AdvDiffSolver();
+
+   test->InitVariables();
+   test->InitVisualization();
+
+   test->AddBCFunction(ExactSolution);
+   test->SetBdrType(BoundaryType::DIRICHLET);
+   test->AddRHSFunction(ExactRHS);
+   test->SetFlowAtSubdomain(ExactFlow);
+
+   FunctionCoefficient exact_sol(ExactSolution);
+   for (int k = 0; k < test->GetNumSubdomains(); k++)
+   {
+      GridFunction *uk = test->GetGridFunction(k);
+      uk->ProjectCoefficient(exact_sol);
+   }
+   BlockVector *exact_U = test->GetSolutionCopy();
+   Vector error;
+
+   test->BuildOperators();
+
+   test->SetupBCOperators();
+
+   test->Assemble();
+
+   test->Solve();
+   // test->CompareSolution(*exact_U, error);
+   test->SaveVisualization();
+
+   delete exact_U;
+   return test;
+}
+
+void CheckConvergence()
+{
+   amp[0] = config.GetOption<double>("manufactured_solution/amp1", 0.22);
+   amp[1] = config.GetOption<double>("manufactured_solution/amp2", 0.13);
+   amp[2] = config.GetOption<double>("manufactured_solution/amp3", 0.37);
+   L[0] = config.GetOption<double>("manufactured_solution/L1", 0.31);
+   L[1] = config.GetOption<double>("manufactured_solution/L2", 0.72);
+   L[2] = config.GetOption<double>("manufactured_solution/L2", 0.47);
+   offset[0] = config.GetOption<double>("manufactured_solution/offset1", 0.35);
+   offset[1] = config.GetOption<double>("manufactured_solution/offset2", 0.73);
+   offset[2] = config.GetOption<double>("manufactured_solution/offset3", 0.59);
+   constant = config.GetOption<double>("manufactured_solution/constant", -0.27);
+
+   Pe = config.GetOption<double>("adv-diff/peclet_number", 0.2);
+   u0 = config.GetOption<double>("manufactured_solution/u0", 1.2);
+   v0 = config.GetOption<double>("manufactured_solution/v0", -0.7);
+   du = config.GetOption<double>("manufactured_solution/du", 0.21);
+   wn = config.GetOption<double>("manufactured_solution/wn", 0.8);
+   uoffset[0] = config.GetOption<double>("manufactured_solution/uoffset1", 0.51);
+   uoffset[1] = config.GetOption<double>("manufactured_solution/uoffset2", 0.19);
+   uoffset[2] = config.GetOption<double>("manufactured_solution/uoffset3", 0.91);
+
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+   // Compare with exact solution
+   FunctionCoefficient exact_sol(ExactSolution);
+
+   printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
+
+   Vector conv_rate(num_refine);
+   conv_rate = 0.0;
+   double error1 = 0.0;
+   for (int r = base_refine; r < num_refine; r++)
+   {
+      AdvDiffSolver *test = SolveWithRefinement(r);
+
+      int order = test->GetDiscretizationOrder();
+      int order_quad = max(2, 2*order+1);
+      const IntegrationRule *irs[Geometry::NumGeom];
+      for (int i=0; i < Geometry::NumGeom; ++i)
+      {
+         irs[i] = &(IntRules.Get(i, order_quad));
+      }
+
+      int numEl = 0;
+      double norm = 0.0;
+      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      {
+         Mesh *mk = test->GetMesh(k);
+         norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
+         numEl += mk->GetNE();
+      }
+      norm = sqrt(norm);
+
+      double error = 0.0;
+      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      {
+         GridFunction *uk = test->GetGridFunction(k);
+         error += pow(uk->ComputeLpError(2, exact_sol), 2);
+      }
+      error = sqrt(error);
+      error /= norm;
+      
+      if (r > base_refine)
+      {
+         conv_rate(r) = error1 / error;
+      }
+      printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
+
+      // reported convergence rate
+      if (r > base_refine)
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.5);
+
+      error1 = error;
+
+      delete test;
+   }
+
+   return;
+}
+
+}  // namespace advdiff
+
 namespace fem
 {
 
