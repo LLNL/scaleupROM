@@ -16,13 +16,13 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
-// TEST(DDSerialTest, Test_convergence)
-// {
-//    config = InputParser("inputs/dd_mms.yml");
-//    CheckConvergence();
+TEST(DDSerialTest, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   CheckConvergence();
 
-//    return;
-// }
+   return;
+}
 
 TEST(DDSerialTest, Test_direct_solver)
 {
@@ -33,21 +33,21 @@ TEST(DDSerialTest, Test_direct_solver)
    return;
 }
 
-// TEST(DDSerial_component_wise_test, Test_convergence)
-// {
-//    config = InputParser("inputs/dd_mms.component.yml");
-//    CheckConvergence();
+TEST(DDSerial_component_wise_test, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.component.yml");
+   CheckConvergence();
 
-//    return;
-// }
+   return;
+}
 
-// TEST(DDSerial_component_3D_hex_test, Test_convergence)
-// {
-//    config = InputParser("inputs/dd_mms.comp.3d.yml");
-//    CheckConvergence();
+TEST(DDSerial_component_3D_hex_test, Test_convergence)
+{
+   config = InputParser("inputs/dd_mms.comp.3d.yml");
+   CheckConvergence();
 
-//    return;
-// }
+   return;
+}
 
 // TEST(DDSerial_component_3D_tet_test, Test_convergence)
 // {

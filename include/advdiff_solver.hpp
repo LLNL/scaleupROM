@@ -38,6 +38,8 @@ public:
    // Component-wise assembly
    void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) override;
 
+   bool Solve() override;
+
    void SetFlowAtSubdomain(std::function<void(const Vector &, Vector &)> F, const int m=-1);
 
    void SetParameterizedProblem(ParameterizedProblem *problem) override;

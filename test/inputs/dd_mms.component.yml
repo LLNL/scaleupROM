@@ -39,5 +39,8 @@ manufactured_solution:
   amp2: 3.13
   constant: 1.11
 
+adv-diff:
+  peclet_number: 1.1
+
 stokes:
   nu: 1.2

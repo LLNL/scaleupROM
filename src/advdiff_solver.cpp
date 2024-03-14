@@ -67,6 +67,83 @@ void AdvDiffSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
+bool AdvDiffSolver::Solve()
+{
+   // If using direct solver, returns always true.
+   bool converged = true;
+
+   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
+   int print_level = config.GetOption<int>("solver/print_level", 0);
+
+   // TODO: need to change when the actual parallelization is implemented.
+   if (direct_solve)
+   {
+      assert(mumps);
+      mumps->SetPrintLevel(print_level);
+      mumps->Mult(*RHS, *U);
+   }
+   else
+   {
+      GMRESSolver *solver = NULL;
+      HypreBoomerAMG *M = NULL;
+      BlockDiagonalPreconditioner *globalPrec = NULL;
+      
+      // HypreBoomerAMG makes a meaningful difference in computation time.
+      if (use_amg)
+      {
+         // Initializating HypreParMatrix needs the monolithic sparse matrix.
+         assert(globalMat_mono != NULL);
+
+         solver = new GMRESSolver(MPI_COMM_SELF);
+
+         M = new HypreBoomerAMG(*globalMat_hypre);
+         M->SetPrintLevel(print_level);
+
+         solver->SetPreconditioner(*M);
+         solver->SetOperator(*globalMat_hypre);
+      }
+      else
+      {
+         solver = new GMRESSolver();
+         
+         if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
+         {
+            globalPrec = new BlockDiagonalPreconditioner(var_offsets);
+            solver->SetPreconditioner(*globalPrec);
+         }
+         solver->SetOperator(*globalMat);
+      }
+      solver->SetAbsTol(atol);
+      solver->SetRelTol(rtol);
+      solver->SetMaxIter(maxIter);
+      solver->SetPrintLevel(print_level);
+
+      *U = 0.0;
+      // The time for the setup above is much smaller than this Mult().
+      // StopWatch test;
+      // test.Start();
+      solver->Mult(*RHS, *U);
+      // test.Stop();
+      // printf("test: %f seconds.\n", test.RealTime());
+      converged = solver->GetConverged();
+
+      // delete the created objects.
+      if (use_amg)
+      {
+         delete M;
+      }
+      else
+      {
+         if (globalPrec != NULL) delete globalPrec;
+      }
+      delete solver;
+   }
+
+   return converged;
+}
+
 void AdvDiffSolver::SetFlowAtSubdomain(std::function<void(const Vector &, Vector &)> F, const int m)
 {
    assert(flow_coeffs.Size() == numSub);

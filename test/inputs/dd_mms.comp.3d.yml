@@ -39,6 +39,9 @@ discretization:
   order: 2
   full-discrete-galerkin: false
 
+solver:
+  direct_solve: true
+
 visualization:
   enable: false
   output_dir: dd_mms_output
@@ -49,6 +52,9 @@ manufactured_solution:
   amp2: 3.13
   amp3: 2.77
   constant: 1.11
+
+adv-diff:
+  peclet_number: 1.1
 
 stokes:
   nu: 1.2
