@@ -674,7 +674,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    Solver *J_solver = NULL;
    if (linsol_type == SolverType::DIRECT)
    {
-      mumps = new MUMPSSolver();
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(mat_type);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;
@@ -1086,7 +1086,7 @@ void MFEMROMHandler::SetupDirectSolver()
    sys_row_starts[1] = romMat_mono->NumRows();
    romMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, romMat_mono);
 
-   mumps = new MUMPSSolver();
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
    mumps->SetMatrixSymType(mat_type);
    mumps->SetOperator(*romMat_hypre);
 }

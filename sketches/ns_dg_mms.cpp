@@ -413,7 +413,7 @@ int main(int argc, char *argv[])
    MUMPSSolver *J_mumps = NULL;
    if (direct_solve)
    {
-      J_mumps = new MUMPSSolver;
+      J_mumps = new MUMPSSolver(MPI_COMM_WORLD);
       J_mumps->SetPrintLevel(-1);
       J_mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       J_solver = J_mumps;

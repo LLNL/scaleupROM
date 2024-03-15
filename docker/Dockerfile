@@ -29,6 +29,8 @@ WORKDIR /usr/lib
 RUN arch=$(uname -m) && sudo ln -s /usr/lib/${arch}-linux-gnu/libscalapack-openmpi.so.2.1.0 ./
 
 # re-install mfem with mumps, with cmake
+WORKDIR $LIB_DIR/mfem
+RUN sudo git checkout v4.6
 WORKDIR $LIB_DIR/mfem/build
 RUN sudo -E cmake .. -DBUILD_SHARED_LIBS=YES -DMFEM_USE_MPI=YES -DMFEM_USE_GSLIB=${MG} -DMFEM_USE_METIS=YES -DMFEM_USE_METIS_5=YES -DMFEM_USE_MUMPS=YES -DGSLIB_DIR="$LIB_DIR/gslib/build" -DMUMPS_DIR="$LIB_DIR/mumps/build/local"
 RUN sudo -E make -j 16
@@ -54,7 +56,7 @@ WORKDIR ./libROM
 RUN sudo git pull && sudo git checkout mpi-io
 WORKDIR ./build
 # libROM is using the MFEM without MUMPS right now.
-RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=${USE_MFEM} -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
+RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=OFF -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
 RUN sudo make -j 16
 
 ENV LIBROM_DIR=$LIB_DIR/libROM

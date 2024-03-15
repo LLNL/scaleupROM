@@ -292,7 +292,7 @@ void LinElastSolver::AssembleOperator()
       sys_row_starts[1] = globalMat_mono->NumRows();
       globalMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, globalMat_mono);
 
-      mumps = new MUMPSSolver();
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
       mumps->SetOperator(*globalMat_hypre);
    }

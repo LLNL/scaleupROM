@@ -492,7 +492,7 @@ void StokesSolver::SetupMUMPSSolver()
    sys_row_starts[1] = systemOp_mono->NumRows();
    systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
-   mumps = new MUMPSSolver();
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
    mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
    mumps->SetOperator(*systemOp_hypre);
 }
@@ -1080,7 +1080,7 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
-   
+
    nu = function_factory::stokes_problem::nu;
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);

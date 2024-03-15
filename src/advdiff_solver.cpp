@@ -19,6 +19,7 @@ AdvDiffSolver::AdvDiffSolver()
    Pe = config.GetOption<double>("adv-diff/peclet_number", 0.0);
 
    flow_coeffs.SetSize(numSub);
+   flow_coeffs = NULL;
 
    save_flow = config.GetOption<bool>("adv-diff/save_flow", false);
    load_flow = config.GetOption<bool>("adv-diff/load_flow", false);
@@ -175,7 +176,7 @@ void AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 void AdvDiffSolver::SetMUMPSSolver()
 {
    assert(globalMat_hypre);
-   mumps = new MUMPSSolver();
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
    mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
    mumps->SetOperator(*globalMat_hypre);
 }

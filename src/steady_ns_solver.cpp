@@ -645,7 +645,7 @@ bool SteadyNSSolver::Solve()
 
    if (direct_solve)
    {
-      mumps = new MUMPSSolver();
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;

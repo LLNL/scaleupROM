@@ -556,7 +556,7 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
-   
+
    // clean up rhs for parametrized problem.
    if (rhs_coeffs.Size() > 0)
    {
@@ -592,7 +592,7 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 void PoissonSolver::SetMUMPSSolver()
 {
    assert(globalMat_hypre);
-   mumps = new MUMPSSolver();
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
    mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
    mumps->SetOperator(*globalMat_hypre);
 }

@@ -242,7 +242,7 @@ public:
 
       if (direct_solve)
       {
-         J_mumps = new MUMPSSolver();
+         J_mumps = new MUMPSSolver(MPI_COMM_WORLD);
          J_mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
          J_solver = J_mumps;
       }
