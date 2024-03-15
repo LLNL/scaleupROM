@@ -200,6 +200,32 @@ void tip_force(const Vector &x, Vector &f)
 
 }  // namespace linelast_force
 
+namespace advdiff_problem
+{
+
+bool analytic_flow;
+StokesProblem *flow_problem;
+
+namespace advdiff_flow_past_array
+{
+
+double q0, dq, qoffset;
+Vector qk;
+
+double qbdr(const Vector &x)
+{
+   assert(qk.Size() >= x.Size());
+   double tmp = 0.0;
+   for (int d = 0; d < x.Size(); d++)
+      tmp += advdiff_flow_past_array::qk(d) * x(d);
+   tmp += advdiff_flow_past_array::qoffset;
+   return advdiff_flow_past_array::q0 + advdiff_flow_past_array::dq * sin(2.0 * pi * tmp);
+}
+
+}  // namespace advdiff_flow_past_array
+
+}  // namespace advdiff_problem
+
 }  // namespace function_factory
 
 ParameterizedProblem::ParameterizedProblem()
@@ -302,6 +328,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "linelast_force_cantilever")
    {
       problem = new LinElastForceCantilever();
+   }
+   else if (problem_name == "advdiff_flow_past_array")
+   {
+      problem = new AdvDiffFlowPastArray();
    }
    else
    {
@@ -761,4 +791,52 @@ LinElastForceCantilever::LinElastForceCantilever()
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL;
+}
+
+/*
+   AdvDiffFlowPastArray
+*/
+
+AdvDiffFlowPastArray::AdvDiffFlowPastArray()
+   : StokesFlowPastArray(), flow_problem(new StokesFlowPastArray)
+{
+   function_factory::advdiff_problem::analytic_flow = false;
+   function_factory::advdiff_problem::flow_problem = flow_problem;
+
+   bdr_type.SetSize(5);
+   bdr_type = BoundaryType::DIRICHLET;
+   bdr_type[4] = BoundaryType::NEUMANN;
+
+   scalar_rhs_ptr = NULL;
+   scalar_bdr_ptr.SetSize(5);
+   scalar_bdr_ptr = &(function_factory::advdiff_problem::advdiff_flow_past_array::qbdr);
+
+   // q0 + dq + qoffset + qk(3)
+   param_num += 1 + 1 + 1 + 3;
+   const int p0 = flow_problem->GetNumParams();
+
+   param_map["q0"] = p0;
+   param_map["dq"] = p0 + 1;
+   param_map["qoffset"] = p0 + 2;
+   param_map["qk_x"] = p0 + 3;
+   param_map["qk_y"] = p0 + 4;
+   param_map["qk_z"] = p0 + 5;
+
+   // default values.
+   function_factory::advdiff_problem::advdiff_flow_past_array::q0 = 1.0;
+   function_factory::advdiff_problem::advdiff_flow_past_array::dq = 0.1;
+   function_factory::advdiff_problem::advdiff_flow_past_array::qoffset = 0.0;
+   function_factory::advdiff_problem::advdiff_flow_past_array::qk.SetSize(3);
+   function_factory::advdiff_problem::advdiff_flow_past_array::qk = 0.0;
+
+   param_ptr.Append(&(function_factory::advdiff_problem::advdiff_flow_past_array::q0));
+   param_ptr.Append(&(function_factory::advdiff_problem::advdiff_flow_past_array::dq));
+   param_ptr.Append(&(function_factory::advdiff_problem::advdiff_flow_past_array::qoffset));
+   for (int j = 0; j < 3; j++)
+      param_ptr.Append(&(function_factory::advdiff_problem::advdiff_flow_past_array::qk(j)));
+}
+
+AdvDiffFlowPastArray::~AdvDiffFlowPastArray()
+{
+   delete flow_problem;
 }

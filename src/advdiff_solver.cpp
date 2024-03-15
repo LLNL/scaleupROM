@@ -19,11 +19,17 @@ AdvDiffSolver::AdvDiffSolver()
    Pe = config.GetOption<double>("adv-diff/peclet_number", 0.0);
 
    flow_coeffs.SetSize(numSub);
+
+   save_flow = config.GetOption<bool>("adv-diff/save_flow", false);
+   load_flow = config.GetOption<bool>("adv-diff/load_flow", false);
+   if (save_flow || load_flow)
+      flow_file = config.GetRequiredOption<std::string>("adv-diff/flow_file");
 }
 
 AdvDiffSolver::~AdvDiffSolver()
 {
    DeletePointers(flow_coeffs);
+   delete stokes_solver;
 }
 
 void AdvDiffSolver::BuildDomainOperators()
@@ -160,9 +166,10 @@ void AdvDiffSolver::SetFlowAtSubdomain(std::function<void(const Vector &, Vector
 
 void AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
-   PoissonSolver::SetParameterizedProblem(problem);
+   if (!function_factory::advdiff_problem::analytic_flow)
+      GetFlowField(function_factory::advdiff_problem::flow_problem);
 
-   // TODO(kevin): add flow field setup.
+   PoissonSolver::SetParameterizedProblem(problem);
 }
 
 void AdvDiffSolver::SetMUMPSSolver()
@@ -171,4 +178,40 @@ void AdvDiffSolver::SetMUMPSSolver()
    mumps = new MUMPSSolver();
    mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
    mumps->SetOperator(*globalMat_hypre);
+}
+
+void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
+{
+   assert(flow_problem);
+   mfem_warning("AdvDiffSolver: Obtaining flow field. This may take a while depending on the domain size.\n");
+
+   stokes_solver = new StokesSolver;
+   stokes_solver->InitVariables();
+   stokes_solver->InitVisualization();
+
+   if (load_flow && FileExists(flow_file))
+      stokes_solver->LoadSolution(flow_file);
+   else
+   {
+      stokes_solver->SetParameterizedProblem(flow_problem);
+      // currently only support FOM.
+      stokes_solver->BuildOperators();
+      stokes_solver->SetupBCOperators();
+      stokes_solver->Assemble();
+      stokes_solver->Solve();
+   }
+
+   if (save_flow)
+      stokes_solver->SaveSolution(flow_file);
+
+   DeletePointers(flow_coeffs);
+   const int stokes_numvar = stokes_solver->GetNumVar();
+   for (int m = 0; m < numSub; m++)
+      flow_coeffs[m] = new VectorGridFunctionCoefficient(stokes_solver->GetGridFunction(m * stokes_numvar));
+
+   /*
+      VectorGridFunctionCoefficient does not own the grid function,
+      and it requires the grid function for its lifetime.
+      Thus stokes_solver will be deleted at ~AdvDiffSolver().
+   */
 }

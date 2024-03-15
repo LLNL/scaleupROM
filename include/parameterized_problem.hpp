@@ -92,9 +92,24 @@ extern double rforce_f;
 void tip_force(const Vector &x, Vector &u);
 }
 
+namespace advdiff_problem
+{
+
+extern bool analytic_flow;
+
+namespace advdiff_flow_past_array
+{
+   extern double q0, dq, qoffset;
+   extern Vector qk;
+
+   double qbdr(const Vector &x);
+}  //  namespace advdiff_flow_past_array
+
+}  // namespace advdiff_problem
+
 }
 
-enum BoundaryType
+enum class BoundaryType
 { 
    ZERO,
    DIRICHLET,
@@ -169,8 +184,8 @@ class PoissonComponent : public PoissonProblem
 public:
    PoissonComponent();
    virtual ~PoissonComponent() {};
-   virtual void SetParams(const std::string &key, const double &value) override;
-   virtual void SetParams(const Array<int> &indexes, const Vector &values) override;
+   void SetParams(const std::string &key, const double &value) override;
+   void SetParams(const Array<int> &indexes, const Vector &values) override;
 
 private:
    void SetBattr();
@@ -206,15 +221,17 @@ public:
 
 class StokesFlowPastArray : public StokesComponent
 {
+friend class AdvDiffFlowPastArray;
+
 public:
    StokesFlowPastArray();
 
-   virtual void SetParams(const std::string &key, const double &value);
-   virtual void SetParams(const Array<int> &indexes, const Vector &values);
+   virtual void SetParams(const std::string &key, const double &value) override;
+   virtual void SetParams(const Array<int> &indexes, const Vector &values) override;
 
-private:
+protected:
    Vector *u0;
-   void SetBattr();
+   virtual void SetBattr();
 };
 
 class LinElastProblem : public ParameterizedProblem
@@ -249,6 +266,43 @@ class LinElastForceCantilever : public LinElastProblem
 {
 public:
    LinElastForceCantilever();
+};
+
+namespace function_factory
+{
+
+namespace advdiff_problem
+{
+/*
+   flow_problem will be passed down to StokesSolver/SteadyNSSolver for obtaining velocity field.
+   It must be set appropriately within each AdvDiffSolver problems.
+*/
+extern StokesProblem *flow_problem;
+
+}  // namespace advdiff_problem
+
+}  // namespace function_factory
+
+class AdvDiffFlowPastArray : public StokesFlowPastArray
+{
+protected:
+   /*
+      flow_problem shares the same pointers with this class.
+      Thus every parameter set by this class is reflected to StokesFlowPastArrayProblem as well.
+      flow_problem will be passed down to StokesSolver/SteadyNSSolver for obtaining velocity field.
+   */
+   StokesFlowPastArray *flow_problem = NULL;
+
+public:
+   AdvDiffFlowPastArray();
+   virtual ~AdvDiffFlowPastArray();
+
+protected:
+   void SetBattr() override
+   {
+      StokesFlowPastArray::SetBattr();
+      flow_problem->SetBattr();
+   }
 };
 
 ParameterizedProblem* InitParameterizedProblem();

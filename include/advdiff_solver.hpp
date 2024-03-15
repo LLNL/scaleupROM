@@ -27,6 +27,9 @@ protected:
       flow solver to obtain the prescribed velocity field. both StokesSolver / SteadyNSSolver can be used.
    */
    StokesSolver *stokes_solver = NULL;
+   bool load_flow = false;
+   bool save_flow = false;
+   std::string flow_file = "";
 
 public:
    AdvDiffSolver();
@@ -46,6 +49,9 @@ public:
 
 protected:
    void SetMUMPSSolver() override;
+
+private:
+   void GetFlowField(ParameterizedProblem *flow_problem);
 };
 
 #endif

@@ -1,0 +1,81 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  solver: adv-diff
+  mode: single_run
+  use_rom: true
+
+adv-diff:
+  peclet_number: 1.1
+  save_flow: true
+  flow_file: advdiff.flow_field.h5
+
+mesh:
+  filename: meshes/test.2x2.mesh
+  uniform_refinement: 1
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: false
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: sample_gen_output
+
+parameterized_problem:
+  name: advdiff_flow_past_array
+
+single_run:
+  advdiff_flow_past_array:
+    nu: 2.5
+    u0_x: 1.0
+    u0_y: -1.0
+    du_x: 0.1
+    du_y: 0.1
+    k_u_x: 0.5
+    k_u_y: 0.8
+    k_v_x: 0.7
+    k_v_y: 0.2
+    q0: 1.0
+    dq: 0.8
+    qoffset: 0.0
+    qk_x: 1.5
+    qk_y: 0.9
+
+sample_generation:
+  maximum_number_of_snapshots: 400
+  component_sampling: false
+  file_path:
+    prefix: "advdiff_flow_past_array"
+  parameters:
+    - key: single_run/advdiff_flow_past_array/qk_x
+      type: double
+      sample_size: 3
+      minimum: 1.0
+      maximum: 2.0
+
+basis:
+  prefix: "advdiff0"
+  number_of_basis: 3
+  tags:
+    - name: comp0
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  # individual/universal
+  subdomain_training: individual
+  save_operator:
+    level: global
+    prefix: "proj_inv"
+  compare_solution:
+    enabled: true
+  linear_solver_type: direct
+  linear_system_type: us

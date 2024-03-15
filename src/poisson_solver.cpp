@@ -554,6 +554,9 @@ void PoissonSolver::SanityCheckOnCoeffs()
 
 void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   /* set up boundary types */
+   MultiBlockSolver::SetParameterizedProblem(problem);
+   
    // clean up rhs for parametrized problem.
    if (rhs_coeffs.Size() > 0)
    {

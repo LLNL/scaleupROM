@@ -33,6 +33,7 @@ add_executable(test_workflow test_workflow.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 file(COPY inputs/test.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY inputs/stokes.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY inputs/steady_ns.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
+file(COPY inputs/advdiff.base.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/test.2x2.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY meshes/test.2x1.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 

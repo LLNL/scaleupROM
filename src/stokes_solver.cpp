@@ -1078,6 +1078,9 @@ void StokesSolver::SanityCheckOnCoeffs()
 
 void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   /* set up boundary types */
+   MultiBlockSolver::SetParameterizedProblem(problem);
+   
    nu = function_factory::stokes_problem::nu;
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);
