@@ -269,7 +269,7 @@ void ROMHandlerBase::LoadReducedBasis()
       */
       {
          int local_dim = CAROM::split_dimension(dim_ref_basis[k], MPI_COMM_WORLD);
-         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k], CAROM::Database::HDF5_MPIO, local_dim);
+         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k], CAROM::Database::formats::HDF5_MPIO, local_dim);
 
          carom_ref_basis[k] = new CAROM::Matrix(*basis_reader->getSpatialBasis(num_ref_basis[k]));
          carom_ref_basis[k]->gather();
