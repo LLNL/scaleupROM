@@ -493,7 +493,7 @@ void StokesSolver::SetupMUMPSSolver(bool set_oper)
    systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
    mumps = new MUMPSSolver(MPI_COMM_SELF);
-   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
    if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 
