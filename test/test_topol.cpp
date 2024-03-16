@@ -62,6 +62,9 @@ TEST(PortReadWrite_test, Test_topol)
 {
    config = InputParser("inputs/test_topol.3d.yml");
    config.dict_["mesh"]["component-wise"]["write_ports"] = true;
+   config.dict_["mesh"]["component-wise"]["ports"][0]["file"] = "port1.3d.h5";
+   config.dict_["mesh"]["component-wise"]["ports"][1]["file"] = "port2.3d.h5";
+   config.dict_["mesh"]["component-wise"]["ports"][2]["file"] = "port3.3d.h5";
 
    printf("Generate\n");
    ComponentTopologyHandler *old = new ComponentTopologyHandler();

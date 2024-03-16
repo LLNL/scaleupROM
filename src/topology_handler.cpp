@@ -306,6 +306,9 @@ void SubMeshTopologyHandler::BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm,
    MFEM_ASSERT(pm.Dimension() == 2, "Support only 2-dimension meshes!");
    MFEM_ASSERT(sm.Dimension() == 2, "Support only 2-dimension meshes!");
 
+   // NOTE(kevin): MFEM v4.6 SubMesh uses this for generated boundary attributes.
+   const int generated_battr = pmesh->bdr_attributes.Max() + 1;
+
    // Array<int> parent_face_map = submesh.GetParentFaceIDMap();
    if (parent_face_map == NULL)
       parent_face_map = new Array<int>(BuildFaceMap2D(pm, sm));
@@ -332,7 +335,7 @@ void SubMeshTopologyHandler::BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm,
          // This case happens when a domain is extracted, but the root parent
          // mesh didn't have a boundary element on the surface that defined
          // it's boundary. It still creates a valid mesh, so we allow it.
-         sm.GetBdrElement(k)->SetAttribute(SubMesh::GENERATED_ATTRIBUTE);
+         sm.GetBdrElement(k)->SetAttribute(generated_battr);
       }
    }
 
@@ -350,13 +353,15 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
    port_infos.SetSize(0);
 
    // interface attribute starts after the parent mesh boundary attributes.
-   int if_attr = pmesh->bdr_attributes.Max() + 1;
+   // NOTE(kevin): MFEM v4.6 SubMesh uses this for generated boundary attributes.
+   const int generated_battr = pmesh->bdr_attributes.Max() + 1;
+   int if_attr = pmesh->bdr_attributes.Max() + 2;
 
    for (int i = 0; i < numSub; i++)
    {
       for (int ib = 0; ib < meshes[i]->GetNBE(); ib++)
       {
-         if (meshes[i]->GetBdrAttribute(ib) != SubMesh::GENERATED_ATTRIBUTE) continue;
+         if (meshes[i]->GetBdrAttribute(ib) != generated_battr) continue;
          int parent_face_i = (*parent_face_map[i])[meshes[i]->GetBdrFace(ib)];
 
          // Loop over each subdomain, each boundary element, to find the match.
@@ -367,12 +372,12 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
                int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrFace(jb)];
                if (parent_face_i != parent_face_j) continue;
 
-               assert(meshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE);
+               assert(meshes[j]->GetBdrAttribute(jb) == generated_battr);
 
                if (interface_attributes[i][j] <= 0) {
                   interface_attributes[i][j] = if_attr;
                   interface_map[i][j] = port_infos.Size();
-                  // NOTE: for SubMehs, component boundary attribute is simply SubMesh::GENERATED_ATTRIBUTE,
+                  // NOTE: for SubMesh, component boundary attribute is simply generated_battr,
                   // which is not informative at all.
                   port_infos.Append(PortInfo({.PortAttr = if_attr,
                                               .Mesh1 = i, .Mesh2 = j,
