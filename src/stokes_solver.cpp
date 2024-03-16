@@ -399,7 +399,7 @@ void StokesSolver::AssembleOperator()
    AssembleOperatorBase();
 
    if (direct_solve)
-      SetupMUMPSSolver();
+      SetupMUMPSSolver(true);
    else
       // pressure mass matrix for preconditioner.
       SetupPressureMassMatrix();
@@ -477,7 +477,7 @@ void StokesSolver::AssembleOperatorBase()
    systemOp->SetBlock(1,0, B);
 }
 
-void StokesSolver::SetupMUMPSSolver()
+void StokesSolver::SetupMUMPSSolver(bool set_oper)
 {
    assert(systemOp);
    delete systemOp_mono;
@@ -494,7 +494,7 @@ void StokesSolver::SetupMUMPSSolver()
 
    mumps = new MUMPSSolver(MPI_COMM_SELF);
    mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
-   mumps->SetOperator(*systemOp_hypre);
+   if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 
 void StokesSolver::SetupPressureMassMatrix()

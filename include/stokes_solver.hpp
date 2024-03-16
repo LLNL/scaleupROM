@@ -179,7 +179,7 @@ public:
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrices();
-   virtual void SetupMUMPSSolver();
+   virtual void SetupMUMPSSolver(bool set_oper);
    virtual void SetupPressureMassMatrix();
 
    // Component-wise assembly

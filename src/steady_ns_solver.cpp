@@ -329,13 +329,6 @@ void SteadyNSSolver::InitVariables()
    }
 }
 
-void SteadyNSSolver::BuildOperators()
-{
-   BuildRHSOperators();
-
-   BuildDomainOperators();
-}
-
 void SteadyNSSolver::BuildDomainOperators()
 {
    StokesSolver::BuildDomainOperators();
@@ -427,13 +420,15 @@ void SteadyNSSolver::SetupDomainBCOperators()
    
 }
 
-void SteadyNSSolver::Assemble()
+void SteadyNSSolver::AssembleOperator()
 {
-   StokesSolver::AssembleRHS();
+   StokesSolver::AssembleOperatorBase();
 
-   StokesSolver::AssembleOperator();
-
-   // nonlinear operator?
+   if (direct_solve)
+      StokesSolver::SetupMUMPSSolver(false);
+   else
+      // pressure mass matrix for preconditioner.
+      StokesSolver::SetupPressureMassMatrix();
 }
 
 void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
