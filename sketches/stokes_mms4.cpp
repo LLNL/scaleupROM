@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
       HYPRE_BigInt sys_row_starts[2] = {0, sys_mat->NumRows()};
       HypreParMatrix Aop(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, sys_mat);
 
-      MUMPSSolver mumps;
+      MUMPSSolver mumps(MPI_COMM_WORLD);
       mumps.SetPrintLevel(1);
       mumps.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       // mumps.SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
