@@ -243,8 +243,12 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
    stokes_solver->InitVariables();
    stokes_solver->SetSolutionSaveMode(save_flow);
 
+   bool flow_loaded = false;
    if (load_flow && FileExists(flow_file))
+   {
       stokes_solver->LoadSolution(flow_file);
+      flow_loaded = true;
+   }
    else
    {
       stokes_solver->SetParameterizedProblem(flow_problem);
@@ -255,7 +259,7 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
       stokes_solver->Solve();
    }
 
-   if (save_flow)
+   if (save_flow && (!flow_loaded))
       stokes_solver->SaveSolution(flow_file);
 
    DeletePointers(flow_coeffs);
