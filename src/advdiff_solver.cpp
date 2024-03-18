@@ -11,7 +11,7 @@ using namespace std;
 using namespace mfem;
 
 AdvDiffSolver::AdvDiffSolver()
-   : PoissonSolver()
+   : PoissonSolver(), flow_visual(0), flow_fes(0), global_flow_visual(0)
 {
    // ConvectionIntegrator does not support L2 space.
    assert(!full_dg);
@@ -30,6 +30,9 @@ AdvDiffSolver::AdvDiffSolver()
 AdvDiffSolver::~AdvDiffSolver()
 {
    DeletePointers(flow_coeffs);
+   if (!stokes_solver) DeletePointers(flow_visual);
+   DeletePointers(global_flow_visual);
+   delete global_flow_fes;
    delete stokes_solver;
 }
 
@@ -173,6 +176,56 @@ void AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    PoissonSolver::SetParameterizedProblem(problem);
 }
 
+void AdvDiffSolver::SaveVisualization()
+{
+   if (!save_visual) return;
+
+   assert(paraviewColls.Size() > 0);
+   for (int k = 0; k < paraviewColls.Size(); k++)
+      assert(paraviewColls[k]);
+
+   flow_visual.SetSize(numSub);
+   flow_visual = NULL;
+
+   const int stokes_numvar = (stokes_solver) ? stokes_solver->GetNumVar() : 0;
+   if (!stokes_solver)
+   {
+      flow_fes.SetSize(numSub);
+      for (int m = 0; m < numSub; m++)
+      {
+         flow_fes[m] = new FiniteElementSpace(meshes[m], fec[0], dim);
+         flow_visual[m] = new GridFunction(flow_fes[m]);
+      }
+   }
+
+   for (int m = 0; m < numSub; m++)
+   {
+      if (stokes_solver)
+         flow_visual[m] = stokes_solver->GetGridFunction(m * stokes_numvar);
+      else
+      {
+         assert(flow_coeffs[m]);
+         flow_visual[m]->ProjectCoefficient(*flow_coeffs[m]);
+      }
+   }
+
+   if (unified_paraview)
+   {
+      assert(pmesh);
+      global_flow_fes = new FiniteElementSpace(pmesh, fec[0], dim);
+      global_flow_visual.SetSize(1);
+      global_flow_visual[0] = new GridFunction(global_flow_fes);
+      topol_handler->TransferToGlobal(flow_visual, global_flow_visual, 1);
+
+      paraviewColls[0]->RegisterField("flow", global_flow_visual[0]);
+   }
+   else
+      for (int m = 0; m < numSub; m++)
+         paraviewColls[m]->RegisterField("flow", flow_visual[m]);
+
+   MultiBlockSolver::SaveVisualization();
+}
+
 void AdvDiffSolver::SetMUMPSSolver()
 {
    assert(globalMat_hypre);
@@ -188,7 +241,6 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
 
    stokes_solver = new StokesSolver;
    stokes_solver->InitVariables();
-   stokes_solver->InitVisualization();
 
    if (load_flow && FileExists(flow_file))
       stokes_solver->LoadSolution(flow_file);

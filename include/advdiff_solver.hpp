@@ -31,6 +31,13 @@ protected:
    bool save_flow = false;
    std::string flow_file = "";
 
+   /* grid functions for visualizaing flow field */
+   /* NOTE(kevin): this will be set up at SaveVisualization. */
+   Array<FiniteElementSpace *> flow_fes;
+   Array<GridFunction *> flow_visual;
+   FiniteElementSpace *global_flow_fes = NULL;
+   Array<GridFunction *> global_flow_visual;
+
 public:
    AdvDiffSolver();
 
@@ -46,6 +53,8 @@ public:
    void SetFlowAtSubdomain(std::function<void(const Vector &, Vector &)> F, const int m=-1);
 
    void SetParameterizedProblem(ParameterizedProblem *problem) override;
+
+   void SaveVisualization() override;
 
 protected:
    void SetMUMPSSolver() override;
