@@ -557,72 +557,6 @@ def ComponentWiseTrain3():
         f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
     return
 
-def ComponentWiseTrainOptFOM(nx, ny):
-    # nx and ny are the number of sections in x- and y-direction, respectively
-    l = 17.0 
-    w = 1.0
-    mesh_configs, bdr_data, if_data, mesh_type, n_mesh = grid_mesh_configs(nx, ny, l, w)
-
-    # interface data
-    if_data = np.array(if_data)
-
-    # boundary attributes
-    bdr_data = np.array(bdr_data)
-
-    filename = "linelast.cw_opt_fom.h5"
-    with h5py.File(filename, 'w') as f:
-        # c++ currently cannot read datasets of string.
-        # change to multiple attributes, only as a temporary implementation.
-        grp = f.create_group("components")
-        grp.attrs["number_of_components"] = 3
-        grp.attrs["0"] = "optjoint"
-        grp.attrs["1"] = "optbeam"
-        grp.attrs["2"] = "optcol"
-        # component index of each mesh
-        grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
-        # 3-dimension vector for translation / rotation
-        grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
-
-        grp = f.create_group("ports")
-        grp.attrs["number_of_references"] = 4
-        grp.attrs["0"] = "port1"
-        grp.attrs["1"] = "port2"
-        grp.attrs["2"] = "port3"
-        grp.attrs["3"] = "port4"
-        grp.create_dataset("interface", if_data.shape, data=if_data)
-
-        port = grp.create_group("port1")
-        port.attrs["comp1"] = "optjoint"
-        port.attrs["comp2"] = "optbeam"
-        port.attrs["attr1"] = 2
-        port.attrs["attr2"] = 4
-        port.create_dataset("comp2_configuration", (6,), data=[w, 0., 0., 0., 0., 0.])
-
-        port = grp.create_group("port2")
-        port.attrs["comp1"] = "optjoint"
-        port.attrs["comp2"] = "optbeam"
-        port.attrs["attr1"] = 4
-        port.attrs["attr2"] = 2
-        port.create_dataset("comp2_configuration", (6,), data=[-l, 0., 0., 0., 0., 0.])
-
-        port = grp.create_group("port3")
-        port.attrs["comp1"] = "optjoint"
-        port.attrs["comp2"] = "optcol"
-        port.attrs["attr1"] = 3
-        port.attrs["attr2"] = 1
-        port.create_dataset("comp2_configuration", (6,), data=[0., w, 0., 0., 0., 0.])
-
-        port = grp.create_group("port4")
-        port.attrs["comp1"] = "optjoint"
-        port.attrs["comp2"] = "optcol"
-        port.attrs["attr1"] = 1
-        port.attrs["attr2"] = 3
-        port.create_dataset("comp2_configuration", (6,), data=[0., -l, 0., 0., 0., 0.])
-
-        # boundary attributes
-        f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
-    return
-
 def ComponentWiseTrainOptROM():
     n_mesh = 8
     l = 17.0
@@ -730,6 +664,74 @@ def ComponentWiseTrainOptROM():
         # boundary attributes
         f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
     return
+
+
+def ComponentWiseTrainOptFOM(nx, ny):
+    # nx and ny are the number of sections in x- and y-direction, respectively
+    l = 17.0 
+    w = 1.0
+    mesh_configs, bdr_data, if_data, mesh_type, n_mesh = grid_mesh_configs(nx, ny, l, w)
+
+    # interface data
+    if_data = np.array(if_data)
+
+    # boundary attributes
+    bdr_data = np.array(bdr_data)
+
+    filename = "linelast.cw_opt_fom.h5"
+    with h5py.File(filename, 'w') as f:
+        # c++ currently cannot read datasets of string.
+        # change to multiple attributes, only as a temporary implementation.
+        grp = f.create_group("components")
+        grp.attrs["number_of_components"] = 3
+        grp.attrs["0"] = "optjoint"
+        grp.attrs["1"] = "optbeam"
+        grp.attrs["2"] = "optcol"
+        # component index of each mesh
+        grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
+        # 3-dimension vector for translation / rotation
+        grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
+
+        grp = f.create_group("ports")
+        grp.attrs["number_of_references"] = 4
+        grp.attrs["0"] = "port1"
+        grp.attrs["1"] = "port2"
+        grp.attrs["2"] = "port3"
+        grp.attrs["3"] = "port4"
+        grp.create_dataset("interface", if_data.shape, data=if_data)
+
+        port = grp.create_group("port1")
+        port.attrs["comp1"] = "optjoint"
+        port.attrs["comp2"] = "optbeam"
+        port.attrs["attr1"] = 2
+        port.attrs["attr2"] = 4
+        port.create_dataset("comp2_configuration", (6,), data=[w, 0., 0., 0., 0., 0.])
+
+        port = grp.create_group("port2")
+        port.attrs["comp1"] = "optjoint"
+        port.attrs["comp2"] = "optbeam"
+        port.attrs["attr1"] = 4
+        port.attrs["attr2"] = 2
+        port.create_dataset("comp2_configuration", (6,), data=[-l, 0., 0., 0., 0., 0.])
+
+        port = grp.create_group("port3")
+        port.attrs["comp1"] = "optjoint"
+        port.attrs["comp2"] = "optcol"
+        port.attrs["attr1"] = 3
+        port.attrs["attr2"] = 1
+        port.create_dataset("comp2_configuration", (6,), data=[0., w, 0., 0., 0., 0.])
+
+        port = grp.create_group("port4")
+        port.attrs["comp1"] = "optjoint"
+        port.attrs["comp2"] = "optcol"
+        port.attrs["attr1"] = 1
+        port.attrs["attr2"] = 3
+        port.create_dataset("comp2_configuration", (6,), data=[0., -l, 0., 0., 0., 0.])
+
+        # boundary attributes
+        f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
+    return
+
 
 if __name__ == "__main__":
     import sys
