@@ -137,6 +137,8 @@ public:
    BlockVector* GetSolution() { return U; }
    BlockVector* GetSolutionCopy() { return new BlockVector(*U); }
 
+   void SetSolutionSaveMode(const bool save_sol_);
+
    void GetVariableVector(const int &var_idx, BlockVector &global, BlockVector &var);
    void SetVariableVector(const int &var_idx, BlockVector &var, BlockVector &global);
 

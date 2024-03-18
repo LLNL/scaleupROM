@@ -241,6 +241,7 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
 
    stokes_solver = new StokesSolver;
    stokes_solver->InitVariables();
+   stokes_solver->SetSolutionSaveMode(save_flow);
 
    if (load_flow && FileExists(flow_file))
       stokes_solver->LoadSolution(flow_file);
