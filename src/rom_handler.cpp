@@ -269,7 +269,7 @@ void ROMHandlerBase::LoadReducedBasis()
       */
       {
          int local_dim = CAROM::split_dimension(dim_ref_basis[k], MPI_COMM_WORLD);
-         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k], CAROM::Database::HDF5_MPIO, local_dim);
+         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k], CAROM::Database::formats::HDF5_MPIO, local_dim);
 
          carom_ref_basis[k] = new CAROM::Matrix(*basis_reader->getSpatialBasis(num_ref_basis[k]));
          carom_ref_basis[k]->gather();
@@ -674,7 +674,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    Solver *J_solver = NULL;
    if (linsol_type == SolverType::DIRECT)
    {
-      mumps = new MUMPSSolver();
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(mat_type);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;
@@ -1086,7 +1086,7 @@ void MFEMROMHandler::SetupDirectSolver()
    sys_row_starts[1] = romMat_mono->NumRows();
    romMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, romMat_mono);
 
-   mumps = new MUMPSSolver();
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
    mumps->SetMatrixSymType(mat_type);
    mumps->SetOperator(*romMat_hypre);
 }

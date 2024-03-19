@@ -150,35 +150,34 @@ public:
 
    using StokesSolver::GetVariableNames;
 
-   virtual void InitVariables();
+   void InitVariables() override;
 
-   virtual void BuildOperators() override;
-   virtual void BuildDomainOperators();
+   void BuildDomainOperators() override;
 
-   virtual void SetupRHSBCOperators() override;
-   virtual void SetupDomainBCOperators() override;
+   void SetupRHSBCOperators() override;
+   void SetupDomainBCOperators() override;
 
-   virtual void Assemble();
+   void AssembleOperator() override;
 
-   virtual void SaveROMOperator(const std::string input_prefix="");
-   virtual void LoadROMOperatorFromFile(const std::string input_prefix="");
+   void SaveROMOperator(const std::string input_prefix="") override;
+   void LoadROMOperatorFromFile(const std::string input_prefix="") override;
 
    // Component-wise assembly
-   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp);
+   void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) override;
    // virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
    // virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
-   virtual void SaveCompBdrROMElement(hid_t &file_id) override;
-   virtual void LoadCompBdrROMElement(hid_t &file_id) override;
+   void SaveCompBdrROMElement(hid_t &file_id) override;
+   void LoadCompBdrROMElement(hid_t &file_id) override;
 
-   virtual bool Solve();
+   bool Solve() override;
 
-   virtual void ProjectOperatorOnReducedBasis();
+   void ProjectOperatorOnReducedBasis() override;
 
-   virtual void SolveROM() override;
+   void SolveROM() override;
 
-   virtual void TrainEQP(SampleGenerator *sample_generator) override;
-   virtual void SaveEQP() override;
-   virtual void LoadEQP() override;
+   void TrainEQP(SampleGenerator *sample_generator) override;
+   void SaveEQP() override;
+   void LoadEQP() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);

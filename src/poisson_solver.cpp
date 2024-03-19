@@ -332,9 +332,7 @@ void PoissonSolver::AssembleOperator()
       sys_row_starts[1] = globalMat_mono->NumRows();
       globalMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, globalMat_mono);
 
-      mumps = new MUMPSSolver();
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
-      mumps->SetOperator(*globalMat_hypre);
+      if (direct_solve) SetMUMPSSolver();
    }
 }
 
@@ -556,6 +554,9 @@ void PoissonSolver::SanityCheckOnCoeffs()
 
 void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   /* set up boundary types */
+   MultiBlockSolver::SetParameterizedProblem(problem);
+
    // clean up rhs for parametrized problem.
    if (rhs_coeffs.Size() > 0)
    {
@@ -586,4 +587,12 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->scalar_rhs_ptr));
    else
       AddRHSFunction(0.0);
+}
+
+void PoissonSolver::SetMUMPSSolver()
+{
+   assert(globalMat_hypre);
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
+   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+   mumps->SetOperator(*globalMat_hypre);
 }

@@ -179,9 +179,9 @@ void ComponentTopologyHandler::SetupReferencePorts()
       for (int p = 0; p < port_list.size(); p++)
       {
          // Read hdf5 files.
-         std::string filename = config.GetRequiredOptionFromDict<std::string>("file", port_list[p]);
+         std::string filename = config.GetOptionFromDict<std::string>("file", "", port_list[p]);
 
-         if (FileExists(filename))
+         if ((filename != "") && FileExists(filename))
             ReadPortDatasFromFile(filename);
          else
             BuildPortDataFromInput(port_list[p]);
@@ -320,9 +320,11 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
    int attr_offset = 0;
    for (int c = 0; c < num_comp; c++)
       attr_offset = max(attr_offset, components[c]->bdr_attributes.Max());
-   // Also does not overlap with global boundary attributes.
    assert(bdr_attributes.Size() > 0);
-   attr_offset = max(attr_offset, bdr_attributes.Max());
+   // Also does not overlap with global boundary attributes.
+   // In order to keep consistencity with SubMesh,
+   // We leave bdr_attributes.Max()+1 empty.
+   attr_offset = max(attr_offset, bdr_attributes.Max()+1);
    attr_offset += 1;
 
    for (int p = 0; p < num_ports; p++)

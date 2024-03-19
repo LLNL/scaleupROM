@@ -329,13 +329,6 @@ void SteadyNSSolver::InitVariables()
    }
 }
 
-void SteadyNSSolver::BuildOperators()
-{
-   BuildRHSOperators();
-
-   BuildDomainOperators();
-}
-
 void SteadyNSSolver::BuildDomainOperators()
 {
    StokesSolver::BuildDomainOperators();
@@ -427,13 +420,15 @@ void SteadyNSSolver::SetupDomainBCOperators()
    
 }
 
-void SteadyNSSolver::Assemble()
+void SteadyNSSolver::AssembleOperator()
 {
-   StokesSolver::AssembleRHS();
+   StokesSolver::AssembleOperatorBase();
 
-   StokesSolver::AssembleOperator();
-
-   // nonlinear operator?
+   if (direct_solve)
+      StokesSolver::SetupMUMPSSolver(false);
+   else
+      // pressure mass matrix for preconditioner.
+      StokesSolver::SetupPressureMassMatrix();
 }
 
 void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
@@ -645,7 +640,7 @@ bool SteadyNSSolver::Solve()
 
    if (direct_solve)
    {
-      mumps = new MUMPSSolver();
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;

@@ -16,10 +16,19 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound) {
    SUCCEED();
 }
 
-TEST(DDSerialTest, Test_convergence)
+TEST(Poisson, Test_convergence)
 {
    config = InputParser("test.component.yml");
    CheckConvergence();
+
+   return;
+}
+
+TEST(AdvDiff, Test_convergence)
+{
+   config = InputParser("test.component.yml");
+   config.dict_["adv-diff"]["peclet_number"] = 1.1;
+   mms::advdiff::CheckConvergence();
 
    return;
 }

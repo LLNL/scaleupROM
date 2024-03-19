@@ -399,7 +399,7 @@ void StokesSolver::AssembleOperator()
    AssembleOperatorBase();
 
    if (direct_solve)
-      SetupMUMPSSolver();
+      SetupMUMPSSolver(true);
    else
       // pressure mass matrix for preconditioner.
       SetupPressureMassMatrix();
@@ -477,7 +477,7 @@ void StokesSolver::AssembleOperatorBase()
    systemOp->SetBlock(1,0, B);
 }
 
-void StokesSolver::SetupMUMPSSolver()
+void StokesSolver::SetupMUMPSSolver(bool set_oper)
 {
    assert(systemOp);
    delete systemOp_mono;
@@ -492,9 +492,9 @@ void StokesSolver::SetupMUMPSSolver()
    sys_row_starts[1] = systemOp_mono->NumRows();
    systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
-   mumps = new MUMPSSolver();
-   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
-   mumps->SetOperator(*systemOp_hypre);
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
+   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
+   if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 
 void StokesSolver::SetupPressureMassMatrix()
@@ -1078,6 +1078,9 @@ void StokesSolver::SanityCheckOnCoeffs()
 
 void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   /* set up boundary types */
+   MultiBlockSolver::SetParameterizedProblem(problem);
+
    nu = function_factory::stokes_problem::nu;
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);

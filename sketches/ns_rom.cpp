@@ -242,7 +242,7 @@ public:
 
       if (direct_solve)
       {
-         J_mumps = new MUMPSSolver();
+         J_mumps = new MUMPSSolver(MPI_COMM_WORLD);
          J_mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
          J_solver = J_mumps;
       }
@@ -1768,7 +1768,7 @@ int main(int argc, char *argv[])
       J_gmres.SetMaxIter(maxIter);
       J_gmres.SetPrintLevel(-1);
 
-      MUMPSSolver J_mumps;
+      MUMPSSolver J_mumps(MPI_COMM_WORLD);
       J_mumps.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
 
       Solver *J_solver;

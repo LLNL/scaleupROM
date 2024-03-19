@@ -186,7 +186,7 @@ void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::stri
 
    snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
    snapshot_options.Last()->static_svd_preserve_snapshot = true;
-   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename, CAROM::Database::HDF5_MPIO));
+   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename, CAROM::Database::formats::HDF5_MPIO));
 
    basis_tag2idx[basis_tag] = basis_tags.size();
    basis_tags.push_back(basis_tag);
@@ -264,7 +264,7 @@ void SampleGenerator::FormReducedBasis(const std::string &basis_prefix,
    CAROM::BasisGenerator *basis_generator = snapshot_generators.Last();
 
    for (int s = 0; s < file_list.size(); s++)
-      basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::HDF5_MPIO);
+      basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5_MPIO);
 
    basis_generator->endSamples(); // save the merged basis file
    SaveSV(basis_generator, basis_name, ref_num_basis);
@@ -289,8 +289,7 @@ const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
       file_id = H5Fopen(filename_ext.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       assert(file_id >= 0);
 
-      // TODO(kevin): will have to reflect dataset name update.
-      hdf5_utils::ReadDataset(file_id, "snapshot_matrix_num_rows_000000", nrows);
+      hdf5_utils::ReadDataset(file_id, "snapshot_matrix_num_rows", nrows);
       assert(nrows[0] > 0);
 
       errf = H5Fclose(file_id);

@@ -125,7 +125,13 @@ void MultiBlockSolver::ParseInputs()
    train_mode = SetTrainMode();
 
    // save solution if single run.
-   save_sol = config.GetOption<bool>("save_solution/enabled", false);
+   SetSolutionSaveMode(config.GetOption<bool>("save_solution/enabled", false));
+}
+
+void MultiBlockSolver::SetSolutionSaveMode(const bool save_sol_)
+{
+   // save solution if single run.
+   save_sol = save_sol_;
    if (save_sol)
    {
       // Default file path if no input file name is provided.

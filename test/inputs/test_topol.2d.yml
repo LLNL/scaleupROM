@@ -9,7 +9,7 @@ mesh:
         file: "meshes/test.2x2.mesh"
     ports:
       - name: "port1"
-        file: "port1.h5"
+        file: "port1.2d.h5"
         comp1:
           name: "unit"
           attr: 3 
@@ -18,7 +18,7 @@ mesh:
           attr: 1
         comp2_configuration: [0.0, 2.0, 0.0, 0.0, 0.0, 0.0]
       - name: "port2"
-        file: "port2.h5"
+        file: "port2.2d.h5"
         comp1:
           name: "unit"
           attr: 2 

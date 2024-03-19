@@ -9,6 +9,7 @@
 #include "linelast_solver.hpp"
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
+#include "advdiff_solver.hpp"
 #include "etc.hpp"
 #include <fstream>
 #include <iostream>
@@ -55,6 +56,7 @@ MultiBlockSolver* InitSolver()
    else if (solver_type == "stokes")   { solver = new StokesSolver; }
    else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
    else if (solver_type == "linelast")   { solver = new LinElastSolver; }
+   else if (solver_type == "adv-diff")   { solver = new AdvDiffSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
