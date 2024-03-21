@@ -112,6 +112,20 @@ extern double dy;
 extern double ux;
 extern double uy;
 
+extern double xu_amp;
+extern double xu_freq;
+extern double xu_offset;
+extern double xf_amp;
+extern double xf_freq;
+extern double xf_offset;
+extern double yu_amp;
+extern double yu_freq;
+extern double yu_offset;
+extern double yf_amp;
+extern double yf_freq;
+extern double yf_offset;
+
+double perturb_func(const double x, const double amp, const double freq, const double offset);
 void left_disp(const Vector &x, Vector &u);
 void up_disp(const Vector &x, Vector &u);
 void down_disp(const Vector &x, Vector &u);

@@ -238,6 +238,22 @@ double udisp_y;
 double ddisp_x;
 double ddisp_y;
 
+double xu_amp;
+double xu_freq;
+double xu_offset;
+
+double xf_amp;
+double xf_freq;
+double xf_offset;
+
+double yu_amp;
+double yu_freq;
+double yu_offset;
+
+double yf_amp;
+double yf_freq;
+double yf_offset;
+
 double lx;
 double ly;
 double rx;
@@ -247,36 +263,41 @@ double dy;
 double ux;
 double uy;
 
+double perturb_func(const double x, const double amp, const double freq, const double offset)
+{
+   return amp * sin(pi * freq *( x / 3.0 + 2 * offset) );
+}
+
 void left_disp(const Vector &x, Vector &u)
 {
    if (lx >= 0.5)
-      u(0) = glob_disp_x;
+      u(0) = glob_disp_x + perturb_func(x(0), xu_amp, xu_freq, xu_offset);
    if (ly >= 0.5)
-      u(1) = glob_disp_y;
+      u(1) = glob_disp_y + perturb_func(x(1), yu_amp, yu_freq, yu_offset);
 }
 
 void right_disp(const Vector &x, Vector &u)
 {
    if (rx >= 0.5)
-      u(0) = rdisp_x;
+      u(0) = rdisp_x + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (ry >= 0.5)
-      u(1) = rdisp_y;
+      u(1) = rdisp_y + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
 void up_disp(const Vector &x, Vector &u)
 {
    if (ux >= 0.5)
-      u(0) = udisp_x;
+      u(0) = udisp_x + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (uy >= 0.5)
-      u(1) = udisp_y;
+      u(1) = udisp_y + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
 void down_disp(const Vector &x, Vector &u)
 {
    if (dx >= 0.5)
-      u(0) = ddisp_x;
+      u(0) = ddisp_x + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (dy >= 0.5)
-      u(1) = ddisp_y;
+      u(1) = ddisp_y + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
 }  // namespace linelast_cwtrain
@@ -957,6 +978,18 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    function_factory::linelast_cwtrain::uy = 0.0;
    function_factory::linelast_problem::_lambda = 1.0;
    function_factory::linelast_problem::_mu = 1.0;
+   function_factory::linelast_cwtrain::xu_amp = 1.0;
+   function_factory::linelast_cwtrain::xu_freq = 1.0;
+   function_factory::linelast_cwtrain::xu_offset = 0.0;
+   function_factory::linelast_cwtrain::xf_amp = 1.0;
+   function_factory::linelast_cwtrain::xf_freq = 1.0;
+   function_factory::linelast_cwtrain::xf_offset = 0.0;
+   function_factory::linelast_cwtrain::yu_amp = 1.0;
+   function_factory::linelast_cwtrain::yu_freq = 1.0;
+   function_factory::linelast_cwtrain::yu_offset = 0.0;
+   function_factory::linelast_cwtrain::yf_amp = 1.0;
+   function_factory::linelast_cwtrain::yf_freq = 1.0;
+   function_factory::linelast_cwtrain::yf_offset = 0.0;
 
    param_map["glob_disp_x"] = 0;
    param_map["glob_disp_y"] = 1;
@@ -976,8 +1009,20 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_map["uy"] = 15;
    param_map["lambda"] = 16;
    param_map["mu"] = 17;
+   param_map["xu_amp"] = 18;
+   param_map["xu_freq"] = 19;
+   param_map["xu_offset"] = 20;
+   param_map["xf_amp"] = 21;
+   param_map["xf_freq"] = 22;
+   param_map["xf_offset"] = 23;
+   param_map["yu_amp"] = 24;
+   param_map["yu_freq"] = 25;
+   param_map["yu_offset"] = 26;
+   param_map["yf_amp"] = 27;
+   param_map["yf_freq"] = 28;
+   param_map["yf_offset"] = 29;
 
-   param_ptr.SetSize(18);
+   param_ptr.SetSize(30);
    param_ptr[0] = &(function_factory::linelast_cwtrain::glob_disp_x);
    param_ptr[1] = &(function_factory::linelast_cwtrain::glob_disp_y);
    param_ptr[2] = &(function_factory::linelast_cwtrain::rdisp_x);
@@ -996,6 +1041,18 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_ptr[15] = &(function_factory::linelast_cwtrain::uy);
    param_ptr[16] = &(function_factory::linelast_problem::_lambda);
    param_ptr[17] = &(function_factory::linelast_problem::_mu);
+   param_ptr[18] = &(function_factory::linelast_cwtrain::xu_amp);
+   param_ptr[19] = &(function_factory::linelast_cwtrain::xu_freq);
+   param_ptr[20] = &(function_factory::linelast_cwtrain::xu_offset);
+   param_ptr[21] = &(function_factory::linelast_cwtrain::xf_amp);
+   param_ptr[22] = &(function_factory::linelast_cwtrain::xf_freq);
+   param_ptr[23] = &(function_factory::linelast_cwtrain::xf_offset);
+   param_ptr[24] = &(function_factory::linelast_cwtrain::yu_amp);
+   param_ptr[25] = &(function_factory::linelast_cwtrain::yu_freq);
+   param_ptr[26] = &(function_factory::linelast_cwtrain::yu_offset);
+   param_ptr[27] = &(function_factory::linelast_cwtrain::yf_amp);
+   param_ptr[28] = &(function_factory::linelast_cwtrain::yf_freq);
+   param_ptr[29] = &(function_factory::linelast_cwtrain::yf_offset);
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
