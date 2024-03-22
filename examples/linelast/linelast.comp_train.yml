@@ -190,6 +190,7 @@ sample_generation:
 
 basis:
   prefix: "linelast_cwtrain"
+  number_of_basis: 16
   tags:
     - name: "joint2D"
       number_of_basis: 16
