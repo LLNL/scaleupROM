@@ -4,6 +4,37 @@
 
 import numpy as np
 import h5py
+import os
+import matplotlib.pyplot as plt
+
+def shift_mesh_battrs(num_attr, path):
+    # Read original file
+    f = open(path, "r")
+    all_lines = [x for x in f]
+    f.close()
+    f = open(path, "r")
+    bdr_start = next(x for x, val in enumerate(f)
+                                if val == "boundary\n")
+    bdr_len = int(f.readline(bdr_start+1))
+    bdr_txt = [f.readline(bdr_start+2 + i) for i in range(bdr_len)]
+    battrs = [int(txt.split(' ')[0]) for txt in bdr_txt]
+    first_lines = all_lines[0:bdr_start+2]
+    last_lines = all_lines[bdr_start+2+bdr_len:]
+    f.close()
+    prefix = path.split('.')[0]
+    for i in range(num_attr):
+        filename = prefix + "_"+ str(i) + ".mesh"
+        shift_battrs = [(b + i ) if (b + i) == num_attr else (b + i )%num_attr for b in battrs]
+        shift_battrs_txt = [' '.join([str(shift_battrs[i]), *txt.split(' ')[1:]]) for i, txt in enumerate(bdr_txt)]
+        f = open(filename, "w")
+        new_txt = ''.join([''.join(first_lines), ''.join(shift_battrs_txt), ''.join(last_lines)])
+        f.write(new_txt)
+        f.close()
+
+def create_training_meshes(prefix):
+    shift_mesh_battrs(4, os.path.join(prefix, "joint2D.mesh"))
+    shift_mesh_battrs(4, os.path.join(prefix, "rod2D_H.mesh"))
+    shift_mesh_battrs(4, os.path.join(prefix, "rod2D_V.mesh"))
 
 def cwgrid_mesh_configs(nx, ny, l, w):
     bdr_data = []
@@ -83,7 +114,7 @@ def cwgrid_mesh_configs(nx, ny, l, w):
 
     return mesh_configs, bdr_data, if_data, mesh_type, n_mesh
 
-def ComponentWiseTrain2All():
+def CWTrain1x1():
     n_mesh = 8
     mesh_type = [0, 1, 0, 2, 2, 0, 1, 0]
     mesh_configs = np.zeros([n_mesh, 6])
@@ -134,7 +165,7 @@ def ComponentWiseTrain2All():
     # boundary attributes
     bdr_data0 = np.array(bdr_data)
 
-    for i in range(14): # Loop over all the variants
+    for i in range(4): # Loop over all the variants
         bdr_data = PermuteBdrData(bdr_data0, i)
         filename = "linelast.comp_train" + str(i) + ".h5"
         with h5py.File(filename, 'w') as f:
@@ -195,20 +226,7 @@ battr_map = np.array(
     [1, 2 ,3, 4],
     [4, 1, 2 ,3],
     [3, 4, 1, 2],
-    [2, 3, 4, 1],
-
-    [4, 2 ,3, 4],
-    [4, 4, 2 ,3],
-    [3, 4, 4, 2],
-    [2, 3, 4, 4],
-
-    [4, 4 ,3, 4],
-    [4, 4, 4 ,3],
-    [3, 4, 4, 4],
-    [4, 3, 4, 4],
-
-    [2, 4 ,3, 4],
-    [4, 3, 4 ,2]
+    [2, 3, 4, 1]
 ]
 )
 
@@ -221,7 +239,7 @@ def PermuteBdrData(bdr_data0, j):
     return bdr_data
 
 
-def ComponentWiseTrain3All():
+def CWTrain2x2():
     nx = 2
     ny = 2
     l = 4.0
@@ -234,7 +252,7 @@ def ComponentWiseTrain3All():
     # boundary attributes
     bdr_data0 = np.array(bdr_data)
 
-    for i in range(14): # Loop over all the variants
+    for i in range(4): # Loop over all the variants
         bdr_data = PermuteBdrData(bdr_data0, i)
         filename = "linelast.comp_train" + str(i) + ".h5"
         with h5py.File(filename, 'w') as f:
@@ -290,15 +308,64 @@ def ComponentWiseTrain3All():
             f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
     return
 
+def get_file_data(filename):
+    with h5py.File(filename, 'r') as f:
+        fom_t = f['fom_solve'][0]
+        rom_t = f['rom_solve'][0]
+        speedup = fom_t / rom_t
+        relerr = f['rel_error'][0]
+        return fom_t, rom_t, relerr, speedup
+
+def get_results(samples, prefix):
+    res=[]
+
+    for name in samples:
+        filename = os.path.join(prefix, 'comparison' + str(name) + '.h5')
+        res.append(get_file_data(filename))
+
+    return np.array(res)
+
+def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
+    fig, axs = plt.subplots(1,2, figsize=(15,5))
+
+    axs[0].plot(samples, res[:,0], label='FOM solve time')
+    axs[0].plot(samples, res[:,1], label='ROM solve time')
+    axs[0].plot(samples, res[:,2], label='Relative error')
+    axs[0].set_xlabel(scale_prefix)
+    axs[0].set_yscale('log')
+    axs[0].legend()
+
+
+    axs[1].plot(samples, res[:,3], label='Speedup factor', )
+    axs[1].set_xlabel(scale_prefix)
+    axs[1].legend()
+
+    fig.suptitle(scale_prefix+'-scaling', fontsize = 24)
+    plt.tight_layout()
+    plt.savefig(plt_name)
+
+def basis_scaling_plot(prefix, plot_path):
+    scale_prefix = '$n_{basis}$'
+    samples = (2, 4, 6, 8, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128)
+    res = get_results(samples, prefix)
+    create_scaling_plot(samples, res, scale_prefix, plot_path)
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) == 1:
         print("Please specify a component to generate")
     else:
         name = sys.argv[1]
-        if name == "componentwise_train2all":
-            ComponentWiseTrain2All()
-        elif name == "componentwise_train3all":
-            ComponentWiseTrain3All()
+        if name == "cwtrain_1x1":
+            CWTrain1x1()
+        elif name == "cwtrain_2x2":
+            CWTrain2x2()
+        elif name == "bscale":
+            prefix = sys.argv[2]
+            plot_path = sys.argv[3]
+            basis_scaling_plot(prefix, plot_path)
+        elif name == "cwtrain_mesh":
+            prefix = sys.argv[2]
+            create_training_meshes(prefix)
         else:
-            print("Config not found")
+            print("Option not found")
