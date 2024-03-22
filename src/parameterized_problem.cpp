@@ -229,14 +229,14 @@ double qbdr(const Vector &x)
 namespace linelast_cwtrain
 {
 
-double glob_disp_x;
-double glob_disp_y;
-double rdisp_x;
-double rdisp_y;
-double udisp_x;
-double udisp_y;
-double ddisp_x;
-double ddisp_y;
+double l_ux;
+double l_uy;
+double r_fx;
+double r_fy;
+double u_fx;
+double u_fy;
+double d_fx;
+double d_fy;
 
 double xu_amp;
 double xu_freq;
@@ -271,33 +271,33 @@ double perturb_func(const double x, const double amp, const double freq, const d
 void left_disp(const Vector &x, Vector &u)
 {
    if (lx >= 0.5)
-      u(0) = glob_disp_x + perturb_func(x(0), xu_amp, xu_freq, xu_offset);
+      u(0) = l_ux + perturb_func(x(0), xu_amp, xu_freq, xu_offset);
    if (ly >= 0.5)
-      u(1) = glob_disp_y + perturb_func(x(1), yu_amp, yu_freq, yu_offset);
+      u(1) = l_uy + perturb_func(x(1), yu_amp, yu_freq, yu_offset);
 }
 
 void right_disp(const Vector &x, Vector &u)
 {
    if (rx >= 0.5)
-      u(0) = rdisp_x + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+      u(0) = r_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (ry >= 0.5)
-      u(1) = rdisp_y + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+      u(1) = r_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
 void up_disp(const Vector &x, Vector &u)
 {
    if (ux >= 0.5)
-      u(0) = udisp_x + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+      u(0) = u_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (uy >= 0.5)
-      u(1) = udisp_y + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+      u(1) = u_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
 void down_disp(const Vector &x, Vector &u)
 {
    if (dx >= 0.5)
-      u(0) = ddisp_x + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+      u(0) = d_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (dy >= 0.5)
-      u(1) = ddisp_y + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+      u(1) = d_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
 }  // namespace linelast_cwtrain
@@ -960,14 +960,14 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
    // Default values.
-   function_factory::linelast_cwtrain::glob_disp_x= 0.0;
-   function_factory::linelast_cwtrain::glob_disp_y = 0.0;
-   function_factory::linelast_cwtrain::rdisp_x = 0.0;
-   function_factory::linelast_cwtrain::rdisp_y = 0.0;
-   function_factory::linelast_cwtrain::udisp_x = 0.0;
-   function_factory::linelast_cwtrain::udisp_y = 0.0;
-   function_factory::linelast_cwtrain::ddisp_x = 0.0;
-   function_factory::linelast_cwtrain::ddisp_y = 0.0;
+   function_factory::linelast_cwtrain::l_ux= 0.0;
+   function_factory::linelast_cwtrain::l_uy = 0.0;
+   function_factory::linelast_cwtrain::r_fx = 0.0;
+   function_factory::linelast_cwtrain::r_fy = 0.0;
+   function_factory::linelast_cwtrain::u_fx = 0.0;
+   function_factory::linelast_cwtrain::u_fy = 0.0;
+   function_factory::linelast_cwtrain::d_fx = 0.0;
+   function_factory::linelast_cwtrain::d_fy = 0.0;
    function_factory::linelast_cwtrain::lx = 0.0;
    function_factory::linelast_cwtrain::ly = 0.0;
    function_factory::linelast_cwtrain::rx = 0.0;
@@ -991,14 +991,14 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    function_factory::linelast_cwtrain::yf_freq = 1.0;
    function_factory::linelast_cwtrain::yf_offset = 0.0;
 
-   param_map["glob_disp_x"] = 0;
-   param_map["glob_disp_y"] = 1;
-   param_map["rdisp_x"] = 2;
-   param_map["rdisp_y"] = 3;
-   param_map["udisp_x"] = 4;
-   param_map["udisp_y"] = 5;
-   param_map["ddisp_x"] = 6;
-   param_map["ddisp_y"] = 7;
+   param_map["l_ux"] = 0;
+   param_map["l_uy"] = 1;
+   param_map["r_fx"] = 2;
+   param_map["r_fy"] = 3;
+   param_map["u_fx"] = 4;
+   param_map["u_fy"] = 5;
+   param_map["d_fx"] = 6;
+   param_map["d_fy"] = 7;
    param_map["lx"] = 8;
    param_map["ly"] = 9;
    param_map["rx"] = 10;
@@ -1023,14 +1023,14 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_map["yf_offset"] = 29;
 
    param_ptr.SetSize(30);
-   param_ptr[0] = &(function_factory::linelast_cwtrain::glob_disp_x);
-   param_ptr[1] = &(function_factory::linelast_cwtrain::glob_disp_y);
-   param_ptr[2] = &(function_factory::linelast_cwtrain::rdisp_x);
-   param_ptr[3] = &(function_factory::linelast_cwtrain::rdisp_y);
-   param_ptr[4] = &(function_factory::linelast_cwtrain::udisp_x);
-   param_ptr[5] = &(function_factory::linelast_cwtrain::udisp_y);
-   param_ptr[6] = &(function_factory::linelast_cwtrain::ddisp_x);
-   param_ptr[7] = &(function_factory::linelast_cwtrain::ddisp_y);
+   param_ptr[0] = &(function_factory::linelast_cwtrain::l_ux);
+   param_ptr[1] = &(function_factory::linelast_cwtrain::l_uy);
+   param_ptr[2] = &(function_factory::linelast_cwtrain::r_fx);
+   param_ptr[3] = &(function_factory::linelast_cwtrain::r_fy);
+   param_ptr[4] = &(function_factory::linelast_cwtrain::u_fx);
+   param_ptr[5] = &(function_factory::linelast_cwtrain::u_fy);
+   param_ptr[6] = &(function_factory::linelast_cwtrain::d_fx);
+   param_ptr[7] = &(function_factory::linelast_cwtrain::d_fy);
    param_ptr[8] = &(function_factory::linelast_cwtrain::lx);
    param_ptr[9] = &(function_factory::linelast_cwtrain::ly);
    param_ptr[10] = &(function_factory::linelast_cwtrain::rx);

@@ -158,7 +158,7 @@ def LatticeCantilever(nx, ny):
     # boundary attributes
     bdr_data = np.array(bdr_data)
 
-    filename = prefix + ".h5"
+    filename = "linelast.lattice.h5"
     with h5py.File(filename, 'w') as f:
         # c++ currently cannot read datasets of string.
         # change to multiple attributes, only as a temporary implementation.

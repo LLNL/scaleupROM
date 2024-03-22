@@ -94,14 +94,14 @@ void tip_force(const Vector &x, Vector &u);
 
 namespace linelast_cwtrain
 {
-extern double glob_disp_x;
-extern double glob_disp_y;
-extern double rdisp_x;
-extern double rdisp_y;
-extern double udisp_x;
-extern double udisp_y;
-extern double ddisp_x;
-extern double ddisp_y;
+extern double l_ux;
+extern double l_uy;
+extern double r_fx;
+extern double r_fy;
+extern double u_fx;
+extern double u_fy;
+extern double d_fx;
+extern double d_fy;
 
 extern double lx;
 extern double ly;

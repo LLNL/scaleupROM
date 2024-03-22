@@ -37,14 +37,14 @@ parameterized_problem:
 
 single_run:
   linelast_cwtrain:
-    glob_disp_x: 0.0
-    glob_disp_y: 0.0
-    rdisp_x: 0.0
-    rdisp_y: -2.0e-2
-    udisp_x: 0.0
-    udisp_y: 0.0
-    ddisp_x: 0.0
-    ddisp_y: 0.0
+    l_ux: 0.0
+    l_uy: 0.0
+    r_fx: 0.0
+    r_fy: -2.0e-2
+    u_fx: 0.0
+    u_fy: 0.0
+    d_fx: 0.0
+    d_fy: 0.0
     lx: 0.5
     ly: 0.5
     rx: 0.0
@@ -75,35 +75,35 @@ sample_generation:
   file_path:
     prefix: "linelast_cwtrain"
   parameters:
-    - key: single_run/linelast_cwtrain/glob_disp_x
+    - key: single_run/linelast_cwtrain/l_ux
       type: double
       minimum: 0.0
       maximum: 10.0
-    - key: single_run/linelast_cwtrain/glob_disp_y
+    - key: single_run/linelast_cwtrain/l_uy
       type: double
       minimum: 0.0
       maximum: 10.0
-    - key: single_run/linelast_cwtrain/rdisp_x
+    - key: single_run/linelast_cwtrain/r_fx
       type: double
       minimum: -20.0
       maximum: 20.0
-    - key: single_run/linelast_cwtrain/rdisp_y
+    - key: single_run/linelast_cwtrain/r_fy
       type: double
       minimum: -20.0
       maximum: 20.0
-    - key: single_run/linelast_cwtrain/udisp_x
+    - key: single_run/linelast_cwtrain/u_fx
       type: double
       minimum: -20.0
       maximum: 20.0
-    - key: single_run/linelast_cwtrain/udisp_y
+    - key: single_run/linelast_cwtrain/u_fy
       type: double
       minimum: -20.0
       maximum: 20.0
-    - key: single_run/linelast_cwtrain/ddisp_x
+    - key: single_run/linelast_cwtrain/d_fx
       type: double
       minimum: -20.0
       maximum: 20.0
-    - key: single_run/linelast_cwtrain/ddisp_y
+    - key: single_run/linelast_cwtrain/d_fy
       type: double
       minimum: -20.0
       maximum: 20.0
