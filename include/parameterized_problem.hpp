@@ -162,6 +162,8 @@ public:
    virtual void SetParams(const Array<int> &indexes, const Vector &values);
 
    void SetSingleRun();
+   void LoadParams(const std::string &filename);
+   void SaveParams(const std::string &filename);
 };
 
 class PoissonProblem : public ParameterizedProblem

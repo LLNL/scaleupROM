@@ -442,6 +442,12 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
 
    problem->SetSingleRun();
+   std::string load_params = config.GetOption<std::string>("single_run/load_params_from", "");
+   std::string save_params = config.GetOption<std::string>("single_run/save_params_to", "");
+   if (load_params != "")
+      problem->LoadParams(load_params);
+   if (save_params != "")
+      problem->SaveParams(save_params);
    test->SetParameterizedProblem(problem);
 
    // TODO: there are skippable operations depending on rom/fom mode.

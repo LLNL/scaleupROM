@@ -4,6 +4,7 @@
 
 #include "parameterized_problem.hpp"
 #include "input_parser.hpp"
+#include "hdf5_utils.hpp"
 #include <cmath>
 
 using namespace mfem;
@@ -282,6 +283,64 @@ void ParameterizedProblem::SetSingleRun()
       double value = it->second.as<double>();
       SetParams(param_name, value);
    }
+}
+
+void ParameterizedProblem::LoadParams(const std::string &filename)
+{
+   printf("Opening %s..\n", filename.c_str());
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   /*
+   * Iterate through all attributes
+   */
+   hid_t attr_id;
+   H5O_info_t oinfo;
+   errf = H5Oget_info(file_id, &oinfo);
+   assert(errf >= 0);
+   for (hsize_t i = 0; i < (unsigned) oinfo.num_attrs; i++)
+   {
+      char attr_name[256];
+      double attr_val;
+      attr_id = H5Aopen_by_idx(file_id, "/", H5_INDEX_CRT_ORDER, H5_ITER_INC, (hsize_t) i, H5P_DEFAULT, H5P_DEFAULT);
+      ssize_t attr_length = H5Aget_name(attr_id, 256, attr_name);
+      assert(attr_length < 256);
+      errf = H5Aclose(attr_id);
+      assert(errf >= 0);
+
+      hdf5_utils::ReadAttribute(file_id, attr_name, attr_val);
+      printf("%s = %5e\n", attr_name, attr_val);
+      SetParams(attr_name, attr_val);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+
+   printf("Done!\n");
+   return;
+}
+
+void ParameterizedProblem::SaveParams(const std::string &filename)
+{
+   printf("Creating %s..\n", filename.c_str());
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   for ( const auto &param : param_map )
+   {
+      printf("%s = %5e\n", param.first.c_str(), *param_ptr[param.second]);
+      hdf5_utils::WriteAttribute(file_id, param.first, *param_ptr[param.second]);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   printf("Done!\n");
+   return;
 }
 
 ParameterizedProblem* InitParameterizedProblem()
