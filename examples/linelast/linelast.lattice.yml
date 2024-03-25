@@ -26,7 +26,7 @@ visualization:
   enabled: false
   unified_paraview: true
   file_path:
-    prefix: lattice_output
+    prefix: paraview_output
 
 parameterized_problem:
   name: linelast_disp_lattice

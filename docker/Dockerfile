@@ -63,7 +63,7 @@ ENV LIBROM_DIR=$LIB_DIR/libROM
 
 # install python
 RUN sudo apt-get update && sudo apt-get install -yq python3 python3-pip
-RUN sudo pip3 install --upgrade pip && sudo pip3 install numpy scipy argparse tables PyYAML h5py
+RUN sudo pip3 install --upgrade pip && sudo pip3 install numpy scipy argparse tables PyYAML h5py matplotlib
 
 # install h5dump and gmsh
 RUN sudo apt-get install -yq hdf5-tools gmsh

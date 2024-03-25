@@ -92,6 +92,47 @@ extern double rforce_f;
 void tip_force(const Vector &x, Vector &u);
 }
 
+namespace linelast_cwtrain
+{
+extern double l_ux;
+extern double l_uy;
+extern double r_fx;
+extern double r_fy;
+extern double u_fx;
+extern double u_fy;
+extern double d_fx;
+extern double d_fy;
+
+extern double lx;
+extern double ly;
+extern double rx;
+extern double ry;
+extern double dx;
+extern double dy;
+extern double ux;
+extern double uy;
+
+extern double xu_amp;
+extern double xu_freq;
+extern double xu_offset;
+extern double xf_amp;
+extern double xf_freq;
+extern double xf_offset;
+extern double yu_amp;
+extern double yu_freq;
+extern double yu_offset;
+extern double yf_amp;
+extern double yf_freq;
+extern double yf_offset;
+
+double perturb_func(const double x, const double amp, const double freq, const double offset);
+void left_disp(const Vector &x, Vector &u);
+void up_disp(const Vector &x, Vector &u);
+void down_disp(const Vector &x, Vector &u);
+void right_disp(const Vector &x, Vector &u);
+
+}
+
 namespace advdiff_problem
 {
 
@@ -303,6 +344,12 @@ protected:
       StokesFlowPastArray::SetBattr();
       flow_problem->SetBattr();
    }
+};
+
+class LinElastComponentWiseTrain : public LinElastProblem
+{
+public:
+   LinElastComponentWiseTrain();
 };
 
 ParameterizedProblem* InitParameterizedProblem();
