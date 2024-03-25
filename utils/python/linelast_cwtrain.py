@@ -298,65 +298,10 @@ def CWTrain2x2():
 def CWTrainOptROM():
     l = 17.0
     w = 1.0
-    n_mesh = 8
-    mesh_type = [0, 1, 0, 2, 2, 0, 1, 0]
-    mesh_configs = np.zeros([n_mesh, 6])
-    mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
-    mesh_configs[2,:] = [5., 0., 0., 0., 0., 0.]
-    mesh_configs[3,:] = [0., 1., 0., 0., 0., 0.]
-    mesh_configs[4,:] = [5., 1., 0., 0., 0., 0.]
-    mesh_configs[5,:] = [0., 5., 0., 0., 0., 0.]
-    mesh_configs[6,:] = [1., 5., 0., 0., 0., 0.]
-    mesh_configs[7,:] = [5., 5., 0., 0., 0., 0.]
-
-    # interface data
-    # mesh1 / mesh2 / battr1 / battr2 / port_idx
-    if_data = np.zeros([8, 5])
-    if_data[0, :] = [0, 1, 2, 4, 0]
-    if_data[1, :] = [2, 1, 4, 2, 1]
-    if_data[2, :] = [0, 3, 3, 1, 2]
-    if_data[3, :] = [2, 4, 3, 1, 2]
-    if_data[4, :] = [5, 3, 1, 3, 3]
-    if_data[5, :] = [7, 4, 1, 3, 3]
-    if_data[6, :] = [5, 6, 2, 4, 0]
-    if_data[7, :] = [7, 6, 4, 2, 1]
-
-    # boundary attributes
-    # global_battr / mesh_idx / comp_battr
-    bdr_data = []
-
-    # applied loads and displacements
-    bdr_data += [[1, 0, 1]]
-    bdr_data += [[1, 1, 1]]
-    bdr_data += [[1, 2, 1]]
-    bdr_data += [[2, 2, 2]]
-    bdr_data += [[2, 4, 2]]
-    bdr_data += [[2, 7, 2]]
-    bdr_data += [[3, 5, 3]]
-    bdr_data += [[3, 6, 3]]
-    bdr_data += [[3, 7, 3]]
-    bdr_data += [[4, 0, 4]]
-    bdr_data += [[4, 3, 4]]
-    bdr_data += [[4, 5, 4]]
-
-    # homogenous neumann
-    bdr_data += [[5, 1, 3]]
-    bdr_data += [[5, 4, 4]]
-    bdr_data += [[5, 6, 1]]
-    bdr_data += [[5, 3, 2]]
-
-    # boundary attributes
-    bdr_data0 = np.array(bdr_data)
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_1x1(w,l)
 
     # list of component names J H V
-    comp_list = ["joint2D", "rod2D_H", "rod2D_V"]
-
-    # component config list J-H H-J J-V V-J
-    comp_configs = []
-    comp_configs += [[1., 0., 0., 0., 0., 0.]]
-    comp_configs += [[-4., 0., 0., 0., 0., 0.]]
-    comp_configs += [[0., 1., 0., 0., 0., 0.]]
-    comp_configs += [[0., -4., 0., 0., 0., 0.]]
+    comp_list = ["optjoint", "optbeam", "optcol"]
 
     for i in range(4): # Loop over all the variants
         bdr_data = PermuteBdrData(bdr_data0, i)
