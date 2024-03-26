@@ -53,17 +53,17 @@ single_run:
     dy: 0.0
     ux: 0.0
     uy: 0.0
-    xu_amp: 1.0
-    xu_freq: 1.0
+    xu_amp: 0.0
+    xu_freq: 0.0
     xu_offset: 0.0
-    xf_amp: 1.0
-    xf_freq: 1.0
+    xf_amp: 0.0
+    xf_freq: 0.0
     xf_offset: 0.0
-    yu_amp: 1.0
-    yu_freq: 1.0
+    yu_amp: 0.0
+    yu_freq: 0.0
     yu_offset: 0.0
-    yf_amp: 1.0
-    yf_freq: 1.0
+    yf_amp: 0.0
+    yf_freq: 0.0
     yf_offset: 0.0
 
 sample_generation:
