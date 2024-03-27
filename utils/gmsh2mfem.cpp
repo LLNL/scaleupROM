@@ -34,9 +34,8 @@ int main(int argc, char *argv[])
 
    Mesh mesh(meshFileString);
 
-   // Promote to high order mesh
-   if (order_ > 1)
-      mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
+   // Promote to high order mesh and ensure discontinuity
+   mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
 
    std::string outputFile(meshFileString);
    outputFile += ".mfem";
