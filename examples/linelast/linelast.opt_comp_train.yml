@@ -187,29 +187,29 @@ sample_generation:
       type: double
       minimum: 0.1
       maximum: 1.0
-
+      
 basis:
   prefix: "linelast_cwtrain"
   number_of_basis: 16
   tags:
-    - name: "joint2D"
+    - name: "optjoint"
       number_of_basis: 16
       snapshot_format:
         minimum: 0
         maximum: 3
-        format: "linelast_cwtrain_sample_joint2D_snapshot%01d"
-    - name: "rod2D_H"
+        format: "linelast_cwtrain_sample_optjoint_snapshot%01d"
+    - name: "optbeam"
       number_of_basis: 64
       snapshot_format:
         minimum: 0
         maximum: 3
-        format: "linelast_cwtrain_sample_rod2D_H_snapshot%01d"
-    - name: "rod2D_V"
+        format: "linelast_cwtrain_sample_optbeam_snapshot%01d"
+    - name: "optcol"
       number_of_basis: 64
       snapshot_format:
         minimum: 0
         maximum: 3
-        format: "linelast_cwtrain_sample_rod2D_V_snapshot%01d"
+        format: "linelast_cwtrain_sample_optcol_snapshot%01d"
   svd:
     save_spectrum: true
     update_right_sv: false
