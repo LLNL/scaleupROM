@@ -312,6 +312,24 @@ def CWTrainOptROM():
             Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
     return
 
+def CWTrainOptFOM():
+    nx = 8
+    ny = 8
+    l = 17.0
+    w = 1.0
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data, comp_configs = cw_generate_mxn(nx, ny, w,l)
+
+    # list of component names J H V
+    comp_list = ["optjoint", "optbeam", "optcol"]
+
+    filename = "linelast.optfom.h5"
+    with h5py.File(filename, 'w') as f:
+        # c++ currently cannot read datasets of string.
+        # change to multiple attributes, only as a temporary implementation.
+        Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
+    return
+
+
 def get_file_data(filename):
     with h5py.File(filename, 'r') as f:
         fom_t = f['fom_solve'][0]
