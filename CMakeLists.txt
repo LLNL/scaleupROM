@@ -179,6 +179,9 @@ set(scaleupROMObj_SOURCES
   include/dg_linear.hpp
   src/dg_linear.cpp
 
+  include/nlelast_integ.hpp
+  src/nlelast_integ.cpp
+
   include/nonlinear_integ.hpp
   src/nonlinear_integ.cpp
 

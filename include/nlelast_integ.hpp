@@ -6,6 +6,7 @@
 #define SCALEUPROM_NLELAST_INTEG_HPP
 
 #include "mfem.hpp"
+#include "hyperreduction_integ.hpp"
 
 namespace mfem
 {
@@ -14,7 +15,6 @@ namespace mfem
 class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator 
  {
  public:
-
     DGHyperelasticNLFIntegrator(double alpha_, double kappa_)
        : HyperReductionIntegrator(false), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) { }
  
@@ -64,7 +64,7 @@ class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator
        const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
        DenseMatrix &elmat, DenseMatrix &jmat);
 
-    using BilinearFormIntegrator::AssembleFaceMatrix;
+    //using BilinearFormIntegrator::AssembleFaceMatrix;
     virtual void AssembleFaceMatrix(const FiniteElement &el1,
                                     const FiniteElement &el2,
                                     FaceElementTransformations &Trans,
@@ -124,7 +124,7 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
 
 // RHS integrator for nonlinear elastic DG.
 // For this is just DGElasticityDirichletLFIntegrator with a different name
- class DGHyperelasticDirichletNLFIntegrator : public LinearFormIntegrator // Should this be a nonlinear form later?
+  class DGHyperelasticDirichletNLFIntegrator : public LinearFormIntegrator // Should this be a nonlinear form later?
  {
  protected:
     VectorCoefficient &uD;
@@ -156,7 +156,7 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
                                         Vector &elvect);
  
     using LinearFormIntegrator::AssembleRHSElementVect;
- };
+ }; 
 
 } // namespace mfem
 
