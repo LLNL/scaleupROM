@@ -36,7 +36,7 @@ def create_training_meshes(prefix):
     shift_mesh_battrs(4, os.path.join(prefix, "rod2D_H.mesh"))
     shift_mesh_battrs(4, os.path.join(prefix, "rod2D_V.mesh"))
 
-def cw_generate_mxn(nx, ny, w, l):
+def cw_generate_nu_mxn(nx, ny, wh,wv,lh,lv):
     bdr_data = []
     if_data = []
     n_joint = (nx + 1) * (ny + 1)
@@ -50,7 +50,7 @@ def cw_generate_mxn(nx, ny, w, l):
     for i in range(n_joint):
         xi = (i + nx+1) % (nx+1)
         yi = np.floor(i / (nx+1))
-        mesh_configs[i,:] = [xi*(l+w), yi*(l+w), 0., 0., 0., 0.]
+        mesh_configs[i,:] = [xi*(lh+wv), yi*(lv+wh), 0., 0., 0., 0.]
 
         # Boundary check
         # global_battr / mesh_idx / comp_battr
@@ -82,7 +82,7 @@ def cw_generate_mxn(nx, ny, w, l):
     for i in range(n_rod_H):
         xi = (i + nx) % (nx)
         yi = np.floor(i / (nx))
-        mesh_configs[n_joint + i,:] = [xi*(l+w) + w, yi*(l+w), 0., 0., 0., 0.]
+        mesh_configs[n_joint + i,:] = [xi*(lh+wv) + wv, yi*(lv+wh), 0., 0., 0., 0.]
         # Boundary check
         if yi==0.0:
             bdr_data += [[3, n_joint + i, 3]] # free boundary
@@ -99,7 +99,7 @@ def cw_generate_mxn(nx, ny, w, l):
     for i in range(n_rod_V):
         xi = (i + nx+1) % (nx+1)
         yi = np.floor(i / (nx+1))
-        mesh_configs[n_joint + n_rod_H + i,:] = [xi*(l+w), yi*(l+w) + w, 0., 0., 0., 0.]
+        mesh_configs[n_joint + n_rod_H + i,:] = [xi*(lh+wv), yi*(lv+wh) + wh, 0., 0., 0., 0.]
 
         # Boundary check
         if xi == 0.0:
@@ -114,10 +114,10 @@ def cw_generate_mxn(nx, ny, w, l):
 
     # component config list J-H H-J J-V V-J
     comp_configs = []
-    comp_configs += [[w, 0., 0., 0., 0., 0.]]
-    comp_configs += [[-l, 0., 0., 0., 0., 0.]]
-    comp_configs += [[0., w, 0., 0., 0., 0.]]
-    comp_configs += [[0., -l, 0., 0., 0., 0.]]
+    comp_configs += [[wv, 0., 0., 0., 0., 0.]]
+    comp_configs += [[-lh, 0., 0., 0., 0., 0.]]
+    comp_configs += [[0., wh, 0., 0., 0., 0.]]
+    comp_configs += [[0., -lv, 0., 0., 0., 0.]]
 
     # interface data
     if_data = np.array(if_data)
@@ -126,19 +126,52 @@ def cw_generate_mxn(nx, ny, w, l):
     bdr_data0 = np.array(bdr_data)
 
     return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
+def cw_generate_mxn(nx, ny, w, l):
+    cw_generate_nu_mxn(nx, ny, w,w,l,l)
 
+def cw_generate_cwfom_mxn(nx, ny, wh,wv,lh,lv):
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_nu_mxn(nx, ny, wh,wv,lh,lv)
+    
+    # Manipulate to remove the bottom beams
+    n_mesh -= nx
+    n_joint = (nx + 1) * (ny + 1)
+    bbeam_ids = range(n_joint, n_joint + nx)
+    mesh_type = [mesh_type[i] for i in range(len(mesh_type)) if i not in bbeam_ids]
+    mesh_configs = np.delete(mesh_configs, bbeam_ids, 0)
 
-def cw_generate_1x1(w,l):
+    # Delete unused interfaces
+    # mesh1 / mesh2 / battr1 / battr2 / port_idx
+    if_delete = []
+    for i in range(if_data.shape[0]):
+        row = if_data[i,:]
+        if row[0] <= nx:
+            if row[2] == 2 or row[2] == 4:
+                if_delete.append(i) 
+    if_data = np.delete(if_data, if_delete, 0)
+
+    # Delete unused boundaries
+    # global_battr / mesh_idx / comp_battr
+    bdr_delete = []
+    for i in range(bdr_data0.shape[0]):
+        row = bdr_data0[i,:]
+        if row[1] == 1:
+            if row[2] >= n_joint:
+                bdr_delete.append(i) 
+    bdr_data0 = np.delete(bdr_data0, bdr_delete, 0)
+
+    return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
+
+def cw_generate_nu_1x1(wh,wv,lh,lv):
     n_mesh = 8
     mesh_type = [0, 1, 0, 2, 2, 0, 1, 0]
     mesh_configs = np.zeros([n_mesh, 6])
-    mesh_configs[1,:] = [w, 0., 0., 0., 0., 0.]
-    mesh_configs[2,:] = [w+l, 0., 0., 0., 0., 0.]
-    mesh_configs[3,:] = [0., w, 0., 0., 0., 0.]
-    mesh_configs[4,:] = [w+l, w, 0., 0., 0., 0.]
-    mesh_configs[5,:] = [0., w+l, 0., 0., 0., 0.]
-    mesh_configs[6,:] = [w, w+l, 0., 0., 0., 0.]
-    mesh_configs[7,:] = [w+l, w+l, 0., 0., 0., 0.]
+    mesh_configs[1,:] = [wv, 0., 0., 0., 0., 0.]
+    mesh_configs[2,:] = [wv+lh, 0., 0., 0., 0., 0.]
+    mesh_configs[3,:] = [0., wh, 0., 0., 0., 0.]
+    mesh_configs[4,:] = [wv+lh, wh, 0., 0., 0., 0.]
+    mesh_configs[5,:] = [0., wh+lv, 0., 0., 0., 0.]
+    mesh_configs[6,:] = [wv, wh+lv, 0., 0., 0., 0.]
+    mesh_configs[7,:] = [wv+lh, wh+lv, 0., 0., 0., 0.]
 
     # interface data
     # mesh1 / mesh2 / battr1 / battr2 / port_idx
@@ -181,12 +214,15 @@ def cw_generate_1x1(w,l):
 
     # component config list J-H H-J J-V V-J
     comp_configs = []
-    comp_configs += [[w, 0., 0., 0., 0., 0.]]
-    comp_configs += [[-l, 0., 0., 0., 0., 0.]]
-    comp_configs += [[0., w, 0., 0., 0., 0.]]
-    comp_configs += [[0., -l, 0., 0., 0., 0.]]
+    comp_configs += [[wv, 0., 0., 0., 0., 0.]]
+    comp_configs += [[-lh, 0., 0., 0., 0., 0.]]
+    comp_configs += [[0., wh, 0., 0., 0., 0.]]
+    comp_configs += [[0., -lv, 0., 0., 0., 0.]]
 
     return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
+
+def cw_generate_1x1(w,l):
+    return cw_generate_nu_1x1(w,w,l,l)
 
 def Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data):
     # comp_list is a list of component names
@@ -296,9 +332,12 @@ def CWTrain2x2():
 
 
 def CWTrainOptROM():
-    l = 17.0
-    w = 1.0
-    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_1x1(w,l)
+    wh = 0.2
+    wv = 0.2
+    lh = 6.0
+    lv = 4.0
+
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_nu_1x1(wh,wv,lh,lv)
 
     # list of component names J H V
     comp_list = ["optjoint", "optbeam", "optcol"]
@@ -313,11 +352,15 @@ def CWTrainOptROM():
     return
 
 def CWTrainOptFOM():
-    nx = 8
-    ny = 8
-    l = 17.0
-    w = 1.0
-    n_mesh, mesh_type, mesh_configs, if_data, bdr_data, comp_configs = cw_generate_mxn(nx, ny, w,l)
+    nx = 3
+    ny = 3
+
+    wh = 0.2
+    wv = 0.2
+    lh = 6.0
+    lv = 4.0
+
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data, comp_configs = cw_generate_cwfom_mxn(nx, ny, wh,wv,lh,lv)
 
     # list of component names J H V
     comp_list = ["optjoint", "optbeam", "optcol"]
@@ -328,7 +371,6 @@ def CWTrainOptFOM():
         # change to multiple attributes, only as a temporary implementation.
         Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
     return
-
 
 def get_file_data(filename):
     with h5py.File(filename, 'r') as f:
