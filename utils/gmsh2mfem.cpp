@@ -37,14 +37,21 @@ int main(int argc, char *argv[])
 
    Mesh mesh(meshFileString);
 
-   // Promote to high order mesh and ensure discontinuity
+   // Promote to high order mesh
    if (order_ >1)
       mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
    
    // Force mesh to be nonconforming
    if (force_nc_)
    {
-      mesh.SetCurvature(mesh.GetNodalFESpace()->GetMaxElementOrder(), true, 2, Ordering::byVDIM);
+      if (mesh.GetNodalFESpace())
+      {
+         mesh.SetCurvature(mesh.GetNodalFESpace()->GetMaxElementOrder(), true, 2, Ordering::byVDIM);
+      }
+      else
+      {
+         mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
+      }
    }
    
    std::string outputFile(meshFileString);
