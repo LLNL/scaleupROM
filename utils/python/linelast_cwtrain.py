@@ -36,7 +36,7 @@ def create_training_meshes(prefix):
     shift_mesh_battrs(4, os.path.join(prefix, "rod2D_H.mesh"))
     shift_mesh_battrs(4, os.path.join(prefix, "rod2D_V.mesh"))
 
-def cwgrid_mesh_configs(nx, ny, l, w):
+def cw_generate_nu_mxn(nx, ny, wh,wv,lh,lv):
     bdr_data = []
     if_data = []
     n_joint = (nx + 1) * (ny + 1)
@@ -50,7 +50,7 @@ def cwgrid_mesh_configs(nx, ny, l, w):
     for i in range(n_joint):
         xi = (i + nx+1) % (nx+1)
         yi = np.floor(i / (nx+1))
-        mesh_configs[i,:] = [xi*(l+w), yi*(l+w), 0., 0., 0., 0.]
+        mesh_configs[i,:] = [xi*(lh+wv), yi*(lv+wh), 0., 0., 0., 0.]
 
         # Boundary check
         # global_battr / mesh_idx / comp_battr
@@ -82,7 +82,7 @@ def cwgrid_mesh_configs(nx, ny, l, w):
     for i in range(n_rod_H):
         xi = (i + nx) % (nx)
         yi = np.floor(i / (nx))
-        mesh_configs[n_joint + i,:] = [xi*(l+w) + w, yi*(l+w), 0., 0., 0., 0.]
+        mesh_configs[n_joint + i,:] = [xi*(lh+wv) + wv, yi*(lv+wh), 0., 0., 0., 0.]
         # Boundary check
         if yi==0.0:
             bdr_data += [[3, n_joint + i, 3]] # free boundary
@@ -99,7 +99,7 @@ def cwgrid_mesh_configs(nx, ny, l, w):
     for i in range(n_rod_V):
         xi = (i + nx+1) % (nx+1)
         yi = np.floor(i / (nx+1))
-        mesh_configs[n_joint + n_rod_H + i,:] = [xi*(l+w), yi*(l+w) + w, 0., 0., 0., 0.]
+        mesh_configs[n_joint + n_rod_H + i,:] = [xi*(lh+wv), yi*(lv+wh) + wh, 0., 0., 0., 0.]
 
         # Boundary check
         if xi == 0.0:
@@ -112,19 +112,66 @@ def cwgrid_mesh_configs(nx, ny, l, w):
             bdr_data += [[3, n_joint + n_rod_H + i, 2]] # constrain one end
             bdr_data += [[3, n_joint + n_rod_H + i, 4]] # free boundary
 
-    return mesh_configs, bdr_data, if_data, mesh_type, n_mesh
+    # component config list J-H H-J J-V V-J
+    comp_configs = []
+    comp_configs += [[wv, 0., 0., 0., 0., 0.]]
+    comp_configs += [[-lh, 0., 0., 0., 0., 0.]]
+    comp_configs += [[0., wh, 0., 0., 0., 0.]]
+    comp_configs += [[0., -lv, 0., 0., 0., 0.]]
 
-def CWTrain1x1():
+    # interface data
+    if_data = np.array(if_data)
+
+    # boundary attributes
+    bdr_data0 = np.array(bdr_data)
+
+    return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
+def cw_generate_mxn(nx, ny, w, l):
+    cw_generate_nu_mxn(nx, ny, w,w,l,l)
+
+def cw_generate_cwfom_mxn(nx, ny, wh,wv,lh,lv):
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_nu_mxn(nx, ny, wh,wv,lh,lv)
+    
+    # Manipulate to remove the bottom beams
+    n_mesh -= nx
+    n_joint = (nx + 1) * (ny + 1)
+    bbeam_ids = range(n_joint, n_joint + nx)
+    mesh_type = [mesh_type[i] for i in range(len(mesh_type)) if i not in bbeam_ids]
+    mesh_configs = np.delete(mesh_configs, bbeam_ids, 0)
+
+    # Delete unused interfaces
+    # mesh1 / mesh2 / battr1 / battr2 / port_idx
+    if_delete = []
+    for i in range(if_data.shape[0]):
+        row = if_data[i,:]
+        if row[0] <= nx:
+            if row[2] == 2 or row[2] == 4:
+                if_delete.append(i) 
+    if_data = np.delete(if_data, if_delete, 0)
+
+    # Delete unused boundaries
+    # global_battr / mesh_idx / comp_battr
+    bdr_delete = []
+    for i in range(bdr_data0.shape[0]):
+        row = bdr_data0[i,:]
+        if row[1] == 1:
+            if row[2] >= n_joint:
+                bdr_delete.append(i) 
+    bdr_data0 = np.delete(bdr_data0, bdr_delete, 0)
+
+    return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
+
+def cw_generate_nu_1x1(wh,wv,lh,lv):
     n_mesh = 8
     mesh_type = [0, 1, 0, 2, 2, 0, 1, 0]
     mesh_configs = np.zeros([n_mesh, 6])
-    mesh_configs[1,:] = [1., 0., 0., 0., 0., 0.]
-    mesh_configs[2,:] = [5., 0., 0., 0., 0., 0.]
-    mesh_configs[3,:] = [0., 1., 0., 0., 0., 0.]
-    mesh_configs[4,:] = [5., 1., 0., 0., 0., 0.]
-    mesh_configs[5,:] = [0., 5., 0., 0., 0., 0.]
-    mesh_configs[6,:] = [1., 5., 0., 0., 0., 0.]
-    mesh_configs[7,:] = [5., 5., 0., 0., 0., 0.]
+    mesh_configs[1,:] = [wv, 0., 0., 0., 0., 0.]
+    mesh_configs[2,:] = [wv+lh, 0., 0., 0., 0., 0.]
+    mesh_configs[3,:] = [0., wh, 0., 0., 0., 0.]
+    mesh_configs[4,:] = [wv+lh, wh, 0., 0., 0., 0.]
+    mesh_configs[5,:] = [0., wh+lv, 0., 0., 0., 0.]
+    mesh_configs[6,:] = [wv, wh+lv, 0., 0., 0., 0.]
+    mesh_configs[7,:] = [wv+lh, wh+lv, 0., 0., 0., 0.]
 
     # interface data
     # mesh1 / mesh2 / battr1 / battr2 / port_idx
@@ -165,61 +212,69 @@ def CWTrain1x1():
     # boundary attributes
     bdr_data0 = np.array(bdr_data)
 
-    for i in range(4): # Loop over all the variants
-        bdr_data = PermuteBdrData(bdr_data0, i)
-        filename = "linelast.comp_train" + str(i) + ".h5"
-        with h5py.File(filename, 'w') as f:
-            # c++ currently cannot read datasets of string.
-            # change to multiple attributes, only as a temporary implementation.
-            grp = f.create_group("components")
-            grp.attrs["number_of_components"] = 3
-            grp.attrs["0"] = "joint2D"
-            grp.attrs["1"] = "rod2D_H"
-            grp.attrs["2"] = "rod2D_V"
-            # component index of each mesh
-            grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
-            # 3-dimension vector for translation / rotation
-            grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
+    # component config list J-H H-J J-V V-J
+    comp_configs = []
+    comp_configs += [[wv, 0., 0., 0., 0., 0.]]
+    comp_configs += [[-lh, 0., 0., 0., 0., 0.]]
+    comp_configs += [[0., wh, 0., 0., 0., 0.]]
+    comp_configs += [[0., -lv, 0., 0., 0., 0.]]
 
-            grp = f.create_group("ports")
-            grp.attrs["number_of_references"] = 4
-            grp.attrs["0"] = "port1"
-            grp.attrs["1"] = "port2"
-            grp.attrs["2"] = "port3"
-            grp.attrs["3"] = "port4"
-            grp.create_dataset("interface", if_data.shape, data=if_data)
+    return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
 
-            port = grp.create_group("port1")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_H"
-            port.attrs["attr1"] = 2
-            port.attrs["attr2"] = 4
-            port.create_dataset("comp2_configuration", (6,), data=[1., 0., 0., 0., 0., 0.])
+def cw_generate_1x1(w,l):
+    return cw_generate_nu_1x1(w,w,l,l)
 
-            port = grp.create_group("port2")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_H"
-            port.attrs["attr1"] = 4
-            port.attrs["attr2"] = 2
-            port.create_dataset("comp2_configuration", (6,), data=[-4., 0., 0., 0., 0., 0.])
+def Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data):
+    # comp_list is a list of component names
+    # comp_configs is a list of component configuration
+    grp = f.create_group("components")
+    grp.attrs["number_of_components"] = len(comp_list)
+    grp.attrs["0"] = comp_list[0] # Joint component name
+    grp.attrs["1"] = comp_list[1] # Horizontal rod component name
+    grp.attrs["2"] = comp_list[2] # Vertical rod component name
+    # component index of each mesh
+    grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
+    # 3-dimension vector for translation / rotation
+    grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
 
-            port = grp.create_group("port3")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_V"
-            port.attrs["attr1"] = 3
-            port.attrs["attr2"] = 1
-            port.create_dataset("comp2_configuration", (6,), data=[0., 1., 0., 0., 0., 0.])
+    grp = f.create_group("ports")
+    grp.attrs["number_of_references"] = 4
+    grp.attrs["0"] = "port1"
+    grp.attrs["1"] = "port2"
+    grp.attrs["2"] = "port3"
+    grp.attrs["3"] = "port4"
+    grp.create_dataset("interface", if_data.shape, data=if_data)
 
-            port = grp.create_group("port4")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_V"
-            port.attrs["attr1"] = 1
-            port.attrs["attr2"] = 3
-            port.create_dataset("comp2_configuration", (6,), data=[0., -4., 0., 0., 0., 0.])
+    port = grp.create_group("port1")
+    port.attrs["comp1"] = comp_list[0] # Joint component name
+    port.attrs["comp2"] = comp_list[1] # Horizontal rod component name
+    port.attrs["attr1"] = 2
+    port.attrs["attr2"] = 4
+    port.create_dataset("comp2_configuration", (6,), data=comp_configs[0])
 
-            # boundary attributes
-            f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
-    return
+    port = grp.create_group("port2")
+    port.attrs["comp1"] = comp_list[0] # Joint component name
+    port.attrs["comp2"] = comp_list[1] # Horizontal rod component name
+    port.attrs["attr1"] = 4
+    port.attrs["attr2"] = 2
+    port.create_dataset("comp2_configuration", (6,), data=comp_configs[1])
+
+    port = grp.create_group("port3")
+    port.attrs["comp1"] = comp_list[0] # Joint component name
+    port.attrs["comp2"] = comp_list[2] # Vertical rod component name
+    port.attrs["attr1"] = 3
+    port.attrs["attr2"] = 1
+    port.create_dataset("comp2_configuration", (6,), data=comp_configs[2])
+
+    port = grp.create_group("port4")
+    port.attrs["comp1"] = comp_list[0] # Joint component name
+    port.attrs["comp2"] = comp_list[2] # Vertical rod component name
+    port.attrs["attr1"] = 1
+    port.attrs["attr2"] = 3
+    port.create_dataset("comp2_configuration", (6,), data=comp_configs[3])
+
+    # boundary attributes
+    f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
 
 battr_map = np.array(
 [
@@ -238,19 +293,13 @@ def PermuteBdrData(bdr_data0, j):
             bdr_data[i, 0] = battr_map[j, battr-1]
     return bdr_data
 
-
-def CWTrain2x2():
-    nx = 2
-    ny = 2
-    l = 4.0
+def CWTrain1x1():
     w = 1.0
-    mesh_configs, bdr_data, if_data, mesh_type, n_mesh = cwgrid_mesh_configs(nx, ny, l, w)
+    l = 4.0
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_1x1(w,l)
 
-    # interface data
-    if_data = np.array(if_data)
-
-    # boundary attributes
-    bdr_data0 = np.array(bdr_data)
+    # list of component names J H V
+    comp_list = ["joint2D", "rod2D_H", "rod2D_V"]
 
     for i in range(4): # Loop over all the variants
         bdr_data = PermuteBdrData(bdr_data0, i)
@@ -258,54 +307,69 @@ def CWTrain2x2():
         with h5py.File(filename, 'w') as f:
             # c++ currently cannot read datasets of string.
             # change to multiple attributes, only as a temporary implementation.
-            grp = f.create_group("components")
-            grp.attrs["number_of_components"] = 3
-            grp.attrs["0"] = "joint2D"
-            grp.attrs["1"] = "rod2D_H"
-            grp.attrs["2"] = "rod2D_V"
-            # component index of each mesh
-            grp.create_dataset("meshes", (n_mesh,), data=mesh_type)
-            # 3-dimension vector for translation / rotation
-            grp.create_dataset("configuration", mesh_configs.shape, data=mesh_configs)
+            Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
+    return
 
-            grp = f.create_group("ports")
-            grp.attrs["number_of_references"] = 4
-            grp.attrs["0"] = "port1"
-            grp.attrs["1"] = "port2"
-            grp.attrs["2"] = "port3"
-            grp.attrs["3"] = "port4"
-            grp.create_dataset("interface", if_data.shape, data=if_data)
+def CWTrain2x2():
+    nx = 2
+    ny = 2
+    l = 4.0
+    w = 1.0
 
-            port = grp.create_group("port1")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_H"
-            port.attrs["attr1"] = 2
-            port.attrs["attr2"] = 4
-            port.create_dataset("comp2_configuration", (6,), data=[w, 0., 0., 0., 0., 0.])
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_mxn(nx, ny, w,l)
 
-            port = grp.create_group("port2")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_H"
-            port.attrs["attr1"] = 4
-            port.attrs["attr2"] = 2
-            port.create_dataset("comp2_configuration", (6,), data=[-l, 0., 0., 0., 0., 0.])
+    # list of component names J H V
+    comp_list = ["joint2D", "rod2D_H", "rod2D_V"]
 
-            port = grp.create_group("port3")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_V"
-            port.attrs["attr1"] = 3
-            port.attrs["attr2"] = 1
-            port.create_dataset("comp2_configuration", (6,), data=[0., w, 0., 0., 0., 0.])
+    for i in range(4): # Loop over all the variants
+        bdr_data = PermuteBdrData(bdr_data0, i)
+        filename = "linelast.comp_train" + str(i) + ".h5"
+        with h5py.File(filename, 'w') as f:
+            # c++ currently cannot read datasets of string.
+            # change to multiple attributes, only as a temporary implementation.
+            Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
+    return
 
-            port = grp.create_group("port4")
-            port.attrs["comp1"] = "joint2D"
-            port.attrs["comp2"] = "rod2D_V"
-            port.attrs["attr1"] = 1
-            port.attrs["attr2"] = 3
-            port.create_dataset("comp2_configuration", (6,), data=[0., -l, 0., 0., 0., 0.])
 
-            # boundary attributes
-            f.create_dataset("boundary", bdr_data.shape, data=bdr_data)
+def CWTrainOptROM():
+    wh = 0.2
+    wv = 0.2
+    lh = 6.0
+    lv = 4.0
+
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_nu_1x1(wh,wv,lh,lv)
+
+    # list of component names J H V
+    comp_list = ["optjoint", "optbeam", "optcol"]
+
+    for i in range(4): # Loop over all the variants
+        bdr_data = PermuteBdrData(bdr_data0, i)
+        filename = "linelast.comp_train" + str(i) + ".h5"
+        with h5py.File(filename, 'w') as f:
+            # c++ currently cannot read datasets of string.
+            # change to multiple attributes, only as a temporary implementation.
+            Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
+    return
+
+def CWTrainOptFOM():
+    nx = 3
+    ny = 3
+
+    wh = 0.2
+    wv = 0.2
+    lh = 6.0
+    lv = 4.0
+
+    n_mesh, mesh_type, mesh_configs, if_data, bdr_data, comp_configs = cw_generate_cwfom_mxn(nx, ny, wh,wv,lh,lv)
+
+    # list of component names J H V
+    comp_list = ["optjoint", "optbeam", "optcol"]
+
+    filename = "linelast.optfom.h5"
+    with h5py.File(filename, 'w') as f:
+        # c++ currently cannot read datasets of string.
+        # change to multiple attributes, only as a temporary implementation.
+        Configure2DLatticeComponent(f, comp_list, comp_configs, n_mesh, mesh_type, mesh_configs, if_data, bdr_data)
     return
 
 def get_file_data(filename):
@@ -360,6 +424,10 @@ if __name__ == "__main__":
             CWTrain1x1()
         elif name == "cwtrain_2x2":
             CWTrain2x2()
+        elif name == "cwtrain_optROM":
+            CWTrainOptROM()
+        elif name == "cwtrain_optFOM":
+            CWTrainOptFOM()
         elif name == "bscale":
             prefix = sys.argv[2]
             plot_path = sys.argv[3]

@@ -9,9 +9,14 @@ file(COPY config/linelast.lattice.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/li
 file(COPY linelast.force_cantilever.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY linelast.comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY config/linelast.comp_train.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY linelast.opt_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
+
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/joint2D.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/rod2D_H.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/rod2D_V.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/optjoint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/optbeam.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/optcol.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
