@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
                   "File name for the output mesh.");
    args.AddOption(&order_, "-o", "--mesh-order",
                   "Order (polynomial degree) of the mesh elements.");
-   args.AddOption(&force_nc_, "-fnc", "--force-non-conforming", "-nfnc", "--noforce-non-conforming"
+   args.AddOption(&force_nc_, "-fnc", "--force-non-conforming", "-nfnc", "--noforce-non-conforming",
                   "Sets whether to force the output mesh to be nonconforming. Default behavior is no enforcing.");
 
    args.Parse();
