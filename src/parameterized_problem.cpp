@@ -200,6 +200,33 @@ void tip_force(const Vector &x, Vector &f)
 
 }  // namespace linelast_force
 
+namespace linelast_frame_wind
+{
+
+double qwind_f;
+double density;
+double g;
+
+void gravity_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(f.Size()-1) = -density * g;
+}
+
+void wind_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(0) = qwind_f;
+}
+
+void dirichlet(const Vector &x, Vector &u)
+{
+   u = 0.0;
+}
+
+}  // namespace linelast_frame_wind
+
+
 namespace advdiff_problem
 {
 
@@ -408,6 +435,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "linelast_cwtrain")
    {
       problem = new LinElastComponentWiseTrain();
+   }
+   else if (problem_name == "linelast_frame_wind")
+   {
+      problem = new LinElastFrameWind();
    }
    else if (problem_name == "advdiff_flow_past_array")
    {
@@ -870,6 +901,71 @@ LinElastForceCantilever::LinElastForceCantilever()
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL;
+}
+
+LinElastFrameWind::LinElastFrameWind()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
+
+   // Left (Actually Left)
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = &(function_factory::linelast_frame_wind::wind_load);
+
+   // Right (Actually Right)
+   battr[1] = 2;
+   bdr_type[1] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[1] = NULL;
+
+   // None (Actually up)
+   battr[2] = 5;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[2] = NULL;
+
+   // Up (Actually down)
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_frame_wind::dirichlet);
+
+   // Down (Actually none)
+   battr[4] = 3;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
+
+
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+   // Default values.
+   function_factory::linelast_problem::_lambda = 3846153846.0;
+   function_factory::linelast_problem::_mu = 769230769.0;
+   function_factory::linelast_frame_wind::qwind_f = 500.0; // [N]
+   function_factory::linelast_frame_wind::density = 78.5; //[kg/m2]
+   function_factory::linelast_frame_wind::g = 9.81; 
+
+   param_map["lambda"] = 0;
+   param_map["mu"] = 1;
+   param_map["qwind_f"] = 2;
+   param_map["density"] = 3;
+   param_map["g"] = 4;
+
+   param_ptr.SetSize(5);
+   param_ptr[0] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[1] = &(function_factory::linelast_problem::_mu);
+   param_ptr[2] = &(function_factory::linelast_frame_wind::qwind_f);
+   param_ptr[3] = &(function_factory::linelast_frame_wind::density);
+   param_ptr[4] = &(function_factory::linelast_frame_wind::g);
+
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
+
+   vector_rhs_ptr = &(function_factory::linelast_frame_wind::gravity_load);
 }
 
 /*

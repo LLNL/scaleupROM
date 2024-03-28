@@ -132,32 +132,6 @@ def cw_generate_mxn(nx, ny, w, l):
 def cw_generate_cwfom_mxn(nx, ny, wh,wv,lh,lv):
     n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs = cw_generate_nu_mxn(nx, ny, wh,wv,lh,lv)
     
-    # Manipulate to remove the bottom beams
-    n_mesh -= nx
-    n_joint = (nx + 1) * (ny + 1)
-    bbeam_ids = range(n_joint, n_joint + nx)
-    mesh_type = [mesh_type[i] for i in range(len(mesh_type)) if i not in bbeam_ids]
-    mesh_configs = np.delete(mesh_configs, bbeam_ids, 0)
-
-    # Delete unused interfaces
-    # mesh1 / mesh2 / battr1 / battr2 / port_idx
-    if_delete = []
-    for i in range(if_data.shape[0]):
-        row = if_data[i,:]
-        if row[0] <= nx:
-            if row[2] == 2 or row[2] == 4:
-                if_delete.append(i) 
-    if_data = np.delete(if_data, if_delete, 0)
-
-    # Delete unused boundaries
-    # global_battr / mesh_idx / comp_battr
-    bdr_delete = []
-    for i in range(bdr_data0.shape[0]):
-        row = bdr_data0[i,:]
-        if row[1] == 1:
-            if row[2] >= n_joint:
-                bdr_delete.append(i) 
-    bdr_data0 = np.delete(bdr_data0, bdr_delete, 0)
 
     return n_mesh, mesh_type, mesh_configs, if_data, bdr_data0, comp_configs
 

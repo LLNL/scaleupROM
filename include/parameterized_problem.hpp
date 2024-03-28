@@ -133,6 +133,20 @@ void right_disp(const Vector &x, Vector &u);
 
 }
 
+namespace linelast_frame_wind
+{
+extern double qwind_f;
+extern double density;
+extern double g;
+
+void wind_load(const Vector &x, Vector &f);
+
+void gravity_load(const Vector &x, Vector &f);
+
+void dirichlet(const Vector &x, Vector &u);
+
+}
+
 namespace advdiff_problem
 {
 
@@ -307,6 +321,12 @@ class LinElastForceCantilever : public LinElastProblem
 {
 public:
    LinElastForceCantilever();
+};
+
+class LinElastFrameWind : public LinElastProblem
+{
+public:
+   LinElastFrameWind();
 };
 
 namespace function_factory
