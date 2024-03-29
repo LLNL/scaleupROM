@@ -85,28 +85,28 @@ sample_generation:
       maximum: 1.0
     - key: single_run/linelast_cwtrain/r_fx
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/r_fy
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/u_fx
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/u_fy
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/d_fx
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/d_fy
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/rx
       type: double
       minimum: 0.0
@@ -157,20 +157,20 @@ sample_generation:
       maximum: 1.0
     - key: single_run/linelast_cwtrain/xu_amp
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/yu_amp
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/xf_amp
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/yf_amp
       type: double
-      minimum: -5000.0
-      maximum: 5000.0
+      minimum: -50000.0
+      maximum: 50000.0
     - key: single_run/linelast_cwtrain/xu_freq
       type: double
       minimum: 0.1

@@ -818,20 +818,34 @@ LinElastDispLattice::LinElastDispLattice()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(3);
-   battr.SetSize(3);
-   vector_bdr_ptr.SetSize(3);
-  for (size_t i = 0; i < 2; i++)
-      {
-      battr[i] = i+1;
-      bdr_type[i] = BoundaryType::DIRICHLET;
-      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
-   }
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
 
-   /* homogeneous Neumann bc */
+   // Down
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = NULL;
+
+   // Right
+   battr[1] = 2;
+   bdr_type[1] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[1] = &(function_factory::linelast_disp::init_disp);
+
+   // Up
    battr[2] = 3;
    bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
+
+   // Left
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_disp::init_disp);
+
+   // None
+   battr[4] = 5;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
 
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -861,24 +875,34 @@ LinElastForceCantilever::LinElastForceCantilever()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(3);
-   battr.SetSize(3);
-   vector_bdr_ptr.SetSize(3);
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
 
-   // Fixed end of cantilever
+   // Down
    battr[0] = 1;
-   bdr_type[0] = BoundaryType::DIRICHLET;
-   vector_bdr_ptr[0] = &(function_factory::linelast_disp::init_disp);
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = NULL;
 
-   // Free end of cantilever
+   // Right
    battr[1] = 2;
    bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_force::tip_force);
 
-   /* homogeneous Neumann bc */
+   // Up
    battr[2] = 3;
    bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
+
+   // Left
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_disp::init_disp);
+
+   // None
+   battr[4] = 5;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
    
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -911,31 +935,30 @@ LinElastFrameWind::LinElastFrameWind()
    battr.SetSize(5);
    vector_bdr_ptr.SetSize(5);
 
-   // Left (Actually Left)
+   // battr 1: Wind load
    battr[0] = 1;
    bdr_type[0] = BoundaryType::NEUMANN;
    vector_bdr_ptr[0] = &(function_factory::linelast_frame_wind::wind_load);
 
-   // Right (Actually Right)
+   // battr 2: Line load (to be implemented)
    battr[1] = 2;
    bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = NULL;
 
-   // None (Actually up)
-   battr[2] = 5;
+   // battr 3: Other load (To be implemented)
+   battr[2] = 3;
    bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
 
-   // Up (Actually down)
+   // battr 4: Dirichlet BCs
    battr[3] = 4;
    bdr_type[3] = BoundaryType::DIRICHLET;
    vector_bdr_ptr[3] = &(function_factory::linelast_frame_wind::dirichlet);
 
-   // Down (Actually none)
+   // battr 5: Unloaded
    battr[4] = 3;
    bdr_type[4] = BoundaryType::NEUMANN;
    vector_bdr_ptr[4] = NULL;
-
 
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -1024,31 +1047,30 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    battr.SetSize(5);
    vector_bdr_ptr.SetSize(5);
 
-   // Left
+   // Down
    battr[0] = 1;
-   bdr_type[0] = BoundaryType::DIRICHLET;
-   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::left_disp);
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::down_disp);
 
    // Right
    battr[1] = 2;
    bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_cwtrain::right_disp);
 
-   // None
-   battr[2] = 5;
-   bdr_type[2] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[2] = NULL;
-
    // Up
+   battr[2] = 3;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[2] = &(function_factory::linelast_cwtrain::up_disp);
+
+   // Left
    battr[3] = 4;
-   bdr_type[3] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::up_disp);
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::left_disp);
 
-   // Down
-   battr[4] = 3;
+   // None
+   battr[4] = 5;
    bdr_type[4] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[4] = &(function_factory::linelast_cwtrain::down_disp);
-
+   vector_bdr_ptr[4] = NULL;
 
    // Set materials
    general_scalar_ptr.SetSize(2);
