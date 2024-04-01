@@ -81,11 +81,6 @@ void LinElastSolver::SetupBCVariables()
    mu_c.SetSize(numSub);
    mu_c = NULL;
 
-   for (size_t i = 0; i < numSub; i++)
-   {
-      lambda_c[i] = new ConstantCoefficient(1.0);
-      mu_c[i] = new ConstantCoefficient(1.0);
-   }
 }
 
 void LinElastSolver::InitVariables()
