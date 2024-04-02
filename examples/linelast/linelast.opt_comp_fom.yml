@@ -1,0 +1,51 @@
+main:
+  mode: single_run
+  use_rom: false
+  solver: linelast
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "config/linelast.optfom.h5"
+    components:
+      - name: "optjoint"
+        file: "meshes/optjoint.mesh"
+      - name: "optbeam"
+        file: "meshes/optbeam.mesh"
+      - name: "optcol"
+        file: "meshes/optcol.mesh"
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: paraview_output
+
+parameterized_problem:
+  name: linelast_frame_wind
+
+single_run:
+  linelast_frame_wind:
+    qwind_f : 500.0
+   
+
+model_reduction:
+  rom_handler_type: mfem
+  subdomain_training: universal
+  linear_solver_type: direct
+  save_operator:
+    level: component
+    prefix: "linelast_cw.rom_elem"
+  compare_solution:
+    enabled: true
