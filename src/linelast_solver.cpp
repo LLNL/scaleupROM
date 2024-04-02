@@ -74,13 +74,6 @@ void LinElastSolver::SetupBCVariables()
    MultiBlockSolver::SetupBCVariables();
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
-
-   lambda_c.SetSize(numSub);
-   lambda_c = NULL;
-
-   mu_c.SetSize(numSub);
-   mu_c = NULL;
-
 }
 
 void LinElastSolver::InitVariables()
@@ -103,6 +96,19 @@ void LinElastSolver::InitVariables()
    block_offsets.PartialSum();
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
+
+   // Set material parameters
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
+
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
+
+   for (int i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new ConstantCoefficient(lambda);
+      mu_c[i] = new ConstantCoefficient(mu);
+   }
 
    SetupBCVariables();
 
