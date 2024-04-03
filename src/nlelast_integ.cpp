@@ -107,9 +107,127 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
                                  FaceElementTransformations &Tr,
                                  const Vector &elfun, Vector &elvect){
-       DenseMatrix elmat(elfun.Size());
-       AssembleFaceMatrix(el1, el2, Tr, elmat);
-       elmat.Mult(elfun, elvect);
+       #ifdef MFEM_THREAD_SAFE
+    // For descriptions of these variables, see the class declaration.
+    Vector shape1, shape2;
+    DenseMatrix dshape1, dshape2;
+    DenseMatrix adjJ;
+    DenseMatrix dshape1_ps, dshape2_ps;
+    Vector nor;
+    Vector nL1, nL2;
+    Vector nM1, nM2;
+    Vector dshape1_dnM, dshape2_dnM;
+    DenseMatrix jmat;
+ #endif
+ 
+    const int dim = el1.GetDim();
+    const int ndofs1 = el1.GetDof();
+    const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+    const int nvdofs = dim*(ndofs1 + ndofs2);
+
+    // TODO: Assert that elvect and elfun are of size nvdofs.
+ 
+    // TODO: Make sure that kappa works and is correct
+    kappa = 0.0;
+    const bool kappa_is_nonzero = (kappa != 0.0);
+    if (kappa_is_nonzero)
+    {
+       jmat.SetSize(nvdofs);
+       jmat = 0.;
+    }
+ 
+    adjJ.SetSize(dim);
+    shape1.SetSize(ndofs1);
+    dshape1.SetSize(ndofs1, dim);
+    dshape1_ps.SetSize(ndofs1, dim);
+    nor.SetSize(dim);
+    nL1.SetSize(dim);
+    nM1.SetSize(dim);
+    dshape1_dnM.SetSize(ndofs1);
+ 
+    if (ndofs2)
+    {
+       shape2.SetSize(ndofs2);
+       dshape2.SetSize(ndofs2, dim);
+       dshape2_ps.SetSize(ndofs2, dim);
+       nL2.SetSize(dim);
+       nM2.SetSize(dim);
+       dshape2_dnM.SetSize(ndofs2);
+    }
+ 
+    const IntegrationRule *ir = IntRule;
+    if (ir == NULL)
+    {
+       // a simple choice for the integration order; is this OK?
+       const int order = 2 * max(el1.GetOrder(), ndofs2 ? el2.GetOrder() : 0);
+       ir = &IntRules.Get(Trans.GetGeometryType(), order);
+    }
+ 
+    for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+    {
+       const IntegrationPoint &ip = ir->IntPoint(pind);
+      
+       // Set the integration point in the face and the neighboring elements
+       Trans.SetAllIntPoints(&ip);
+ 
+       // Access the neighboring elements' integration points
+       // Note: eip2 will only contain valid data if Elem2 exists
+       const IntegrationPoint &eip1 = Trans.GetElement1IntPoint();
+       const IntegrationPoint &eip2 = Trans.GetElement2IntPoint();
+ 
+       el1.CalcShape(eip1, shape1);
+       el1.CalcDShape(eip1, dshape1);
+ 
+       CalcAdjugate(Trans.Elem1->Jacobian(), adjJ);
+       Mult(dshape1, adjJ, dshape1_ps);
+ 
+       if (dim == 1)
+       {
+          nor(0) = 2*eip1.x - 1.0;
+       }
+       else
+       {
+          CalcOrtho(Trans.Jacobian(), nor);
+       }
+ 
+       double w, wLM;
+       if (ndofs2)
+       {
+          el2.CalcShape(eip2, shape2);
+          el2.CalcDShape(eip2, dshape2);
+          CalcAdjugate(Trans.Elem2->Jacobian(), adjJ);
+          Mult(dshape2, adjJ, dshape2_ps);
+ 
+          w = ip.weight/2;
+       }
+       else
+       {
+          w = ip.weight;
+       }
+ 
+       {
+          const double w1 = w * Trans.Elem1->Weight();
+          Trans.SetIntPoint(&eip1); //Correct?
+          CalcInverse(Trans.Jacobian(), Jrt1);
+          el1.CalcDShape(eip1, DSh1);
+          Mult(DSh1, Jrt1, DS1);
+          MultAtB(PMatI, DS1, Jpt1);
+
+          //model->EvalP(Jpt, P);
+         model->EvalP(el1, eip1, PMatI, Trans, P1);
+ 
+         P1 *= w1;
+
+         // Do dot product between P and normal
+         // Sum dot product results
+       }
+
+       
+ 
+       
+
+
+    }
                                  };
 
 void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
