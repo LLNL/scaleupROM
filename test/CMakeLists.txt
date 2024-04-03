@@ -71,6 +71,9 @@ add_executable(test_rom_nonlinearform test_rom_nonlinearform.cpp $<TARGET_OBJECT
 
 add_executable(test_ns_parallel test_ns_parallel.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
+add_executable(nlelast_test nlelast_test.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
+
 function(add_test_dir TEST_DIR)
     # helper function that adds all executables in a given directory as tests for ctest
     get_property(target_names DIRECTORY ${TEST_DIR} PROPERTY BUILDSYSTEM_TARGETS)

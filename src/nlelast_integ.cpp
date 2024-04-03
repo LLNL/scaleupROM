@@ -333,7 +333,9 @@ void HyperelasticNLFIntegratorHR::AssembleElementVector(const FiniteElement &el,
                                       Vector &elvect){
        DenseMatrix elmat(elfun.Size());
        AssembleElementMatrix(el, trans, elmat);
-       elmat.Mult(elfun, elvect);
+      elvect.SetSize(elfun.Size());
+      elmat.Mult(elfun, elvect);
+
        }
 
 void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
