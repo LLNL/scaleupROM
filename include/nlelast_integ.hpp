@@ -11,22 +11,24 @@
 namespace mfem
 {
 
- class TestLinModel : public HyperelasticModel
+ class TestLinModel //: public HyperelasticModel
  {
  protected:
     mutable double mu, lambda;
     Coefficient *c_mu, *c_lambda;
+    ElementTransformation *Ttr;
  
  public:
     TestLinModel(double mu_, double lambda_)
-       : mu(mu_), lambda(lambda_) { c_mu = c_lambda = NULL; }
+       : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
  
+    void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
     double EvalW(const DenseMatrix &J);
  
-    void EvalP(const DenseMatrix &J, DenseMatrix &P);
+    void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P);
  
     void AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
-                           const double weight, DenseMatrix &A);
+                     const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans);
  };
  
 // DG boundary integrator for nonlinear elastic DG.

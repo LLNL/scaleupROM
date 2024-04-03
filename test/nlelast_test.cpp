@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <gtest/gtest.h>
+#include <random>
 #include "mms_suite.hpp"
 #include "nlelast_integ.hpp"
 
@@ -23,7 +24,7 @@ void InitDisplacement(const Vector &x, Vector &u)
 }
 
 // Closed because of work on nonlinear version
-/* TEST(TempLinStiffnessMatrices, Test_NLElast)
+TEST(TempLinStiffnessMatrices, Test_NLElast)
 {
    // Temporary test that the nonlinear operators do the correct things
     Mesh mesh("../examples/linelast/meshes/joint2D.mesh", 1, 1);
@@ -38,11 +39,9 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
    Vector lambda(mesh.attributes.Max());
    lambda = 1.0;      // Set lambda = 1 for all element attributes.
-   lambda(0) = 50.0;  // Set lambda = 50 for element attribute 1.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
    mu = 1.0;      // Set mu = 1 for all element attributes.
-   mu(0) = 50.0;  // Set mu = 50 for element attribute 1.
    PWConstCoefficient mu_c(mu);
 
     Array<int> dir_bdr(mesh.bdr_attributes.Max());
@@ -54,22 +53,36 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
    a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
    //a1.AddInteriorFaceIntegrator(
       //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
-   a1.AddBdrFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+   //a1.AddBdrFaceIntegrator(
+     // new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
 
+
+   TestLinModel model(1.0, 1.0);
    NonlinearForm a2(&fespace);
-   a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(lambda_c, mu_c));
+   a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
    //a2.AddInteriorFaceIntegrator(
       //new DGHyperelasticNLFIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed?
-   a2.AddBdrFaceIntegrator(
-      new DGHyperelasticNLFIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+   //a2.AddBdrFaceIntegrator(
+      //new DGHyperelasticNLFIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
     
     // Create vectors to hold the values of the forms
     Vector x, y1, y2;
 
     x.SetSize(fespace.GetTrueVSize());
-    x = 0.0;
+
+    double lower_bound = -1;
+    double upper_bound = 1;
+ 
+    uniform_real_distribution<double> unif(lower_bound,
+                                           upper_bound);
+    default_random_engine re;
+
+    for (size_t i = 0; i < x.Size(); i++)
+    {
+      x[i] = unif(re);
+    }
+    
 
     y1.SetSize(fespace.GetTrueVSize());
     y1 = 0.0;
@@ -81,18 +94,26 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
     a1.Mult(x, y1);
     a2.Mult(x, y2);
 
+   double norm_diff = 0.0;
+   cout << "Linear residual norm: " << y1.Norml2() << endl;
+    cout << "Nonlinear residual norm: " << y2.Norml2() << endl;
+
+    y1 -= y2;
+    norm_diff = y1.Norml2();
+    cout << "Residual difference norm: " << norm_diff << endl;
+
     Operator *J_op = &(a2.GetGradient(x));
     SparseMatrix *J = dynamic_cast<SparseMatrix *>(J_op);
 
     SparseMatrix diff_matrix(*J);
     diff_matrix.Add(-1.0, a1.SpMat());
-    double norm_diff = diff_matrix.MaxNorm();
+    
+    norm_diff = diff_matrix.MaxNorm();
 
+    cout << "Linear Stiffness matrix norm: " << J->MaxNorm() << endl;
+    cout << "Nonlinear Stiffness matrix norm: " << a1.SpMat().MaxNorm() << endl;
     cout << "Stiffness matrix difference norm: " << norm_diff << endl;
 
-    y1 -= y2,
-    norm_diff = y1.Norml2();
-    cout << "Residual difference norm: " << norm_diff << endl;
 
     LinearForm b1(&fespace);
    b1.AddBdrFaceIntegrator(
@@ -113,10 +134,8 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
     cout << "RHS difference norm: " << norm_diff << endl;
 
    return;
-} */
-
+} 
  
-
 int main(int argc, char *argv[])
 {
    MPI_Init(&argc, &argv);

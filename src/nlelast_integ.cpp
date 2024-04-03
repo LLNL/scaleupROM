@@ -10,13 +10,97 @@ namespace mfem
 
 double TestLinModel::EvalW(const DenseMatrix &J)
 {MFEM_ABORT("TODO")};
+
+void TestLinModel::EvalP(
+    const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P)
+{
+   const int dof = el.GetDof();
+    const int dim = el.GetDim();
+    double L, M;
  
-void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
-{MFEM_ABORT("TODO")};
+    DenseMatrix dshape(dof, dim);
+    double gh_data[9], grad_data[9];
+    DenseMatrix gh(gh_data, dim, dim);
+    DenseMatrix grad(grad_data, dim, dim);
+
+   el.CalcDShape(ip, dshape);
+   MultAtB(PMatI, dshape, gh);
+ 
+   Trans.SetIntPoint(&ip);
+   Mult(gh, Trans.InverseJacobian(), grad);
+ 
+   M = c_mu->Eval(Trans, ip);
+
+   L = c_lambda->Eval(Trans, ip);
+
+   // stress = 2*M*e(u) + L*tr(e(u))*I, where
+   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
+   const double M2 = 2.0*M;
+   if (dim == 2)
+   {
+      L *= (grad(0,0) + grad(1,1));
+      P(0,0) = M2*grad(0,0) + L;
+      P(1,1)  = M2*grad(1,1) + L;
+      P(1,0)  = M*(grad(0,1) + grad(1,0));
+      P(0,1)  = M*(grad(0,1) + grad(1,0));
+   }
+   else if (dim == 3)
+   {
+      L *= (grad(0,0) + grad(1,1) + grad(2,2));
+      P(0,0) = M2*grad(0,0) + L;
+      P(1,1) = M2*grad(1,1) + L;
+      P(2,2) = M2*grad(2,2) + L;
+      P(0,1) = M*(grad(0,1) + grad(1,0));
+      P(1,0) = M*(grad(0,1) + grad(1,0));
+      P(0,2) = M*(grad(0,2) + grad(2,0));
+      P(2,0) = M*(grad(0,2) + grad(2,0));
+      P(1,2) = M*(grad(1,2) + grad(2,1));
+      P(2,1) = M*(grad(1,2) + grad(2,1));
+   }
+}
 
 void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
-                     const double weight, DenseMatrix &A)
-                     {MFEM_ABORT("TODO")};
+                     const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans)
+      {
+      const int dof = el.GetDof();
+      const int dim = el.GetDim();
+      double L, M;
+      DenseMatrix dshape(dof, dim), gshape(dof, dim), pelmat(dof);
+      Vector divshape(dim*dof);
+
+      el.CalcDShape(ip, dshape);
+
+      Trans.SetIntPoint(&ip);
+      Mult(dshape, Trans.InverseJacobian(), gshape);
+      MultAAt(gshape, pelmat);
+      gshape.GradToDiv (divshape);
+
+      M = c_mu->Eval(Trans, ip);
+ 
+      L = c_lambda->Eval(Trans, ip);
+
+      AddMult_a_VVt(L * w, divshape, elmat);
+
+      for (int d = 0; d < dim; d++)
+      {
+         for (int k = 0; k < dof; k++)
+            for (int l = 0; l < dof; l++)
+            {
+               elmat (dof*d+k, dof*d+l) += (M * w) * pelmat(k, l);
+            }
+      }
+      for (int ii = 0; ii < dim; ii++)
+         for (int jj = 0; jj < dim; jj++)
+         {
+            for (int kk = 0; kk < dof; kk++)
+               for (int ll = 0; ll < dof; ll++)
+               {
+                  elmat(dof*ii+kk, dof*jj+ll) +=
+                     (M * w) * gshape(kk, jj) * gshape(ll, ii);
+               }
+         }
+
+       };
 
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
@@ -291,7 +375,8 @@ void HyperelasticNLFIntegratorHR::AssembleElementVector(const FiniteElement &el,
        Mult(DSh, Jrt, DS);
        MultAtB(PMatI, DS, Jpt);
  
-       model->EvalP(Jpt, P);
+       //model->EvalP(Jpt, P);
+       model->EvalP(el, ip, PMatI, Ttr, P);
  
        P *= ip.weight * Ttr.Weight();
        AddMultABt(DS, P, PMatO);
@@ -329,7 +414,8 @@ int dof = el.GetDof(), dim = el.GetDim();
        Mult(DSh, Jrt, DS);
        MultAtB(PMatI, DS, Jpt);
  
-       model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat);
+       //model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat);
+       model->AssembleH(Jpt, DS,ip.weight * Ttr.Weight(), elmat, el, ip, Ttr);
     }
                                     };
  
