@@ -13,7 +13,8 @@ using namespace mfem;
 NLElastSolver::NLElastSolver()
     : MultiBlockSolver()
 {
-   alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
+   //alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
+   alpha = 0.0; // Currently only allow IIPG mode
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 
    var_names = GetVariableNames();

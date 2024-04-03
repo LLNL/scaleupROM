@@ -10,6 +10,25 @@
 
 namespace mfem
 {
+
+ class TestLinModel : public HyperelasticModel
+ {
+ protected:
+    mutable double mu, lambda;
+    Coefficient *c_mu, *c_lambda;
+ 
+ public:
+    TestLinModel(double mu_, double lambda_)
+       : mu(mu_), lambda(lambda_) { c_mu = c_lambda = NULL; }
+ 
+    double EvalW(const DenseMatrix &J);
+ 
+    void EvalP(const DenseMatrix &J, DenseMatrix &P);
+ 
+    void AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
+                           const double weight, DenseMatrix &A);
+ };
+ 
 // DG boundary integrator for nonlinear elastic DG.
 // For this is just DGElasticityIntegrator with a different name
 class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator 
@@ -77,7 +96,7 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
  {
  
  private:
- HyperelasticModel *model;
+ TestLinModel *model;
     //   Jrt: the Jacobian of the target-to-reference-element transformation.
     //   Jpr: the Jacobian of the reference-to-physical-element transformation.
     //   Jpt: the Jacobian of the target-to-physical-element transformation.
@@ -91,7 +110,7 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
     DenseMatrix DSh, DS, Jrt, Jpr, Jpt, P, PMatI, PMatO;
  
  public:
-    HyperelasticNLFIntegratorHR(HyperelasticModel *m): HyperReductionIntegrator(false), model(m)
+    HyperelasticNLFIntegratorHR(TestLinModel *m): HyperReductionIntegrator(false), model(m)
     { }
 
    virtual void AssembleElementVector(const FiniteElement &el,

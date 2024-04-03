@@ -7,6 +7,17 @@
 using namespace std;
 namespace mfem
 {
+
+double TestLinModel::EvalW(const DenseMatrix &J)
+{MFEM_ABORT("TODO")};
+ 
+void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
+{MFEM_ABORT("TODO")};
+
+void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
+                     const double weight, DenseMatrix &A)
+                     {MFEM_ABORT("TODO")};
+
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
