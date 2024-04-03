@@ -72,33 +72,27 @@ class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator
  };
 
 // Domain integrator for nonlinear elastic DG.
-// For this is just ElasticityIntegrator with a different name
-// Later, this will just be HyperelasticNLFIntegrator
+// WIP: this will just be HyperelasticNLFIntegrator
 class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator 
  {
- protected:
-    double q_lambda, q_mu;
-    Coefficient *lambda, *mu;
-    virtual void AssembleElementMatrix(const FiniteElement &,
-                                       ElementTransformation &,
-                                       DenseMatrix &);
  
  private:
- #ifndef MFEM_THREAD_SAFE
-    Vector shape;
-    DenseMatrix dshape, gshape, pelmat;
-    Vector divshape;
- #endif
+ HyperelasticModel *model;
+    //   Jrt: the Jacobian of the target-to-reference-element transformation.
+    //   Jpr: the Jacobian of the reference-to-physical-element transformation.
+    //   Jpt: the Jacobian of the target-to-physical-element transformation.
+    //     P: represents dW_d(Jtp) (dim x dim).
+    //   DSh: gradients of reference shape functions (dof x dim).
+    //    DS: gradients of the shape functions in the target (stress-free)
+    //        configuration (dof x dim).
+    // PMatI: coordinates of the deformed configuration (dof x dim).
+    // PMatO: reshaped view into the local element contribution to the operator
+    //        output - the result of AssembleElementVector() (dof x dim).
+    DenseMatrix DSh, DS, Jrt, Jpr, Jpt, P, PMatI, PMatO;
  
  public:
-    HyperelasticNLFIntegratorHR(Coefficient &l, Coefficient &m): HyperReductionIntegrator(false)
-    { lambda = &l; mu = &m; }
-
-    /** With this constructor lambda = q_l * m and mu = q_m * m;
-        if dim * q_l + 2 * q_m = 0 then trace(sigma) = 0. */
-    HyperelasticNLFIntegratorHR(Coefficient &m, double q_l, double q_m): HyperReductionIntegrator(false)
-    { lambda = NULL; mu = &m; q_lambda = q_l; q_mu = q_m; }
- 
+    HyperelasticNLFIntegratorHR(HyperelasticModel *m): HyperReductionIntegrator(false), model(m)
+    { }
 
    virtual void AssembleElementVector(const FiniteElement &el,
                                       ElementTransformation &trans,
@@ -109,17 +103,7 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
                                     ElementTransformation &trans,
                                     const Vector &elfun,
                                     DenseMatrix &elmat);
- 
-    virtual void ComputeElementFlux(const FiniteElement &el,
-                                    ElementTransformation &Trans,
-                                    Vector &u,
-                                    const FiniteElement &fluxelem,
-                                    Vector &flux, bool with_coef = true,
-                                    const IntegrationRule *ir = NULL);
- 
-    virtual double ComputeFluxEnergy(const FiniteElement &fluxelem,
-                                     ElementTransformation &Trans,
-                                     Vector &flux, Vector *d_energy = NULL);
+
  };
 
 // RHS integrator for nonlinear elastic DG.

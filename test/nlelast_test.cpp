@@ -22,7 +22,8 @@ void InitDisplacement(const Vector &x, Vector &u)
    u(u.Size()-1) = -0.2*x(0);
 }
 
-TEST(TempLinStiffnessMatrices, Test_NLElast)
+// Closed because of work on nonlinear version
+/* TEST(TempLinStiffnessMatrices, Test_NLElast)
 {
    // Temporary test that the nonlinear operators do the correct things
     Mesh mesh("../examples/linelast/meshes/joint2D.mesh", 1, 1);
@@ -112,7 +113,7 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
     cout << "RHS difference norm: " << norm_diff << endl;
 
    return;
-}
+} */
 
  
 
