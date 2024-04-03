@@ -206,6 +206,9 @@ set(scaleupROMObj_SOURCES
   include/linelast_solver.hpp
   src/linelast_solver.cpp
 
+  include/nlelast_solver.hpp
+  src/nlelast_solver.cpp
+
   include/stokes_solver.hpp
   src/stokes_solver.cpp
 
