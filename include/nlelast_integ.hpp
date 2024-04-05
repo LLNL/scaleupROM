@@ -35,30 +35,32 @@ namespace mfem
 // For this is just DGElasticityIntegrator with a different name
 class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator 
  {
- public:
-    DGHyperelasticNLFIntegrator(double alpha_, double kappa_)
-       : HyperReductionIntegrator(false), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) { }
- 
-    DGHyperelasticNLFIntegrator(Coefficient &lambda_, Coefficient &mu_,
-                           double alpha_, double kappa_)
-       : HyperReductionIntegrator(false), lambda(&lambda_), mu(&mu_), alpha(alpha_), kappa(kappa_) { }
 
+ public:
+    DGHyperelasticNLFIntegrator(TestLinModel *m, double alpha_, double kappa_)
+       : HyperReductionIntegrator(false), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) { }
+ 
    virtual void AssembleFaceVector(const FiniteElement &el1,
                                    const FiniteElement &el2,
-                                   FaceElementTransformations &Tr,
+                                   FaceElementTransformations &Trans,
                                    const Vector &elfun, Vector &elvect);
 
    virtual void AssembleFaceGrad(const FiniteElement &el1,
                                  const FiniteElement &el2,
                                  FaceElementTransformations &Tr,
                                  const Vector &elfun, DenseMatrix &elmat);
- protected:
+        // values of all scalar basis functions for one component of u (which is a
+    protected:
+   TestLinModel *model;
     Coefficient *lambda, *mu;
-    double alpha, kappa;
- 
+    double alpha, kappa;// vector) at the integration point in the reference space
  #ifndef MFEM_THREAD_SAFE
-    // values of all scalar basis functions for one component of u (which is a
-    // vector) at the integration point in the reference space
+    Vector elvect1, elvect2;
+    Vector elfun1, elfun2;
+
+   DenseMatrix Jrt;
+    DenseMatrix PMatI1, PMatO1, NorMat1, DSh1, DS1, Jpt1, P1;
+    DenseMatrix PMatI2, PMatO2, NorMat2, DSh2, DS2, Jpt2, P2;
     Vector shape1, shape2;
     // values of derivatives of all scalar basis functions for one component
     // of u (which is a vector) at the integration point in the reference space

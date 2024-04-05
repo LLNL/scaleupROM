@@ -105,28 +105,14 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
-                                 FaceElementTransformations &Tr,
+                                 FaceElementTransformations &Trans,
                                  const Vector &elfun, Vector &elvect){
-       #ifdef MFEM_THREAD_SAFE
-    // For descriptions of these variables, see the class declaration.
-    Vector shape1, shape2;
-    DenseMatrix dshape1, dshape2;
-    DenseMatrix adjJ;
-    DenseMatrix dshape1_ps, dshape2_ps;
-    Vector nor;
-    Vector nL1, nL2;
-    Vector nM1, nM2;
-    Vector dshape1_dnM, dshape2_dnM;
-    DenseMatrix jmat;
- #endif
- 
     const int dim = el1.GetDim();
     const int ndofs1 = el1.GetDof();
     const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
     const int nvdofs = dim*(ndofs1 + ndofs2);
 
     // TODO: Assert that elvect and elfun are of size nvdofs.
- 
     // TODO: Make sure that kappa works and is correct
     kappa = 0.0;
     const bool kappa_is_nonzero = (kappa != 0.0);
@@ -135,26 +121,36 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        jmat.SetSize(nvdofs);
        jmat = 0.;
     }
- 
-    adjJ.SetSize(dim);
-    shape1.SetSize(ndofs1);
-    dshape1.SetSize(ndofs1, dim);
-    dshape1_ps.SetSize(ndofs1, dim);
+   Vector elfun_copy(elfun); // FIXME: How to avoid this?
+    elvect.SetSize(nvdofs*dim);
+    elvect = 0.0;
     nor.SetSize(dim);
-    nL1.SetSize(dim);
-    nM1.SetSize(dim);
-    dshape1_dnM.SetSize(ndofs1);
- 
+    Jrt.SetSize(dim);
+    elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
+    elvect1.MakeRef(elvect,0,ndofs1*dim);
+
+    PMatI1.UseExternalData(elfun1.GetData(), ndofs1, dim);
+    PMatO1.UseExternalData(elvect1.GetData(), ndofs1, dim);
+    NorMat1.SetSize(ndofs1, dim);
+    DSh1.SetSize(ndofs1, dim);
+    DS1.SetSize(ndofs1, dim);
+    Jpt1.SetSize(dim);
+    P1.SetSize(dim);
+   
     if (ndofs2)
     {
-       shape2.SetSize(ndofs2);
-       dshape2.SetSize(ndofs2, dim);
-       dshape2_ps.SetSize(ndofs2, dim);
-       nL2.SetSize(dim);
-       nM2.SetSize(dim);
-       dshape2_dnM.SetSize(ndofs2);
+    elfun2.MakeRef(elfun_copy,0,ndofs2*dim);
+    elvect2.MakeRef(elvect,0,ndofs2*dim);
+
+    PMatI2.UseExternalData(elfun2.GetData(), ndofs2, dim);
+    PMatO2.UseExternalData(elvect2.GetData(), ndofs2, dim);
+    NorMat2.SetSize(ndofs2, dim);
+
+    DSh2.SetSize(ndofs2, dim);
+    DS2.SetSize(ndofs2, dim);
+    Jpt2.SetSize(dim);
+    P2.SetSize(dim);
     }
- 
     const IntegrationRule *ir = IntRule;
     if (ir == NULL)
     {
@@ -175,12 +171,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        const IntegrationPoint &eip1 = Trans.GetElement1IntPoint();
        const IntegrationPoint &eip2 = Trans.GetElement2IntPoint();
  
-       el1.CalcShape(eip1, shape1);
-       el1.CalcDShape(eip1, dshape1);
- 
-       CalcAdjugate(Trans.Elem1->Jacobian(), adjJ);
-       Mult(dshape1, adjJ, dshape1_ps);
- 
        if (dim == 1)
        {
           nor(0) = 2*eip1.x - 1.0;
@@ -189,16 +179,44 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        {
           CalcOrtho(Trans.Jacobian(), nor);
        }
- 
-       double w, wLM;
+
+       // Fill normal matrix
+       for (size_t i = 0; i < ndofs1; i++)
+       {
+         for (size_t j = 0; j < dim; j++)
+         {
+            NorMat1(i,j) = nor(j);
+         } 
+       }
+       
        if (ndofs2)
        {
-          el2.CalcShape(eip2, shape2);
-          el2.CalcDShape(eip2, dshape2);
-          CalcAdjugate(Trans.Elem2->Jacobian(), adjJ);
-          Mult(dshape2, adjJ, dshape2_ps);
+         for (size_t i = 0; i < ndofs2; i++)
+       {
+         for (size_t j = 0; j < dim; j++)
+         {
+            NorMat2(i,j) = nor(j);
+         } 
+       }
+       }
+
+       CalcInverse(Trans.Jacobian(), Jrt);
  
+       double w;
+       if (ndofs2)
+       {
           w = ip.weight/2;
+          const double w2 = w * Trans.Elem2->Weight();
+          //Trans.SetIntPoint(&eip2); //Correct?
+          el1.CalcDShape(eip2, DSh2);
+          Mult(DSh2, Jrt, DS2);
+          MultAtB(PMatI2, DS2, Jpt2);
+
+          //model->EvalP(Jpt2, P2);
+         model->EvalP(el2, eip2, PMatI2, Trans, P2);
+         P2 *= w2;
+         //AddMultABt(NorMat2,P2, PMatO2);
+
        }
        else
        {
@@ -207,28 +225,40 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
  
        {
           const double w1 = w * Trans.Elem1->Weight();
-          Trans.SetIntPoint(&eip1); //Correct?
-          CalcInverse(Trans.Jacobian(), Jrt1);
-          el1.CalcDShape(eip1, DSh1);
-          Mult(DSh1, Jrt1, DS1);
-          MultAtB(PMatI, DS1, Jpt1);
+          //Trans.SetIntPoint(&ip); //Correct?
+          el1.CalcDShape(ip, DSh1);
+          Mult(DSh1, Jrt, DS1);
+          MultAtB(PMatI1, DS1, Jpt1);
 
           //model->EvalP(Jpt, P);
-         model->EvalP(el1, eip1, PMatI, Trans, P1);
+         model->EvalP(el1, ip, PMatI1, Trans, P1);
  
-         P1 *= w1;
+         //P1 *= w1;
+         for (size_t i = 0; i < dim; i++)
+         {
+            nor(i) /= Trans.Elem1->Weight();
+            //nor(i) /= 0.25;
+         } 
 
-         // Do dot product between P and normal
-         // Sum dot product results
+         cout<<"nor.Norml2() is: "<<nor.Norml2()<<endl;
+         
+         Vector tau(dim);
+         P1.Mult(nor, tau);
+
+         tau *= w1;
+         shape1.SetSize(ndofs1);
+         el1.CalcShape(eip1, shape1);
+
+         for (int i = 0; i < ndofs1; i++)
+          for (int j = 0; j < dim; j++)
+          {
+             PMatO1(i, j) += shape1(i) * tau(j);
+          }
+
        }
 
-       
- 
-       
-
-
     }
-                                 };
+};
 
 void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                               const FiniteElement &el2,
