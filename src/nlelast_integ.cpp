@@ -100,6 +100,21 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
          }
 
        };
+void _PrintMatrix(const DenseMatrix &mat,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < mat.NumRows(); i++)
+   {
+      for (int j = 0; j < mat.NumCols(); j++)
+         fprintf(fp, "%.15E\t", mat(i,j));
+      fprintf(fp, "\n");
+   }
+
+   fclose(fp);
+   return;
+}
 
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
@@ -139,7 +154,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
    Vector tau(dim);
 
-   for (int i = 0; i < ir->GetNPoints(); i++)
+   //for (int i = 0; i < ir->GetNPoints(); i++)
+   for (int i = 0; i < 1; i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -169,8 +185,11 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       model->EvalP(el1, eip, PMatI1, Trans, P1);
 
       //P1 *= ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
-      P1 *= ip.weight *Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
+      //P1 *= ip.weight *Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
       double w1 = ip.weight / Trans.Elem1->Weight();
+      _PrintMatrix(P1, "Pmat.txt");
+      //P1 *= Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
+
       nor *= w1;
       P1.Mult(nor, tau);
       //nor /= Trans.Elem1->Weight();
@@ -191,7 +210,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
           {
              for (int idof = 0; idof < ndofs1; ++idof, ++i)
              {
-                elvect(i) += shape1(idof) * nor(im) * PMatI1(jdof, jm);
+                elvect(i) += shape1(idof) * nor(im) * PMatI1(jdof, jm); // Funkar
+                //elvect(i) += shape1(idof) * tau(im); // jobba på detta
              }
           }
        }

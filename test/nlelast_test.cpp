@@ -77,6 +77,7 @@ namespace mfem
           for (int im = 0, i = row_offset; im < dim; ++im)
           {
              //const double t1 = col_dshape(jdof, jm) * col_nL(im);
+             //const double t1 = col_dshape(jdof, jm);
              //const double t3 = col_dshape(jdof, im) * col_nM(jm);
              //const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
              double tt = col_nL(im);
@@ -144,7 +145,8 @@ namespace mfem
        ir = &IntRules.Get(Trans.GetGeometryType(), order);
     }
  
-    for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+    //for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+    for (int pind = 0; pind < 1; ++pind)
     {
        const IntegrationPoint &ip = ir->IntPoint(pind);
  
@@ -188,6 +190,8 @@ namespace mfem
           //dshape1_ps.Mult(nM1, dshape1_dnM);
        }
  
+      PrintMatrix(dshape1_ps, "checkjac.txt");
+
        // (1,1) block
        _AssembleBlock(
           dim, ndofs1, ndofs1, 0, 0, 0.0, nL1, nM1,
