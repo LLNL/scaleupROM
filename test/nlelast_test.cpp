@@ -267,8 +267,9 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
     for (size_t i = 0; i < x.Size(); i++)
     {
-      //x[i] = unif(re);
-      x[i] = 1.0;
+      x[i] = unif(re);
+      //x[i] = 1.0;
+      //x[i] = i;
     }
     
 
