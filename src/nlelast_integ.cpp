@@ -26,7 +26,6 @@ void TestLinModel::EvalP(
    el.CalcDShape(ip, dshape);
    MultAtB(PMatI, dshape, gh);
  
-   Trans.SetIntPoint(&ip);
    Mult(gh, Trans.InverseJacobian(), grad);
  
    M = c_mu->Eval(Trans, ip);
@@ -104,6 +103,105 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
 
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Trans,
+                                 const Vector &elfun, Vector &elvect)
+{
+   const int dim = el1.GetDim();
+   const int ndofs1 = el1.GetDof();
+   const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+   const int nvdofs = dim*(ndofs1 + ndofs2);
+
+   shape1.SetSize(ndofs1);
+
+   Vector elfun_copy(elfun); // FIXME: How to avoid this?
+    nor.SetSize(dim);
+    Jrt.SetSize(dim);
+    elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
+    //elvect1.MakeRef(elvect,0,ndofs1*dim);
+
+    PMatI1.UseExternalData(elfun1.GetData(), ndofs1, dim);
+    //PMatO1.UseExternalData(elvect1.GetData(), ndofs1, dim);
+    DSh1.SetSize(ndofs1, dim);
+    DS1.SetSize(ndofs1, dim);
+    Jpt1.SetSize(dim);
+    P1.SetSize(dim);
+
+   elvect.SetSize(dim*ndofs1);
+   elvect = 0.0;
+   model->SetTransformation(Trans);
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = 2*el1.GetOrder();
+      ir = &IntRules.Get(Trans.GetGeometryType(), intorder);
+   }
+
+   Vector tau(dim);
+
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      // Set the integration point in the face and the neighboring element
+      Trans.SetAllIntPoints(&ip);
+
+      // Access the neighboring element's integration point
+      const IntegrationPoint &eip = Trans.GetElement1IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Trans.Jacobian(), nor);
+      }
+
+      CalcInverse(Trans.Jacobian(), Jrt);
+
+      el1.CalcShape(eip, shape1);
+      el1.CalcDShape(eip, DSh1);
+      Mult(DSh1, Jrt, DS1);
+      MultAtB(PMatI1, DS1, Jpt1);
+
+      //model->EvalP(Jpt, P);
+      model->EvalP(el1, eip, PMatI1, Trans, P1);
+
+      //P1 *= ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
+      P1 *= ip.weight *Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
+      P1.Mult(nor, tau);
+      double w1 = ip.weight / Trans.Elem1->Weight();
+      //nor /= Trans.Elem1->Weight();
+      tau *= w1;
+      //cout<<"Trans.Weight() is: "<<Trans.Weight()<<endl;
+      //cout<<"Trans.Elem1->Weight() is: "<<Trans.Elem1->Weight()<<endl;
+      //cout<<"Trans.Weight()/Trans.Elem1->Weight() is: "<<Trans.Weight()/Trans.Elem1->Weight()<<endl;
+      //tau *= ip.weight;
+      /* for (int k = 0, j = 0; k < dim; k++)
+         for (int jdof = 0; jdof < ndofs1; jdof++, j++)
+            elvect(j) += nor(k) * shape1(jdof); */
+
+       {
+    for (int jm = 0, j = 0; jm < dim; ++jm)
+    {
+       for (int jdof = 0; jdof < ndofs1; ++jdof, ++j)
+       {
+          for (int im = 0, i = 0; im < dim; ++im)
+          {
+             for (int idof = 0; idof < ndofs1; ++idof, ++i)
+             {
+                elvect(i) += shape1(idof) * tau(im);
+             }
+          }
+       }
+    }
+ 
+    }
+   }
+   elvect *= -1.0;
+}
+/* void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
                                  FaceElementTransformations &Trans,
                                  const Vector &elfun, Vector &elvect){
@@ -258,7 +356,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        }
 
     }
-};
+}; */
 
 void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                               const FiniteElement &el2,

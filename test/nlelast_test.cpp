@@ -10,6 +10,194 @@
 using namespace std;
 using namespace mfem;
 
+namespace mfem
+{
+ class Test_DGElasticityIntegrator : public BilinearFormIntegrator
+ {
+ public:
+    Test_DGElasticityIntegrator(double alpha_, double kappa_)
+       : lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) { }
+ 
+    Test_DGElasticityIntegrator(Coefficient &lambda_, Coefficient &mu_,
+                           double alpha_, double kappa_)
+       : lambda(&lambda_), mu(&mu_), alpha(alpha_), kappa(kappa_) { }
+ 
+    using BilinearFormIntegrator::AssembleFaceMatrix;
+    virtual void AssembleFaceMatrix(const FiniteElement &el1,
+                                    const FiniteElement &el2,
+                                    FaceElementTransformations &Trans,
+                                    DenseMatrix &elmat);
+ 
+ protected:
+    Coefficient *lambda, *mu;
+    double alpha, kappa;
+ 
+ #ifndef MFEM_THREAD_SAFE
+    // values of all scalar basis functions for one component of u (which is a
+    // vector) at the integration point in the reference space
+    Vector shape1, shape2;
+    // values of derivatives of all scalar basis functions for one component
+    // of u (which is a vector) at the integration point in the reference space
+    DenseMatrix dshape1, dshape2;
+    // Adjugate of the Jacobian of the transformation: adjJ = det(J) J^{-1}
+    DenseMatrix adjJ;
+    // gradient of shape functions in the real (physical, not reference)
+    // coordinates, scaled by det(J):
+    //    dshape_ps(jdof,jm) = sum_{t} adjJ(t,jm)*dshape(jdof,t)
+    DenseMatrix dshape1_ps, dshape2_ps;
+    Vector nor;  // nor = |weight(J_face)| n
+    Vector nL1, nL2;  // nL1 = (lambda1 * ip.weight / detJ1) nor
+    Vector nM1, nM2;  // nM1 = (mu1     * ip.weight / detJ1) nor
+    Vector dshape1_dnM, dshape2_dnM; // dshape1_dnM = dshape1_ps . nM1
+    // 'jmat' corresponds to the term: kappa <h^{-1} {lambda + 2 mu} [u], [v]>
+    DenseMatrix jmat;
+ #endif
+ 
+    static void AssembleBlock(
+       const int dim, const int row_ndofs, const int col_ndofs,
+       const int row_offset, const int col_offset,
+       const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
+       const Vector &row_shape, const Vector &col_shape,
+       const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
+       DenseMatrix &elmat, DenseMatrix &jmat);
+ };
+ void _AssembleBlock(
+    const int dim, const int row_ndofs, const int col_ndofs,
+    const int row_offset, const int col_offset,
+    const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
+    const Vector &row_shape, const Vector &col_shape,
+    const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
+    DenseMatrix &elmat, DenseMatrix &jmat)
+ {
+    for (int jm = 0, j = col_offset; jm < dim; ++jm)
+    {
+       for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+       {
+          //const double t2 = col_dshape_dnM(jdof);
+          for (int im = 0, i = row_offset; im < dim; ++im)
+          {
+             const double t1 = col_dshape(jdof, jm) * col_nL(im);
+             //const double t3 = col_dshape(jdof, im) * col_nM(jm);
+             //const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
+             //double tt = col_nL(im);
+             double tt = t1;
+             for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+             {
+                elmat(i, j) += row_shape(idof) * tt;
+             }
+          }
+       }
+    }
+ };
+ void Test_DGElasticityIntegrator::AssembleFaceMatrix(
+    const FiniteElement &el1, const FiniteElement &el2,
+    FaceElementTransformations &Trans, DenseMatrix &elmat)
+ {
+ #ifdef MFEM_THREAD_SAFE
+    // For descriptions of these variables, see the class declaration.
+    Vector shape1, shape2;
+    DenseMatrix dshape1, dshape2;
+    DenseMatrix adjJ;
+    DenseMatrix dshape1_ps, dshape2_ps;
+    Vector nor;
+    Vector nL1, nL2;
+    Vector nM1, nM2;
+    Vector dshape1_dnM, dshape2_dnM;
+    DenseMatrix jmat;
+ #endif
+ 
+    const int dim = el1.GetDim();
+    const int ndofs1 = el1.GetDof();
+    const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+    const int nvdofs = dim*(ndofs1 + ndofs2);
+ 
+    // Initially 'elmat' corresponds to the term:
+    //    < { sigma(u) . n }, [v] > =
+    //    < { (lambda div(u) I + mu (grad(u) + grad(u)^T)) . n }, [v] >
+    // But eventually, it's going to be replaced by:
+    //    elmat := -elmat + alpha*elmat^T + jmat
+    elmat.SetSize(nvdofs);
+    elmat = 0.;
+ 
+    const bool kappa_is_nonzero = (kappa != 0.0);
+    if (kappa_is_nonzero)
+    {
+       jmat.SetSize(nvdofs);
+       jmat = 0.;
+    }
+ 
+    adjJ.SetSize(dim);
+    shape1.SetSize(ndofs1);
+    dshape1.SetSize(ndofs1, dim);
+    dshape1_ps.SetSize(ndofs1, dim);
+    nor.SetSize(dim);
+    nL1.SetSize(dim);
+    nM1.SetSize(dim);
+    dshape1_dnM.SetSize(ndofs1);
+
+ 
+    const IntegrationRule *ir = IntRule;
+    if (ir == NULL)
+    {
+       // a simple choice for the integration order; is this OK?
+       const int order = 2 * max(el1.GetOrder(), ndofs2 ? el2.GetOrder() : 0);
+       ir = &IntRules.Get(Trans.GetGeometryType(), order);
+    }
+ 
+    for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+    {
+       const IntegrationPoint &ip = ir->IntPoint(pind);
+ 
+       // Set the integration point in the face and the neighboring elements
+       Trans.SetAllIntPoints(&ip);
+ 
+       // Access the neighboring elements' integration points
+       // Note: eip2 will only contain valid data if Elem2 exists
+       const IntegrationPoint &eip1 = Trans.GetElement1IntPoint();
+       const IntegrationPoint &eip2 = Trans.GetElement2IntPoint();
+ 
+       el1.CalcShape(eip1, shape1);
+       el1.CalcDShape(eip1, dshape1);
+ 
+       CalcAdjugate(Trans.Elem1->Jacobian(), adjJ);
+       Mult(dshape1, adjJ, dshape1_ps);
+ 
+       if (dim == 1)
+       {
+          nor(0) = 2*eip1.x - 1.0;
+       }
+       else
+       {
+          CalcOrtho(Trans.Jacobian(), nor);
+       }
+ 
+       double w, wLM;
+
+          w = ip.weight;
+          wLM = 0.0;
+ 
+       {
+          //const double w1 = w / Trans.Elem1->Weight();
+          //const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
+          //const double wM1 = w1 * mu->Eval(*Trans.Elem1, eip1);
+          const double w1 = w / Trans.Elem1->Weight();
+          const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
+          const double wM1 = 0.0;
+          nL1.Set(wL1, nor);
+          //nM1.Set(wM1, nor);
+          //dshape1_ps.Mult(nM1, dshape1_dnM);
+       }
+ 
+       // (1,1) block
+       _AssembleBlock(
+          dim, ndofs1, ndofs1, 0, 0, 0.0, nL1, nM1,
+          shape1, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
+    }
+ 
+    elmat *= -1.0;
+    PrintMatrix(elmat, "checkmat.txt");
+ }
+} // namespace mfem
 /**
  * Simple smoke test to make sure Google Test is properly linked
  */
@@ -41,7 +229,7 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
    lambda = 1.0;      // Set lambda = 1 for all element attributes.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
-   mu = 1.0;      // Set mu = 1 for all element attributes.
+   mu = 0.0;      // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
     Array<int> dir_bdr(mesh.bdr_attributes.Max());
@@ -52,11 +240,10 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
    BilinearForm a1(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
    //a1.AddInteriorFaceIntegrator(
-      //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+      //new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
    a1.AddBdrFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+      new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
-
 
    TestLinModel model(1.0, 1.0);
    NonlinearForm a2(&fespace);
@@ -81,6 +268,7 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
     for (size_t i = 0; i < x.Size(); i++)
     {
       x[i] = unif(re);
+      //x[i] = 1.0;
     }
     
 
@@ -98,9 +286,36 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
    cout << "Linear residual norm: " << y1.Norml2() << endl;
     cout << "Nonlinear residual norm: " << y2.Norml2() << endl;
 
+
+
     y1 -= y2;
     norm_diff = y1.Norml2();
     cout << "Residual difference norm: " << norm_diff << endl;
+
+    a1.Mult(x, y1);
+    a2.Mult(x, y2);
+
+    y1/=y1.Norml2();
+    y2/=y2.Norml2();
+
+   /*  cout << "print y1: "<< endl;
+    for (size_t i = 0; i < y1.Size(); i++)
+    {
+      cout<<y1[i]<<endl;
+    }
+
+    cout << "print y2: "<< endl;
+    for (size_t i = 0; i < y2.Size(); i++)
+    {
+      cout<<y2[i]<<endl;
+    } */
+
+   cout << "Scaled Linear residual norm: " << y1.Norml2() << endl;
+    cout << "Scaled Nonlinear residual norm: " << y2.Norml2() << endl;
+
+    y1 -= y2;
+    norm_diff = y1.Norml2();
+    cout << "Scaled Residual difference norm: " << norm_diff << endl;
 
     /* Operator *J_op = &(a2.GetGradient(x));
     SparseMatrix *J = dynamic_cast<SparseMatrix *>(J_op);
