@@ -170,10 +170,10 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       //P1 *= ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
       P1 *= ip.weight *Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
-      P1.Mult(nor, tau);
       double w1 = ip.weight / Trans.Elem1->Weight();
+      nor *= w1;
+      P1.Mult(nor, tau);
       //nor /= Trans.Elem1->Weight();
-      tau *= w1;
       //cout<<"Trans.Weight() is: "<<Trans.Weight()<<endl;
       //cout<<"Trans.Elem1->Weight() is: "<<Trans.Elem1->Weight()<<endl;
       //cout<<"Trans.Weight()/Trans.Elem1->Weight() is: "<<Trans.Weight()/Trans.Elem1->Weight()<<endl;
@@ -191,7 +191,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
           {
              for (int idof = 0; idof < ndofs1; ++idof, ++i)
              {
-                elvect(i) += shape1(idof) * tau(im);
+                elvect(i) += shape1(idof) * nor(im);
              }
           }
        }

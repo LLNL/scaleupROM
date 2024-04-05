@@ -76,11 +76,11 @@ namespace mfem
           //const double t2 = col_dshape_dnM(jdof);
           for (int im = 0, i = row_offset; im < dim; ++im)
           {
-             const double t1 = col_dshape(jdof, jm) * col_nL(im);
+             //const double t1 = col_dshape(jdof, jm) * col_nL(im);
              //const double t3 = col_dshape(jdof, im) * col_nM(jm);
              //const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
-             //double tt = col_nL(im);
-             double tt = t1;
+             double tt = col_nL(im);
+             //double tt = t1;
              for (int idof = 0; idof < row_ndofs; ++idof, ++i)
              {
                 elmat(i, j) += row_shape(idof) * tt;
@@ -267,8 +267,8 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
     for (size_t i = 0; i < x.Size(); i++)
     {
-      x[i] = unif(re);
-      //x[i] = 1.0;
+      //x[i] = unif(re);
+      x[i] = 1.0;
     }
     
 
