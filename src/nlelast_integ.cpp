@@ -190,11 +190,11 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 {
    const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
-   const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+   //const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+   int ndofs2 = 0;
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
    // TODO: Assert ndofs1 == ndofs2
-
 
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
     nor.SetSize(dim);
@@ -303,13 +303,13 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       if (ndofs2 == 0) {continue;}
        shape2.Neg();
 
-      for (int im = 0, i = 0; im < dim; ++im)
+     /*  for (int im = 0, i = 0; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
          {
          elvect(i) += shape1(idof) * tau2(im);
          }
-      }
+      } */
 /* 
       for (int im = 0, i = ndofs1*dim; im < dim; ++im)
       {

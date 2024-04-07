@@ -61,7 +61,8 @@ namespace mfem
        const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
        DenseMatrix &elmat, DenseMatrix &jmat);
  };
- void _AssembleBlock(
+
+  void _AssembleBlock(
     const int dim, const int row_ndofs, const int col_ndofs,
     const int row_offset, const int col_offset,
     const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
@@ -86,6 +87,7 @@ namespace mfem
           }
        }
     }
+ 
  };
 
  void _AssembleBlock2(
@@ -218,6 +220,7 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
     const int dim = el1.GetDim();
     const int ndofs1 = el1.GetDof();
     const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+    //int ndofs2 = 0;
     const int nvdofs = dim*(ndofs1 + ndofs2);
  
     // Initially 'elmat' corresponds to the term:
@@ -243,7 +246,16 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
     nL1.SetSize(dim);
     nM1.SetSize(dim);
     dshape1_dnM.SetSize(ndofs1);
-
+ 
+    if (ndofs2)
+    {
+       shape2.SetSize(ndofs2);
+       dshape2.SetSize(ndofs2, dim);
+       dshape2_ps.SetSize(ndofs2, dim);
+       nL2.SetSize(dim);
+       nM2.SetSize(dim);
+       dshape2_dnM.SetSize(ndofs2);
+    }
  
     const IntegrationRule *ir = IntRule;
     if (ir == NULL)
@@ -253,7 +265,6 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
        ir = &IntRules.Get(Trans.GetGeometryType(), order);
     }
  
-    //for (int pind = 0; pind < 1; ++pind)
     for (int pind = 0; pind < ir->GetNPoints(); ++pind)
     {
        const IntegrationPoint &ip = ir->IntPoint(pind);
@@ -282,45 +293,65 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
        }
  
        double w, wLM;
-
+       if (ndofs2)
+       {
+          el2.CalcShape(eip2, shape2);
+          el2.CalcDShape(eip2, dshape2);
+          CalcAdjugate(Trans.Elem2->Jacobian(), adjJ);
+          Mult(dshape2, adjJ, dshape2_ps);
+ 
+          w = ip.weight/2;
+          const double w2 = w / Trans.Elem2->Weight();
+          const double wL2 = w2 * lambda->Eval(*Trans.Elem2, eip2);
+          const double wM2 = w2 * mu->Eval(*Trans.Elem2, eip2);
+          nL2.Set(wL2, nor);
+          nM2.Set(wM2, nor);
+          wLM = (wL2 + 2.0*wM2);
+          dshape2_ps.Mult(nM2, dshape2_dnM);
+       }
+       else
+       {
           w = ip.weight;
           wLM = 0.0;
- 
-       {
-          //const double w1 = w / Trans.Elem1->Weight();
-          //const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
-          //const double wM1 = w1 * mu->Eval(*Trans.Elem1, eip1);
-          const double w1 = w / Trans.Elem1->Weight();
-          const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
-          const double wM1 = 0.0;
-          nL1.Set(wL1, nor); //Add for normal lambda behavior
-          //nL1.Set(1.0, nor); // Debug only
-
-          //nM1.Set(wM1, nor);
-          //dshape1_ps.Mult(nM1, dshape1_dnM);
        }
  
-      /* //PrintMatrix(dshape1_ps, "checkjac.txt");
-      for (size_t i = 0; i < nor.Size(); i++)
-      {
-         cout<<"norMFEM"<<i<<" "<<nor(i)<<endl;
-      } */
+       {
+          const double w1 = w / Trans.Elem1->Weight();
+          const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
+          const double wM1 = w1 * mu->Eval(*Trans.Elem1, eip1);
+          nL1.Set(wL1, nor);
+          nM1.Set(wM1, nor);
+          wLM += (wL1 + 2.0*wM1);
+          dshape1_ps.Mult(nM1, dshape1_dnM);
+       }
+ 
+       const double jmatcoef = 0.0;
+ 
        // (1,1) block
-       _AssembleBlock3(
-          dim, ndofs1, ndofs1, 0, 0, 0.0, nL1, nM1,
+       _AssembleBlock(
+          dim, ndofs1, ndofs1, 0, 0, jmatcoef, nL1, nM1,
           shape1, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
+ 
+       if (ndofs2 == 0) { continue; }
+ 
+       // In both elmat and jmat, shape2 appears only with a minus sign.
+       shape2.Neg();
+ 
+       // (1,2) block
+       _AssembleBlock(
+          dim, ndofs1, ndofs2, 0, dim*ndofs1, jmatcoef, nL2, nM2,
+          shape1, shape2, dshape2_dnM, dshape2_ps, elmat, jmat);
+       // (2,1) block
+       _AssembleBlock(
+          dim, ndofs2, ndofs1, dim*ndofs1, 0, jmatcoef, nL1, nM1,
+          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
+       // (2,2) block
+       _AssembleBlock(
+          dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, jmatcoef, nL2, nM2,
+          shape2, shape2, dshape2_dnM, dshape2_ps, elmat, jmat);
     }
  
     elmat *= -1.0;
-    PrintMatrix(elmat, "checkmat.txt");
-    double temp = 0.0;
-    for (size_t i = 0; i < nvdofs; i++)
-    {
-      cout<<"tempi = "<<elmat(0, i)<<endl;
-      temp += i * elmat(0, i);
-    }
-    
-    cout<<"temp is: "<< temp<<endl;
  }
 } // namespace mfem
 /**
@@ -368,9 +399,9 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    BilinearForm a1(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
    a1.AddInteriorFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+      new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
    //a1.AddBdrFaceIntegrator(
-     // new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+    //  new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
 
    TestLinModel model(_mu, _lambda);
@@ -379,14 +410,14 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    a2.AddInteriorFaceIntegrator(
       new DGHyperelasticNLFIntegrator(&model, alpha, kappa)); //Needed?
    //a2.AddBdrFaceIntegrator(
-      //new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
+    //  new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 
       /* BilinearForm a2(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
-   //a1.AddInteriorFaceIntegrator(
-      //new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
-   a2.AddBdrFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+   a2.AddInteriorFaceIntegrator(
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+   //a2.AddBdrFaceIntegrator(
+    //  new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a2.Assemble(); */
     
     // Create vectors to hold the values of the forms
