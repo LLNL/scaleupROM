@@ -257,17 +257,22 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       double w1 = ip.weight / Trans.Elem1->Weight();
       //P1 *= Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
 
-      P1 *= ip.weight;
+      P1 *= w1;
       _PrintMatrix(P1, "Pmat.txt");
       
-      //P1.Mult(nor, tau);
-      for (size_t i = 0; i < tau.Size(); i++)
+      P1.Mult(nor, tau);
+      /* for (size_t i = 0; i < tau.Size(); i++)
       {
          tau(i) = (P1(0,0) + P1(1,1)) * nor(i) * w1;
       }
-      
+       */
+
       _PrintVector(tau, "tauprint.txt");
 
+      /*
+      4.709999999999997E+00
+      -0.000000000000000E+00
+      */
       Vector big_row(dim*ndofs1);
       for (int im = 0, i = 0; im < dim; ++im)
       {
