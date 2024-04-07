@@ -351,11 +351,11 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
    Vector lambda(mesh.attributes.Max());
-   double _lambda = 3.14;      
+   double _lambda = 2.0;      
    lambda = _lambda;      // Set lambda for all element attributes.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
-   double _mu = 0.0;      
+   double _mu = 3.14;      
    mu = _mu;       // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
