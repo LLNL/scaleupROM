@@ -336,11 +336,12 @@ void InitDisplacement(const Vector &x, Vector &u)
    u(u.Size()-1) = -0.2*x(0);
 }
 
-// Closed because of work on nonlinear version
+// Currently Domain test and Boundary test works. Todo: RHS, Boundary gradients
 TEST(TempLinStiffnessMatrices, Test_NLElast)
 {
-   // Temporary test that the nonlinear operators do the correct things
-    Mesh mesh("../examples/linelast/meshes/joint2D.mesh", 1, 1);
+   // Test that the nonlinear operators do the correct things
+    Mesh mesh("meshes/test.2x1.mesh", 1, 1);
+
    int dim = mesh.Dimension();
    int order = 1;
    double alpha = 0.0; // IIPG
@@ -348,7 +349,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    DG_FECollection fec(order, dim, BasisType::GaussLobatto);
    FiniteElementSpace fespace(&mesh, &fec, dim);
 
-VectorFunctionCoefficient init_x(dim, InitDisplacement);
+   VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
    Vector lambda(mesh.attributes.Max());
    double _lambda = 2.0;      
@@ -366,19 +367,19 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
    BilinearForm a1(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
-   //a1.AddInteriorFaceIntegrator(
-      //new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
-   a1.AddBdrFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+   a1.AddInteriorFaceIntegrator(
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+   //a1.AddBdrFaceIntegrator(
+     // new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
 
    TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
    //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
-   //a2.AddInteriorFaceIntegrator(
-      //new DGHyperelasticNLFIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed?
-   a2.AddBdrFaceIntegrator(
-      new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
+   a2.AddInteriorFaceIntegrator(
+      new DGHyperelasticNLFIntegrator(&model, alpha, kappa)); //Needed?
+   //a2.AddBdrFaceIntegrator(
+      //new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 
       /* BilinearForm a2(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
@@ -413,7 +414,6 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
     y2.SetSize(fespace.GetTrueVSize());
     y2 = 0.0;
-    cout<< 5 <<endl;
 
     a1.Mult(x, y1);
     a2.Mult(x, y2);
@@ -434,17 +434,17 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
     y1/=y1.Norml2();
     y2/=y2.Norml2();
 
-   /*  cout << "print y1: "<< endl;
+   cout << "print y1: "<< endl;
     for (size_t i = 0; i < y1.Size(); i++)
     {
       cout<<y1[i]<<endl;
     }
-
+ 
     cout << "print y2: "<< endl;
     for (size_t i = 0; i < y2.Size(); i++)
     {
       cout<<y2[i]<<endl;
-    } */
+    }
 
    cout << "Scaled Linear residual norm: " << y1.Norml2() << endl;
     cout << "Scaled Nonlinear residual norm: " << y2.Norml2() << endl;
@@ -487,6 +487,7 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
    return;
 } 
  
+
 int main(int argc, char *argv[])
 {
    MPI_Init(&argc, &argv);

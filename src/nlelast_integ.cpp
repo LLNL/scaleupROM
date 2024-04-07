@@ -193,24 +193,38 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
-   shape1.SetSize(ndofs1);
+   // TODO: Assert ndofs1 == ndofs2
+
 
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
     nor.SetSize(dim);
     Jrt.SetSize(dim);
-    elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
-    //elvect1.MakeRef(elvect,0,ndofs1*dim);
+   elvect.SetSize(dim*ndofs1);
+   elvect = 0.0;
+   model->SetTransformation(Trans);
 
+   shape1.SetSize(ndofs1);
+    elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
+    elvect1.MakeRef(elvect,0,ndofs1*dim);
     PMatI1.UseExternalData(elfun1.GetData(), ndofs1, dim);
-    //PMatO1.UseExternalData(elvect1.GetData(), ndofs1, dim);
     DSh1.SetSize(ndofs1, dim);
     DS1.SetSize(ndofs1, dim);
     Jpt1.SetSize(dim);
     P1.SetSize(dim);
 
-   elvect.SetSize(dim*ndofs1);
-   elvect = 0.0;
-   model->SetTransformation(Trans);
+    if (ndofs2)
+    {
+   shape2.SetSize(ndofs2);
+      elfun2.MakeRef(elfun_copy,ndofs1*dim,ndofs2*dim);
+      elvect2.MakeRef(elvect,ndofs1*dim,ndofs2*dim);
+      PMatI2.UseExternalData(elfun2.GetData(), ndofs2, dim);
+      DSh2.SetSize(ndofs2, dim);
+      DS2.SetSize(ndofs2, dim);
+      Jpt2.SetSize(dim);
+      P2.SetSize(dim);
+    }
+    
+
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
@@ -218,7 +232,12 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       ir = &IntRules.Get(Trans.GetGeometryType(), intorder);
    }
 
-   Vector tau(dim);
+   // TODO: Add to class
+   Vector tau1(dim);
+   Vector tau2(dim);
+
+   Vector big_row1(dim*ndofs1);
+   Vector big_row2(dim*ndofs1);
 
    //for (int i = 0; i < 1; i++)
    for (int i = 0; i < ir->GetNPoints(); i++)
@@ -229,11 +248,12 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       Trans.SetAllIntPoints(&ip);
 
       // Access the neighboring element's integration point
-      const IntegrationPoint &eip = Trans.GetElement1IntPoint();
+      const IntegrationPoint &eip1 = Trans.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Trans.GetElement1IntPoint();
 
       if (dim == 1)
       {
-         nor(0) = 2*eip.x - 1.0;
+         nor(0) = 2*eip1.x - 1.0;
       }
       else
       {
@@ -242,48 +262,67 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       CalcInverse(Trans.Jacobian(), Jrt);
 
-      el1.CalcShape(eip, shape1);
-      el1.CalcDShape(eip, DSh1);
+      double w = ip.weight;
+      if (ndofs2)
+      {
+         w /= 2.0;
+
+      el2.CalcShape(eip2, shape2);
+      el2.CalcDShape(eip2, DSh2);
+      Mult(DSh2, Jrt, DS2);
+      MultAtB(PMatI2, DS2, Jpt2);
+
+      model->EvalP(el2, eip2, PMatI2, Trans, P2);
+
+      double w2 = w / Trans.Elem2->Weight();
+      P2 *= w2;
+      //_PrintMatrix(P2, "Pmat.txt");
+      P2.Mult(nor, tau2);
+      }
+
+      el1.CalcShape(eip1, shape1);
+      el1.CalcDShape(eip1, DSh1);
       Mult(DSh1, Jrt, DS1);
       MultAtB(PMatI1, DS1, Jpt1);
 
-      //model->EvalP(Jpt, P);
-      //cout<<"weight = "<< Trans.Weight()<<endl;
-      //PMatI1 *= ip.weight; // temp
-      model->EvalP(el1, eip, PMatI1, Trans, P1);
+      model->EvalP(el1, eip1, PMatI1, Trans, P1);
 
-      //P1 *= ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
-      //P1 *= ip.weight *Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
-      double w1 = ip.weight / Trans.Elem1->Weight();
-      //P1 *= Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
-
+      double w1 = w / Trans.Elem1->Weight();
       P1 *= w1;
-      _PrintMatrix(P1, "Pmat.txt");
-      
-      P1.Mult(nor, tau);
-      /* for (size_t i = 0; i < tau.Size(); i++)
-      {
-         tau(i) = (P1(0,0) + P1(1,1)) * nor(i) * w1;
-      }
-       */
+      //_PrintMatrix(P1, "Pmat.txt");
+      P1.Mult(nor, tau1);
+      //_PrintVector(tau, "tauprint.txt");
 
-      _PrintVector(tau, "tauprint.txt");
-
-      /*
-      4.709999999999997E+00
-      -0.000000000000000E+00
-      */
-      Vector big_row(dim*ndofs1);
       for (int im = 0, i = 0; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
          {
-         elvect(i) += shape1(idof) * tau(im);
+         elvect(i) += shape1(idof) * tau1(im);
          }
       }
+      if (ndofs2 == 0) {continue;}
+       shape2.Neg();
 
-   }
+      for (int im = 0, i = 0; im < dim; ++im)
+      {
+         for (int idof = 0; idof < ndofs1; ++idof, ++i)
+         {
+         elvect(i) += shape1(idof) * tau2(im);
+         }
+      }
+/* 
+      for (int im = 0, i = ndofs1*dim; im < dim; ++im)
+      {
+         for (int idof = 0; idof < ndofs2; ++idof, ++i)
+         {
+         elvect(i) += shape2(idof) * tau1(im) + shape2(idof) * tau2(im);
+         }
+      } */
+   
+      }
+
    elvect *= -1.0;
+
 }
 /* void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
