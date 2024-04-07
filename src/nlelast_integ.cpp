@@ -11,6 +11,60 @@ namespace mfem
 double TestLinModel::EvalW(const DenseMatrix &J)
 {MFEM_ABORT("TODO")};
 
+
+void TestLinModel::EvalP(
+    const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P)
+{
+   const int dof = el.GetDof();
+    const int dim = el.GetDim();
+    double L, M;
+ 
+    DenseMatrix dshape(dof, dim);
+    double gh_data[9], grad_data[9];
+    DenseMatrix gh(gh_data, dim, dim);
+    DenseMatrix grad(grad_data, dim, dim);
+
+   el.CalcDShape(ip, dshape);
+   MultAtB(PMatI, dshape, gh);
+
+   Mult(gh, Trans.InverseJacobian(), grad);
+
+   // The part below has been changed
+   DenseMatrix tempadj(dim, dim);
+   CalcAdjugate(Trans.Elem1->Jacobian(), tempadj);
+   Mult(gh, tempadj, grad);
+ 
+   M = c_mu->Eval(Trans, ip);
+
+   L = c_lambda->Eval(Trans, ip);
+
+   // stress = 2*M*e(u) + L*tr(e(u))*I, where
+   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
+   const double M2 = 2.0*M;
+   if (dim == 2)
+   {
+      L *= (grad(0,0) + grad(1,1));
+      P(0,0) = M2*grad(0,0) + L;
+      P(1,1)  = M2*grad(1,1) + L;
+      P(1,0)  = M*(grad(0,1) + grad(1,0));
+      P(0,1)  = M*(grad(0,1) + grad(1,0));
+   }
+   else if (dim == 3)
+   {
+      L *= (grad(0,0) + grad(1,1) + grad(2,2));
+      P(0,0) = M2*grad(0,0) + L;
+      P(1,1) = M2*grad(1,1) + L;
+      P(2,2) = M2*grad(2,2) + L;
+      P(0,1) = M*(grad(0,1) + grad(1,0));
+      P(1,0) = M*(grad(0,1) + grad(1,0));
+      P(0,2) = M*(grad(0,2) + grad(2,0));
+      P(2,0) = M*(grad(0,2) + grad(2,0));
+      P(1,2) = M*(grad(1,2) + grad(2,1));
+      P(2,1) = M*(grad(1,2) + grad(2,1));
+   }
+}
+
+
 void TestLinModel::EvalP(
     const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P)
 {
@@ -25,9 +79,9 @@ void TestLinModel::EvalP(
 
    el.CalcDShape(ip, dshape);
    MultAtB(PMatI, dshape, gh);
- 
+
    Mult(gh, Trans.InverseJacobian(), grad);
- 
+
    M = c_mu->Eval(Trans, ip);
 
    L = c_lambda->Eval(Trans, ip);
@@ -116,6 +170,18 @@ void _PrintMatrix(const DenseMatrix &mat,
    return;
 }
 
+void _PrintVector(const Vector &vec,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < vec.Size(); i++)
+      fprintf(fp, "%.15E\n", vec(i));
+
+   fclose(fp);
+   return;
+}
+
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
@@ -154,8 +220,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
    Vector tau(dim);
 
-   //for (int i = 0; i < ir->GetNPoints(); i++)
-   for (int i = 0; i < 1; i++)
+   //for (int i = 0; i < 1; i++)
+   for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -182,42 +248,35 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       MultAtB(PMatI1, DS1, Jpt1);
 
       //model->EvalP(Jpt, P);
+      //cout<<"weight = "<< Trans.Weight()<<endl;
+      //PMatI1 *= ip.weight; // temp
       model->EvalP(el1, eip, PMatI1, Trans, P1);
 
       //P1 *= ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
       //P1 *= ip.weight *Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
       double w1 = ip.weight / Trans.Elem1->Weight();
-      _PrintMatrix(P1, "Pmat.txt");
       //P1 *= Trans.Weight(); //ip.weight; // * Trans.Weight();///Trans.Elem1->Weight();
 
-      nor *= w1;
-      P1.Mult(nor, tau);
-      //nor /= Trans.Elem1->Weight();
-      //cout<<"Trans.Weight() is: "<<Trans.Weight()<<endl;
-      //cout<<"Trans.Elem1->Weight() is: "<<Trans.Elem1->Weight()<<endl;
-      //cout<<"Trans.Weight()/Trans.Elem1->Weight() is: "<<Trans.Weight()/Trans.Elem1->Weight()<<endl;
-      //tau *= ip.weight;
-      /* for (int k = 0, j = 0; k < dim; k++)
-         for (int jdof = 0; jdof < ndofs1; jdof++, j++)
-            elvect(j) += nor(k) * shape1(jdof); */
+      P1 *= ip.weight;
+      _PrintMatrix(P1, "Pmat.txt");
+      
+      //P1.Mult(nor, tau);
+      for (size_t i = 0; i < tau.Size(); i++)
+      {
+         tau(i) = (P1(0,0) + P1(1,1)) * nor(i) * w1;
+      }
+      
+      _PrintVector(tau, "tauprint.txt");
 
-       {
-    for (int jm = 0, j = 0; jm < dim; ++jm)
-    {
-       for (int jdof = 0; jdof < ndofs1; ++jdof, ++j)
-       {
-          for (int im = 0, i = 0; im < dim; ++im)
-          {
-             for (int idof = 0; idof < ndofs1; ++idof, ++i)
-             {
-                elvect(i) += shape1(idof) * nor(im) * PMatI1(jdof, jm); // Funkar
-                //elvect(i) += shape1(idof) * tau(im); // jobba på detta
-             }
-          }
-       }
-    }
- 
-    }
+      Vector big_row(dim*ndofs1);
+      for (int im = 0, i = 0; im < dim; ++im)
+      {
+         for (int idof = 0; idof < ndofs1; ++idof, ++i)
+         {
+         elvect(i) += shape1(idof) * tau(im);
+         }
+      }
+
    }
    elvect *= -1.0;
 }

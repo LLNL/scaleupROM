@@ -73,18 +73,126 @@ namespace mfem
     {
        for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
        {
-          //const double t2 = col_dshape_dnM(jdof);
+          const double t2 = col_dshape_dnM(jdof);
           for (int im = 0, i = row_offset; im < dim; ++im)
           {
-             //const double t1 = col_dshape(jdof, jm) * col_nL(im);
-             //const double t1 = col_dshape(jdof, jm);
-             //const double t3 = col_dshape(jdof, im) * col_nM(jm);
-             //const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
-             double tt = col_nL(im);
-             //double tt = t1;
+             const double t1 = col_dshape(jdof, jm) * col_nL(im);
+             const double t3 = col_dshape(jdof, im) * col_nM(jm);
+             const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
              for (int idof = 0; idof < row_ndofs; ++idof, ++i)
              {
                 elmat(i, j) += row_shape(idof) * tt;
+             }
+          }
+       }
+    }
+ };
+
+ void _AssembleBlock2(
+    const int dim, const int row_ndofs, const int col_ndofs,
+    const int row_offset, const int col_offset,
+    const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
+    const Vector &row_shape, const Vector &col_shape,
+    const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
+    DenseMatrix &elmat, DenseMatrix &jmat)
+ {
+
+ //Vector s_n(dim);
+ DenseMatrix elmat_temp(dim * row_ndofs, dim * col_ndofs);
+ elmat_temp= 0.0;
+ 
+ DenseMatrix A(dim, dim * col_ndofs);
+for (int jm = 0, j = col_offset; jm < dim; ++jm)
+    {
+       for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+       {
+          const double t2 = col_dshape_dnM(jdof);
+          for (int im = 0, i = row_offset; im < dim; ++im)
+          {
+             const double t1 = col_dshape(jdof, jm) * col_nL(im);
+             const double t3 = col_dshape(jdof, im) * col_nM(jm);
+             const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
+             A(im, j) = tt;
+          }
+       }
+    }
+
+   DenseMatrix vb(dim * row_ndofs, dim);
+
+   for (int jm = 0, j = col_offset; jm < dim; ++jm)
+    {
+      for (int im = 0, i = row_offset; im < dim; ++im)
+      {
+         for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+         {
+            vb(i, jm) = row_shape(idof);
+         }
+      }
+    }
+
+
+    for (int jm = 0, j = col_offset; jm < dim; ++jm)
+    {
+       for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+       {
+          for (int im = 0, i = row_offset; im < dim; ++im)
+          {
+             for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+             {
+                elmat_temp(i, j) += vb(i, jm) * A(im, j);
+             }
+          }
+       }
+    }
+
+      
+      /* for (size_t j = 0; j < dim; j++)
+      {
+         double temp = 0.0;
+         for (size_t i = 0; i < col_ndofs * dim; i++)
+         {
+            temp += i * A(j, i);
+         }
+         cout<<"tauMFEM = :"<<temp<<endl;
+      } */
+      
+   
+    elmat += elmat_temp;
+ };
+
+ void _AssembleBlock3(
+    const int dim, const int row_ndofs, const int col_ndofs,
+    const int row_offset, const int col_offset,
+    const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
+    const Vector &row_shape, const Vector &col_shape,
+    const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
+    DenseMatrix &elmat, DenseMatrix &jmat)
+ {
+   Vector big_row(dim*row_ndofs);
+   for (int im = 0, i = row_offset; im < dim; ++im)
+   {
+      for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+      {
+      big_row(i) = row_shape(idof);
+      }
+   }
+
+    for (int jm = 0, j = col_offset; jm < dim; ++jm)
+    {
+       for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+       {
+          //const double t2 = col_dshape_dnM(jdof);
+          for (int im = 0, i = row_offset; im < dim; ++im)
+          {
+             const double t1 = col_dshape(jdof, jm) * col_nL(im);
+             //const double t1 = col_dshape(jdof, jm);
+             //const double t3 = col_dshape(jdof, im) * col_nM(jm);
+             //const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
+             const double tt = t1;
+             for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+             {
+                elmat(i, j) += big_row(i) * tt;
+                //elmat(i, j) += tt;
              }
           }
        }
@@ -145,8 +253,8 @@ namespace mfem
        ir = &IntRules.Get(Trans.GetGeometryType(), order);
     }
  
-    //for (int pind = 0; pind < ir->GetNPoints(); ++pind)
-    for (int pind = 0; pind < 1; ++pind)
+    //for (int pind = 0; pind < 1; ++pind)
+    for (int pind = 0; pind < ir->GetNPoints(); ++pind)
     {
        const IntegrationPoint &ip = ir->IntPoint(pind);
  
@@ -185,21 +293,34 @@ namespace mfem
           const double w1 = w / Trans.Elem1->Weight();
           const double wL1 = w1 * lambda->Eval(*Trans.Elem1, eip1);
           const double wM1 = 0.0;
-          nL1.Set(wL1, nor);
+          nL1.Set(wL1, nor); //Add for normal lambda behavior
+          //nL1.Set(1.0, nor); // Debug only
+
           //nM1.Set(wM1, nor);
           //dshape1_ps.Mult(nM1, dshape1_dnM);
        }
  
-      PrintMatrix(dshape1_ps, "checkjac.txt");
-
+      /* //PrintMatrix(dshape1_ps, "checkjac.txt");
+      for (size_t i = 0; i < nor.Size(); i++)
+      {
+         cout<<"norMFEM"<<i<<" "<<nor(i)<<endl;
+      } */
        // (1,1) block
-       _AssembleBlock(
+       _AssembleBlock3(
           dim, ndofs1, ndofs1, 0, 0, 0.0, nL1, nM1,
           shape1, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
     }
  
     elmat *= -1.0;
     PrintMatrix(elmat, "checkmat.txt");
+    double temp = 0.0;
+    for (size_t i = 0; i < nvdofs; i++)
+    {
+      cout<<"tempi = "<<elmat(0, i)<<endl;
+      temp += i * elmat(0, i);
+    }
+    
+    cout<<"temp is: "<< temp<<endl;
  }
 } // namespace mfem
 /**
@@ -246,16 +367,24 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
    //a1.AddInteriorFaceIntegrator(
       //new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
    a1.AddBdrFaceIntegrator(
-      new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
 
-   TestLinModel model(1.0, 1.0);
+   TestLinModel model(0.0, 1.0);
    NonlinearForm a2(&fespace);
    //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
    //a2.AddInteriorFaceIntegrator(
       //new DGHyperelasticNLFIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed?
    a2.AddBdrFaceIntegrator(
       new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
+
+      /* BilinearForm a2(&fespace);
+   //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
+   //a1.AddInteriorFaceIntegrator(
+      //new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+   a2.AddBdrFaceIntegrator(
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+   a2.Assemble(); */
     
     // Create vectors to hold the values of the forms
     Vector x, y1, y2;
@@ -271,9 +400,9 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
     for (size_t i = 0; i < x.Size(); i++)
     {
-      x[i] = unif(re);
+      //x[i] = unif(re);
       //x[i] = 1.0;
-      //x[i] = i;
+      x[i] = i;
     }
     
 

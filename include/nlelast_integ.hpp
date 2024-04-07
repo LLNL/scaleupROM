@@ -25,6 +25,7 @@ namespace mfem
     void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
     double EvalW(const DenseMatrix &J);
  
+    void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P);
     void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P);
  
     void AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
