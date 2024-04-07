@@ -351,10 +351,12 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
    Vector lambda(mesh.attributes.Max());
-   lambda = 1.0;      // Set lambda = 1 for all element attributes.
+   double _lambda = 3.14;      
+   lambda = _lambda;      // Set lambda for all element attributes.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
-   mu = 0.0;      // Set mu = 1 for all element attributes.
+   double _mu = 0.0;      
+   mu = _mu;       // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
     Array<int> dir_bdr(mesh.bdr_attributes.Max());
@@ -370,7 +372,7 @@ VectorFunctionCoefficient init_x(dim, InitDisplacement);
       new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
 
-   TestLinModel model(0.0, 1.0);
+   TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
    //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
    //a2.AddInteriorFaceIntegrator(
