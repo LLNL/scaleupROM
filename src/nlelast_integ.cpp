@@ -242,8 +242,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    Vector big_row1(dim*ndofs1);
    Vector big_row2(dim*ndofs2);
 
-   //for (int i = 0; i < ir->GetNPoints(); i++)
-   for (int i = 0; i < 1; i++)
+   //for (int i = 0; i < 1; i++)
+   for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -297,6 +297,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       //_PrintVector(tau, "tauprint.txt");
 
       // Works
+      // (1,1) block
       for (int im = 0, i = 0; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
@@ -308,16 +309,27 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       if (ndofs2 == 0) {continue;}
        shape2.Neg();
 
-      /* for (int im = 0, i = 0; im < dim; ++im)
+      // (1,2) block
+      for (int im = 0, i = 0; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
          {
-         //elvect(i) += shape1(idof) * tau2(im);
+         //elvect(i) += shape1(idof) * tau1(im);
+         elvect(i) += shape1(idof) * tau2(im);
+         }
+      }
 
+      // (2,1) block
+      /* for (int im = 0, i = ndofs1*dim; im < dim; ++im)
+      {
+         for (int idof = 0; idof < ndofs2; ++idof, ++i)
+         {
+         elvect(i) += shape2(idof) * tau2(im);
          }
       } */
 
       // Works
+      // (2,2) block
       for (int im = 0, i = ndofs1*dim; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs2; ++idof, ++i)
