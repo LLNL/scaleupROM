@@ -293,21 +293,21 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    dir_bdr[1] = 1; // boundary attribute 2 is Dirichlet
 
    BilinearForm a1(&fespace);
-   //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
-   a1.AddInteriorFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+   a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
+   //a1.AddInteriorFaceIntegrator(
+      //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
    //a1.AddBdrFaceIntegrator(
-    //  new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+      //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
    cout<<"a1.Height() is: "<<a1.Height()<<endl;
 
    TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
-   //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
-   a2.AddInteriorFaceIntegrator(
-      new DGHyperelasticNLFIntegrator(&model, alpha, kappa)); //Needed?
+   a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
+   //a2.AddInteriorFaceIntegrator(
+      //new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
    //a2.AddBdrFaceIntegrator(
-    //  new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
+      //new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 
       /* BilinearForm a2(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
@@ -331,9 +331,9 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 
     for (size_t i = 0; i < x.Size(); i++)
     {
-      x[i] = unif(re);
+      //x[i] = unif(re);
       //x[i] = 1.0;
-      //x[i] = 0.0;
+      x[i] = 0.0;
       //x[i] = i;
     }
     
@@ -351,7 +351,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    cout << "Linear residual norm: " << y1.Norml2() << endl;
     cout << "Nonlinear residual norm: " << y2.Norml2() << endl;
 
-cout << "print y1: "<< endl;
+/* cout << "print y1: "<< endl;
     for (size_t i = 0; i < y1.Size(); i++)
     {
       cout<<y1[i]<<endl;
@@ -362,7 +362,7 @@ cout << "print y1: "<< endl;
     {
       cout<<y2[i]<<endl;
     }
-
+ */
     y1 -= y2;
     norm_diff = y1.Norml2();
     cout << "Residual difference norm: " << norm_diff << endl;
@@ -382,17 +382,17 @@ cout << "print y1: "<< endl;
     norm_diff = y1.Norml2();
     cout << "Scaled Residual difference norm: " << norm_diff << endl;
 
-    /* Operator *J_op = &(a2.GetGradient(x));
+    Operator *J_op = &(a2.GetGradient(x));
     SparseMatrix *J = dynamic_cast<SparseMatrix *>(J_op);
 
     SparseMatrix diff_matrix(*J);
-    //diff_matrix.Add(-1.0, a1.SpMat());
+    diff_matrix.Add(-1.0, a1.SpMat());
     
     norm_diff = diff_matrix.MaxNorm();
 
     cout << "Linear Stiffness matrix norm: " << J->MaxNorm() << endl;
     cout << "Nonlinear Stiffness matrix norm: " << a1.SpMat().MaxNorm() << endl;
-    cout << "Stiffness matrix difference norm: " << norm_diff << endl; */
+    cout << "Stiffness matrix difference norm: " << norm_diff << endl;
 
 
     LinearForm b1(&fespace);

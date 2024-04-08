@@ -88,15 +88,9 @@ class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator
        const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
        DenseMatrix &elmat, DenseMatrix &jmat);
 
-    //using BilinearFormIntegrator::AssembleFaceMatrix;
-    virtual void AssembleFaceMatrix(const FiniteElement &el1,
-                                    const FiniteElement &el2,
-                                    FaceElementTransformations &Trans,
-                                    DenseMatrix &elmat);
  };
 
 // Domain integrator for nonlinear elastic DG.
-// WIP: this will just be HyperelasticNLFIntegrator
 class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator 
  {
  
