@@ -314,19 +314,18 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
          {
-         //elvect(i) += shape1(idof) * tau1(im);
          elvect(i) += shape1(idof) * tau2(im);
          }
       }
 
       // (2,1) block
-      /* for (int im = 0, i = ndofs1*dim; im < dim; ++im)
+      for (int im = 0, i = ndofs1*dim; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs2; ++idof, ++i)
          {
-         elvect(i) += shape2(idof) * tau2(im);
+         elvect(i) += shape2(idof) * tau1(im);
          }
-      } */
+      }
 
       // Works
       // (2,2) block

@@ -237,10 +237,10 @@ namespace mfem
        _AssembleBlock(
           dim, ndofs1, ndofs2, 0, dim*ndofs1, jmatcoef, nL2, nM2,
           shape1, shape2, dshape2_dnM, dshape2_ps, elmat, jmat);
-       /* // (2,1) block
+       // (2,1) block
        _AssembleBlock(
           dim, ndofs2, ndofs1, dim*ndofs1, 0, jmatcoef, nL1, nM1,
-          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat); */
+          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
        // (2,2) block
        _AssembleBlock(
           dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, jmatcoef, nL2, nM2,
@@ -295,7 +295,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    BilinearForm a1(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
    a1.AddInteriorFaceIntegrator(
-      new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
    //a1.AddBdrFaceIntegrator(
     //  new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
