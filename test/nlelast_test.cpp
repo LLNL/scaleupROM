@@ -83,6 +83,9 @@ namespace mfem
              for (int idof = 0; idof < row_ndofs; ++idof, ++i)
              {
                 elmat(i, j) += row_shape(idof) * tt;
+                //elmat(i, j) += row_shape(idof);
+                //elmat(i, j) += tt;
+                //elmat(i, j) += idof;
              }
           }
        }
@@ -219,8 +222,11 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
  
     const int dim = el1.GetDim();
     const int ndofs1 = el1.GetDof();
-    const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
-    //int ndofs2 = 0;
+    //const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
+
+    int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0; // TEMP: Prevents resizing of elmat
+    
+
     const int nvdofs = dim*(ndofs1 + ndofs2);
  
     // Initially 'elmat' corresponds to the term:
@@ -230,7 +236,9 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
     //    elmat := -elmat + alpha*elmat^T + jmat
     elmat.SetSize(nvdofs);
     elmat = 0.;
- 
+
+   //ndofs2 = 0; // TEMP: Prevents resizing of elmat
+
     const bool kappa_is_nonzero = (kappa != 0.0);
     if (kappa_is_nonzero)
     {
@@ -265,7 +273,8 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
        ir = &IntRules.Get(Trans.GetGeometryType(), order);
     }
  
-    for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+    //for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+    for (int pind = 0; pind < 1; ++pind)
     {
        const IntegrationPoint &ip = ir->IntPoint(pind);
  
@@ -338,20 +347,20 @@ for (int jm = 0, j = col_offset; jm < dim; ++jm)
        shape2.Neg();
  
        // (1,2) block
-       _AssembleBlock(
+       /* _AssembleBlock(
           dim, ndofs1, ndofs2, 0, dim*ndofs1, jmatcoef, nL2, nM2,
-          shape1, shape2, dshape2_dnM, dshape2_ps, elmat, jmat);
-       // (2,1) block
+          shape1, shape2, dshape2_dnM, dshape2_ps, elmat, jmat); */
+       /* // (2,1) block
        _AssembleBlock(
           dim, ndofs2, ndofs1, dim*ndofs1, 0, jmatcoef, nL1, nM1,
-          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
+          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat); */
        // (2,2) block
        _AssembleBlock(
           dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, jmatcoef, nL2, nM2,
-          shape2, shape2, dshape2_dnM, dshape2_ps, elmat, jmat);
+          shape2, shape2, dshape2_dnM, dshape2_ps, elmat, jmat); 
     }
- 
     elmat *= -1.0;
+ PrintMatrix(elmat, "checkmat.txt");
  }
 } // namespace mfem
 /**
@@ -403,6 +412,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    //a1.AddBdrFaceIntegrator(
     //  new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
+   cout<<"a1.Height() is: "<<a1.Height()<<endl;
 
    TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
@@ -434,9 +444,10 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 
     for (size_t i = 0; i < x.Size(); i++)
     {
-      //x[i] = unif(re);
+      x[i] = unif(re);
       //x[i] = 1.0;
-      x[i] = i;
+      //x[i] = 0.0;
+      //x[i] = i;
     }
     
 
@@ -453,7 +464,17 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    cout << "Linear residual norm: " << y1.Norml2() << endl;
     cout << "Nonlinear residual norm: " << y2.Norml2() << endl;
 
-
+cout << "print y1: "<< endl;
+    for (size_t i = 0; i < y1.Size(); i++)
+    {
+      cout<<y1[i]<<endl;
+    }
+ 
+    cout << "print y2: "<< endl;
+    for (size_t i = 0; i < y2.Size(); i++)
+    {
+      cout<<y2[i]<<endl;
+    }
 
     y1 -= y2;
     norm_diff = y1.Norml2();
@@ -465,17 +486,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
     y1/=y1.Norml2();
     y2/=y2.Norml2();
 
-   cout << "print y1: "<< endl;
-    for (size_t i = 0; i < y1.Size(); i++)
-    {
-      cout<<y1[i]<<endl;
-    }
- 
-    cout << "print y2: "<< endl;
-    for (size_t i = 0; i < y2.Size(); i++)
-    {
-      cout<<y2[i]<<endl;
-    }
+   
 
    cout << "Scaled Linear residual norm: " << y1.Norml2() << endl;
     cout << "Scaled Nonlinear residual norm: " << y2.Norml2() << endl;

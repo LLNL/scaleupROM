@@ -191,7 +191,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
    //const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
-   int ndofs2 = 0;
+   int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0; // TEMP: Prevents resizing of elmat
+
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
    // TODO: Assert ndofs1 == ndofs2
@@ -199,9 +200,11 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
     nor.SetSize(dim);
     Jrt.SetSize(dim);
-   elvect.SetSize(dim*ndofs1);
+   elvect.SetSize(nvdofs);
    elvect = 0.0;
    model->SetTransformation(Trans);
+
+   //ndofs2 = 0; // TEMP: Prevents resizing of elmat
 
    shape1.SetSize(ndofs1);
     elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
@@ -237,10 +240,10 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    Vector tau2(dim);
 
    Vector big_row1(dim*ndofs1);
-   Vector big_row2(dim*ndofs1);
+   Vector big_row2(dim*ndofs2);
 
-   //for (int i = 0; i < 1; i++)
-   for (int i = 0; i < ir->GetNPoints(); i++)
+   //for (int i = 0; i < ir->GetNPoints(); i++)
+   for (int i = 0; i < 1; i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -249,7 +252,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       // Access the neighboring element's integration point
       const IntegrationPoint &eip1 = Trans.GetElement1IntPoint();
-      const IntegrationPoint &eip2 = Trans.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Trans.GetElement2IntPoint();
 
       if (dim == 1)
       {
@@ -293,6 +296,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       P1.Mult(nor, tau1);
       //_PrintVector(tau, "tauprint.txt");
 
+      // Works
       for (int im = 0, i = 0; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
@@ -300,24 +304,27 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
          elvect(i) += shape1(idof) * tau1(im);
          }
       }
+
       if (ndofs2 == 0) {continue;}
        shape2.Neg();
 
-     /*  for (int im = 0, i = 0; im < dim; ++im)
+      /* for (int im = 0, i = 0; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs1; ++idof, ++i)
          {
-         elvect(i) += shape1(idof) * tau2(im);
+         //elvect(i) += shape1(idof) * tau2(im);
+
          }
       } */
-/* 
+
+      // Works
       for (int im = 0, i = ndofs1*dim; im < dim; ++im)
       {
          for (int idof = 0; idof < ndofs2; ++idof, ++i)
          {
-         elvect(i) += shape2(idof) * tau1(im) + shape2(idof) * tau2(im);
+         elvect(i) += shape2(idof) * tau2(im);
          }
-      } */
+      }
    
       }
 
