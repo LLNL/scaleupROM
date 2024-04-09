@@ -213,7 +213,9 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
             for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
             {
                const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? L * w * gshape(m,n) : 0.0);
+               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
             }
          }
       }
@@ -236,7 +238,7 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                for (size_t k = 0; k < dim; k++)
                {
                   const int S_jk = k * dim + j;
-                  temp += Dmat(S_jk, mn) * gshape(i,k);
+                  temp += Dmat(S_jk, mn) * w * gshape(i,k);
                }
                elmat(ij, mn) += temp;
                
