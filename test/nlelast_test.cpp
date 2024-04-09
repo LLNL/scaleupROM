@@ -263,6 +263,23 @@ void InitDisplacement(const Vector &x, Vector &u)
    u(u.Size()-1) = -0.2*x(0);
 }
 
+
+void _PrintMatrix(const DenseMatrix &mat,
+                 const std::string &filename)
+{
+   FILE *fp = fopen(filename.c_str(), "w");
+
+   for (int i = 0; i < mat.NumRows(); i++)
+   {
+      for (int j = 0; j < mat.NumCols(); j++)
+         fprintf(fp, "%.15E\t", mat(i,j));
+      fprintf(fp, "\n");
+   }
+
+   fclose(fp);
+   return;
+}
+
 // Currently Domain test and Boundary test works. Todo: RHS, Boundary gradients
 TEST(TempLinStiffnessMatrices, Test_NLElast)
 {
@@ -279,11 +296,11 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    VectorFunctionCoefficient init_x(dim, InitDisplacement);
 
    Vector lambda(mesh.attributes.Max());
-   double _lambda = 1.1;      
+   double _lambda = 1.0;      
    lambda = _lambda;      // Set lambda for all element attributes.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
-   double _mu = 1.0;      
+   double _mu = 0.0;      
    mu = _mu;       // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
@@ -307,7 +324,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    //a2.AddInteriorFaceIntegrator(
       //new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
    //a2.AddBdrFaceIntegrator(
-      //new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
+   //   new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 
       /* BilinearForm a2(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
@@ -386,6 +403,11 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
     SparseMatrix *J = dynamic_cast<SparseMatrix *>(J_op);
 
     SparseMatrix diff_matrix(*J);
+   _PrintMatrix(*(diff_matrix.ToDenseMatrix()), "test_elmat1.txt");
+   SparseMatrix a1view(a1.SpMat());
+   a1view.Finalize();
+   _PrintMatrix(*(a1view.ToDenseMatrix()), "test_elmat2.txt");
+
     diff_matrix.Add(-1.0, a1.SpMat());
     
     norm_diff = diff_matrix.MaxNorm();
