@@ -175,7 +175,7 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
       Trans.SetIntPoint(&ip);
       Mult(dshape, Trans.InverseJacobian(), gshape);
       MultAAt(gshape, pelmat);
-      gshape.GradToDiv (divshape);
+      gshape.GradToDiv(divshape);
 
       M = c_mu->Eval(Trans, ip);
  
@@ -188,52 +188,104 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
 
       // Construct derivative matrix
       // dS_ij/dU_mn = delta_ij(L * DS_mn) + ...
+      /* DenseMatrix Dmat(dim * dim, dim * dof);
+      for (int i = 0; i < dim; i++) // sigma index i
+         for (int j = 0; j < dim; j++) // sigma index j
+         {
+            for (int m = 0; m < dof; m++) // u index m rows
+               for (int n = 0; n < dim; n++) // u index n cols
+               {
+                  const int S_ij = i * dim + j;
+                  const int U_mn = m * dim + n;
+                  Dmat(S_ij, U_mn) = ((i == j) ? L * w * gshape(m,n) : 0.0);
+                  //Dmat(S_ij, U_mn) = ((i == j) ? L * w * divshape(U_mn) : 0.0);
+               }
+         }  */
+
       DenseMatrix Dmat(dim * dim, dim * dof);
-      for (int i = 0; i < dim; i++) // sigma index i
-         for (int j = 0; j < dim; j++) // sigma index j
+      for (size_t i = 0; i < dim; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
          {
-            for (int m = 0; m < dim; m++) // u index m
-               for (int n = 0; n < dof; n++) // u index m
-               {
-                  const int S_ij = i * dim + j;
-                  const int U_mn = m * dof + n;
-                  Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
-               }
-         } 
+            const int S_ij = j * dim + i;
 
-
-      // Lambda part of elmat
-      for (int i = 0; i < dim; i++) // sigma index i
-         for (int j = 0; j < dim; j++) // sigma index j
-         {
-            for (int m = 0; m < dim; m++) // u index m
-               for (int n = 0; n < dof; n++) // u index m
-               {
-                  const int S_ij = i * dim + j;
-                  const int U_mn = m * dof + n;
-                  Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
-               }
-         } 
-
-      for (int jm = 0, j = 0; jm < dim; ++jm)
-         {
-            for (int jdof = 0; jdof < dof; ++jdof, ++j)
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
             {
-               for (int im = 0, i = 0; im < dim; ++im)
+               const int U_mn = n * dof + m;
+               Dmat(S_ij, U_mn) = ((i == j) ? L * w * gshape(m,n) : 0.0);
+            }
+         }
+      }
+
+      //Lambda part of elmat
+      for (size_t i = 0; i < dof; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int ij = j * dof + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int mn = n * dof + m;
+               //elmat(ij, mn) +=  L * w * divshape(ij) * divshape(mn);
+               //elmat(ij, mn) +=  L * w * gshape(i, j)* divshape(mn);
+               //elmat(ij, mn) +=  L * w * gshape(i,j)* gshape(m,n);
+               double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
                {
-                  for (int idof = 0; idof < dof; ++idof, ++i)
+                  const int S_jk = k * dim + j;
+                  temp += Dmat(S_jk, mn) * gshape(i,k);
+               }
+               elmat(ij, mn) += temp;
+               
+            }
+         }
+      }
+
+/*       for (size_t i = 0; i < dim*dof; i++)
+      {
+         cout<<"divshape(i) is: "<<divshape(i)<<endl;
+      }
+
+for (size_t j = 0; j < dim; j++)
+         {
+      for (size_t i = 0; i < dof; i++)
+      {
+         
+            cout<<"gshape(i,j) is: "<<gshape(i,j)<<endl;
+         }
+         
+      } */
+      
+      
+      
+      /* for (int jdof = 0, j = 0; jdof < dof; ++jdof)
+         {
+            for (int jm = 0; jm < dim; ++jm, ++j)
+            {
+               for (int idof = 0, i = 0; idof < dim; ++idof)
+               {
+                  for (int im = 0; im < dim; ++im, ++i)
                   {
                      for (size_t k = 0; k < dim; k++)
                      {
-                        const int S_jk = jm * dim + k;
-                        const int U_mn = j;
-                        elmat(i, j) += gshape(idof, k) * Dmat(S_jk, k);
+                        const int S_jk = im * dof + k;
+                        //const int S_jk = k * dim + jm;
+                        //const int U_mn = j;
+                        const int U_mn = im * dof + k;
+                        //elmat(i, j) += gshape(idof, jm) * Dmat(S_jk, k);
+                        //elmat(i, j) += gshape(idof, k) * Dmat(S_jk, j);
+                        //elmat(i, j) += gshape(idof, k) * ((k == jm) ? L * w * gshape(jdof,jm) : 0.0);
                      }
+                        elmat(i, j) +=  L * w * divshape(i) * divshape(j);
+
                      
                   }
                }
             }
-         }
+         } */
       /* for (int d = 0; d < dim; d++)
       {
          for (int k = 0; k < dof; k++)

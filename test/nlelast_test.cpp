@@ -412,8 +412,8 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
     
     norm_diff = diff_matrix.MaxNorm();
 
-    cout << "Linear Stiffness matrix norm: " << J->MaxNorm() << endl;
-    cout << "Nonlinear Stiffness matrix norm: " << a1.SpMat().MaxNorm() << endl;
+    cout << "Nonlinear Stiffness matrix norm: " << J->MaxNorm() << endl;
+    cout << "Linear Stiffness matrix norm: " << a1.SpMat().MaxNorm() << endl;
     cout << "Stiffness matrix difference norm: " << norm_diff << endl;
 
 
