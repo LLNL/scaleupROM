@@ -27,7 +27,9 @@ namespace mfem
  
     void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P);
     void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P);
- 
+
+    void EvalDmat(const int dim, const int dof, const double L, const double M, const DenseMatrix gshape, DenseMatrix &Dmat);
+    
     void AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                      const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans);
  };

@@ -39,7 +39,6 @@ void TestLinModel::EvalP(
    DenseMatrix DS(dof, dim);
    Mult(dshape, tempadj, DS);
 
-   cout<<"correct part"<<endl;
    P = 0.0;
    // Calculate divergence of strain tensor
    double e_div = 0.0;
@@ -51,7 +50,6 @@ void TestLinModel::EvalP(
       }
    }
    
-
    // Fill stress tensor
    for (size_t i = 0; i < dim; i++)
    {
@@ -73,45 +71,6 @@ void TestLinModel::EvalP(
          
       }
    }
-/*
-  std::string filename = "Pnew.txt";
-   FILE *fp = fopen(filename.c_str(), "w");
-
-   for (int i = 0; i < P.NumRows(); i++)
-   {
-      for (int j = 0; j < P.NumCols(); j++)
-         fprintf(fp, "%.15E\t", P(i,j));
-      fprintf(fp, "\n");
-   }
-   fclose(fp);
-
-   P*=0.0; */
-    // stress = 2*M*e(u) + L*tr(e(u))*I, where
-   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
-   /* const double M2 = 2.0*M;
-   if (dim == 2)
-   {
-      L *= (grad(0,0) + grad(1,1));
-      P(0,0) = M2*grad(0,0) + L;
-      P(1,1)  = M2*grad(1,1) + L;
-      P(1,0)  = M*(grad(0,1) + grad(1,0));
-      P(0,1)  = M*(grad(0,1) + grad(1,0));
-   }
-   else if (dim == 3)
-   {
-      L *= (grad(0,0) + grad(1,1) + grad(2,2));
-      P(0,0) = M2*grad(0,0) + L;
-      P(1,1) = M2*grad(1,1) + L;
-      P(2,2) = M2*grad(2,2) + L;
-      P(0,1) = M*(grad(0,1) + grad(1,0));
-      P(1,0) = M*(grad(0,1) + grad(1,0));
-      P(0,2) = M*(grad(0,2) + grad(2,0));
-      P(2,0) = M*(grad(0,2) + grad(2,0));
-      P(1,2) = M*(grad(1,2) + grad(2,1));
-      P(2,1) = M*(grad(1,2) + grad(2,1));
-   } 
-   //_PrintMatrix(P, "Pnold.txt"); */
-
 }
 
 void TestLinModel::EvalP(
@@ -161,6 +120,27 @@ void TestLinModel::EvalP(
    }
 }
 
+void TestLinModel::EvalDmat(const int dim, const int dof, const double L, const double M, 
+const DenseMatrix gshape, DenseMatrix &Dmat)
+{
+for (size_t i = 0; i < dim; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int S_ij = j * dim + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int U_mn = n * dof + m;
+               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
+            }
+         }
+      }
+}
+
 void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                      const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans)
       {
@@ -181,45 +161,9 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
  
       L = c_lambda->Eval(Trans, ip);
 
-      // stress = 2*M*e(u) + L*tr(e(u))*I, where
-   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
-      // Fill elmat
-      //AddMult_a_VVt(L * w, divshape, elmat);
-
-      // Construct derivative matrix
-      // dS_ij/dU_mn = delta_ij(L * DS_mn) + ...
-      /* DenseMatrix Dmat(dim * dim, dim * dof);
-      for (int i = 0; i < dim; i++) // sigma index i
-         for (int j = 0; j < dim; j++) // sigma index j
-         {
-            for (int m = 0; m < dof; m++) // u index m rows
-               for (int n = 0; n < dim; n++) // u index n cols
-               {
-                  const int S_ij = i * dim + j;
-                  const int U_mn = m * dim + n;
-                  Dmat(S_ij, U_mn) = ((i == j) ? L * w * gshape(m,n) : 0.0);
-                  //Dmat(S_ij, U_mn) = ((i == j) ? L * w * divshape(U_mn) : 0.0);
-               }
-         }  */
-
       DenseMatrix Dmat(dim * dim, dim * dof);
-      for (size_t i = 0; i < dim; i++) 
-      {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int S_ij = j * dim + i;
-
-            for (size_t m = 0; m < dof; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
-            {
-               const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
-            }
-         }
-      }
-
+      EvalDmat(dim, dof, L, M, gshape, Dmat);
+   
       //Lambda part of elmat
       for (size_t i = 0; i < dof; i++) 
       {
@@ -231,9 +175,6 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
             for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
             {
                const int mn = n * dof + m;
-               //elmat(ij, mn) +=  L * w * divshape(ij) * divshape(mn);
-               //elmat(ij, mn) +=  L * w * gshape(i, j)* divshape(mn);
-               //elmat(ij, mn) +=  L * w * gshape(i,j)* gshape(m,n);
                double temp = 0.0;
                for (size_t k = 0; k < dim; k++)
                {
@@ -246,75 +187,6 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
          }
       }
 
-/*       for (size_t i = 0; i < dim*dof; i++)
-      {
-         cout<<"divshape(i) is: "<<divshape(i)<<endl;
-      }
-
-for (size_t j = 0; j < dim; j++)
-         {
-      for (size_t i = 0; i < dof; i++)
-      {
-         
-            cout<<"gshape(i,j) is: "<<gshape(i,j)<<endl;
-         }
-         
-      } */
-      
-      
-      
-      /* for (int jdof = 0, j = 0; jdof < dof; ++jdof)
-         {
-            for (int jm = 0; jm < dim; ++jm, ++j)
-            {
-               for (int idof = 0, i = 0; idof < dim; ++idof)
-               {
-                  for (int im = 0; im < dim; ++im, ++i)
-                  {
-                     for (size_t k = 0; k < dim; k++)
-                     {
-                        const int S_jk = im * dof + k;
-                        //const int S_jk = k * dim + jm;
-                        //const int U_mn = j;
-                        const int U_mn = im * dof + k;
-                        //elmat(i, j) += gshape(idof, jm) * Dmat(S_jk, k);
-                        //elmat(i, j) += gshape(idof, k) * Dmat(S_jk, j);
-                        //elmat(i, j) += gshape(idof, k) * ((k == jm) ? L * w * gshape(jdof,jm) : 0.0);
-                     }
-                        elmat(i, j) +=  L * w * divshape(i) * divshape(j);
-
-                     
-                  }
-               }
-            }
-         } */
-      /* for (int d = 0; d < dim; d++)
-      {
-         for (int k = 0; k < dof; k++)
-            for (int l = 0; l < dof; l++)
-            {
-               elmat (dof*d+k, dof*d+l) += (M * w) * pelmat(k, l);
-            }
-      }
-
-      for (int ii = 0; ii < dim; ii++)
-         for (int jj = 0; jj < dim; jj++)
-         {
-            for (int kk = 0; kk < dof; kk++)
-               for (int ll = 0; ll < dof; ll++)
-               {
-                  elmat(dof*ii+kk, dof*jj+ll) +=
-                     (M * w) * gshape(kk, jj) * gshape(ll, ii);
-               }
-         }  */
-
-     /*  // Remove divergence from linear elastic stiffness matrix
-      for (size_t i = 0; i < dof*dim; i++)
-      for (size_t j = 0; j < dof*dim; j++)
-      {
-         elmat(i,j) /= divshape(i);
-      }
-*/
        }; 
 void _PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename)
@@ -454,32 +326,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       double w1 = w / Trans.Elem1->Weight();
       P1 *= w1;
       P1.Mult(nor, tau1);
-
-       DenseMatrix temp_elmat1(ndofs1*dim);
-       DenseMatrix temp_elmat2(ndofs1*dim);
-
-       temp_elmat1 = 0.0;
-       temp_elmat2 = 0.0;
-       model->AssembleH(Jpt1, DS1, ip.weight * Trans.Weight(), temp_elmat1, el1, ip, Trans);
-
-    DenseMatrix adjJ(dim);
-    DenseMatrix dshape1_ps(ndofs1, dim);
-    Vector dshape1_dnM(ndofs1);
-CalcAdjugate(Trans.Elem1->Jacobian(), adjJ);
-cout<<"adjJ.FNorm() is: "<<adjJ.FNorm()<<endl;
-       Mult(DSh1, adjJ, dshape1_ps);
-       cout<<"dshape1.FNorm() is: "<<dshape1.FNorm()<<endl;
-cout<<"dshape1_ps.FNorm() is: "<<dshape1_ps.FNorm()<<endl;
-cout<<"ip.weight * Trans.Weight() is: "<<ip.weight * Trans.Weight()<<endl;
-cout<<"w1 is: "<<w1<<endl;
-         dshape1_ps *= w1;
-          dshape1_ps.Mult(nor, dshape1_dnM);
-AssembleBlock(
-          dim, ndofs1, ndofs1, 0, 0, 0.0, nor, nor,
-          shape1, shape1, dshape1_dnM, dshape1_ps, temp_elmat2, P1);
-      
-      _PrintMatrix(temp_elmat1, "temp_elmat1.txt");
-      _PrintMatrix(temp_elmat2, "temp_elmat2.txt");
 
       // (1,1) block
       for (int im = 0, i = 0; im < dim; ++im)

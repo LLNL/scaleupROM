@@ -310,21 +310,21 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    dir_bdr[1] = 1; // boundary attribute 2 is Dirichlet
 
    BilinearForm a1(&fespace);
-   a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
+   //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
    //a1.AddInteriorFaceIntegrator(
       //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
-   //a1.AddBdrFaceIntegrator(
-      //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+   a1.AddBdrFaceIntegrator(
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
    cout<<"a1.Height() is: "<<a1.Height()<<endl;
 
    TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
-   a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
+   //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
    //a2.AddInteriorFaceIntegrator(
       //new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
-   //a2.AddBdrFaceIntegrator(
-   //   new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
+   a2.AddBdrFaceIntegrator(
+      new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 
       /* BilinearForm a2(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
