@@ -130,15 +130,11 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
  
       L = c_lambda->Eval(Trans, ip);
 
+      // stress = 2*M*e(u) + L*tr(e(u))*I, where
+   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
       // Fill elmat
-      for (size_t i = 0; i < dof*dim; i++)
-      for (size_t j = 0; j < dof*dim; j++)
-      {
-         elmat(i,j) = L * w * divshape(j);
-      }
-      
-      //AddMult_a_VVt(L * w, divshape, elmat);
-/* 
+      AddMult_a_VVt(L * w, divshape, elmat);
+
       for (int d = 0; d < dim; d++)
       {
          for (int k = 0; k < dof; k++)
@@ -147,6 +143,7 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                elmat (dof*d+k, dof*d+l) += (M * w) * pelmat(k, l);
             }
       }
+
       for (int ii = 0; ii < dim; ii++)
          for (int jj = 0; jj < dim; jj++)
          {
@@ -156,7 +153,14 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                   elmat(dof*ii+kk, dof*jj+ll) +=
                      (M * w) * gshape(kk, jj) * gshape(ll, ii);
                }
-         } */
+         } 
+
+      // Remove divergence from linear elastic stiffness matrix
+      for (size_t i = 0; i < dof*dim; i++)
+      for (size_t j = 0; j < dof*dim; j++)
+      {
+         elmat(i,j) /= divshape(i);
+      }
 
        };
 void _PrintMatrix(const DenseMatrix &mat,

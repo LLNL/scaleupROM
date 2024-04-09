@@ -283,7 +283,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    lambda = _lambda;      // Set lambda for all element attributes.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
-   double _mu = 0.0;      
+   double _mu = 1.0;      
    mu = _mu;       // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
@@ -331,9 +331,9 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 
     for (size_t i = 0; i < x.Size(); i++)
     {
-      //x[i] = unif(re);
+      x[i] = unif(re);
       //x[i] = 1.0;
-      x[i] = 0.0;
+      //x[i] = 0.0;
       //x[i] = i;
     }
     
