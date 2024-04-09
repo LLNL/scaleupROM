@@ -33,7 +33,6 @@ void TestLinModel::EvalP(
    DenseMatrix tempadj(dim, dim);
    CalcAdjugate(Trans.Elem1->Jacobian(), tempadj);
    Mult(gh, tempadj, grad);
- 
    M = c_mu->Eval(Trans, ip);
 
    L = c_lambda->Eval(Trans, ip);
@@ -64,7 +63,6 @@ void TestLinModel::EvalP(
    }
 }
 
-
 void TestLinModel::EvalP(
     const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P)
 {
@@ -79,9 +77,9 @@ void TestLinModel::EvalP(
 
    el.CalcDShape(ip, dshape);
    MultAtB(PMatI, dshape, gh);
-
+   
    Mult(gh, Trans.InverseJacobian(), grad);
-
+   
    M = c_mu->Eval(Trans, ip);
 
    L = c_lambda->Eval(Trans, ip);
@@ -132,8 +130,15 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
  
       L = c_lambda->Eval(Trans, ip);
 
-      AddMult_a_VVt(L * w, divshape, elmat);
-
+      // Fill elmat
+      for (size_t i = 0; i < dof*dim; i++)
+      for (size_t j = 0; j < dof*dim; j++)
+      {
+         elmat(i,j) = L * w * divshape(j);
+      }
+      
+      //AddMult_a_VVt(L * w, divshape, elmat);
+/* 
       for (int d = 0; d < dim; d++)
       {
          for (int k = 0; k < dof; k++)
@@ -151,7 +156,7 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                   elmat(dof*ii+kk, dof*jj+ll) +=
                      (M * w) * gshape(kk, jj) * gshape(ll, ii);
                }
-         }
+         } */
 
        };
 void _PrintMatrix(const DenseMatrix &mat,
@@ -445,7 +450,22 @@ int dof = el.GetDof(), dim = el.GetDim();
        MultAtB(PMatI, DS, Jpt);
  
        //model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat);
-       model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat, el, ip, Ttr);
+       DenseMatrix temp_elmat1(dof*dim);
+       DenseMatrix temp_elmat2(dof*dim);
+
+       temp_elmat1 = 0.0;
+       model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), temp_elmat1, el, ip, Ttr);
+
+       Vector divshape(dof*dim);
+       DS.GradToDiv(divshape);
+       // Create diagonal divergence matrix
+       DenseMatrix divdiag(dof*dim);
+       for (size_t i = 0; i < dof*dim; i++)
+       {
+         divdiag(i,i) = divshape(i);
+       }
+      Mult(divdiag, temp_elmat1, temp_elmat2);
+       elmat += temp_elmat2;
     }
                                     };
  
