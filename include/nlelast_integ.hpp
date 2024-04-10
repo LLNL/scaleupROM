@@ -85,11 +85,8 @@ class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator
  
     static void AssembleBlock(
        const int dim, const int row_ndofs, const int col_ndofs,
-       const int row_offset, const int col_offset,
-       const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
-       const Vector &row_shape, const Vector &col_shape,
-       const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
-       DenseMatrix &elmat, DenseMatrix &jmat);
+       const int row_offset, const int col_offset, const Vector &row_shape,
+       const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat);
 
  };
 

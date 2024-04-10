@@ -400,16 +400,12 @@ const int dim = el1.GetDim();
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
-   // TODO: Assert ndofs1 == ndofs2
-
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
     nor.SetSize(dim);
     Jrt.SetSize(dim);
    elmat.SetSize(nvdofs);
    elmat = 0.0;
    model->SetTransformation(Tr);
-
-   //ndofs2 = 0; // TEMP: Prevents resizing of elmat
 
    shape1.SetSize(ndofs1);
     elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
@@ -442,6 +438,9 @@ const int dim = el1.GetDim();
    Vector tau1(dim);
    Vector tau2(dim);
 
+   Vector wnor1(dim);
+   Vector wnor2(dim);
+
    Vector big_row1(dim*ndofs1);
    Vector big_row2(dim*ndofs2);
 
@@ -451,7 +450,6 @@ const int dim = el1.GetDim();
    Dmat1 = 0.0;
    Dmat2 = 0.0;
 
-   //for (int i = 0; i < 1; i++)
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
@@ -483,12 +481,12 @@ const int dim = el1.GetDim();
 
       model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
+      wnor2.Set(w2,nor);
       }
 
       el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
       Mult(DSh1, Jrt, DS1);
-
 
       double w1 = w / Tr.Elem1->Weight();
 
@@ -504,83 +502,46 @@ const int dim = el1.GetDim();
    
       model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       
-      for (int n = 0, jj = 0; n < dim; ++n)
-    {
-       for (int m = 0; m < ndofs1; ++m, ++jj)
-       {
-         const int mn = n * ndofs1 + m;
-          for (int j = 0, ii = 0; j < dim; ++j)
-          {
-             for (int i = 0; i < ndofs1; ++i, ++ii)
-             {
-               double temp = 0.0;
-               for (size_t k = 0; k < dim; k++)
-               {
-                  const int S_jk = k * dim + j;
-                  temp += Dmat1(S_jk, mn) * w1 * nor(k);
-               }
-                elmat(ii, jj) += shape1(i) * temp;
-             }
-          }
-       }
-    }
- 
-/* 
       // (1,1) block
-      for (size_t i = 0; i < ndofs1; i++) 
-      {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int ij = j * ndofs1 + i;
-            //const int ij = i * dim + j;
-
-            for (size_t m = 0; m < ndofs1; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
-            {
-               const int mn = n * ndofs1 + m;
-               //const int mn = m * dim + n;
-               double temp = 0.0;
-               for (size_t k = 0; k < dim; k++)
-               {
-                  const int S_jk = k * dim + j;
-                  temp += Dmat1(S_jk, mn) * w1 * nor(k);
-                  //temp += 1.0;
-
-               }
-               temp *= shape1(i);
-               elmat(ij, mn) += temp;
-               
-            }
-         }
-      } */
-
+      wnor1.Set(w1,nor);
+      AssembleBlock(dim, ndofs1, ndofs1, 0, 0, shape1, wnor1, Dmat1, elmat);
+ 
       if (ndofs2 == 0) {continue;}
        shape2.Neg();
+
+       // (1,2) block
+      AssembleBlock(dim, ndofs1, ndofs2, 0, 0, shape1, wnor2, Dmat2, elmat);
+
+       // (2,1) block
+      AssembleBlock(dim, ndofs2, ndofs1, 0, 0, shape2, wnor1, Dmat1, elmat);
+
+       // (2,2) block
+      AssembleBlock(dim, ndofs2, ndofs2, 0, 0, shape2, wnor2, Dmat2, elmat);
+
    }
    elmat *= -1.0;
                               };
 
 void DGHyperelasticNLFIntegrator::AssembleBlock(
        const int dim, const int row_ndofs, const int col_ndofs,
-       const int row_offset, const int col_offset,
-       const double jmatcoef, const Vector &col_nL, const Vector &col_nM,
-       const Vector &row_shape, const Vector &col_shape,
-       const Vector &col_dshape_dnM, const DenseMatrix &col_dshape,
-       DenseMatrix &elmat, DenseMatrix &jmat){
-for (int jm = 0, j = col_offset; jm < dim; ++jm)
+       const int row_offset, const int col_offset, const Vector &row_shape,
+       const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat){
+for (int n = 0, jj = col_offset; n < dim; ++n)
     {
-       for (int jdof = 0; jdof < col_ndofs; ++jdof, ++j)
+       for (int m = 0; m < col_ndofs; ++m, ++jj)
        {
-          const double t2 = col_dshape_dnM(jdof);
-          for (int im = 0, i = row_offset; im < dim; ++im)
+         const int mn = n * col_ndofs + m;
+          for (int j = 0, ii = row_offset; j < dim; ++j)
           {
-             const double t1 = col_dshape(jdof, jm) * col_nL(im);
-             const double t3 = col_dshape(jdof, im) * col_nM(jm);
-             const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
-             for (int idof = 0; idof < row_ndofs; ++idof, ++i)
+             for (int i = 0; i < row_ndofs; ++i, ++ii)
              {
-                //elmat(i, j) += row_shape(idof) * tt;
-                elmat(i, j) += row_shape(idof) * tt; // Only lambda contribution
+               double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
+               {
+                  const int S_jk = k * dim + j;
+                  temp += Dmat(S_jk, mn) * wnor(k);
+               }
+                elmat(ii, jj) += row_shape(i) * temp;
              }
           }
        }
