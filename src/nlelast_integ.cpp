@@ -503,80 +503,24 @@ const int dim = el1.GetDim();
       Mult(DSh1, adjJ, dshape1_ps);
    
       model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
-      double L = 1.0;
-      double M = 0.0;
-      const double wL1 = w1 * L;
-      const double wM1 = w1 * M;
-
-      nL1.Set(wL1, nor);
-      nM1.Set(wM1, nor);
-      dshape1_ps.Mult(nM1, dshape1_dnM);
-
-      for (int jm = 0, j = 0; jm < dim; ++jm)
+      
+      for (int n = 0, jj = 0; n < dim; ++n)
     {
-       for (int jdof = 0; jdof < ndofs1; ++jdof, ++j)
+       for (int m = 0; m < ndofs1; ++m, ++jj)
        {
-          const double t2 = dshape1_dnM(jdof);
-         
-          for (int im = 0, i = 0; im < dim; ++im)
+         const int mn = n * ndofs1 + m;
+          for (int j = 0, ii = 0; j < dim; ++j)
           {
-             const double t1 = dshape1_ps(jdof, jm) * nL1(im);
-             const double t3 = dshape1_ps(jdof, im) * nM1(jm);
-             const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
-             //for (size_t k = 0; k < dim; k++)
-               //{
-                  //const int S_jk = k * dim + j;
-                  //temp += Dmat1(S_jk, mn) * w1 * nor(k);
-                  //temp += dshape1_ps(jdof, jm) * w1 * nor(im);
-                  const int m = jdof;
-                  const int n = jm;
-                  const int mn = n * ndofs1 + m;
-                  const int k = im;
-                  const int jj = k; // for now
-                  const int S_jk = k * dim + jj;
-                  double temp = 0.0;
-                  //temp += dshape1_ps(m, n) * w1 * nor(im);
-                  temp += Dmat1(S_jk, mn) * w1 * nor(k);
-               //}
-/* for (size_t i = 0; i < dim; i++) 
-      {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int S_ij = j * dim + i;
-
-            for (size_t m = 0; m < dof; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
-            {
-               const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
-            }
-         }
-      }
-} */
-               
-             for (int idof = 0; idof < ndofs1; ++idof, ++i)
+             for (int i = 0; i < ndofs1; ++i, ++ii)
              {
-
-                  double temp = 0.0;
+               double temp = 0.0;
                for (size_t k = 0; k < dim; k++)
                {
-                  //const int S_jk = k * dim + j;
-                  //temp += Dmat1(S_jk, mn) * w1 * nor(k);
-                  //temp += dshape1_ps(jdof, jm) * w1 * nor(im);
-                  const int m = jdof;
-                  const int n = jm;
-                  const int mn = n * ndofs1 + m;
-                  //const int k = im;
-                  //const int jj = k; // for now
-                  const int S_jk = k * dim + im;
+                  const int S_jk = k * dim + j;
                   temp += Dmat1(S_jk, mn) * w1 * nor(k);
                }
-                elmat(i, j) += shape1(idof) * temp;
-             cout<<temp - tt<<endl;
+                elmat(ii, jj) += shape1(i) * temp;
              }
-
           }
        }
     }
