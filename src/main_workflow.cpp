@@ -291,36 +291,40 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
       delete problem;
       delete solver;
    }
-
-   /* EQP NNLS procedure */
-   std::string eqp_str = config.GetOption<std::string>("model_reduction/nonlinear_handling", "none");
-   if (eqp_str == "eqp")
-   {
-      MultiBlockSolver *test = NULL;
-      test = InitSolver();
-      test->InitVariables();
-
-      if (!test->IsNonlinear())
-      {
-         delete test;
-         return;
-      }
-
-      if (!test->UseRom()) mfem_error("ROM must be enabled for EQP training!\n");
-
-      test->LoadReducedBasis();
-
-      test->TrainEQP(sample_generator);
-
-      test->SaveEQP();
-
-      delete test;
-   }
 }
 
 void TrainEQP(MPI_Comm comm)
 {
-   
+   SampleGenerator *sample_generator = InitSampleGenerator(comm);
+
+   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
+   CollectSamples(sample_generator);
+
+   /* EQP NNLS procedure */
+   std::string eqp_str = config.GetOption<std::string>("model_reduction/nonlinear_handling", "none");
+   if (eqp_str != "eqp")
+      mfem_error("ROM nonlinear handling is not eqp!\n");
+
+   MultiBlockSolver *test = NULL;
+   test = InitSolver();
+   test->InitVariables();
+
+   if (!test->IsNonlinear())
+   {
+      mfem_warning("The physics solver is not nonlinear. Exiting TrainEQP.\n");
+      delete test;
+      return;
+   }
+
+   if (!test->UseRom()) mfem_error("ROM must be enabled for EQP training!\n");
+
+   test->LoadReducedBasis();
+
+   test->TrainEQP(sample_generator);
+
+   test->SaveEQP();
+
+   delete test;
 }
 
 void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
