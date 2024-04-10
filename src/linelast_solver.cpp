@@ -495,7 +495,7 @@ void LinElastSolver::ProjectOperatorOnReducedBasis()
 }
 
 // Component-wise assembly
-void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
+void LinElastSolver::BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -521,7 +521,7 @@ void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
+void LinElastSolver::BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -553,7 +553,7 @@ void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
+void LinElastSolver::BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);

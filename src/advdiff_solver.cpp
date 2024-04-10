@@ -47,9 +47,9 @@ void AdvDiffSolver::BuildDomainOperators()
    }
 }
 
-void AdvDiffSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
+void AdvDiffSolver::BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
-   mfem_error("AdvDiffSolver::BuildCompROMElement is not implemented yet!\n");
+   mfem_error("AdvDiffSolver::BuildCompROMProjElems is not implemented yet!\n");
 
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());

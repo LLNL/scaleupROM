@@ -393,10 +393,10 @@ void BuildROM(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMElements();
-         test->BuildROMElements();
+         test->AllocateROMProjElems();
+         test->BuildROMProjElems();
          std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
-         test->SaveROMElements(filename);
+         test->SaveROMProjElems(filename);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -484,9 +484,9 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
                mfem_error("Submesh does not support component rom building level!\n");
 
             printf("Loading component operator file.. ");
-            test->AllocateROMElements();
+            test->AllocateROMProjElems();
             std::string filename = rom->GetOperatorPrefix() + ".h5";
-            test->LoadROMElements(filename);
+            test->LoadROMProjElems(filename);
             test->AssembleROM();
             break;
          }

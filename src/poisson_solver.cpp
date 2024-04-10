@@ -342,7 +342,7 @@ void PoissonSolver::AssembleInterfaceMatrices()
    a_itf->AssembleInterfaceMatrices(mats);
 }
 
-void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
+void PoissonSolver::BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -368,7 +368,7 @@ void PoissonSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
+void PoissonSolver::BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -400,7 +400,7 @@ void PoissonSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void PoissonSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
+void PoissonSolver::BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);

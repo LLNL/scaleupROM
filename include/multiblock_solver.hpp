@@ -190,27 +190,27 @@ public:
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
-   virtual void AllocateROMElements();
+   virtual void AllocateROMProjElems();
 
-   void BuildROMElements();
-   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
-   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   void BuildROMProjElems();
+   virtual void BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp) = 0;
    // TODO(kevin): part of this can be transferred to InterfaceForm.
-   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp) = 0;
 
-   void SaveROMElements(const std::string &filename);
+   void SaveROMProjElems(const std::string &filename);
    // Save ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void SaveCompBdrROMElement(hid_t &file_id);
-   void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   void SaveInterfaceROMElement(hid_t &file_id);
+   virtual void SaveCompBdrROMProjElems(hid_t &file_id);
+   void SaveBdrROMProjElems(hid_t &comp_grp_id, const int &comp_idx);
+   void SaveItfaceROMProjElems(hid_t &file_id);
 
-   void LoadROMElements(const std::string &filename);
+   void LoadROMProjElems(const std::string &filename);
    // Load ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void LoadCompBdrROMElement(hid_t &file_id);
-   void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   void LoadInterfaceROMElement(hid_t &file_id);
+   virtual void LoadCompBdrROMProjElems(hid_t &file_id);
+   void LoadBdrROMProjElems(hid_t &comp_grp_id, const int &comp_idx);
+   void LoadItfaceROMProjElems(hid_t &file_id);
 
    void AssembleROM();
 

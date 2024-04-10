@@ -264,7 +264,7 @@ void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fe
    }
 }
 
-void MultiBlockSolver::AllocateROMElements()
+void MultiBlockSolver::AllocateROMProjElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -290,7 +290,7 @@ void MultiBlockSolver::AllocateROMElements()
       port_mats[p] = new MatrixBlocks(2 * block_size, 2 * block_size);
 }
 
-void MultiBlockSolver::BuildROMElements()
+void MultiBlockSolver::BuildROMProjElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -301,18 +301,18 @@ void MultiBlockSolver::BuildROMElements()
    Array<FiniteElementSpace *> fes_comp;
    GetComponentFESpaces(fes_comp);
 
-   BuildCompROMElement(fes_comp);
+   BuildCompROMProjElems(fes_comp);
 
    // Boundary penalty matrices
-   BuildBdrROMElement(fes_comp);
+   BuildBdrROMProjElems(fes_comp);
 
    // Port penalty matrices
-   BuildInterfaceROMElement(fes_comp);
+   BuildItfaceROMProjElems(fes_comp);
 
    for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
 }
 
-void MultiBlockSolver::SaveROMElements(const std::string &filename)
+void MultiBlockSolver::SaveROMProjElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -323,17 +323,17 @@ void MultiBlockSolver::SaveROMElements(const std::string &filename)
    assert(file_id >= 0);
 
    // components + boundary
-   SaveCompBdrROMElement(file_id);
+   SaveCompBdrROMProjElems(file_id);
 
    // (reference) ports
-   SaveInterfaceROMElement(file_id);
+   SaveItfaceROMProjElems(file_id);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
    return;
 }
 
-void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
+void MultiBlockSolver::SaveCompBdrROMProjElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    hid_t grp_id;
@@ -360,7 +360,7 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
       hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp_mats[c]);
 
       // boundaries are saved for each component group.
-      SaveBdrROMElement(comp_grp_id, c);
+      SaveBdrROMProjElems(comp_grp_id, c);
 
       errf = H5Gclose(comp_grp_id);
       assert(errf >= 0);
@@ -371,7 +371,7 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
    return;
 }
 
-void MultiBlockSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx)
+void MultiBlockSolver::SaveBdrROMProjElems(hid_t &comp_grp_id, const int &comp_idx)
 {
    assert(comp_grp_id >= 0);
    herr_t errf;
@@ -394,7 +394,7 @@ void MultiBlockSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
    return;
 }
 
-void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
+void MultiBlockSolver::SaveItfaceROMProjElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    herr_t errf;
@@ -422,7 +422,7 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
    return;
 }
 
-void MultiBlockSolver::LoadROMElements(const std::string &filename)
+void MultiBlockSolver::LoadROMProjElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -433,10 +433,10 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
    assert(file_id >= 0);
 
    // components
-   LoadCompBdrROMElement(file_id);
+   LoadCompBdrROMProjElems(file_id);
 
    // (reference) ports
-   LoadInterfaceROMElement(file_id);
+   LoadItfaceROMProjElems(file_id);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
@@ -444,7 +444,7 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
    return;
 }
 
-void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
+void MultiBlockSolver::LoadCompBdrROMProjElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    herr_t errf;
@@ -470,7 +470,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
       hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp_mats[c]);
 
       // boundary
-      LoadBdrROMElement(comp_grp_id, c);
+      LoadBdrROMProjElems(comp_grp_id, c);
 
       errf = H5Gclose(comp_grp_id);
       assert(errf >= 0);
@@ -480,7 +480,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
    assert(errf >= 0);
 }
 
-void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx)
+void MultiBlockSolver::LoadBdrROMProjElems(hid_t &comp_grp_id, const int &comp_idx)
 {
    assert(comp_grp_id >= 0);
    herr_t errf;
@@ -504,7 +504,7 @@ void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
    return;
 }
 
-void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
+void MultiBlockSolver::LoadItfaceROMProjElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    herr_t errf;
