@@ -138,8 +138,10 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
  {
  protected:
     VectorCoefficient &uD;
+    TestLinModel *model;
     Coefficient *lambda, *mu;
     double alpha, kappa;
+
  
  #ifndef MFEM_THREAD_SAFE
     Vector shape;
@@ -154,9 +156,9 @@ class HyperelasticNLFIntegratorHR : virtual public HyperReductionIntegrator
  
  public:
     DGHyperelasticDirichletNLFIntegrator(VectorCoefficient &uD_,
-                                      Coefficient &lambda_, Coefficient &mu_,
+                                      TestLinModel *m,
                                       double alpha_, double kappa_)
-       : uD(uD_), lambda(&lambda_), mu(&mu_), alpha(alpha_), kappa(kappa_) { }
+       : uD(uD_), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) { }
  
     virtual void AssembleRHSElementVect(const FiniteElement &el,
                                         ElementTransformation &Tr,

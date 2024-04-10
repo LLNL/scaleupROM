@@ -457,7 +457,7 @@ cout << "print y1: "<< endl;
    LinearForm b2(&fespace);
    b2.AddBdrFaceIntegrator(
       new DGHyperelasticDirichletNLFIntegrator(
-         init_x, lambda_c, mu_c, alpha, kappa), dir_bdr);
+         init_x, &model, alpha, kappa), dir_bdr);
    b2.Assemble();
 
     cout << "Linear RHS norm: " << b1.Norml2() << endl;

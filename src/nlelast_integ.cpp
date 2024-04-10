@@ -782,14 +782,9 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
  
     elvect.SetSize(nvdofs);
     elvect = 0.0;
- 
-    adjJ.SetSize(dim);
+
     shape.SetSize(ndofs);
-    dshape.SetSize(ndofs, dim);
-    dshape_ps.SetSize(ndofs, dim);
     nor.SetSize(dim);
-    dshape_dn.SetSize(ndofs);
-    dshape_du.SetSize(ndofs);
     u_dir.SetSize(dim);
  
     const IntegrationRule *ir = IntRule;
@@ -813,10 +808,6 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
        uD.Eval(u_dir, Tr, ip);
  
        el.CalcShape(eip, shape);
-       el.CalcDShape(eip, dshape);
- 
-       CalcAdjugate(Tr.Elem1->Jacobian(), adjJ);
-       Mult(dshape, adjJ, dshape_ps);
  
        if (dim == 1)
        {
@@ -827,64 +818,20 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
           CalcOrtho(Tr.Jacobian(), nor);
        }
  
-       double wL, wM, jcoef;
-       {
-          const double w = ip.weight / Tr.Elem1->Weight();
-          wL = w * lambda->Eval(*Tr.Elem1, eip);
-          wM = w * mu->Eval(*Tr.Elem1, eip);
-          jcoef = kappa * (wL + 2.0*wM) * (nor*nor);
-          dshape_ps.Mult(nor, dshape_dn);
-          dshape_ps.Mult(u_dir, dshape_du);
-       }
+       double jcoef;
+       double wLM;
+
+      const double w = ip.weight / Tr.Elem1->Weight();
+      wLM = model->EvalwLM(w, *Tr.Elem1, eip);
+      jcoef = kappa * wLM * (nor*nor);
+
  
-       // alpha < uD, (lambda div(v) I + mu (grad(v) + grad(v)^T)) . n > +
-       //   + kappa < h^{-1} (lambda + 2 mu) uD, v >
- 
-       // i = idof + ndofs * im
-       // v_phi(i,d) = delta(im,d) phi(idof)
-       // div(v_phi(i)) = dphi(idof,im)
-       // (grad(v_phi(i)))(k,l) = delta(im,k) dphi(idof,l)
-       //
-       // term 1:
-       //   alpha < uD, lambda div(v_phi(i)) n >
-       //   alpha lambda div(v_phi(i)) (uD.n) =
-       //   alpha lambda dphi(idof,im) (uD.n) --> quadrature -->
-       //   ip.weight/det(J1) alpha lambda (uD.nor) dshape_ps(idof,im) =
-       //   alpha * wL * (u_dir*nor) * dshape_ps(idof,im)
-       // term 2:
-       //   < alpha uD, mu grad(v_phi(i)).n > =
-       //   alpha mu uD^T grad(v_phi(i)) n =
-       //   alpha mu uD(k) delta(im,k) dphi(idof,l) n(l) =
-       //   alpha mu uD(im) dphi(idof,l) n(l) --> quadrature -->
-       //   ip.weight/det(J1) alpha mu uD(im) dshape_ps(idof,l) nor(l) =
-       //   alpha * wM * u_dir(im) * dshape_dn(idof)
-       // term 3:
-       //   < alpha uD, mu (grad(v_phi(i)))^T n > =
-       //   alpha mu n^T grad(v_phi(i)) uD =
-       //   alpha mu n(k) delta(im,k) dphi(idof,l) uD(l) =
-       //   alpha mu n(im) dphi(idof,l) uD(l) --> quadrature -->
-       //   ip.weight/det(J1) alpha mu nor(im) dshape_ps(idof,l) uD(l) =
-       //   alpha * wM * nor(im) * dshape_du(idof)
-       // term j:
-       //   < kappa h^{-1} (lambda + 2 mu) uD, v_phi(i) > =
-       //   kappa/h (lambda + 2 mu) uD(k) v_phi(i,k) =
-       //   kappa/h (lambda + 2 mu) uD(k) delta(im,k) phi(idof) =
-       //   kappa/h (lambda + 2 mu) uD(im) phi(idof) --> quadrature -->
-       //      [ 1/h = |nor|/det(J1) ]
-       //   ip.weight/det(J1) |nor|^2 kappa (lambda + 2 mu) uD(im) phi(idof) =
-       //   jcoef * u_dir(im) * shape(idof)
- 
-       wM *= alpha;
-       const double t1 = alpha * wL * (u_dir*nor);
        for (int im = 0, i = 0; im < dim; ++im)
        {
-          const double t2 = wM * u_dir(im);
-          const double t3 = wM * nor(im);
           const double tj = jcoef * u_dir(im);
           for (int idof = 0; idof < ndofs; ++idof, ++i)
           {
-             elvect(i) += (t1*dshape_ps(idof,im) + t2*dshape_dn(idof) +
-                           t3*dshape_du(idof) + tj*shape(idof));
+             elvect(i) += tj*shape(idof);
           }
        }
     }
