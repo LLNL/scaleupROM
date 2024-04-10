@@ -169,6 +169,7 @@ namespace mfem
        ir = &IntRules.Get(Trans.GetGeometryType(), order);
     }
  
+    //for (int pind = 0; pind < 1; ++pind)
     for (int pind = 0; pind < ir->GetNPoints(); ++pind)
     {
        const IntegrationPoint &ip = ir->IntPoint(pind);
@@ -272,7 +273,7 @@ namespace mfem
           elmat(i,i) += jmat(i,i);
        } 
     }
-
+   PrintMatrix(elmat, "checkmat.txt");
  }
 /*  PrintMatrix(elmat, "checkmat.txt");
  } */
@@ -316,7 +317,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    int dim = mesh.Dimension();
    int order = 1;
    double alpha = 0.0; // IIPG
-   double kappa = -1.0; // TODO: Enable kappa = -1.0
+   double kappa = -1.0; 
    DG_FECollection fec(order, dim, BasisType::GaussLobatto);
    FiniteElementSpace fespace(&mesh, &fec, dim);
 
@@ -337,19 +338,19 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    dir_bdr[1] = 1; // boundary attribute 2 is Dirichlet
 
    BilinearForm a1(&fespace);
-   //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
-   //a1.AddInteriorFaceIntegrator(
-   //   new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+   a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
+   a1.AddInteriorFaceIntegrator(
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
    a1.AddBdrFaceIntegrator(
-      new Test_DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
    cout<<"a1.Height() is: "<<a1.Height()<<endl;
 
    TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
-   //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
-   //a2.AddInteriorFaceIntegrator(
-   //   new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
+   a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
+   a2.AddInteriorFaceIntegrator(
+      new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
    a2.AddBdrFaceIntegrator(
       new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 

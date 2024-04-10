@@ -91,6 +91,11 @@ class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator
        const Vector &col_shape, const double jmatcoef,
        const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat, DenseMatrix &jmat);
 
+    static void AssembleJmat(
+       const int dim, const int row_ndofs, const int col_ndofs,
+       const int row_offset, const int col_offset, const Vector &row_shape,
+       const Vector &col_shape, const double jmatcoef,DenseMatrix &jmat);
+
  };
 
 // Domain integrator for nonlinear elastic DG.

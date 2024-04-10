@@ -244,6 +244,25 @@ void _PrintVector(const Vector &vec,
    return;
 }
 
+void DGHyperelasticNLFIntegrator::AssembleJmat(
+       const int dim, const int row_ndofs, const int col_ndofs,
+       const int row_offset, const int col_offset, const Vector &row_shape,
+       const Vector &col_shape, const double jmatcoef,DenseMatrix &jmat){
+    for (int d = 0; d < dim; ++d)
+    {
+       const int jo = col_offset + d*col_ndofs;
+       const int io = row_offset + d*row_ndofs;
+       for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
+       {
+          const double sj = jmatcoef * col_shape(jdof);
+          for (int i = max(io,j), idof = i - io; idof < row_ndofs; ++idof, ++i)
+          {
+             jmat(i, j) += row_shape(idof) * sj;
+          }
+       }
+    }
+};
+
  // Boundary integrator
 void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                  const FiniteElement &el2,
@@ -308,8 +327,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    Vector big_row1(dim*ndofs1);
    Vector big_row2(dim*ndofs2);
 
-   //for (int i = 0; i < ir->GetNPoints(); i++)
-   for (int i = 0; i < 1; i++)
+   //for (int i = 0; i < 1; i++)
+   for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -371,10 +390,49 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
          {
          elvect(i) += shape1(idof) * tau1(im);
          }
+      } 
+      if (ndofs2 != 0) {
+      shape2.Neg();
       }
 
+      if (kappa_is_nonzero)
+    {
+       jmat = 0.;
+       AssembleJmat(
+       dim, ndofs1, ndofs1, 0, 0, shape1,
+       shape1, jmatcoef, jmat);
+       if (ndofs2 != 0) {
+       AssembleJmat(
+       dim, ndofs1, ndofs2, 0, ndofs1*dim, shape1,
+       shape2, jmatcoef, jmat);
+       AssembleJmat(
+       dim, ndofs2, ndofs1, ndofs1*dim, 0, shape2,
+       shape1, jmatcoef, jmat);
+       AssembleJmat(
+       dim, ndofs2, ndofs2, ndofs1*dim, ndofs1*dim, shape2,
+       shape2, jmatcoef, jmat);
+       }
+
+       //Flatten jmat
+       for (int i = 0; i < nvdofs; ++i)
+       {
+          for (int j = 0; j < i; ++j)
+          {
+             jmat(j,i) = jmat(i,j);
+          }
+       } 
+       // Apply jmat
+       for (size_t i = 0; i < nvdofs; i++)
+       {
+            for (size_t j = 0; j < nvdofs; j++)
+         {
+            elvect(i) -= jmat(i,j) * elfun(j);
+         }
+       }
+    }
+
       if (ndofs2 == 0) {continue;}
-       shape2.Neg();
+       
 
       // (1,2) block
       for (int im = 0, i = 0; im < dim; ++im)
@@ -555,7 +613,7 @@ const int dim = el1.GetDim();
       AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
 
    }
-   
+
    // elmat := -elmat + jmat
     elmat *= -1.0;
     if (kappa_is_nonzero)
