@@ -30,6 +30,7 @@ void TestLinModel::EvalP(
    Mult(gh, Trans.InverseJacobian(), grad);
 
    // The part below has been changed
+   // TODO: This isn't correct in general
    DenseMatrix tempadj(dim, dim);
    CalcAdjugate(Trans.Elem1->Jacobian(), tempadj);
    Mult(gh, tempadj, grad);
@@ -120,9 +121,34 @@ void TestLinModel::EvalP(
    }
 }
 
-void TestLinModel::EvalDmat(const int dim, const int dof, const double L, const double M, 
+void TestLinModel::EvalDmat(const int dim, const int dof, const IntegrationPoint ip, FaceElementTransformations &Trans, 
 const DenseMatrix gshape, DenseMatrix &Dmat)
 {
+   double M = c_mu->Eval(Trans, ip);
+   double L = c_lambda->Eval(Trans, ip);
+for (size_t i = 0; i < dim; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int S_ij = j * dim + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int U_mn = n * dof + m;
+               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
+            }
+         }
+      }
+}
+
+void TestLinModel::EvalDmat(const int dim, const int dof, const IntegrationPoint ip, ElementTransformation &Trans, 
+const DenseMatrix gshape, DenseMatrix &Dmat)
+{
+   double M = c_mu->Eval(Trans, ip);
+   double L = c_lambda->Eval(Trans, ip);
 for (size_t i = 0; i < dim; i++) 
       {
          for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
@@ -157,14 +183,10 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
       MultAAt(gshape, pelmat);
       gshape.GradToDiv(divshape);
 
-      M = c_mu->Eval(Trans, ip);
- 
-      L = c_lambda->Eval(Trans, ip);
-
       DenseMatrix Dmat(dim * dim, dim * dof);
-      EvalDmat(dim, dof, L, M, gshape, Dmat);
+      EvalDmat(dim, dof, ip, Trans, gshape, Dmat);
    
-      //Lambda part of elmat
+      //Assemble elmat
       for (size_t i = 0; i < dof; i++) 
       {
          for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
@@ -224,8 +246,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 {
    const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
-   //const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
-   int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0; // TEMP: Prevents resizing of elmat
+   const int ndofs2 = (Trans.Elem2No >= 0) ? el2.GetDof() : 0;
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
@@ -237,8 +258,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    elvect.SetSize(nvdofs);
    elvect = 0.0;
    model->SetTransformation(Trans);
-
-   //ndofs2 = 0; // TEMP: Prevents resizing of elmat
 
    shape1.SetSize(ndofs1);
     elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
@@ -261,7 +280,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       P2.SetSize(dim);
     }
     
-
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
@@ -376,7 +394,226 @@ void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                               const FiniteElement &el2,
                               FaceElementTransformations &Tr,
                               const Vector &elfun, DenseMatrix &elmat){
+const int dim = el1.GetDim();
+   const int ndofs1 = el1.GetDof();
+   const int ndofs2 = (Tr.Elem2No >= 0) ? el2.GetDof() : 0;
 
+   const int nvdofs = dim*(ndofs1 + ndofs2);
+
+   // TODO: Assert ndofs1 == ndofs2
+
+   Vector elfun_copy(elfun); // FIXME: How to avoid this?
+    nor.SetSize(dim);
+    Jrt.SetSize(dim);
+   elmat.SetSize(nvdofs);
+   elmat = 0.0;
+   model->SetTransformation(Tr);
+
+   //ndofs2 = 0; // TEMP: Prevents resizing of elmat
+
+   shape1.SetSize(ndofs1);
+    elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
+    PMatI1.UseExternalData(elfun1.GetData(), ndofs1, dim);
+    DSh1.SetSize(ndofs1, dim);
+    DS1.SetSize(ndofs1, dim);
+    Jpt1.SetSize(dim);
+    P1.SetSize(dim);
+
+    if (ndofs2)
+    {
+   shape2.SetSize(ndofs2);
+      elfun2.MakeRef(elfun_copy,ndofs1*dim,ndofs2*dim);
+      PMatI2.UseExternalData(elfun2.GetData(), ndofs2, dim);
+      DSh2.SetSize(ndofs2, dim);
+      DS2.SetSize(ndofs2, dim);
+      Jpt2.SetSize(dim);
+      P2.SetSize(dim);
+    }
+    
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int intorder = 2*el1.GetOrder();
+      ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   }
+
+   // TODO: Add to class
+   Vector tau1(dim);
+   Vector tau2(dim);
+
+   Vector big_row1(dim*ndofs1);
+   Vector big_row2(dim*ndofs2);
+
+   DenseMatrix Dmat1(dim * dim,dim*ndofs1);
+   DenseMatrix Dmat2(dim * dim,dim*ndofs2);
+
+   Dmat1 = 0.0;
+   Dmat2 = 0.0;
+
+   //for (int i = 0; i < 1; i++)
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+
+      // Set the integration point in the face and the neighboring element
+      Tr.SetAllIntPoints(&ip);
+
+      // Access the neighboring element's integration point
+      const IntegrationPoint &eip1 = Tr.GetElement1IntPoint();
+      const IntegrationPoint &eip2 = Tr.GetElement2IntPoint();
+
+      if (dim == 1)
+      {
+         nor(0) = 2*eip1.x - 1.0;
+      }
+      else
+      {
+         CalcOrtho(Tr.Jacobian(), nor);
+      }
+
+      CalcInverse(Tr.Jacobian(), Jrt);
+
+      double w = ip.weight;
+      if (ndofs2)
+      {
+      w /= 2.0;
+      el2.CalcDShape(eip2, DSh2);
+      Mult(DSh2, Jrt, DS2);
+
+      model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
+      double w2 = w / Tr.Elem2->Weight();
+      }
+
+      el1.CalcShape(eip1, shape1);
+      el1.CalcDShape(eip1, DSh1);
+      Mult(DSh1, Jrt, DS1);
+
+
+      double w1 = w / Tr.Elem1->Weight();
+
+      // Temporary stuff
+      Vector nL1(dim);
+      Vector nM1(dim);
+      DenseMatrix adjJ(dim);
+      DenseMatrix dshape1_ps(ndofs1,dim);
+      Vector dshape1_dnM(ndofs1);
+      CalcAdjugate(Tr.Elem1->Jacobian(), adjJ);
+
+      Mult(DSh1, adjJ, dshape1_ps);
+   
+      model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
+      double L = 1.0;
+      double M = 0.0;
+      const double wL1 = w1 * L;
+      const double wM1 = w1 * M;
+
+      nL1.Set(wL1, nor);
+      nM1.Set(wM1, nor);
+      dshape1_ps.Mult(nM1, dshape1_dnM);
+
+      for (int jm = 0, j = 0; jm < dim; ++jm)
+    {
+       for (int jdof = 0; jdof < ndofs1; ++jdof, ++j)
+       {
+          const double t2 = dshape1_dnM(jdof);
+         
+          for (int im = 0, i = 0; im < dim; ++im)
+          {
+             const double t1 = dshape1_ps(jdof, jm) * nL1(im);
+             const double t3 = dshape1_ps(jdof, im) * nM1(jm);
+             const double tt = t1 + ((im == jm) ? t2 : 0.0) + t3;
+             //for (size_t k = 0; k < dim; k++)
+               //{
+                  //const int S_jk = k * dim + j;
+                  //temp += Dmat1(S_jk, mn) * w1 * nor(k);
+                  //temp += dshape1_ps(jdof, jm) * w1 * nor(im);
+                  const int m = jdof;
+                  const int n = jm;
+                  const int mn = n * ndofs1 + m;
+                  const int k = im;
+                  const int jj = k; // for now
+                  const int S_jk = k * dim + jj;
+                  double temp = 0.0;
+                  //temp += dshape1_ps(m, n) * w1 * nor(im);
+                  temp += Dmat1(S_jk, mn) * w1 * nor(k);
+               //}
+/* for (size_t i = 0; i < dim; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int S_ij = j * dim + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int U_mn = n * dof + m;
+               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
+            }
+         }
+      }
+} */
+               
+             for (int idof = 0; idof < ndofs1; ++idof, ++i)
+             {
+
+                  double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
+               {
+                  //const int S_jk = k * dim + j;
+                  //temp += Dmat1(S_jk, mn) * w1 * nor(k);
+                  //temp += dshape1_ps(jdof, jm) * w1 * nor(im);
+                  const int m = jdof;
+                  const int n = jm;
+                  const int mn = n * ndofs1 + m;
+                  //const int k = im;
+                  //const int jj = k; // for now
+                  const int S_jk = k * dim + im;
+                  temp += Dmat1(S_jk, mn) * w1 * nor(k);
+               }
+                elmat(i, j) += shape1(idof) * temp;
+             cout<<temp - tt<<endl;
+             }
+
+          }
+       }
+    }
+ 
+/* 
+      // (1,1) block
+      for (size_t i = 0; i < ndofs1; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int ij = j * ndofs1 + i;
+            //const int ij = i * dim + j;
+
+            for (size_t m = 0; m < ndofs1; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int mn = n * ndofs1 + m;
+               //const int mn = m * dim + n;
+               double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
+               {
+                  const int S_jk = k * dim + j;
+                  temp += Dmat1(S_jk, mn) * w1 * nor(k);
+                  //temp += 1.0;
+
+               }
+               temp *= shape1(i);
+               elmat(ij, mn) += temp;
+               
+            }
+         }
+      } */
+
+      if (ndofs2 == 0) {continue;}
+       shape2.Neg();
+   }
+   elmat *= -1.0;
                               };
 
 void DGHyperelasticNLFIntegrator::AssembleBlock(
@@ -481,17 +718,6 @@ int dof = el.GetDof(), dim = el.GetDim();
  
        //model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat);
        model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat, el, ip, Ttr);
-
-       /* Vector divshape(dof*dim);
-       DS.GradToDiv(divshape);
-       // Create diagonal divergence matrix
-       DenseMatrix divdiag(dof*dim);
-       for (size_t i = 0; i < dof*dim; i++)
-       {
-         divdiag(i,i) = divshape(i);
-       }
-      Mult(divdiag, temp_elmat1, temp_elmat2);
-       elmat += temp_elmat2; */
     }
                                     };
  
