@@ -450,6 +450,11 @@ const int dim = el1.GetDim();
    Dmat1 = 0.0;
    Dmat2 = 0.0;
 
+   DenseMatrix adjJ2(dim);
+   
+   DenseMatrix dshape1_ps(ndofs1, dim);
+   DenseMatrix dshape2_ps(ndofs2, dim);
+
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
@@ -476,10 +481,15 @@ const int dim = el1.GetDim();
       if (ndofs2)
       {
       w /= 2.0;
+      el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
       Mult(DSh2, Jrt, DS2);
 
-      model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
+      CalcAdjugate(Tr.Elem2->Jacobian(), adjJ2);
+      Mult(DSh2, adjJ2, dshape2_ps);
+
+      //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
+      model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
       wnor2.Set(w2,nor);
       }
@@ -491,32 +501,28 @@ const int dim = el1.GetDim();
       double w1 = w / Tr.Elem1->Weight();
 
       // Temporary stuff
-      Vector nL1(dim);
-      Vector nM1(dim);
-      DenseMatrix adjJ(dim);
-      DenseMatrix dshape1_ps(ndofs1,dim);
-      Vector dshape1_dnM(ndofs1);
-      CalcAdjugate(Tr.Elem1->Jacobian(), adjJ);
+      DenseMatrix adjJ1(dim);
+      CalcAdjugate(Tr.Elem1->Jacobian(), adjJ1);
+      Mult(DSh1, adjJ1, dshape1_ps);
 
-      Mult(DSh1, adjJ, dshape1_ps);
    
       model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       
-      // (1,1) block
+      // (1,1) block //works
       wnor1.Set(w1,nor);
       AssembleBlock(dim, ndofs1, ndofs1, 0, 0, shape1, wnor1, Dmat1, elmat);
  
       if (ndofs2 == 0) {continue;}
-       shape2.Neg();
+       shape2.Neg(); 
 
-       // (1,2) block
-      AssembleBlock(dim, ndofs1, ndofs2, 0, 0, shape1, wnor2, Dmat2, elmat);
+       // (1,2) block works
+      AssembleBlock(dim, ndofs1, ndofs2, 0, dim*ndofs1, shape1, wnor2, Dmat2, elmat);
 
        // (2,1) block
-      AssembleBlock(dim, ndofs2, ndofs1, 0, 0, shape2, wnor1, Dmat1, elmat);
+      AssembleBlock(dim, ndofs2, ndofs1, dim*ndofs1, 0, shape2, wnor1, Dmat1, elmat); 
 
        // (2,2) block
-      AssembleBlock(dim, ndofs2, ndofs2, 0, 0, shape2, wnor2, Dmat2, elmat);
+      AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, wnor2, Dmat2, elmat);
 
    }
    elmat *= -1.0;

@@ -223,26 +223,26 @@ namespace mfem
  
        const double jmatcoef = 0.0;
  
-       // (1,1) block
-       _AssembleBlock(
+       // (1,1) block works
+        _AssembleBlock(
           dim, ndofs1, ndofs1, 0, 0, jmatcoef, nL1, nM1,
-          shape1, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
+          shape1, shape1, dshape1_dnM, dshape1_ps, elmat, jmat); 
  
        if (ndofs2 == 0) { continue; }
  
        // In both elmat and jmat, shape2 appears only with a minus sign.
        shape2.Neg();
  
-       // (1,2) block
+       // (1,2) block works
        _AssembleBlock(
           dim, ndofs1, ndofs2, 0, dim*ndofs1, jmatcoef, nL2, nM2,
-          shape1, shape2, dshape2_dnM, dshape2_ps, elmat, jmat);
+          shape1, shape2, dshape2_dnM, dshape2_ps, elmat, jmat); 
        // (2,1) block
        _AssembleBlock(
           dim, ndofs2, ndofs1, dim*ndofs1, 0, jmatcoef, nL1, nM1,
-          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat);
+          shape2, shape1, dshape1_dnM, dshape1_ps, elmat, jmat); 
        // (2,2) block
-       _AssembleBlock(
+        _AssembleBlock(
           dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, jmatcoef, nL2, nM2,
           shape2, shape2, dshape2_dnM, dshape2_ps, elmat, jmat); 
     }
@@ -300,7 +300,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    lambda = _lambda;      // Set lambda for all element attributes.
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
-   double _mu = 1.0;      
+   double _mu = 2.33;      
    mu = _mu;       // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
@@ -310,9 +310,9 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    dir_bdr[1] = 1; // boundary attribute 2 is Dirichlet
 
    BilinearForm a1(&fespace);
-   //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
-   //a1.AddInteriorFaceIntegrator(
-      //new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
+   a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
+   a1.AddInteriorFaceIntegrator(
+      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
    a1.AddBdrFaceIntegrator(
       new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), dir_bdr);
    a1.Assemble();
@@ -320,13 +320,13 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 
    TestLinModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
-   //a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
-   //a2.AddInteriorFaceIntegrator(
-      //new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
+   a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
+   a2.AddInteriorFaceIntegrator(
+      new DGHyperelasticNLFIntegrator(&model, alpha, kappa));
    a2.AddBdrFaceIntegrator(
       new DGHyperelasticNLFIntegrator(&model, alpha, kappa), dir_bdr);
 
-      /* BilinearForm a2(&fespace);
+/*       BilinearForm a2(&fespace);
    //a1.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
    a2.AddInteriorFaceIntegrator(
       new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa)); //Needed??
