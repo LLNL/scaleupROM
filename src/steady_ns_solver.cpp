@@ -500,6 +500,15 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    }
 }
 
+void SteadyNSSolver::AllocateROMElements()
+{
+   MultiBlockSolver::AllocateROMElements();
+
+   const int num_comp = topol_handler->GetNumComponents();
+   comp_tensors.SetSize(num_comp);
+   comp_tensors = NULL;
+}
+
 void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    StokesSolver::BuildCompROMElement(fes_comp);
@@ -509,8 +518,7 @@ void SteadyNSSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 
    DenseMatrix *basis = NULL;
    const int num_comp = topol_handler->GetNumComponents();
-   comp_tensors.SetSize(num_comp);
-   comp_tensors = NULL;
+   assert(comp_tensors.Size() == num_comp);
 
    for (int c = 0; c < num_comp; c++)
    {
@@ -564,8 +572,7 @@ void SteadyNSSolver::LoadCompBdrROMElement(hid_t &file_id)
       return;
 
    const int num_comp = topol_handler->GetNumComponents();
-   comp_tensors.SetSize(num_comp);
-   comp_tensors = NULL;
+   assert(comp_tensors.Size() == num_comp);
 
    hid_t grp_id;
    herr_t errf;

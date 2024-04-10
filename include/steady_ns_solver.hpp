@@ -163,6 +163,7 @@ public:
    void LoadROMOperatorFromFile(const std::string input_prefix="") override;
 
    // Component-wise assembly
+   void AllocateROMElements() override;
    void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) override;
    // virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
    // virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);

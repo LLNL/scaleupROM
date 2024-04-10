@@ -190,7 +190,7 @@ public:
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
-   void AllocateROMElements();
+   virtual void AllocateROMElements();
 
    void BuildROMElements();
    virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
