@@ -8,6 +8,7 @@
 #include <algorithm>
 #include "linalg_utils.hpp"
 #include "nonlinear_integ.hpp"
+#include "hyperreduction_integ.hpp"
 #include "dg_mixed_bilin.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
