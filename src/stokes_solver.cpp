@@ -521,7 +521,7 @@ void StokesSolver::AssembleInterfaceMatrices()
    b_itf->AssembleInterfaceMatrices(b_mats);
 }
 
-void StokesSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void StokesSolver::BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -578,7 +578,7 @@ void StokesSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void StokesSolver::BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -639,7 +639,7 @@ void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void StokesSolver::BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void StokesSolver::BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);

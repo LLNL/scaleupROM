@@ -344,7 +344,8 @@ void TrainEQP(MPI_Comm comm)
       }
       case ROMBuildingLevel::GLOBAL:
       {
-         mfem_error("Global EQP training is not implemented yet!\n");
+         test->TrainEQP(sample_generator);
+         test->SaveEQP();
          break;
       }
       case ROMBuildingLevel::NONE:
@@ -422,10 +423,10 @@ void BuildROM(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMLinElems();
-         test->BuildROMLinElems();
+         test->AllocateROMProjElems();
+         test->BuildROMProjElems();
          std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
-         test->SaveROMLinElems(filename);
+         test->SaveROMProjElems(filename);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -510,11 +511,11 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
          
-         test->AllocateROMLinElems();
+         test->AllocateROMProjElems();
 
          printf("Loading ROM projected elements.. ");
          std::string filename = rom->GetOperatorPrefix() + ".h5";
-         test->LoadROMLinElems(filename);
+         test->LoadROMProjElems(filename);
          printf("Done!\n");
 
          printf("Assembling ROM linear matrix.. ");

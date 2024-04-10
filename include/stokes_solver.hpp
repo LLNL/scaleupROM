@@ -183,9 +183,9 @@ public:
    virtual void SetupPressureMassMatrix();
 
    // Component-wise assembly
-   virtual void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp);
 
    virtual bool Solve();
    virtual void Solve_obsolete();
