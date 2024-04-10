@@ -423,10 +423,10 @@ void BuildROM(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMProjElems();
-         test->BuildROMProjElems();
+         test->AllocateROMLinElems();
+         test->BuildROMLinElems();
          std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
-         test->SaveROMProjElems(filename);
+         test->SaveROMLinElems(filename);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -511,16 +511,18 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
          
-         test->AllocateROMProjElems();
+         test->AllocateROMLinElems();
 
          printf("Loading ROM projected elements.. ");
          std::string filename = rom->GetOperatorPrefix() + ".h5";
-         test->LoadROMProjElems(filename);
+         test->LoadROMLinElems(filename);
          printf("Done!\n");
 
          printf("Assembling ROM linear matrix.. ");
          test->AssembleROMMat();
          printf("Done!\n");
+
+         
       }  // if (save_operator == ROMBuildingLevel::COMPONENT)
       else if (save_operator == ROMBuildingLevel::GLOBAL)
       {
