@@ -354,7 +354,6 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
       //x[i] = i;
     }
     
-
     y1.SetSize(fespace.GetTrueVSize());
     y1 = 0.0;
 
@@ -390,9 +389,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
     y1/=y1.Norml2();
     y2/=y2.Norml2();
 
-   
-
-   cout << "Scaled Linear residual norm: " << y1.Norml2() << endl;
+    cout << "Scaled Linear residual norm: " << y1.Norml2() << endl;
     cout << "Scaled Nonlinear residual norm: " << y2.Norml2() << endl;
 
     y1 -= y2;
@@ -416,7 +413,6 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
     cout << "Linear Stiffness matrix norm: " << a1.SpMat().MaxNorm() << endl;
     cout << "Stiffness matrix difference norm: " << norm_diff << endl;
 
-
     LinearForm b1(&fespace);
    b1.AddBdrFaceIntegrator(
       new DGElasticityDirichletLFIntegrator(
@@ -429,6 +425,9 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
          init_x, lambda_c, mu_c, alpha, kappa), dir_bdr);
    b2.Assemble();
 
+    cout << "Linear RHS norm: " << b1.Norml2() << endl;
+    cout << "Nonlinear RHS norm: " << b2.Norml2() << endl;
+    
     b1 -= b2;
     norm_diff = b1.Norml2();
 

@@ -11,6 +11,12 @@ namespace mfem
 double TestLinModel::EvalW(const DenseMatrix &J)
 {MFEM_ABORT("TODO")};
 
+double TestLinModel::EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
+{
+const double wL = w * c_lambda->Eval(Ttr, ip);
+const double wM = w * c_mu->Eval(Ttr, ip);
+return wL + 2.0*wM;
+}
 
 void TestLinModel::EvalP(
     const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P)
@@ -257,6 +263,14 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
     Jrt.SetSize(dim);
    elvect.SetSize(nvdofs);
    elvect = 0.0;
+
+   const bool kappa_is_nonzero = (kappa != 0.0);
+    if (kappa_is_nonzero)
+    {
+       jmat.SetSize(nvdofs);
+       jmat = 0.;
+    }
+
    model->SetTransformation(Trans);
 
    shape1.SetSize(ndofs1);
@@ -318,9 +332,10 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       CalcInverse(Trans.Jacobian(), Jrt);
 
       double w = ip.weight;
+      double wLM = 0.0;
       if (ndofs2)
       {
-         w /= 2.0;
+      w /= 2.0;
 
       el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
@@ -330,6 +345,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       model->EvalP(el2, eip2, PMatI2, Trans, P2);
 
       double w2 = w / Trans.Elem2->Weight();
+      wLM = model->EvalwLM(w2, *Trans.Elem2, eip2);
       P2 *= w2;
       P2.Mult(nor, tau2);
       }
@@ -342,8 +358,11 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       model->EvalP(el1, eip1, PMatI1, Trans, P1);
 
       double w1 = w / Trans.Elem1->Weight();
+      wLM += model->EvalwLM(w1, *Trans.Elem1, eip1);
       P1 *= w1;
       P1.Mult(nor, tau1);
+
+      const double jmatcoef = kappa * (nor*nor) * wLM;
 
       // (1,1) block
       for (int im = 0, i = 0; im < dim; ++im)
@@ -406,6 +425,13 @@ const int dim = el1.GetDim();
    elmat.SetSize(nvdofs);
    elmat = 0.0;
    model->SetTransformation(Tr);
+
+   const bool kappa_is_nonzero = (kappa != 0.0);
+    if (kappa_is_nonzero)
+    {
+       jmat.SetSize(nvdofs);
+       jmat = 0.;
+    }
 
    shape1.SetSize(ndofs1);
     elfun1.MakeRef(elfun_copy,0,ndofs1*dim);
@@ -478,6 +504,7 @@ const int dim = el1.GetDim();
       CalcInverse(Tr.Jacobian(), Jrt);
 
       double w = ip.weight;
+      double wLM = 0.0;
       if (ndofs2)
       {
       w /= 2.0;
@@ -491,6 +518,7 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
+      //wLM = (wL2 + 2.0*wM2);
       wnor2.Set(w2,nor);
       }
 
@@ -505,8 +533,9 @@ const int dim = el1.GetDim();
       CalcAdjugate(Tr.Elem1->Jacobian(), adjJ1);
       Mult(DSh1, adjJ1, dshape1_ps);
 
-   
       model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
+
+      const double jmatcoef = kappa * (nor*nor) * wLM;
       
       // (1,1) block //works
       wnor1.Set(w1,nor);
@@ -526,7 +555,11 @@ const int dim = el1.GetDim();
 
    }
    elmat *= -1.0;
-                              };
+   if (kappa_is_nonzero)
+    {
+   elmat += jmat;
+    }
+   };
 
 void DGHyperelasticNLFIntegrator::AssembleBlock(
        const int dim, const int row_ndofs, const int col_ndofs,
