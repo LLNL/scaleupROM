@@ -27,7 +27,6 @@ namespace mfem
 
    double EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
 
- 
     void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P);
     void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P);
     
@@ -89,7 +88,8 @@ class DGHyperelasticNLFIntegrator : virtual public HyperReductionIntegrator
     static void AssembleBlock(
        const int dim, const int row_ndofs, const int col_ndofs,
        const int row_offset, const int col_offset, const Vector &row_shape,
-       const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat);
+       const Vector &col_shape, const double jmatcoef,
+       const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat, DenseMatrix &jmat);
 
  };
 

@@ -308,8 +308,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    Vector big_row1(dim*ndofs1);
    Vector big_row2(dim*ndofs2);
 
-   //for (int i = 0; i < 1; i++)
-   for (int i = 0; i < ir->GetNPoints(); i++)
+   //for (int i = 0; i < ir->GetNPoints(); i++)
+   for (int i = 0; i < 1; i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -518,7 +518,7 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
-      //wLM = (wL2 + 2.0*wM2);
+      wLM = model->EvalwLM(w2, *Tr.Elem2, eip2);
       wnor2.Set(w2,nor);
       }
 
@@ -527,6 +527,7 @@ const int dim = el1.GetDim();
       Mult(DSh1, Jrt, DS1);
 
       double w1 = w / Tr.Elem1->Weight();
+      wLM += model->EvalwLM(w1, *Tr.Elem1, eip1);
 
       // Temporary stuff
       DenseMatrix adjJ1(dim);
@@ -536,35 +537,47 @@ const int dim = el1.GetDim();
       model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
-      
+
       // (1,1) block //works
       wnor1.Set(w1,nor);
-      AssembleBlock(dim, ndofs1, ndofs1, 0, 0, shape1, wnor1, Dmat1, elmat);
+      AssembleBlock(dim, ndofs1, ndofs1, 0, 0, shape1, shape1, jmatcoef, wnor1,Dmat1, elmat,jmat);
  
       if (ndofs2 == 0) {continue;}
        shape2.Neg(); 
 
        // (1,2) block works
-      AssembleBlock(dim, ndofs1, ndofs2, 0, dim*ndofs1, shape1, wnor2, Dmat2, elmat);
+      AssembleBlock(dim, ndofs1, ndofs2, 0, dim*ndofs1, shape1, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
 
        // (2,1) block
-      AssembleBlock(dim, ndofs2, ndofs1, dim*ndofs1, 0, shape2, wnor1, Dmat1, elmat); 
+      AssembleBlock(dim, ndofs2, ndofs1, dim*ndofs1, 0, shape2, shape1,jmatcoef,wnor1, Dmat1, elmat,jmat); 
 
        // (2,2) block
-      AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, wnor2, Dmat2, elmat);
+      AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
 
    }
-   elmat *= -1.0;
-   if (kappa_is_nonzero)
+   
+   // elmat := -elmat + jmat
+    elmat *= -1.0;
+    if (kappa_is_nonzero)
     {
-   elmat += jmat;
+       for (int i = 0; i < nvdofs; ++i)
+       {
+          for (int j = 0; j < i; ++j)
+          {
+             double mij = jmat(i,j);
+             elmat(i,j) += mij;
+             elmat(j,i) += mij;
+          }
+          elmat(i,i) += jmat(i,i);
+       } 
     }
    };
 
 void DGHyperelasticNLFIntegrator::AssembleBlock(
        const int dim, const int row_ndofs, const int col_ndofs,
        const int row_offset, const int col_offset, const Vector &row_shape,
-       const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat){
+       const Vector &col_shape, const double jmatcoef,
+       const Vector &wnor, const DenseMatrix &Dmat, DenseMatrix &elmat, DenseMatrix &jmat){
 for (int n = 0, jj = col_offset; n < dim; ++n)
     {
        for (int m = 0; m < col_ndofs; ++m, ++jj)
@@ -582,6 +595,22 @@ for (int n = 0, jj = col_offset; n < dim; ++n)
                }
                 elmat(ii, jj) += row_shape(i) * temp;
              }
+          }
+       }
+    }
+
+    if (jmatcoef == 0.0) { return; }
+ 
+    for (int d = 0; d < dim; ++d)
+    {
+       const int jo = col_offset + d*col_ndofs;
+       const int io = row_offset + d*row_ndofs;
+       for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
+       {
+          const double sj = jmatcoef * col_shape(jdof);
+          for (int i = max(io,j), idof = i - io; idof < row_ndofs; ++idof, ++i)
+          {
+             jmat(i, j) += row_shape(idof) * sj;
           }
        }
     }
