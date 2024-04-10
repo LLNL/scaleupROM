@@ -243,10 +243,9 @@ void SampleGenerator::ReportStatus(const int &sample_idx)
    printf("==============================================\n");
 }
 
-void SampleGenerator::FormReducedBasis(const std::string &basis_prefix,
+void SampleGenerator::CollectSnapshots(const std::string &basis_prefix,
                                        const std::string &basis_tag,
-                                       const std::vector<std::string> &file_list,
-                                       const int &ref_num_basis)
+                                       const std::vector<std::string> &file_list)
 {
    // Get dimension from the first snapshot file.
    const int fom_num_vdof = GetDimFromSnapshots(file_list[0]);
@@ -265,9 +264,46 @@ void SampleGenerator::FormReducedBasis(const std::string &basis_prefix,
 
    for (int s = 0; s < file_list.size(); s++)
       basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5_MPIO);
+}
 
-   basis_generator->endSamples(); // save the merged basis file
-   SaveSV(basis_generator, basis_name, ref_num_basis);
+void SampleGenerator::FormReducedBasis(const std::string &basis_prefix)
+{
+   assert(snapshot_generators.Size() > 0);
+   assert(snapshot_generators.Size() == basis_tags.size());
+
+   const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
+   int num_basis;
+   std::string basis_name;
+
+   // tag-specific optional inputs.
+   YAML::Node basis_list = config.FindNode("basis/tags");
+   for (int k = 0; k < snapshot_generators.Size(); k++)
+   {
+      assert(snapshot_generators[k]);
+      assert(snapshot_generators[k]->getNumSamples() > 0);
+      snapshot_generators[k]->endSamples();
+
+      // if optional inputs are specified, parse them first.
+      if (basis_list)
+      {
+         // Find if additional inputs are specified for basis_tags[p].
+         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[k], basis_list);
+         
+         // If basis_tags[p] has additional inputs, parse them.
+         // parse tag-specific number of basis.
+         if (basis_tag_input)
+            num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_tag_input);
+         else
+            num_basis = num_basis_default;
+      }
+      else
+         // if additional inputs are not specified, use default number of basis.
+         num_basis = num_basis_default;
+
+      assert(num_basis > 0);
+      basis_name = GetBaseFilename(basis_prefix, basis_tags[k]);
+      SaveSV(snapshot_generators[k], basis_name, num_basis);
+   }
 }
 
 const int SampleGenerator::GetDimFromSnapshots(const std::string &filename)
@@ -324,7 +360,7 @@ void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::
    }
    if (rom_sv->dim() == ref_num_basis) coverage = total;
    coverage /= total;
-   printf("Coverage: %.7f%%\n", coverage * 100.0);
+   printf("Energy fraction with %d basis: %.7f%%\n", ref_num_basis, coverage * 100.0);
 
    // TODO: hdf5 format + parallel case.
    std::string filename = prefix + "_sv.txt";

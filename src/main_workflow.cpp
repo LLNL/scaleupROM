@@ -224,9 +224,9 @@ void GenerateSamples(MPI_Comm comm)
    config.dict_ = dict0;
 }
 
-void TrainROM(MPI_Comm comm)
+void CollectSamples(SampleGenerator *sample_generator)
 {
-   SampleGenerator *sample_generator = InitSampleGenerator(comm);
+   assert(sample_generator);
 
    TopologyHandlerMode topol_mode = SetTopologyHandlerMode();
    TrainMode train_mode = SetTrainMode();
@@ -239,7 +239,6 @@ void TrainROM(MPI_Comm comm)
    YAML::Node basis_list = config.FindNode("basis/tags");
 
    std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
-   const int num_basis_default = config.GetOption<int>("basis/number_of_basis", -1);
 
    // loop over the required basis tag list.
    for (int p = 0; p < basis_tags.size(); p++)
@@ -250,29 +249,18 @@ void TrainROM(MPI_Comm comm)
       FindSnapshotFilesForBasis(basis_tags[p], default_filename, file_list);
       assert(file_list.size() > 0);
 
-      int num_basis;
-
-      // if optional inputs are specified, parse them first.
-      if (basis_list)
-      {
-         // Find if additional inputs are specified for basis_tags[p].
-         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[p], basis_list);
-         
-         // If basis_tags[p] has additional inputs, parse them.
-         // parse tag-specific number of basis.
-         if (basis_tag_input)
-            num_basis = config.GetOptionFromDict<int>("number_of_basis", num_basis_default, basis_tag_input);
-         else
-            num_basis = num_basis_default;
-      }
-      else
-         // if additional inputs are not specified, use default number of basis.
-         num_basis = num_basis_default;
-
-      assert(num_basis > 0);
-
-      sample_generator->FormReducedBasis(basis_prefix, basis_tags[p], file_list, num_basis);
+      sample_generator->CollectSnapshots(basis_prefix, basis_tags[p], file_list);
    }  // for (int p = 0; p < basis_tags.size(); p++)
+}
+
+void TrainROM(MPI_Comm comm)
+{
+   SampleGenerator *sample_generator = InitSampleGenerator(comm);
+
+   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
+   CollectSamples(sample_generator);
+
+   sample_generator->FormReducedBasis(basis_prefix);
 
    AuxiliaryTrainROM(comm, sample_generator);
 
@@ -328,6 +316,11 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
 
       delete test;
    }
+}
+
+void TrainEQP(MPI_Comm comm)
+{
+   
 }
 
 void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
