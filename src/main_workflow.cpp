@@ -320,9 +320,38 @@ void TrainEQP(MPI_Comm comm)
 
    test->LoadReducedBasis();
 
-   test->TrainEQP(sample_generator);
+   ROMHandlerBase *rom = test->GetROMHandler();
+   ROMBuildingLevel save_operator = rom->GetBuildingLevel();
+   TopologyHandlerMode topol_mode = test->GetTopologyMode();
 
-   test->SaveEQP();
+   if (topol_mode == TopologyHandlerMode::SUBMESH)
+      printf("using SubMesh topology.\n");
+   else if (topol_mode == TopologyHandlerMode::COMPONENT)
+      printf("using Component-wise topology.\n");
+   else
+      mfem_error("Unknown TopologyHandler Mode!\n");
+
+   switch (save_operator)
+   {
+      case ROMBuildingLevel::COMPONENT:
+      {
+         if (topol_mode == TopologyHandlerMode::SUBMESH)
+            mfem_error("Submesh does not support component rom building level!\n");
+
+         test->TrainEQP(sample_generator);
+         test->SaveEQP();
+         break;
+      }
+      case ROMBuildingLevel::GLOBAL:
+      {
+         mfem_error("Global EQP training is not implemented yet!\n");
+         break;
+      }
+      case ROMBuildingLevel::NONE:
+      default:
+         mfem_error("TrainEQP: save_operator level must be either component or global!\n");
+         break;
+   }
 
    delete test;
 }
@@ -393,10 +422,10 @@ void BuildROM(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMProjElems();
-         test->BuildROMProjElems();
+         test->AllocateROMLinElems();
+         test->BuildROMLinElems();
          std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
-         test->SaveROMProjElems(filename);
+         test->SaveROMLinElems(filename);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -476,37 +505,39 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       else
          mfem_error("Unknown TopologyHandler Mode!\n");
 
-      switch (save_operator)
+      if (save_operator == ROMBuildingLevel::COMPONENT)
       {
-         case ROMBuildingLevel::COMPONENT:
-         {
-            if (topol_mode == TopologyHandlerMode::SUBMESH)
-               mfem_error("Submesh does not support component rom building level!\n");
+         if (topol_mode == TopologyHandlerMode::SUBMESH)
+            mfem_error("Submesh does not support component rom building level!\n");
+         
+         test->AllocateROMLinElems();
 
-            printf("Loading component operator file.. ");
-            test->AllocateROMProjElems();
-            std::string filename = rom->GetOperatorPrefix() + ".h5";
-            test->LoadROMProjElems(filename);
-            test->AssembleROM();
-            break;
-         }
-         case ROMBuildingLevel::GLOBAL:
-         {
-            printf("Loading global operator file.. ");
-            test->LoadROMOperatorFromFile();
-            break;
-         }
-         case ROMBuildingLevel::NONE:
-         {
-            printf("Building operator file all the way from FOM.. ");
-            test->BuildDomainOperators();
-            test->SetupDomainBCOperators();
-            test->AssembleOperator();
-            test->ProjectOperatorOnReducedBasis();
-            break;
-         }
-      }
-      printf("Done!\n");
+         printf("Loading ROM projected elements.. ");
+         std::string filename = rom->GetOperatorPrefix() + ".h5";
+         test->LoadROMLinElems(filename);
+         printf("Done!\n");
+
+         printf("Assembling ROM linear matrix.. ");
+         test->AssembleROMMat();
+         printf("Done!\n");
+      }  // if (save_operator == ROMBuildingLevel::COMPONENT)
+      else if (save_operator == ROMBuildingLevel::GLOBAL)
+      {
+         printf("Loading global operator file.. ");
+         test->LoadROMOperatorFromFile();
+         printf("Done!\n");
+      }  // if (save_operator == ROMBuildingLevel::GLOBAL)
+      else if (save_operator == ROMBuildingLevel::NONE)
+      {
+         printf("Building operator file all the way from FOM.. ");
+         test->BuildDomainOperators();
+         test->SetupDomainBCOperators();
+         test->AssembleOperator();
+         test->ProjectOperatorOnReducedBasis();
+         printf("Done!\n");
+      }  // if (save_operator == ROMBuildingLevel::NONE)
+      else
+         mfem_error("SingleRun - Unknown ROMBuildingLevel!\n");
 
       printf("Projecting RHS to ROM.. ");
       test->ProjectRHSOnReducedBasis();

@@ -190,29 +190,29 @@ public:
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
-   virtual void AllocateROMProjElems();
+   virtual void AllocateROMLinElems();
 
-   void BuildROMProjElems();
-   virtual void BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp) = 0;
-   virtual void BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   void BuildROMLinElems();
+   virtual void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
    // TODO(kevin): part of this can be transferred to InterfaceForm.
-   virtual void BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
 
-   void SaveROMProjElems(const std::string &filename);
+   void SaveROMLinElems(const std::string &filename);
    // Save ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void SaveCompBdrROMProjElems(hid_t &file_id);
-   void SaveBdrROMProjElems(hid_t &comp_grp_id, const int &comp_idx);
-   void SaveItfaceROMProjElems(hid_t &file_id);
+   virtual void SaveCompBdrROMLinElems(hid_t &file_id);
+   void SaveBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx);
+   void SaveItfaceROMLinElems(hid_t &file_id);
 
-   void LoadROMProjElems(const std::string &filename);
+   void LoadROMLinElems(const std::string &filename);
    // Load ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void LoadCompBdrROMProjElems(hid_t &file_id);
-   void LoadBdrROMProjElems(hid_t &comp_grp_id, const int &comp_idx);
-   void LoadItfaceROMProjElems(hid_t &file_id);
+   virtual void LoadCompBdrROMLinElems(hid_t &file_id);
+   void LoadBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx);
+   void LoadItfaceROMLinElems(hid_t &file_id);
 
-   void AssembleROM();
+   void AssembleROMMat();
 
    virtual bool Solve() = 0;
 

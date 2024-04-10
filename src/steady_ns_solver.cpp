@@ -500,18 +500,18 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    }
 }
 
-void SteadyNSSolver::AllocateROMProjElems()
+void SteadyNSSolver::AllocateROMLinElems()
 {
-   MultiBlockSolver::AllocateROMProjElems();
+   MultiBlockSolver::AllocateROMLinElems();
 
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
    comp_tensors = NULL;
 }
 
-void SteadyNSSolver::BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp)
+void SteadyNSSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
 {
-   StokesSolver::BuildCompROMProjElems(fes_comp);
+   StokesSolver::BuildCompROMLinElems(fes_comp);
 
    if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
       return;
@@ -529,9 +529,9 @@ void SteadyNSSolver::BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp
    }  // for (int c = 0; c < num_comp; c++)
 }
 
-void SteadyNSSolver::SaveCompBdrROMProjElems(hid_t &file_id)
+void SteadyNSSolver::SaveCompBdrROMLinElems(hid_t &file_id)
 {
-   MultiBlockSolver::SaveCompBdrROMProjElems(file_id);
+   MultiBlockSolver::SaveCompBdrROMLinElems(file_id);
 
    if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
       return;
@@ -564,9 +564,9 @@ void SteadyNSSolver::SaveCompBdrROMProjElems(hid_t &file_id)
    assert(errf >= 0);
 }
 
-void SteadyNSSolver::LoadCompBdrROMProjElems(hid_t &file_id)
+void SteadyNSSolver::LoadCompBdrROMLinElems(hid_t &file_id)
 {
-   MultiBlockSolver::LoadCompBdrROMProjElems(file_id);
+   MultiBlockSolver::LoadCompBdrROMLinElems(file_id);
 
    if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
       return;

@@ -89,9 +89,9 @@ public:
    virtual void SetupDomainBCOperators();
 
    // Component-wise assembly
-   virtual void BuildCompROMProjElems(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildBdrROMProjElems(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildItfaceROMProjElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp);
 
    virtual void ProjectOperatorOnReducedBasis();
 
