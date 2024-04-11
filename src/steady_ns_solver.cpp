@@ -774,18 +774,68 @@ void SteadyNSSolver::AssembleROMTensorOper()
       subdomain_tensors[m] = comp_tensors[rom_handler->GetRefIndexForSubdomain(m)];
 }
 
-void SteadyNSSolver::TrainEQP(SampleGenerator *sample_generator)
+
+void SteadyNSSolver::AllocateROMEQPElems()
 {
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+
+   assert(rom_handler);
+   assert(rom_handler->BasisLoaded());
+
+   bool precompute = config.GetOption<bool>("model_reduction/eqp/precompute", false);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   comp_eqps.SetSize(num_comp);
+   comp_fes.SetSize(num_comp);
+   comp_eqps = NULL;
+   comp_fes = NULL;
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      int midx = -1;
+      for (int m = 0; m < numSub; m++)
+         if (rom_handler->GetRefIndexForSubdomain(m) == c)
+         {
+            midx = m;
+            break;
+         }
+      assert((midx >= 0) && (midx < numSub));
+
+      comp_fes[c] = ufes[midx];
+   }
+
+   DenseMatrix *basis;
+   for (int c = 0; c < num_comp; c++)
+   {
+      int idx = (separate_variable_basis) ? c * num_var : c;
+      rom_handler->GetReferenceBasis(idx, basis);
+
+      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+      nl_integ_tmp->SetIntRule(ir_nl);
+
+      comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c]);
+      comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+      comp_eqps[c]->SetBasis(*basis);
+      comp_eqps[c]->SetPrecomputeMode(precompute);
+   }   
+}
+
+void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+
    assert(sample_generator);
    assert(rom_handler);
    assert(rom_handler->BasisLoaded());
 
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_eqps.Size() == num_comp);
+
    double eqp_tol = config.GetOption<double>("model_reduction/eqp/relative_tolerance", 1.0e-2);
 
-   SetupEQPOperators();
-
    /* EQP NNLS for each reference ROM component */
-   const int num_comp = rom_handler->GetNumROMRefComps();
    std::string basis_tag;
    for (int c = 0; c < num_comp; c++)
    {
@@ -797,10 +847,10 @@ void SteadyNSSolver::TrainEQP(SampleGenerator *sample_generator)
    }
 }
 
-void SteadyNSSolver::SaveEQP()
+void SteadyNSSolver::SaveEQPElems(const std::string &filename)
 {
-   std::string filename = rom_handler->GetBasisPrefix();
-   filename += ".eqp.h5";
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
 
    /*
       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
@@ -808,61 +858,93 @@ void SteadyNSSolver::SaveEQP()
    */
    if (rank == 0)
    {
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
 
-   hid_t file_id;
-   herr_t errf = 0;
-   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-   assert(file_id >= 0);
+      hid_t grp_id;
 
-   const int num_comp = rom_handler->GetNumROMRefComps();
-   assert(comp_eqps.Size() == num_comp);
-   std::string dset_name;
-   for (int c = 0; c < num_comp; c++)
-   {
-      assert(comp_eqps[c]);
-      dset_name = GetBasisTagForComponent(c, train_mode, topol_handler);
-      // only one integrator exists in each nonlinear form.
-      comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, dset_name);
-   }
+      grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
 
-   errf = H5Fclose(file_id);
-   assert(errf >= 0);
+      const int num_comp = topol_handler->GetNumComponents();
+      assert(comp_eqps.Size() == num_comp);
 
+      hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
+
+      std::string dset_name;
+      for (int c = 0; c < num_comp; c++)
+      {
+         assert(comp_eqps[c]);
+         dset_name = topol_handler->GetComponentName(c);
+
+         // only one integrator exists in each nonlinear form.
+         comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name);
+      }  // for (int c = 0; c < num_comp; c++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
    }
    MPI_Barrier(MPI_COMM_WORLD);
    return;
 }
 
-void SteadyNSSolver::LoadEQP()
+void SteadyNSSolver::LoadEQPElems(const std::string &filename)
 {
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
-
-   SetupEQPOperators();
-
-   const int num_comp = rom_handler->GetNumROMRefComps();
-
-   std::string filename = rom_handler->GetBasisPrefix();
-   filename += ".eqp.h5";
 
    hid_t file_id;
    herr_t errf = 0;
    file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
    assert(file_id >= 0);
 
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   int num_comp;
+   hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
+   assert(num_comp >= topol_handler->GetNumComponents());
+   assert(comp_eqps.Size() == num_comp);
+
    std::string dset_name;
-   for (int c = 0; c < num_comp; c++)
+   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
    {
       assert(comp_eqps[c]);
-      dset_name = GetBasisTagForComponent(c, train_mode, topol_handler);
+      dset_name = topol_handler->GetComponentName(c);
+
       // only one integrator exists in each nonlinear form.
-      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, file_id, dset_name);
+      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name);
 
       if (comp_eqps[c]->PrecomputeMode())
          comp_eqps[c]->PrecomputeCoefficients();
-   }
+   }  // for (int c = 0; c < num_comp; c++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
+}
+
+void SteadyNSSolver::AssembleROMEQPOper()
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+
+   const int num_comp = rom_handler->GetNumROMRefComps();
+   assert(comp_eqps.Size() == num_comp);
+
+   subdomain_eqps.SetSize(numSub);
+   subdomain_eqps = NULL;
+   for (int m = 0; m < numSub; m++)
+      subdomain_eqps[m] = comp_eqps[rom_handler->GetRefIndexForSubdomain(m)];
 }
 
 DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)
@@ -910,52 +992,4 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    }  // for (int i = 0; i < num_basis_c; i++)
 
    return tensor;
-}
-
-void SteadyNSSolver::SetupEQPOperators()
-{
-   assert(rom_handler);
-   assert(rom_handler->BasisLoaded());
-
-   bool precompute = config.GetOption<bool>("model_reduction/eqp/precompute", false);
-
-   const int num_comp = rom_handler->GetNumROMRefComps();
-   comp_eqps.SetSize(num_comp);
-   comp_fes.SetSize(num_comp);
-   comp_eqps = NULL;
-   comp_fes = NULL;
-
-   for (int c = 0; c < num_comp; c++)
-   {
-      int midx = -1;
-      for (int m = 0; m < numSub; m++)
-         if (rom_handler->GetRefIndexForSubdomain(m) == c)
-         {
-            midx = m;
-            break;
-         }
-      assert((midx >= 0) && (midx < numSub));
-
-      comp_fes[c] = ufes[midx];
-   }
-
-   DenseMatrix *basis;
-   for (int c = 0; c < num_comp; c++)
-   {
-      int idx = (separate_variable_basis) ? c * num_var : c;
-      rom_handler->GetReferenceBasis(idx, basis);
-
-      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
-      nl_integ_tmp->SetIntRule(ir_nl);
-
-      comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c]);
-      comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
-      comp_eqps[c]->SetBasis(*basis);
-      comp_eqps[c]->SetPrecomputeMode(precompute);
-   }
-
-   subdomain_eqps.SetSize(numSub);
-   subdomain_eqps = NULL;
-   for (int m = 0; m < numSub; m++)
-      subdomain_eqps[m] = comp_eqps[rom_handler->GetRefIndexForSubdomain(m)];
 }

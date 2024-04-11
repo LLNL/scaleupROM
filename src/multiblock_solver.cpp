@@ -839,17 +839,17 @@ void MultiBlockSolver::AllocateROMNlinElems()
    NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
 
    if (rom_nlin_mode == NonlinearHandling::TENSOR)    AllocateROMTensorElems();
-   // else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+   else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
 }
 
-void MultiBlockSolver::LoadROMNlinElems(const std::string &filename)
+void MultiBlockSolver::LoadROMNlinElems(const std::string &input_prefix)
 {
    assert(nonlinear_mode);
    assert(rom_handler);
    NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
 
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    LoadROMTensorElems(filename);
-   // else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    LoadROMTensorElems(input_prefix + ".h5");
+   else if (rom_nlin_mode == NonlinearHandling::EQP)  LoadEQPElems(input_prefix + ".eqp.h5");
 }
 
 void MultiBlockSolver::AssembleROMNlinOper()
@@ -859,7 +859,7 @@ void MultiBlockSolver::AssembleROMNlinOper()
    NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
 
    if (rom_nlin_mode == NonlinearHandling::TENSOR)    AssembleROMTensorOper();
-   // else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+   else if (rom_nlin_mode == NonlinearHandling::EQP)  AssembleROMEQPOper();
 }
 
 void MultiBlockSolver::InitROMHandler()

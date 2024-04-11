@@ -331,6 +331,7 @@ void TrainEQP(MPI_Comm comm)
    else
       mfem_error("Unknown TopologyHandler Mode!\n");
 
+   std::string filename = rom->GetOperatorPrefix() + ".eqp.h5";
    switch (save_operator)
    {
       case ROMBuildingLevel::COMPONENT:
@@ -338,14 +339,16 @@ void TrainEQP(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->TrainEQP(sample_generator);
-         test->SaveEQP();
+         test->AllocateROMEQPElems();
+         test->TrainEQPElems(sample_generator);
+         test->SaveEQPElems(filename);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
       {
-         test->TrainEQP(sample_generator);
-         test->SaveEQP();
+         mfem_error("TrainEQP: not implemented for global yet!\n");
+         // test->TrainEQP(sample_generator);
+         // test->SaveEQP();
          break;
       }
       case ROMBuildingLevel::NONE:
@@ -496,9 +499,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    {
       rom = test->GetROMHandler();
       test->LoadReducedBasis();
-
-      if ((test->IsNonlinear()) && (rom->GetNonlinearHandling() == NonlinearHandling::EQP))
-         test->LoadEQP();
    }
 
    solveTimer.Start();
@@ -534,7 +534,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
          if (test->IsNonlinear())
          {
             test->AllocateROMNlinElems();
-            test->LoadROMNlinElems(filename);
+            test->LoadROMNlinElems(rom->GetOperatorPrefix());
             test->AssembleROMNlinOper();
          }
       }  // if (save_operator == ROMBuildingLevel::COMPONENT)

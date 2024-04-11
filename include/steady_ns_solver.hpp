@@ -174,13 +174,14 @@ public:
    void LoadROMTensorElems(const std::string &filename) override;
    void AssembleROMTensorOper() override;
 
-   void TrainEQP(SampleGenerator *sample_generator) override;
-   void SaveEQP() override;
-   void LoadEQP() override;
+   void AllocateROMEQPElems() override;
+   void TrainEQPElems(SampleGenerator *sample_generator) override;
+   void SaveEQPElems(const std::string &filename) override;
+   void LoadEQPElems(const std::string &filename) override;
+   void AssembleROMEQPOper() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
-   void SetupEQPOperators();
 };
 
 #endif

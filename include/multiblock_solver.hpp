@@ -238,15 +238,17 @@ public:
 
    virtual void AllocateROMEQPElems()
    { mfem_error("Abstract method MultiBlockSolver::AllocateROMEQPElems!\n"); }
-   virtual void TrainEQP(SampleGenerator *sample_generator)
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
-   virtual void SaveEQP()
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
-   virtual void LoadEQP()
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
+   virtual void TrainEQPElems(SampleGenerator *sample_generator)
+   { mfem_error("Abstract method MultiBlockSolver::TrainEQPElems!\n"); }
+   virtual void SaveEQPElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::SaveEQP!\n"); }
+   virtual void LoadEQPElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::LoadEQP!\n"); }
+   virtual void AssembleROMEQPOper()
+   { mfem_error("Abstract method MultiBlockSolver::AssembleROMEQPOper!\n"); }
 
    void AllocateROMNlinElems();
-   void LoadROMNlinElems(const std::string &filename);
+   void LoadROMNlinElems(const std::string &input_prefix);
    void AssembleROMNlinOper();
 
    void InitROMHandler();
