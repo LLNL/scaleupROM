@@ -832,24 +832,39 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
    *U = *input_sol;
 }
 
+void MultiBlockSolver::AllocateROMNlinElems()
+{
+   assert(nonlinear_mode);
+   assert(rom_handler);
+   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
+
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AllocateROMTensorElems();
+   // else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+}
+
+void MultiBlockSolver::LoadROMNlinElems(const std::string &filename)
+{
+   assert(nonlinear_mode);
+   assert(rom_handler);
+   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
+
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    LoadROMTensorElems(filename);
+   // else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+}
+
+void MultiBlockSolver::AssembleROMNlinOper()
+{
+   assert(nonlinear_mode);
+   assert(rom_handler);
+   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
+
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AssembleROMTensorOper();
+   // else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+}
+
 void MultiBlockSolver::InitROMHandler()
 {
-   // std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
-
    rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-
-   // if (rom_handler_str == "base")
-   // {
-   //    rom_handler = new ROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-   // }
-   // else if (rom_handler_str == "mfem")
-   // {
-   //    rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-   // }
-   // else
-   // {
-   //    mfem_error("Unknown ROM handler type!\n");
-   // }
 }
 
 void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)

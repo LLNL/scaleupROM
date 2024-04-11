@@ -162,19 +162,17 @@ public:
    void SaveROMOperator(const std::string input_prefix="") override;
    void LoadROMOperatorFromFile(const std::string input_prefix="") override;
 
-   // Component-wise assembly
-   void AllocateROMLinElems() override;
-   void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp) override;
-   // virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp);
-   // virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp);
-   void SaveCompBdrROMLinElems(hid_t &file_id) override;
-   void LoadCompBdrROMLinElems(hid_t &file_id) override;
-
    bool Solve() override;
 
    void ProjectOperatorOnReducedBasis() override;
 
    void SolveROM() override;
+
+   void AllocateROMTensorElems() override;
+   void BuildROMTensorElems() override;
+   void SaveROMTensorElems(const std::string &filename) override;
+   void LoadROMTensorElems(const std::string &filename) override;
+   void AssembleROMTensorOper() override;
 
    void TrainEQP(SampleGenerator *sample_generator) override;
    void SaveEQP() override;

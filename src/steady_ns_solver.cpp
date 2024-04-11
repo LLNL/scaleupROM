@@ -500,110 +500,6 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    }
 }
 
-void SteadyNSSolver::AllocateROMLinElems()
-{
-   MultiBlockSolver::AllocateROMLinElems();
-
-   const int num_comp = topol_handler->GetNumComponents();
-   comp_tensors.SetSize(num_comp);
-   comp_tensors = NULL;
-}
-
-void SteadyNSSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
-{
-   StokesSolver::BuildCompROMLinElems(fes_comp);
-
-   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
-      return;
-
-   DenseMatrix *basis = NULL;
-   const int num_comp = topol_handler->GetNumComponents();
-   assert(comp_tensors.Size() == num_comp);
-
-   for (int c = 0; c < num_comp; c++)
-   {
-      const int fidx = c * num_var;
-      const int cidx = (separate_variable_basis) ? fidx : c;
-      rom_handler->GetReferenceBasis(cidx, basis);
-      comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
-   }  // for (int c = 0; c < num_comp; c++)
-}
-
-void SteadyNSSolver::SaveCompBdrROMLinElems(hid_t &file_id)
-{
-   MultiBlockSolver::SaveCompBdrROMLinElems(file_id);
-
-   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
-      return;
-
-   const int num_comp = topol_handler->GetNumComponents();
-   assert(comp_tensors.Size() == num_comp);
-
-   hid_t grp_id;
-   herr_t errf;
-   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
-   assert(grp_id >= 0);
-
-   std::string dset_name;
-   for (int c = 0; c < num_comp; c++)
-   {
-      assert(comp_tensors[c]);
-      dset_name = topol_handler->GetComponentName(c);
-
-      hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
-      assert(comp_grp_id >= 0);
-
-      hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
-
-      errf = H5Gclose(comp_grp_id);
-      assert(errf >= 0);
-   }  // for (int c = 0; c < num_comp; c++)
-
-   errf = H5Gclose(grp_id);
-   assert(errf >= 0);
-}
-
-void SteadyNSSolver::LoadCompBdrROMLinElems(hid_t &file_id)
-{
-   MultiBlockSolver::LoadCompBdrROMLinElems(file_id);
-
-   if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
-      return;
-
-   const int num_comp = topol_handler->GetNumComponents();
-   assert(comp_tensors.Size() == num_comp);
-
-   hid_t grp_id;
-   herr_t errf;
-   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
-   assert(grp_id >= 0);
-
-   std::string dset_name;
-   for (int c = 0; c < num_comp; c++)
-   {
-      dset_name = topol_handler->GetComponentName(c);
-
-      hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
-      assert(comp_grp_id >= 0);
-
-      comp_tensors[c] = new DenseTensor;
-      hdf5_utils::ReadDataset(comp_grp_id, "tensor", *comp_tensors[c]);
-
-      errf = H5Gclose(comp_grp_id);
-      assert(errf >= 0);
-   }  // for (int c = 0; c < num_comp; c++)
-
-   errf = H5Gclose(grp_id);
-   assert(errf >= 0);
-
-   subdomain_tensors.SetSize(numSub);
-   subdomain_tensors = NULL;
-   for (int m = 0; m < numSub; m++)
-      subdomain_tensors[m] = comp_tensors[rom_handler->GetRefIndexForSubdomain(m)];
-}
-
 bool SteadyNSSolver::Solve()
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
@@ -745,6 +641,137 @@ void SteadyNSSolver::SolveROM()
    rom_handler->NonlinearSolve(*rom_oper, U_domain);
 
    delete rom_oper;
+}
+
+void SteadyNSSolver::AllocateROMTensorElems()
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   comp_tensors.SetSize(num_comp);
+   comp_tensors = NULL;
+}
+
+void SteadyNSSolver::BuildROMTensorElems()
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+   assert(rom_handler->BasisLoaded());
+
+   // Component domain system
+   const int num_comp = topol_handler->GetNumComponents();
+   Array<FiniteElementSpace *> fes_comp;
+   GetComponentFESpaces(fes_comp);
+
+   DenseMatrix *basis = NULL;
+   assert(comp_tensors.Size() == num_comp);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      const int fidx = c * num_var;
+      const int cidx = (separate_variable_basis) ? fidx : c;
+      rom_handler->GetReferenceBasis(cidx, basis);
+      comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
+   }  // for (int c = 0; c < num_comp; c++)
+
+   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
+}
+
+void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+   assert(FileExists(filename));
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_tensors.Size() == num_comp);
+
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   std::string dset_name;
+   for (int c = 0; c < num_comp; c++)
+   {
+      assert(comp_tensors[c]);
+      dset_name = topol_handler->GetComponentName(c);
+
+      hid_t comp_grp_id;
+      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
+      assert(comp_grp_id >= 0);
+
+      hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
+
+      errf = H5Gclose(comp_grp_id);
+      assert(errf >= 0);
+   }  // for (int c = 0; c < num_comp; c++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
+}
+
+void SteadyNSSolver::LoadROMTensorElems(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_tensors.Size() == num_comp);
+
+   hid_t grp_id;
+   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   std::string dset_name;
+   for (int c = 0; c < num_comp; c++)
+   {
+      dset_name = topol_handler->GetComponentName(c);
+
+      hid_t comp_grp_id;
+      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
+      assert(comp_grp_id >= 0);
+
+      comp_tensors[c] = new DenseTensor;
+      hdf5_utils::ReadDataset(comp_grp_id, "tensor", *comp_tensors[c]);
+
+      errf = H5Gclose(comp_grp_id);
+      assert(errf >= 0);
+   }  // for (int c = 0; c < num_comp; c++)
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+}
+
+void SteadyNSSolver::AssembleROMTensorOper()
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(train_mode == UNIVERSAL);
+
+   const int num_comp = topol_handler->GetNumComponents();
+   assert(comp_tensors.Size() == num_comp);
+
+   subdomain_tensors.SetSize(numSub);
+   subdomain_tensors = NULL;
+   for (int m = 0; m < numSub; m++)
+      subdomain_tensors[m] = comp_tensors[rom_handler->GetRefIndexForSubdomain(m)];
 }
 
 void SteadyNSSolver::TrainEQP(SampleGenerator *sample_generator)

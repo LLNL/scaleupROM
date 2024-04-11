@@ -225,12 +225,29 @@ public:
    void LoadSolution(const std::string &filename);
    void CopySolution(BlockVector *input_sol);
 
+   virtual void AllocateROMTensorElems()
+   { mfem_error("Abstract method MultiBlockSolver::AllocateROMTensorElems!\n"); }
+   virtual void BuildROMTensorElems()
+   { mfem_error("Abstract method MultiBlockSolver::BuildROMTensorElems!\n"); }
+   virtual void SaveROMTensorElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::SaveROMTensorElems!\n"); }
+   virtual void LoadROMTensorElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::LoadROMTensorElems!\n"); }
+   virtual void AssembleROMTensorOper()
+   { mfem_error("Abstract method MultiBlockSolver::AssembleROMTensorOper!\n"); }
+
+   virtual void AllocateROMEQPElems()
+   { mfem_error("Abstract method MultiBlockSolver::AllocateROMEQPElems!\n"); }
    virtual void TrainEQP(SampleGenerator *sample_generator)
    { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
    virtual void SaveEQP()
    { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
    virtual void LoadEQP()
    { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
+
+   void AllocateROMNlinElems();
+   void LoadROMNlinElems(const std::string &filename);
+   void AssembleROMNlinOper();
 
    void InitROMHandler();
    void GetBasisTags(std::vector<std::string> &basis_tags);

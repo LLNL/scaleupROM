@@ -411,11 +411,14 @@ void BuildROM(MPI_Comm comm)
    test->LoadReducedBasis();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
-   ROMBuildingLevel save_operator = test->GetROMHandler()->GetBuildingLevel();
+   ROMHandlerBase *rom = test->GetROMHandler();
+   ROMBuildingLevel save_operator = rom->GetBuildingLevel();
 
    // NOTE(kevin): global operator required only for global rom operator.
    if (save_operator == ROMBuildingLevel::GLOBAL)
       test->Assemble();
+
+   std::string filename = rom->GetOperatorPrefix() + ".h5";
    switch (save_operator)
    {
       case ROMBuildingLevel::COMPONENT:
@@ -425,8 +428,14 @@ void BuildROM(MPI_Comm comm)
 
          test->AllocateROMLinElems();
          test->BuildROMLinElems();
-         std::string filename = test->GetROMHandler()->GetOperatorPrefix() + ".h5";
          test->SaveROMLinElems(filename);
+
+         if ((test->IsNonlinear()) && (rom->GetNonlinearHandling() == NonlinearHandling::TENSOR))
+         {
+            test->AllocateROMTensorElems();
+            test->BuildROMTensorElems();
+            test->SaveROMTensorElems(filename);
+         }
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -506,6 +515,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       else
          mfem_error("Unknown TopologyHandler Mode!\n");
 
+      std::string filename = rom->GetOperatorPrefix() + ".h5";
       if (save_operator == ROMBuildingLevel::COMPONENT)
       {
          if (topol_mode == TopologyHandlerMode::SUBMESH)
@@ -514,7 +524,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
          test->AllocateROMLinElems();
 
          printf("Loading ROM projected elements.. ");
-         std::string filename = rom->GetOperatorPrefix() + ".h5";
          test->LoadROMLinElems(filename);
          printf("Done!\n");
 
@@ -522,7 +531,12 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
          test->AssembleROMMat();
          printf("Done!\n");
 
-         
+         if (test->IsNonlinear())
+         {
+            test->AllocateROMNlinElems();
+            test->LoadROMNlinElems(filename);
+            test->AssembleROMNlinOper();
+         }
       }  // if (save_operator == ROMBuildingLevel::COMPONENT)
       else if (save_operator == ROMBuildingLevel::GLOBAL)
       {
