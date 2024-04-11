@@ -441,7 +441,7 @@ void BuildROM(MPI_Comm comm)
       case ROMBuildingLevel::GLOBAL:
       {
          test->ProjectOperatorOnReducedBasis();
-         test->SaveROMOperator();
+         test->SaveROMOperator(filename);
          break;
       }
       case ROMBuildingLevel::NONE:
@@ -541,7 +541,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       else if (save_operator == ROMBuildingLevel::GLOBAL)
       {
          printf("Loading global operator file.. ");
-         test->LoadROMOperatorFromFile();
+         test->LoadROMOperatorFromFile(filename);
          printf("Done!\n");
       }  // if (save_operator == ROMBuildingLevel::GLOBAL)
       else if (save_operator == ROMBuildingLevel::NONE)

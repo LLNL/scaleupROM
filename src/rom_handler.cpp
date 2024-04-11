@@ -459,17 +459,10 @@ void MFEMROMHandler::ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mat
    SetRomMat(romMat);
 }
 
-void MFEMROMHandler::SaveOperator(const std::string input_prefix)
+void MFEMROMHandler::SaveOperator(const std::string filename)
 {
    assert(save_operator == ROMBuildingLevel::GLOBAL);
    assert(operator_loaded && romMat);
-
-   std::string filename;
-   if (input_prefix == "")
-      filename = operator_prefix;
-   else
-      filename = input_prefix;
-   filename += ".h5";
 
    hid_t file_id;
    herr_t errf = 0;
@@ -910,18 +903,11 @@ void MFEMROMHandler::ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, 
    ProjectToDomainBasis(idx, idx, mats, rom_mats);
 }
 
-void MFEMROMHandler::LoadOperatorFromFile(const std::string input_prefix)
+void MFEMROMHandler::LoadOperatorFromFile(const std::string filename)
 {
    assert(save_operator == ROMBuildingLevel::GLOBAL);
    delete romMat;
    delete romMat_mono;
-   
-   std::string filename;
-   if (input_prefix == "")
-      filename = operator_prefix;
-   else
-      filename = input_prefix;
-   filename += ".h5";
 
    hid_t file_id;
    herr_t errf = 0;

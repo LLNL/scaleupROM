@@ -183,10 +183,10 @@ public:
    virtual void AssembleInterfaceMatrices() = 0;
 
    // Global ROM operator Loading.
-   virtual void SaveROMOperator(const std::string input_prefix="")
-   { rom_handler->SaveOperator(input_prefix); }
-   virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
-   { rom_handler->LoadOperatorFromFile(input_prefix); }
+   virtual void SaveROMOperator(const std::string filename)
+   { rom_handler->SaveOperator(filename); }
+   virtual void LoadROMOperatorFromFile(const std::string filename)
+   { rom_handler->LoadOperatorFromFile(filename); }
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
