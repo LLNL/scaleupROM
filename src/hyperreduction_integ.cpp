@@ -644,6 +644,38 @@ void IncompressibleInviscidFluxNLFIntegrator::AssembleElementGrad(
    }
 }
 
+void IncompressibleInviscidFluxNLFIntegrator::AssembleQuadratureVector(
+   const FiniteElement &el, ElementTransformation &T, const IntegrationPoint &ip,
+   const double &iw, const Vector &eltest, Vector &elquad)
+{
+   const int nd = el.GetDof();
+   dim = el.GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+   elquad.SetSize(nd * dim);
+   uu.SetSize(dim);
+
+   EF.UseExternalData(eltest.GetData(), nd, dim);
+   ELV.UseExternalData(elquad.GetData(), nd, dim);
+
+   Vector u1(dim);
+   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(el, T);
+   ELV = 0.0;
+
+   T.SetIntPoint(&ip);
+   el.CalcShape(ip, shape);
+   el.CalcPhysDShape(T, dshape);
+   double w = iw * T.Weight();
+   if (Q) { w *= Q->Eval(T, ip); }
+
+   // MultAtB(EF, dshape, gradEF);
+   EF.MultTranspose(shape, u1);
+   MultVVt(u1, uu);
+   
+   AddMult_a(w, dshape, uu, ELV);
+}
+
 /*
    DGLaxFriedrichsFluxIntegrator
 */

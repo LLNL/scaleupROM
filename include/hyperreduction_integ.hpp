@@ -188,6 +188,13 @@ public:
                            ElementTransformation &trans,
                            const Vector &elfun,
                            DenseMatrix &elmat) override;
+
+   void AssembleQuadratureVector(const FiniteElement &el,
+                                 ElementTransformation &T,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest,
+                                 Vector &elquad) override;
 };
 
 /*
