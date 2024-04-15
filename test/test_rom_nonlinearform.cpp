@@ -87,6 +87,82 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
    return;
 }
 
+TEST(ROMNonlinearForm, DGLaxFriedrichsFluxIntegrator)
+{
+   Mesh *mesh = new Mesh("meshes/test.4x4.mesh");
+   const int dim = mesh->Dimension();
+   const int order = UniformRandom(1, 3);
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementSpace *fes(new FiniteElementSpace(mesh, dg_coll, dim));
+   const int ndofs = fes->GetTrueVSize();
+
+   const int num_basis = 10;
+   // a fictitious basis.
+   DenseMatrix basis(ndofs, num_basis);
+   for (int i = 0; i < ndofs; i++)
+      for (int j = 0; j < num_basis; j++)
+         basis(i, j) = UniformRandom();
+
+   IntegrationRule ir = IntRules.Get(fes->GetFE(0)->GetGeomType(),
+                                    (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
+   ConstantCoefficient pi(3.141592);
+   auto *integ1 = new DGLaxFriedrichsFluxIntegrator(pi);
+   integ1->SetIntRule(&ir);
+   auto *integ2 = new DGLaxFriedrichsFluxIntegrator(pi);
+   integ2->SetIntRule(&ir);
+
+   NonlinearForm *nform(new NonlinearForm(fes));
+   nform->AddInteriorFaceIntegrator(integ1);
+
+   ROMNonlinearForm *rform(new ROMNonlinearForm(num_basis, fes));
+   rform->AddInteriorFaceIntegrator(integ2);
+   rform->SetBasis(basis);
+
+   // we set the full elements/quadrature points,
+   // so that the resulting vector is equilvalent to FOM.
+   FaceElementTransformations *tr;
+   const int nqe = ir.GetNPoints();
+   const int nf = mesh->GetNumFaces();
+   Array<double> const& w_el = ir.GetWeights();
+   Array<int> sample_el(0), sample_qp(0);
+   Array<double> sample_qw(0);
+   for (int f = 0; f < nf; f++)
+   {
+      tr = mesh->GetInteriorFaceTransformations(f);
+      if (tr == NULL) continue;
+      
+      for (int q = 0; q < nqe; q++)
+      {
+         sample_el.Append(f);
+         sample_qp.Append(q);
+         sample_qw.Append(w_el[q]);
+      }
+   }
+   rform->UpdateInteriorFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+
+   Vector rom_u(num_basis), u(fes->GetTrueVSize());
+   for (int k = 0; k < rom_u.Size(); k++)
+      rom_u(k) = UniformRandom();
+
+   basis.Mult(rom_u, u);
+
+   Vector rom_y(num_basis), y(fes->GetTrueVSize()), Pty(num_basis);
+   nform->Mult(u, y);
+   basis.MultTranspose(y, Pty);
+   rform->Mult(rom_u, rom_y);
+
+   for (int k = 0; k < rom_y.Size(); k++)
+      EXPECT_NEAR(rom_y(k), Pty(k), 1.0e-12);
+
+   delete mesh;
+   delete dg_coll;
+   delete fes;
+   delete nform;
+   delete rform;
+   return;
+}
+
 TEST(ROMNonlinearForm_gradient, VectorConvectionTrilinearFormIntegrator)
 {
    Mesh *mesh = new Mesh("meshes/test.4x4.mesh");

@@ -904,4 +904,91 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
    }
 }
 
+void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureVector(
+   const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &T,
+   const IntegrationPoint &ip, const double &iw, const Vector &eltest, Vector &elquad)
+{
+   dim = el1.GetDim();
+   ndofs1 = el1.GetDof();
+   ndofs2 = (T.Elem2No >= 0) ? el2.GetDof() : 0;
+   nvdofs = dim * (ndofs1 + ndofs2);
+   elquad.SetSize(nvdofs);
+
+   nor.SetSize(dim);
+   flux.SetSize(dim);
+
+   udof1.UseExternalData(eltest.GetData(), ndofs1, dim);
+   elv1.UseExternalData(elquad.GetData(), ndofs1, dim);
+   shape1.SetSize(ndofs1);
+   u1.SetSize(dim);
+   
+   if (ndofs2)
+   {
+      udof2.UseExternalData(eltest.GetData() + ndofs1 * dim, ndofs2, dim);
+      elv2.UseExternalData(elquad.GetData() + ndofs1 * dim, ndofs2, dim);
+      shape2.SetSize(ndofs2);
+      u2.SetSize(dim);
+   }
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // a simple choice for the integration order; is this OK?
+      const int order = (int)(ceil(1.5 * (2 * max(el1.GetOrder(), ndofs2 ? el2.GetOrder() : 0) - 1)));
+      ir = &IntRules.Get(T.GetGeometryType(), order);
+   }
+
+   elquad = 0.0;
+
+   // Set the integration point in the face and the neighboring elements
+   T.SetAllIntPoints(&ip);
+
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
+   const IntegrationPoint &eip2 = T.GetElement2IntPoint();
+
+   el1.CalcShape(eip1, shape1);
+   udof1.MultTranspose(shape1, u1);
+
+   if (dim == 1)
+   {
+      nor(0) = 2*eip1.x - 1.0;
+   }
+   else
+   {
+      CalcOrtho(T.Jacobian(), nor);
+   }
+
+   if (ndofs2)
+   {
+      el2.CalcShape(eip2, shape2);
+      udof2.MultTranspose(shape2, u2);
+   }
+
+   w = iw * T.Weight();
+   if (Q) { w *= Q->Eval(T, ip); }
+
+   nor *= w;
+
+   un1 = nor * u1;
+   un2 = (ndofs2) ? nor * u2 : 0.0;
+
+   flux.Set(un1, u1);
+   if (ndofs2)
+   {
+      flux *= 0.5;
+      flux.Add(0.5 * un2, u2);
+   }
+
+   un = max(abs(un1), abs(un2));
+   flux.Add(un, u1);
+   if (ndofs2)
+      flux.Add(-un, u2);
+
+   AddMultVWt(shape1, flux, elv1);
+   if (ndofs2)
+      AddMult_a_VWt(-1.0, shape2, flux, elv2);
+}
+
 }

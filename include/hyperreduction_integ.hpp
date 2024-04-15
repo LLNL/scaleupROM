@@ -221,6 +221,14 @@ public:
                            FaceElementTransformations &Tr,
                            const Vector &elfun, DenseMatrix &elmat) override;
 
+   void AssembleQuadratureVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &T,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest,
+                                 Vector &elquad) override;
+
 };
 
 } // namespace mfem
