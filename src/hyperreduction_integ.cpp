@@ -676,6 +676,60 @@ void IncompressibleInviscidFluxNLFIntegrator::AssembleQuadratureVector(
    AddMult_a(w, dshape, uu, ELV);
 }
 
+void IncompressibleInviscidFluxNLFIntegrator::AssembleQuadratureGrad(
+   const FiniteElement &el, ElementTransformation &trans, const IntegrationPoint &ip,
+   const double &iw, const Vector &elfun, DenseMatrix &elmat)
+{
+   const int nd = el.GetDof();
+   dim = el.GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+   dshapex.SetSize(nd, dim);
+   elmat.SetSize(nd * dim);
+   elmat_comp.SetSize(nd);
+   // gradEF.SetSize(dim);
+
+   EF.UseExternalData(elfun.GetData(), nd, dim);
+
+   Vector vec1(dim), vec2(nd), vec3(nd);
+
+   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(el, trans);
+
+   elmat = 0.0;
+   
+   trans.SetIntPoint(&ip);
+
+   el.CalcShape(ip, shape);
+   // el.CalcDShape(ip, dshape);
+   el.CalcPhysDShape(trans, dshape);
+
+   EF.MultTranspose(shape, vec1);
+
+   double w = iw * trans.Weight();
+   if (Q) { w *= Q->Eval(trans, ip); }
+
+   vec1 *= w;
+
+   dshape.Mult(vec1, vec2);
+   MultVWt(vec2, shape, elmat_comp);
+   for (int d = 0; d < dim; d++)
+   {
+      elmat.AddMatrix(elmat_comp, d * nd, d * nd);
+   }
+
+   for (int di = 0; di < dim; di++)
+   {
+      dshapex.Set(vec1(di), dshape);
+      for (int dj = 0; dj < dim; dj++)
+      {
+         dshapex.GetColumnReference(dj, vec3);
+         MultVWt(vec3, shape, elmat_comp);
+         elmat.AddMatrix(elmat_comp, di * nd, dj * nd);
+      }
+   }
+}
+
 /*
    DGLaxFriedrichsFluxIntegrator
 */
