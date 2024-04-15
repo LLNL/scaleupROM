@@ -195,6 +195,13 @@ public:
                                  const double &iw,
                                  const Vector &eltest,
                                  Vector &elquad) override;
+
+   void AssembleQuadratureGrad(const FiniteElement &el,
+                              ElementTransformation &trans,
+                              const IntegrationPoint &ip,
+                              const double &iw,
+                              const Vector &elfun,
+                              DenseMatrix &elmat);
 };
 
 /*
