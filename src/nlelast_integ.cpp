@@ -42,8 +42,68 @@ void StVenantKirchhoffModel::EvalP(const DenseMatrix &F, const double lambda, co
    Mult(F, S, P);
 };
 
-void StVenantKirchhoffModel::EvalDmat(const DenseMatrix &w, DenseMatrix &DS, DenseMatrix &Dmat){
+StVenantKirchhoffModel::EvalDfmat(DS)
+{
+   // This is just a simple one
+   // \frac{\partial \mathbf{F}_{i j}}{\partial \mathbf{w}_{m n}}=\delta_{i n}(\mathrm{DS})_{m j}
+};
 
+StVenantKirchhoffModel::EvalDamat(Dfmat)
+{
+   // 
+};
+
+void StVenantKirchhoffModel::EvalDmat(const DenseMatrix &w, DenseMatrix &DS, DenseMatrix &Dmat){
+const int dim = F.NumCols();
+
+   // Get Green-Lagrange strain tensor 1/2 (F'F - I)
+   E.SetSize(dim);
+   E = 0.0;
+   MultAtB(F, F, E);
+   for (size_t i = 0; i < dim; i++)
+   E(i,i) -= 1.0;
+   E*=0.5;
+
+   // Assemble Second Piola Stress tensor
+   S.SetSize(dim);
+   S = 0.0;
+   double temp = 0.0;
+   for (size_t i = 0; i < dim; i++)
+   temp += E(i,i);
+
+   for (size_t i = 0; i < dim; i++)
+   S(i,i) += temp * lambda;
+   S.Add(2*mu, E);
+
+   // Call this function to get the partials of F wrt w
+   EvalDfmat();
+
+   // Call this function to get the partials of S wrt w
+   EvalDamat(Dfmat);
+
+   for (size_t i = 0; i < dim; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int P_ij = j * dim + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to w
+            {
+               const int w_mn = n * dof + m;
+
+               for (size_t k = 0; k < count; k++) // Sum over k
+               {
+                  // Get fik index
+                  Dmat(P_ij, w_mn) += Dfmat(f_ik, w_mn) * S(k, j) + F(i, k) * Damat(a_kj, w_mn)
+               }
+               
+            }
+         }
+      }
+}
+
+   
 };
 
 void StVenantKirchhoffModel::AssembleH(const DenseMatrix &Dmat, const DenseMatrix &DS, const double w, DenseMatrix &elmat)
