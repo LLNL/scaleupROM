@@ -8,6 +8,73 @@ using namespace std;
 namespace mfem
 {
 
+double StVenantKirchhoffModel::EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
+{const double wL = w * c_lambda->Eval(Ttr, ip);
+const double wM = w * c_mu->Eval(Ttr, ip);
+return wL + 2.0*wM;
+};
+
+void StVenantKirchhoffModel::EvalP(const DenseMatrix &F, const double lambda, const double mu, DenseMatrix &P)
+{ 
+   const int dim = F.NumCols();
+
+   // Get Green-Lagrange strain tensor 1/2 (F'F - I)
+   E.SetSize(dim);
+   E = 0.0;
+   MultAtB(F, F, E);
+   for (size_t i = 0; i < dim; i++)
+   E(i,i) -= 1.0;
+   E*=0.5;
+
+   // Assemble Second Piola Stress tensor
+   S.SetSize(dim);
+   S = 0.0;
+   double temp = 0.0;
+   for (size_t i = 0; i < dim; i++)
+   temp += E(i,i);
+
+   for (size_t i = 0; i < dim; i++)
+   S(i,i) += temp * lambda;
+   S.Add(2*mu, E);
+
+   // Compute First Piola Stress tensor.
+   P = 0.0;
+   Mult(F, S, P);
+};
+
+void StVenantKirchhoffModel::EvalDmat(const DenseMatrix &w, DenseMatrix &DS, DenseMatrix &Dmat){
+
+};
+
+void StVenantKirchhoffModel::AssembleH(const DenseMatrix &Dmat, const DenseMatrix &DS, const double w, DenseMatrix &elmat)
+{
+      const int dof = DS.NumRows();
+      const int dim = DS.NumCols();
+
+      //Assemble elmat, can be refactored out
+      for (size_t i = 0; i < dof; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int ij = j * dof + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to w
+            {
+               const int mn = n * dof + m;
+               double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
+               {
+                  const int S_jk = k * dim + j;
+                  temp += Dmat(S_jk, mn) * w * DS(i,k);
+               }
+               elmat(ij, mn) += temp;
+               
+            }
+         }
+      }
+       }; 
+
 double TestLinModel::EvalW(const DenseMatrix &J)
 {MFEM_ABORT("TODO")};
 

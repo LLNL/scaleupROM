@@ -36,6 +36,30 @@ namespace mfem
     void AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                      const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans);
  };
+
+ class StVenantKirchhoffModel //: public HyperelasticModel
+ {
+ protected:
+    mutable double mu, lambda;
+    Coefficient *c_mu, *c_lambda;
+    ElementTransformation *Ttr;
+    DenseMatrix E, S;
+ 
+ public:
+    StVenantKirchhoffModel(double mu_, double lambda_)
+       : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
+ 
+    void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
+    double EvalW(const DenseMatrix &J);
+
+   double EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
+
+    void EvalP(const DenseMatrix &Jpt, const double lambda, const double mu, DenseMatrix &P);
+    
+    void EvalDmat(const DenseMatrix &w, DenseMatrix &DS, DenseMatrix &Dmat);
+    
+    void AssembleH(const DenseMatrix &Dmat, const DenseMatrix &DS, const double w, DenseMatrix &elmat);
+ };
  
 // DG boundary integrator for nonlinear elastic DG.
 // For this is just DGElasticityIntegrator with a different name
