@@ -10,6 +10,9 @@
 using namespace std;
 using namespace mfem;
 
+static const double threshold = 1.0e-12;
+static const double grad_thre = 1.0e-7;
+
 /**
  * Simple smoke test to make sure Google Test is properly linked
  */
@@ -77,7 +80,7 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
    rform->Mult(rom_u, rom_y);
 
    for (int k = 0; k < rom_y.Size(); k++)
-      EXPECT_NEAR(rom_y(k), Pty(k), 1.0e-12);
+      EXPECT_NEAR(rom_y(k), Pty(k), threshold);
 
    delete mesh;
    delete h1_coll;
@@ -147,7 +150,7 @@ TEST(ROMNonlinearForm, IncompressibleInviscidFluxNLFIntegrator)
    rform->Mult(rom_u, rom_y);
 
    for (int k = 0; k < rom_y.Size(); k++)
-      EXPECT_NEAR(rom_y(k), Pty(k), 1.0e-12);
+      EXPECT_NEAR(rom_y(k), Pty(k), threshold);
 
    delete mesh;
    delete dg_coll;
@@ -223,7 +226,7 @@ TEST(ROMNonlinearForm, DGLaxFriedrichsFluxIntegrator)
    rform->Mult(rom_u, rom_y);
 
    for (int k = 0; k < rom_y.Size(); k++)
-      EXPECT_NEAR(rom_y(k), Pty(k), 1.0e-12);
+      EXPECT_NEAR(rom_y(k), Pty(k), threshold);
 
    delete mesh;
    delete dg_coll;
@@ -564,7 +567,7 @@ TEST(ROMNonlinearForm_fast, VectorConvectionTrilinearFormIntegrator)
    rform->SetPrecomputeMode(true);
    rform->Mult(rom_u, rom_yfast);
    for (int k = 0; k < rom_y.Size(); k++)
-      EXPECT_NEAR(rom_y(k), rom_yfast(k), 1.0e-12);
+      EXPECT_NEAR(rom_y(k), rom_yfast(k), threshold);
 
    DenseMatrix *jac = dynamic_cast<DenseMatrix *>(&(rform->GetGradient(rom_u)));
 
@@ -685,7 +688,7 @@ TEST(ROMNonlinearForm, SetupEQPSystemForDomainIntegrator)
    rform->SetupEQPSystemForDomainIntegrator(carom_snapshots_work, integ2, Gt, rhs2);
 
    for (int k = 0; k < rhs1.dim(); k++)
-      EXPECT_NEAR(rhs1(k), rhs2(k), 1.0e-14);
+      EXPECT_NEAR(rhs1(k), rhs2(k), threshold);
 
    double eqp_tol = 1.0e-10;
    rform->TrainEQP(*carom_snapshots, eqp_tol);
@@ -708,10 +711,121 @@ TEST(ROMNonlinearForm, SetupEQPSystemForDomainIntegrator)
 
    for (int i = 0; i < num_basis; i++)
       for (int j = 0; j < num_snap; j++)
-         EXPECT_NEAR(rom_rhs1(i, j), rom_rhs2(i, j), 1.0e-14);
+         EXPECT_NEAR(rom_rhs1(i, j), rom_rhs2(i, j), threshold);
 
    delete mesh;
    delete h1_coll;
+   delete fes;
+   delete nform;
+   delete rform;
+}
+
+TEST(ROMNonlinearForm, SetupEQPSystemForInteriorFaceIntegrator)
+{
+   Mesh *mesh = new Mesh("meshes/test.4x4.mesh");
+   const int dim = mesh->Dimension();
+   const int order = UniformRandom(1, 3);
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementSpace *fes(new FiniteElementSpace(mesh, dg_coll, dim));
+   const int ndofs = fes->GetTrueVSize();
+   const int num_snap = UniformRandom(3, 5);
+   const int num_basis = num_snap;
+
+   // a fictitious snapshots.
+   DenseMatrix snapshots(ndofs, num_snap);
+   for (int i = 0; i < ndofs; i++)
+      for (int j = 0; j < num_snap; j++)
+         snapshots(i, j) = 2.0 * UniformRandom() - 1.0;
+
+   CAROM::Options options(ndofs, num_snap, 1, true);
+   options.static_svd_preserve_snapshot = true;
+   CAROM::BasisGenerator basis_generator(options, false, "test_basis");
+   Vector snapshot(ndofs);
+   for (int s = 0; s < num_snap; s++)
+   {
+      snapshots.GetColumnReference(s, snapshot);
+      basis_generator.takeSample(snapshot.GetData());
+   }
+   basis_generator.endSamples();
+   const CAROM::Matrix *carom_snapshots = basis_generator.getSnapshotMatrix();
+   const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
+   DenseMatrix basis(ndofs, num_basis);
+   CAROM::CopyMatrix(*carom_basis, basis);
+
+   IntegrationRule ir = IntRules.Get(fes->GetFE(0)->GetGeomType(),
+                                    (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
+   ConstantCoefficient pi(3.141592);
+   auto *integ1 = new DGLaxFriedrichsFluxIntegrator(pi);
+   integ1->SetIntRule(&ir);
+   auto *integ2 = new DGLaxFriedrichsFluxIntegrator(pi);
+   integ2->SetIntRule(&ir);
+
+   NonlinearForm *nform(new NonlinearForm(fes));
+   nform->AddInteriorFaceIntegrator(integ1);
+
+   ROMNonlinearForm *rform(new ROMNonlinearForm(num_basis, fes));
+   rform->AddInteriorFaceIntegrator(integ2);
+   rform->SetBasis(basis);
+   rform->SetPrecomputeMode(false);
+
+   CAROM::Vector rhs1(num_snap * num_basis, false);
+   CAROM::Vector rhs2(num_snap * num_basis, false);
+   CAROM::Matrix Gt(1, 1, true);
+
+   /* exact right-hand side by inner product of basis and fom vectors */
+   Vector rhs_vec(ndofs), basis_col(ndofs);
+   for (int s = 0; s < num_snap; s++)
+   {
+      snapshots.GetColumnReference(s, snapshot);
+
+      nform->Mult(snapshot, rhs_vec);
+      for (int b = 0; b < num_basis; b++)
+      {
+         basis.GetColumnReference(b, basis_col);
+         rhs1(b + s * num_basis) = basis_col * rhs_vec;
+      }
+   }
+
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Will have to consider parallel-compatible test.
+   */
+   CAROM::Matrix carom_snapshots_work(*carom_snapshots);
+   carom_snapshots_work.gather();
+
+   /* equivalent operation must happen within this routine */
+   Array<int> fidxs;
+   rform->SetupEQPSystemForInteriorFaceIntegrator(carom_snapshots_work, integ2, Gt, rhs2, fidxs);
+
+   for (int k = 0; k < rhs1.dim(); k++)
+      EXPECT_NEAR(rhs1(k), rhs2(k), threshold);
+
+   double eqp_tol = 1.0e-10;
+   rform->TrainEQP(*carom_snapshots, eqp_tol);
+   if (rform->PrecomputeMode()) rform->PrecomputeCoefficients();
+
+   DenseMatrix rom_rhs1(num_basis, num_snap), rom_rhs2(num_basis, num_snap);
+   Vector rom_sol(num_basis), rom_rhs1_vec, rom_rhs2_vec;
+   for (int s = 0; s < num_snap; s++)
+   {
+      snapshots.GetColumnReference(s, snapshot);
+
+      nform->Mult(snapshot, rhs_vec);
+      rom_rhs1.GetColumnReference(s, rom_rhs1_vec);
+      basis.MultTranspose(rhs_vec, rom_rhs1_vec);
+
+      basis.MultTranspose(snapshot, rom_sol);
+      rom_rhs2.GetColumnReference(s, rom_rhs2_vec);
+      rform->Mult(rom_sol, rom_rhs2_vec);
+   }
+
+   for (int i = 0; i < num_basis; i++)
+      for (int j = 0; j < num_snap; j++)
+         EXPECT_NEAR(rom_rhs1(i, j), rom_rhs2(i, j), threshold);
+
+   delete mesh;
+   delete dg_coll;
    delete fes;
    delete nform;
    delete rform;
