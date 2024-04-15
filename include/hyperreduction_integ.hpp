@@ -243,6 +243,14 @@ public:
                                  const Vector &eltest,
                                  Vector &elquad) override;
 
+   void AssembleQuadratureGrad(const FiniteElement &el1,
+                              const FiniteElement &el2,
+                              FaceElementTransformations &T,
+                              const IntegrationPoint &ip,
+                              const double &iw,
+                              const Vector &eltest,
+                              DenseMatrix &quadmat) override;
+
 };
 
 } // namespace mfem
