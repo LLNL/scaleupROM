@@ -588,7 +588,7 @@ void ROMNonlinearForm::PrecomputeCoefficients()
 
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
-            dnfi[k]->AppendPrecomputeCoefficients(fes, *basis, *sample);
+            dnfi[k]->AppendPrecomputeDomainCoeffs(fes, *basis, *sample);
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
 
@@ -601,7 +601,7 @@ void ROMNonlinearForm::PrecomputeCoefficients()
 
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
-            fnfi[k]->AppendPrecomputeCoefficients(fes, *basis, *sample);
+            fnfi[k]->AppendPrecomputeInteriorFaceCoeffs(fes, *basis, *sample);
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
 
@@ -649,7 +649,7 @@ void ROMNonlinearForm::PrecomputeCoefficients()
                // continue;
             }
 
-            bfnfi[k]->AppendPrecomputeCoefficients(fes, *basis, *sample);
+            bfnfi[k]->AppendPrecomputeBdrFaceCoeffs(fes, *basis, *sample);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())

@@ -42,10 +42,26 @@ void HyperReductionIntegrator::AssembleQuadratureGrad(
                "for face is not implemented for this class.");
 }
 
-void HyperReductionIntegrator::AppendPrecomputeCoefficients(
+void HyperReductionIntegrator::AppendPrecomputeDomainCoeffs(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
-   mfem_error ("HyperReductionIntegrator::AppendPrecomputeCoefficients(...)\n"
+   mfem_error ("HyperReductionIntegrator::AppendPrecomputeDomainCoeffs(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::AppendPrecomputeInteriorFaceCoeffs(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   mfem_error ("HyperReductionIntegrator::AppendPrecomputeInteriorFaceCoeffs(...)\n"
+               "is not implemented for this class,\n"
+               "even though this class is set to be precomputable!\n");
+}
+
+void HyperReductionIntegrator::AppendPrecomputeBdrFaceCoeffs(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   mfem_error ("HyperReductionIntegrator::AppendPrecomputeBdrFaceCoeffs(...)\n"
                "is not implemented for this class,\n"
                "even though this class is set to be precomputable!\n");
 }
@@ -370,7 +386,7 @@ void VectorConvectionTrilinearFormIntegrator::AssembleQuadratureGrad(
    }
 }
 
-void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeCoefficients(
+void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeDomainCoeffs(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
    const int nbasis = basis.NumCols();
@@ -1234,6 +1250,182 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
          }
       }
    }
+}
+
+void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeInteriorFaceCoeffs(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   const int nbasis = basis.NumCols();
+
+   const int face = sample.face;
+   FaceElementTransformations *T = fes->GetMesh()->GetInteriorFaceTransformations(face);
+   assert(T != NULL);
+   assert(T->Elem2No >= 0);
+
+   const FiniteElement *fe1 = fes->GetFE(T->Elem1No);
+   const FiniteElement *fe2 = fes->GetFE(T->Elem2No);
+
+   Array<int> vdofs, vdofs2;
+   fes->GetElementVDofs(T->Elem1No, vdofs);
+   fes->GetElementVDofs(T->Elem2No, vdofs2);
+   vdofs.Append(vdofs2);
+
+   dim = fe1->GetDim();
+   ndofs1 = fe1->GetDof();
+   ndofs2 = (T->Elem2No >= 0) ? fe2->GetDof() : 0;
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // a simple choice for the integration order; is this OK?
+      const int order = (int)(ceil(1.5 * (2 * max(fe1->GetOrder(), ndofs2 ? fe2->GetOrder() : 0) - 1)));
+      ir = &IntRules.Get(T->GetGeometryType(), order);
+   }
+   const IntegrationPoint &ip = ir->IntPoint(sample.qp);
+
+   shape1.SetSize(ndofs1);
+   shape2.SetSize(ndofs2);
+
+   T->SetAllIntPoints(&ip);
+   const IntegrationPoint &eip1 = T->GetElement1IntPoint();
+   const IntegrationPoint &eip2 = T->GetElement2IntPoint();
+
+   fe1->CalcShape(eip1, shape1);
+   fe2->CalcShape(eip2, shape2);
+
+   Vector basis_i;
+   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
+   DenseMatrix *vec2s = new DenseMatrix(dim, nbasis);
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i);
+      elv1.UseExternalData(basis_i.GetData(), ndofs1, dim);
+      elv2.UseExternalData(basis_i.GetData() + ndofs1 * dim, ndofs2, dim);
+
+      Vector vec1, vec2;
+      vec1s->GetColumnReference(i, vec1);
+      elv1.MultTranspose(shape1, vec1);
+
+      vec2s->GetColumnReference(i, vec2);
+      elv2.MultTranspose(shape2, vec2);
+   }
+   shapes1.Append(vec1s);
+   shapes2.Append(vec2s);
+}
+
+void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
+   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+{
+   const bool el2 = (T.Elem2No >= 0);
+   T.SetAllIntPoints(&ip);
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
+   // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
+
+   dim = shapes1[s]->NumRows();
+   nor.SetSize(dim);
+   flux.SetSize(dim);
+   u1.SetSize(dim);
+   if (el2) u2.SetSize(dim);
+
+   double w = qw * T.Weight();
+   if (Q) 
+      w *= Q->Eval(T, ip);
+
+   if (dim == 1)
+   {
+      nor(0) = 2*eip1.x - 1.0;
+   }
+   else
+   {
+      CalcOrtho(T.Jacobian(), nor);
+   }
+
+   nor *= w;
+
+   shapes1[s]->Mult(x, u1);
+   if (el2) shapes2[s]->Mult(x, u2);
+
+   un1 = nor * u1;
+   un2 = (el2) ? nor * u2 : 0.0;
+
+   flux.Set(un1, u1);
+   if (el2)
+   {
+      flux *= 0.5;
+      flux.Add(0.5 * un2, u2);
+   }
+
+   un = max(abs(un1), abs(un2));
+   flux.Add(un, u1);
+   if (el2)
+      flux.Add(-un, u2);
+
+   assert(y.Size() == x.Size());
+   shapes1[s]->AddMultTranspose(flux, y, 1.0);
+   shapes2[s]->AddMultTranspose(flux, y, -1.0);
+}
+
+void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
+   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+{
+   const bool el2 = (T.Elem2No >= 0);
+   T.SetAllIntPoints(&ip);
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
+   // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
+
+   dim = shapes1[s]->NumRows();
+   nor.SetSize(dim);
+   flux.SetSize(dim);
+   u1.SetSize(dim);
+   if (el2) u2.SetSize(dim);
+
+   double w = qw * T.Weight();
+   if (Q) 
+      w *= Q->Eval(T, ip);
+
+   if (dim == 1)
+   {
+      nor(0) = 2*eip1.x - 1.0;
+   }
+   else
+   {
+      CalcOrtho(T.Jacobian(), nor);
+   }
+
+   // {
+   //    dim = shapes[s]->NumRows();
+   //    int nbasis = shapes[s]->NumCols();
+   //    Vector vec1(dim), vec2(dim);
+   //    shapes[s]->Mult(x, vec1);
+   //    Array<DenseMatrix *> *gradEFs = dshapes[s];
+
+   //    gradEF.SetSize(dim);
+   //    gradEF = 0.0;
+   //    for (int k = 0; k < gradEFs->Size(); k++)
+   //       gradEF.Add(x(k), *((*gradEFs)[k]));
+   //    gradEF *= w;
+
+   //    ELV.SetSize(dim, nbasis);
+   //    Mult(gradEF, *shapes[s], ELV);
+
+   //    for (int k = 0; k < nbasis; k++)
+   //    {
+   //       ELV.GetColumnReference(k, vec2);
+   //       (*gradEFs)[k]->AddMult(vec1, vec2, w);
+   //    }
+
+   //    Vector jac_col;
+   //    for (int k = 0; k < nbasis; k++)
+   //    {
+   //       jac.GetColumnReference(k, jac_col);
+   //       ELV.GetColumnReference(k, vec2);
+   //       shapes[s]->AddMultTranspose(vec2, jac_col);
+   //    }
+   // }
 }
 
 }
