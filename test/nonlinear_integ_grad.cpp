@@ -5,6 +5,7 @@
 #include<gtest/gtest.h>
 #include "nonlinear_integ.hpp"
 #include "hyperreduction_integ.hpp"
+#include "interfaceinteg.hpp"
 #include "input_parser.hpp"
 #include "etc.hpp"
 

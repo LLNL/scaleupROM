@@ -4,6 +4,7 @@
 
 #include<gtest/gtest.h>
 #include "hyperreduction_integ.hpp"
+#include "interfaceinteg.hpp"
 #include "rom_nonlinearform.hpp"
 #include "etc.hpp"
 
