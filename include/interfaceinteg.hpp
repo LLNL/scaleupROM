@@ -304,6 +304,20 @@ public:
                            FaceElementTransformations &T, const IntegrationPoint &ip,
                            const Vector &x, DenseMatrix &jac) override;
 
+   void AssembleInterfaceVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr1,
+                                 FaceElementTransformations &Tr2,
+                                 const Vector &elfun1, const Vector &elfun2,
+                                 Vector &elvect1, Vector &elvect2) override;
+
+   void AssembleInterfaceGrad(const FiniteElement &el1,
+                              const FiniteElement &el2,
+                              FaceElementTransformations &Tr1,
+                              FaceElementTransformations &Tr2,
+                              const Vector &elfun1, const Vector &elfun2,
+                              Array2D<DenseMatrix *> &elmats) override;
+
 private:
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
                                     FaceElementTransformations *T,
