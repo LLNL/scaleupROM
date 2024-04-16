@@ -263,6 +263,9 @@ public:
    void AppendPrecomputeInteriorFaceCoeffs(const FiniteElementSpace *fes,
                                        DenseMatrix &basis,
                                        const SampleInfo &sample) override;
+   void AppendPrecomputeBdrFaceCoeffs(const FiniteElementSpace *fes,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample) override;
 
    void AddAssembleVector_Fast(const int s, const double qw,
                               FaceElementTransformations &T, const IntegrationPoint &ip,
@@ -270,6 +273,12 @@ public:
    void AddAssembleGrad_Fast(const int s, const double qw,
                            FaceElementTransformations &T, const IntegrationPoint &ip,
                            const Vector &x, DenseMatrix &jac) override;
+
+private:
+   void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
+                                    FaceElementTransformations *T,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample);
 
 };
 
