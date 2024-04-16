@@ -176,6 +176,9 @@ private:
    DenseMatrix dshape, dshapex, EF, uu, ELV, elmat_comp;
    Vector shape;
 
+   // precomputed basis value at the sample point.
+   Array<DenseMatrix *> shapes;
+   Array<Array<DenseMatrix *> *> dshapes;
 public:
    IncompressibleInviscidFluxNLFIntegrator(Coefficient &q)
       : HyperReductionIntegrator(true), Q(&q) { }
@@ -208,6 +211,17 @@ public:
                               const double &iw,
                               const Vector &elfun,
                               DenseMatrix &elmat);
+
+   void AppendPrecomputeDomainCoeffs(const FiniteElementSpace *fes,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample) override;
+
+   void AddAssembleVector_Fast(const int s, const double qw,
+                                 ElementTransformation &T, const IntegrationPoint &ip,
+                                 const Vector &x, Vector &y) override;
+   void AddAssembleGrad_Fast(const int s, const double qw,
+                              ElementTransformation &T, const IntegrationPoint &ip,
+                              const Vector &x, DenseMatrix &jac) override;
 };
 
 /*
