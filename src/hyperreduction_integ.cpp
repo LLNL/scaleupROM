@@ -815,48 +815,32 @@ void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleGrad_Fast(
    const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
 {
-   // T.SetIntPoint(&ip);
-   // double w = qw * T.Weight();
-   // if (Q) 
-   //    w *= Q->Eval(T, ip);
+   T.SetIntPoint(&ip);
+   double w = qw * T.Weight();
+   if (Q) 
+      w *= Q->Eval(T, ip);
 
-   // if (tensor)
-   // {
-   //    const DenseTensor *tensor = coeffs[s];
-   //    TensorAddScaledMultTranspose(*tensor, w, x, 0, jac);
-   //    TensorAddScaledMultTranspose(*tensor, w, x, 1, jac);
-   // }
-   // else
-   // {
-   //    dim = shapes[s]->NumRows();
-   //    int nbasis = shapes[s]->NumCols();
-   //    Vector vec1(dim), vec2(dim);
-   //    shapes[s]->Mult(x, vec1);
-   //    Array<DenseMatrix *> *gradEFs = dshapes[s];
+   dim = shapes[s]->NumRows();
+   int nbasis = shapes[s]->NumCols();
+   Vector u1(dim), vec1(dim), vec2(nbasis);
+   shapes[s]->Mult(x, u1);
+   Array<DenseMatrix *> *dshape = dshapes[s];
 
-   //    gradEF.SetSize(dim);
-   //    gradEF = 0.0;
-   //    for (int k = 0; k < gradEFs->Size(); k++)
-   //       gradEF.Add(x(k), *((*gradEFs)[k]));
-   //    gradEF *= w;
+   u1 *= w;
 
-   //    ELV.SetSize(dim, nbasis);
-   //    Mult(gradEF, *shapes[s], ELV);
+   for (int i = 0; i < nbasis; i++)
+   {
+      (*dshape)[i]->Mult(u1, vec1);
+      (*dshape)[i]->AddMultTranspose(u1, vec1);
+      shapes[s]->MultTranspose(vec1, vec2);
 
-   //    for (int k = 0; k < nbasis; k++)
-   //    {
-   //       ELV.GetColumnReference(k, vec2);
-   //       (*gradEFs)[k]->AddMult(vec1, vec2, w);
-   //    }
-
-   //    Vector jac_col;
-   //    for (int k = 0; k < nbasis; k++)
-   //    {
-   //       jac.GetColumnReference(k, jac_col);
-   //       ELV.GetColumnReference(k, vec2);
-   //       shapes[s]->AddMultTranspose(vec2, jac_col);
-   //    }
-   // }
+      double *d_jac = jac.GetData() + i;
+      for (int j = 0; j < nbasis; j++)
+      {
+         (*d_jac) += vec2(j);
+         d_jac += nbasis;
+      }
+   }
 }
 
 /*
