@@ -222,9 +222,9 @@ private:
    double w, un1, un2, un;
    Coefficient *Q{};
 
-   Vector nor, flux, shape1, shape2, u1, u2;
+   Vector nor, flux, shape1, shape2, u1, u2, tmp_vec;
    DenseMatrix udof1, udof2, elv1, elv2;
-   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22, tmp;
 
    // precomputed basis value at the sample point.
    Array<DenseMatrix *> shapes1, shapes2;

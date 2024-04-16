@@ -675,39 +675,39 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
    for (int k = 0; k < rom_y.Size(); k++)
       EXPECT_NEAR(rom_y(k), rom_yfast(k), threshold);
 
-   // DenseMatrix *jac = dynamic_cast<DenseMatrix *>(&(rform->GetGradient(rom_u)));
+   DenseMatrix *jac = dynamic_cast<DenseMatrix *>(&(rform->GetGradient(rom_u)));
 
-   // double J0 = 0.5 * (rom_y * rom_y);
-   // Vector grad(num_basis);
-   // jac->MultTranspose(rom_y, grad);
-   // double gg = sqrt(grad * grad);
-   // printf("J0: %.15E\n", J0);
-   // printf("grad: %.15E\n", gg);
+   double J0 = 0.5 * (rom_y * rom_y);
+   Vector grad(num_basis);
+   jac->MultTranspose(rom_y, grad);
+   double gg = sqrt(grad * grad);
+   printf("J0: %.15E\n", J0);
+   printf("grad: %.15E\n", gg);
 
-   // Vector du(grad);
-   // du /= gg;
+   Vector du(grad);
+   du /= gg;
 
-   // Vector rom_y1(num_basis);
-   // const int Nk = 40;
-   // double error1 = 1e100, error;
-   // printf("amp\tJ1\tdJdx\terror\n");
-   // for (int k = 0; k < Nk; k++)
-   // {
-   //    double amp = pow(10.0, -0.25 * k);
-   //    Vector rom_u1(rom_u);
-   //    rom_u1.Add(amp, du);
+   Vector rom_y1(num_basis);
+   const int Nk = 40;
+   double error1 = 1e100, error;
+   printf("amp\tJ1\tdJdx\terror\n");
+   for (int k = 0; k < Nk; k++)
+   {
+      double amp = pow(10.0, -0.25 * k);
+      Vector rom_u1(rom_u);
+      rom_u1.Add(amp, du);
 
-   //    rform->Mult(rom_u1, rom_y1);
-   //    double J1 = 0.5 * (rom_y1 * rom_y1);
-   //    double dJdx = (J1 - J0) / amp;
-   //    error = abs(dJdx - gg) / gg;
+      rform->Mult(rom_u1, rom_y1);
+      double J1 = 0.5 * (rom_y1 * rom_y1);
+      double dJdx = (J1 - J0) / amp;
+      error = abs(dJdx - gg) / gg;
 
-   //    printf("%.5E\t%.5E\t%.5E\t%.5E\n", amp, J1, dJdx, error);
-   //    if (error >= error1)
-   //       break;
-   //    error1 = error;
-   // }
-   // EXPECT_TRUE(min(error, error1) < grad_thre);
+      printf("%.5E\t%.5E\t%.5E\t%.5E\n", amp, J1, dJdx, error);
+      if (error >= error1)
+         break;
+      error1 = error;
+   }
+   EXPECT_TRUE(min(error, error1) < grad_thre);
 
    delete mesh;
    delete dg_coll;
