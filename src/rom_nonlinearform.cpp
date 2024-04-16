@@ -638,7 +638,8 @@ void ROMNonlinearForm::PrecomputeCoefficients()
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int be = sample->be;
-            const int bdr_attr = mesh->GetBdrAttribute(i);
+
+            const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
             { 
@@ -717,13 +718,16 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
       bdr_attr_marker = 0;
       if (bfnfi_marker[k] == NULL)
          bdr_attr_marker = 1;
-      Array<int> &bdr_marker = *bfnfi_marker[k];
-      MFEM_ASSERT(bdr_marker.Size() == bdr_attr_marker.Size(),
-                  "invalid boundary marker for boundary face integrator #"
-                  << k << ", counting from zero");
-      for (int i = 0; i < bdr_attr_marker.Size(); i++)
+      else
       {
-         bdr_attr_marker[i] |= bdr_marker[i];
+         Array<int> &bdr_marker = *bfnfi_marker[k];
+         MFEM_ASSERT(bdr_marker.Size() == bdr_attr_marker.Size(),
+                     "invalid boundary marker for boundary face integrator #"
+                     << k << ", counting from zero");
+         for (int i = 0; i < bdr_attr_marker.Size(); i++)
+         {
+            bdr_attr_marker[i] |= bdr_marker[i];
+         }
       }
 
       SetupEQPSystemForBdrFaceIntegrator(snapshots_work, bfnfi[k], bdr_attr_marker, Gt, rhs_Gw, fidxs);
@@ -959,8 +963,6 @@ void ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator(
    const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
    CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &fidxs)
 {
-   mfem_warning("ROMNonlinearForm::SetupEQPSystemForInteriorFaceIntegrator- this routine is not tested. Set up a test routine in test/test_rom_nonlinearform.cpp.\n");
-
    /*
       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
       Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.
@@ -1089,8 +1091,6 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
    const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, const Array<int> &bdr_attr_marker,
    CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs)
 {
-   mfem_warning("ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator- this routine is not tested. Set up a test routine in test/test_rom_nonlinearform.cpp.\n");
-
    /*
       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
       Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.

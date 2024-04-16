@@ -1255,20 +1255,43 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
 void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeInteriorFaceCoeffs(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
-   const int nbasis = basis.NumCols();
-
    const int face = sample.face;
    FaceElementTransformations *T = fes->GetMesh()->GetInteriorFaceTransformations(face);
    assert(T != NULL);
    assert(T->Elem2No >= 0);
 
+   AppendPrecomputeFaceCoeffs(fes, T, basis, sample);
+}
+
+void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeBdrFaceCoeffs(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   const int be = sample.be;
+   FaceElementTransformations *T = fes->GetMesh()->GetBdrFaceTransformations(be);
+   assert(T != NULL);
+   assert(T->Elem2No < 0);
+
+   AppendPrecomputeFaceCoeffs(fes, T, basis, sample);
+}
+
+void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeFaceCoeffs(
+   const FiniteElementSpace *fes, FaceElementTransformations *T,
+   DenseMatrix &basis, const SampleInfo &sample)
+{
+   const int nbasis = basis.NumCols();
+
+   const bool el2 = (T->Elem2No >= 0);
+
    const FiniteElement *fe1 = fes->GetFE(T->Elem1No);
-   const FiniteElement *fe2 = fes->GetFE(T->Elem2No);
+   const FiniteElement *fe2 = (el2) ? fes->GetFE(T->Elem2No) : fe1;
 
    Array<int> vdofs, vdofs2;
    fes->GetElementVDofs(T->Elem1No, vdofs);
-   fes->GetElementVDofs(T->Elem2No, vdofs2);
-   vdofs.Append(vdofs2);
+   if (el2)
+   {
+      fes->GetElementVDofs(T->Elem2No, vdofs2);
+      vdofs.Append(vdofs2);
+   }
 
    dim = fe1->GetDim();
    ndofs1 = fe1->GetDof();
@@ -1284,33 +1307,41 @@ void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeInteriorFaceCoeffs(
    const IntegrationPoint &ip = ir->IntPoint(sample.qp);
 
    shape1.SetSize(ndofs1);
-   shape2.SetSize(ndofs2);
+   if (el2) shape2.SetSize(ndofs2);
 
    T->SetAllIntPoints(&ip);
-   const IntegrationPoint &eip1 = T->GetElement1IntPoint();
-   const IntegrationPoint &eip2 = T->GetElement2IntPoint();
 
+   const IntegrationPoint &eip1 = T->GetElement1IntPoint();
    fe1->CalcShape(eip1, shape1);
-   fe2->CalcShape(eip2, shape2);
+   if (el2)
+   {
+      const IntegrationPoint &eip2 = T->GetElement2IntPoint();
+      fe2->CalcShape(eip2, shape2);
+   }
 
    Vector basis_i;
-   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
-   DenseMatrix *vec2s = new DenseMatrix(dim, nbasis);
+   DenseMatrix *vec1s, *vec2s;
+   vec1s = new DenseMatrix(dim, nbasis);
+   if (el2) vec2s = new DenseMatrix(dim, nbasis);
+
    for (int i = 0; i < nbasis; i++)
    {
       GetBasisElement(basis, i, vdofs, basis_i);
       elv1.UseExternalData(basis_i.GetData(), ndofs1, dim);
-      elv2.UseExternalData(basis_i.GetData() + ndofs1 * dim, ndofs2, dim);
+      if (el2) elv2.UseExternalData(basis_i.GetData() + ndofs1 * dim, ndofs2, dim);
 
       Vector vec1, vec2;
       vec1s->GetColumnReference(i, vec1);
       elv1.MultTranspose(shape1, vec1);
 
-      vec2s->GetColumnReference(i, vec2);
-      elv2.MultTranspose(shape2, vec2);
+      if (el2)
+      {
+         vec2s->GetColumnReference(i, vec2);
+         elv2.MultTranspose(shape2, vec2);
+      }
    }
    shapes1.Append(vec1s);
-   shapes2.Append(vec2s);
+   if (el2) shapes2.Append(vec2s);
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
@@ -1364,7 +1395,7 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
 
    assert(y.Size() == x.Size());
    shapes1[s]->AddMultTranspose(flux, y, 1.0);
-   shapes2[s]->AddMultTranspose(flux, y, -1.0);
+   if (el2) shapes2[s]->AddMultTranspose(flux, y, -1.0);
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
