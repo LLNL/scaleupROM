@@ -171,7 +171,8 @@ def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
 
 def basis_scaling_plot(prefix, plot_path):
     scale_prefix = '$n_{basis}$'
-    samples = (2, 4, 6, 8, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128)
+    #samples = (2, 4, 6, 8, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128) //regular
+    samples = (1, 2, 3, 4, 6, 7, 9, 12, 15, 20, 25, 32, 41, 53, 68, 87, 111, 142, 183, 234, 300, 384) #//complicated
     res = get_results(samples, prefix)
     create_scaling_plot(samples, res, scale_prefix, plot_path)
 

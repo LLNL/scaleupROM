@@ -1192,7 +1192,7 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_map["bx"] = 38;
    param_map["by"] = 39;
 
-   param_ptr.SetSize(30);
+   param_ptr.SetSize(40);
    param_ptr[0] = &(function_factory::linelast_cwtrain::l_ux);
    param_ptr[1] = &(function_factory::linelast_cwtrain::l_uy);
    param_ptr[2] = &(function_factory::linelast_cwtrain::r_fx);
