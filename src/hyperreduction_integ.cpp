@@ -1383,6 +1383,7 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    flux.SetSize(dim);
    u1.SetSize(dim);
    elmat_comp11.SetSize(dim);
+   elmat_comp11 = 0.0;
    tmp.SetSize(dim, nbasis);
 
    if (el2)
@@ -1391,6 +1392,10 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
       elmat_comp12.SetSize(dim);
       elmat_comp21.SetSize(dim);
       elmat_comp22.SetSize(dim);
+
+      elmat_comp12 = 0.0;
+      elmat_comp21 = 0.0;
+      elmat_comp22 = 0.0;
    }
 
    double w = qw * T.Weight();
@@ -1405,6 +1410,11 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    {
       CalcOrtho(T.Jacobian(), nor);
    }
+
+   nor *= w;
+
+   shapes1[s]->Mult(x, u1);
+   if (el2) shapes2[s]->Mult(x, u2);
 
    un1 = nor * u1;
    un2 = (el2) ? nor * u2 : 0.0;
