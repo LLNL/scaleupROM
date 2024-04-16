@@ -746,6 +746,119 @@ void IncompressibleInviscidFluxNLFIntegrator::AssembleQuadratureGrad(
    }
 }
 
+void IncompressibleInviscidFluxNLFIntegrator::AppendPrecomputeDomainCoeffs(
+   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
+{
+   const int nbasis = basis.NumCols();
+
+   const int el = sample.el;
+   const FiniteElement *fe = fes->GetFE(el);
+   Array<int> vdofs;
+   // TODO(kevin): not exactly sure what doftrans impacts.
+   DofTransformation *doftrans = fes->GetElementVDofs(el, vdofs);
+   ElementTransformation *T = fes->GetElementTransformation(el);
+   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(*fe, *T);
+   const IntegrationPoint &ip = ir->IntPoint(sample.qp);
+
+   const int nd = fe->GetDof();
+   dim = fe->GetDim();
+
+   shape.SetSize(nd);
+   dshape.SetSize(nd, dim);
+
+   T->SetIntPoint(&ip);
+   fe->CalcShape(ip, shape);
+   fe->CalcPhysDShape(*T, dshape);
+
+   Vector basis_i;
+   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
+   Array<DenseMatrix *> *gradEFs = new Array<DenseMatrix *>(0);
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i, doftrans);
+      EF.UseExternalData(basis_i.GetData(), nd, dim);
+
+      Vector vec1;
+      vec1s->GetColumnReference(i, vec1);
+      EF.MultTranspose(shape, vec1);
+
+      DenseMatrix *gradEF1 = new DenseMatrix(dim);
+      MultAtB(EF, dshape, *gradEF1);
+      gradEFs->Append(gradEF1);
+   }
+   shapes.Append(vec1s);
+   dshapes.Append(gradEFs);
+}
+
+void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+{
+   T.SetIntPoint(&ip);
+   double w = qw * T.Weight();
+   if (Q) 
+      w *= Q->Eval(T, ip);
+
+   dim = shapes[s]->NumRows();
+   Vector u1(dim);
+   shapes[s]->Mult(x, u1);
+   Array<DenseMatrix *> *dshape = dshapes[s];
+
+   Vector vec1(dim);
+   assert(y.Size() == dshape->Size());
+   for (int k = 0; k < dshape->Size(); k++)
+   {
+      (*dshape)[k]->Mult(u1, vec1);
+      y(k) += w * (u1 * vec1);
+   }
+}
+
+void IncompressibleInviscidFluxNLFIntegrator::AddAssembleGrad_Fast(
+   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+{
+   // T.SetIntPoint(&ip);
+   // double w = qw * T.Weight();
+   // if (Q) 
+   //    w *= Q->Eval(T, ip);
+
+   // if (tensor)
+   // {
+   //    const DenseTensor *tensor = coeffs[s];
+   //    TensorAddScaledMultTranspose(*tensor, w, x, 0, jac);
+   //    TensorAddScaledMultTranspose(*tensor, w, x, 1, jac);
+   // }
+   // else
+   // {
+   //    dim = shapes[s]->NumRows();
+   //    int nbasis = shapes[s]->NumCols();
+   //    Vector vec1(dim), vec2(dim);
+   //    shapes[s]->Mult(x, vec1);
+   //    Array<DenseMatrix *> *gradEFs = dshapes[s];
+
+   //    gradEF.SetSize(dim);
+   //    gradEF = 0.0;
+   //    for (int k = 0; k < gradEFs->Size(); k++)
+   //       gradEF.Add(x(k), *((*gradEFs)[k]));
+   //    gradEF *= w;
+
+   //    ELV.SetSize(dim, nbasis);
+   //    Mult(gradEF, *shapes[s], ELV);
+
+   //    for (int k = 0; k < nbasis; k++)
+   //    {
+   //       ELV.GetColumnReference(k, vec2);
+   //       (*gradEFs)[k]->AddMult(vec1, vec2, w);
+   //    }
+
+   //    Vector jac_col;
+   //    for (int k = 0; k < nbasis; k++)
+   //    {
+   //       jac.GetColumnReference(k, jac_col);
+   //       ELV.GetColumnReference(k, vec2);
+   //       shapes[s]->AddMultTranspose(vec2, jac_col);
+   //    }
+   // }
+}
+
 /*
    DGLaxFriedrichsFluxIntegrator
 */
