@@ -644,10 +644,13 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
 
    ConstantCoefficient pi(3.141592);
    auto *integ = new DGLaxFriedrichsFluxIntegrator(pi);
+   auto *integ_bdr = new DGLaxFriedrichsFluxIntegrator(pi);
    integ->SetIntRule(ir);
+   integ_bdr->SetIntRule(ir);
 
    ROMNonlinearForm *rform(new ROMNonlinearForm(num_basis, fes));
    rform->AddInteriorFaceIntegrator(integ);
+   rform->AddBdrFaceIntegrator(integ_bdr);
    rform->SetBasis(basis);
 
    // we set the full elements/quadrature points,
@@ -655,12 +658,15 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
    const int nsample = UniformRandom(15, 20);
    const int nqe = ir->GetNPoints();
    const int nf = mesh->GetNumFaces();
+   const int nbe = fes->GetNBE();
    Array<double> const& w_el = ir->GetWeights();
    Array<int> sample_el(nsample), sample_qp(nsample);
    Array<double> sample_qw(nsample);
 
-   int s = 0;
    FaceElementTransformations *tr;
+
+   /* fill up interior face samples first */
+   int s = 0;
    while (s < nsample)
    {
       int f = UniformRandom(0, nf-1);
@@ -674,6 +680,23 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
       s++;
    }
    rform->UpdateInteriorFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+
+   /* fill up boundary face samples */
+   s = 0;
+   while (s < nsample)
+   {
+      int be = UniformRandom(0, nbe-1);
+      tr = mesh->GetBdrFaceTransformations(be);
+      if (tr == NULL) continue;
+
+      sample_el[s] = be;
+      sample_qp[s] = UniformRandom(0, nqe-1);
+      sample_qw[s] = UniformRandom();
+
+      s++;
+   }
+   rform->UpdateBdrFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+
    rform->PrecomputeCoefficients();
 
    Vector rom_u(num_basis);

@@ -237,7 +237,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int be = sample->be;
-            const int bdr_attr = mesh->GetBdrAttribute(i);
+            const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
             { 
@@ -494,7 +494,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
             int be = sample->be;
-            const int bdr_attr = mesh->GetBdrAttribute(i);
+            const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
             { 
