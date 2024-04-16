@@ -627,11 +627,24 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
       for (int j = 0; j < num_basis; j++)
          basis(i, j) = UniformRandom();
 
-   IntegrationRule ir = IntRules.Get(fes->GetFE(0)->GetGeomType(),
-                                    (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
+   // a simple choice for the integration order; is this OK?
+   const IntegrationRule *ir = NULL;
+   {
+      const int int_order = (int) (ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1)));
+      FaceElementTransformations *T = NULL;
+      for (int f = 0; f < mesh->GetNumFaces(); f++)
+      {
+         T = mesh->GetInteriorFaceTransformations(f);
+         if (T != NULL)
+            break;
+      }
+      ir = &IntRules.Get(T->GetGeometryType(), int_order);
+   }
+   assert(ir);
+
    ConstantCoefficient pi(3.141592);
    auto *integ = new DGLaxFriedrichsFluxIntegrator(pi);
-   integ->SetIntRule(&ir);
+   integ->SetIntRule(ir);
 
    ROMNonlinearForm *rform(new ROMNonlinearForm(num_basis, fes));
    rform->AddInteriorFaceIntegrator(integ);
@@ -640,9 +653,9 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
    // we set the full elements/quadrature points,
    // so that the resulting vector is equilvalent to FOM.
    const int nsample = UniformRandom(15, 20);
-   const int nqe = ir.GetNPoints();
+   const int nqe = ir->GetNPoints();
    const int nf = mesh->GetNumFaces();
-   Array<double> const& w_el = ir.GetWeights();
+   Array<double> const& w_el = ir->GetWeights();
    Array<int> sample_el(nsample), sample_qp(nsample);
    Array<double> sample_qw(nsample);
 
