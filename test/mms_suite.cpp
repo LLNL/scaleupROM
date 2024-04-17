@@ -597,6 +597,125 @@ namespace linelast
 
 } // namespace linelast
 
+namespace nlelast
+{
+   void ExactSolution(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      assert(dim == 2);
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = pow(x(i), 2.0) + x(i);
+      }
+   }
+
+   void ExactRHS(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      assert(dim == 2);
+
+      const double K = 3.14;
+      const double mu = 2.33;
+      const double x_1 = x(1);
+      const double x_2 = x(2);
+
+      u(1) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 128.0*mu*x_1 + 384.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 128.0*mu*(pow(x_1,2)) + 384.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1), 4))*(pow((1 + 2*x_2),2)));
+
+      u(2) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 384.0*mu*x_1 + 128.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 384.0*mu*(pow(x_1,2)) + 128.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1),2))*(pow((1 + 2*x_2),4)));
+      //u *= -1.0;
+   }
+
+   NLElastSolver *SolveWithRefinement(const int num_refinement)
+   {
+      config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+      NLElastSolver *test = new NLElastSolver();
+
+      dim = test->GetDim();
+
+      test->InitVariables();
+      test->InitVisualization();
+
+      test->AddBCFunction(ExactSolution, 1);
+      test->AddBCFunction(ExactSolution, 2);
+      test->AddBCFunction(ExactSolution, 3);
+      test->SetBdrType(BoundaryType::DIRICHLET);
+      test->AddRHSFunction(ExactRHS);
+
+      test->BuildOperators();
+
+      test->SetupBCOperators();
+
+      test->Assemble();
+
+      test->Solve();
+
+      return test;
+   }
+
+   void CheckConvergence()
+   {
+      int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+      int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+      // Compare with exact solution
+      int dim = 2; // only check two dimensions
+      VectorFunctionCoefficient exact_sol(dim, ExactSolution);
+
+      printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
+
+      Vector conv_rate(num_refine);
+      conv_rate = 0.0;
+      double error1 = 0.0;
+      for (int r = base_refine; r < num_refine; r++)
+      {
+         NLElastSolver *test = SolveWithRefinement(r);
+
+         int order = test->GetDiscretizationOrder();
+         int order_quad = max(2, 2 * order + 1);
+         const IntegrationRule *irs[Geometry::NumGeom];
+         for (int i = 0; i < Geometry::NumGeom; ++i)
+         {
+            irs[i] = &(IntRules.Get(i, order_quad));
+         }
+
+         int numEl = 0;
+         double norm = 0.0;
+         for (int k = 0; k < test->GetNumSubdomains(); k++)
+         {
+            Mesh *mk = test->GetMesh(k);
+            norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
+            numEl += mk->GetNE();
+         }
+         norm = sqrt(norm);
+
+         double error = 0.0;
+         for (int k = 0; k < test->GetNumSubdomains(); k++)
+         {
+            GridFunction *uk = test->GetGridFunction(k);
+            error += pow(uk->ComputeLpError(2, exact_sol), 2);
+         }
+         error = sqrt(error);
+         error /= norm;
+
+         if (r > base_refine)
+         {
+            conv_rate(r) = error1 / error;
+         }
+
+         printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
+
+         // reported convergence rate
+         if (r > base_refine)
+            EXPECT_TRUE(conv_rate(r) > pow(2.0, order + 1) - 0.5);
+
+         error1 = error;
+      }
+
+      return;
+   }
+
+} // namespace nlelast
+
 namespace advdiff
 {
 

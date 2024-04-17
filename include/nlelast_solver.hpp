@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-#ifndef SCALEUPROM_LINELAST_SOLVER_HPP
-#define SCALEUPROM_LINELAST_SOLVER_HPP
+#ifndef SCALEUPROM_NLELAST_SOLVER_HPP
+#define SCALEUPROM_NLELAST_SOLVER_HPP
 
 #include "multiblock_solver.hpp"
 #include "interfaceinteg.hpp"

@@ -10,6 +10,7 @@
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
 #include "linelast_solver.hpp"
+#include "nlelast_solver.hpp"
 #include "advdiff_solver.hpp"
 #include <fstream>
 #include <iostream>
@@ -90,6 +91,20 @@ LinElastSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 
 }  // namespace linelast
+
+namespace nlelast
+{
+
+static const double pi = 4.0 * atan(1.0);
+static const double mu = 1.0; //only test case when mu = 1.0 (homogenous material)
+static double K = 1.0;
+static int dim;
+static void ExactSolution(const Vector & x, Vector & u);
+static void ExactRHS(const Vector & x, Vector & u);
+NLElastSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence();
+
+}  // namespace nlelast
 
 namespace advdiff
 {
