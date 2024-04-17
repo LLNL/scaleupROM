@@ -145,67 +145,6 @@ const double wM = w * c_mu->Eval(Ttr, ip);
 return wL + 2.0*wM;
 }
 
-/* void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
-{
-   //const int dof = el.GetDof();
-    //const int dim = el.GetDim();
-    //double L, M;
- 
-    //DenseMatrix dshape(dof, dim);
-    //double gh_data[9], grad_data[9];
-    //DenseMatrix gh(gh_data, dim, dim);
-    //DenseMatrix grad(grad_data, dim, dim);
-
-   //el.CalcDShape(ip, dshape);
-   //MultAtB(PMatI, dshape, gh);
-
-   //Mult(gh, Trans.InverseJacobian(), grad);
-
-   // The part below has been changed
-   // TODO: This isn't correct in general
-   //DenseMatrix tempadj(dim, dim);
-   //CalcAdjugate(Trans.Elem1->Jacobian(), tempadj);
-   //Mult(gh, tempadj, grad);
-   //M = c_mu->Eval(Trans, ip);
-   //L = c_lambda->Eval(Trans, ip);
-
-   //DenseMatrix DS(dof, dim);
-   //Mult(dshape, tempadj, DS);
-
-   P = 0.0;
-   // Calculate divergence of strain tensor
-   /* double e_div = 0.0;
-   for (size_t i = 0; i < dim; i++)
-   {
-      for (size_t j = 0; j < dof; j++)
-      {
-         e_div += PMatI(j,i) * DS(j,i);
-      }
-   } */
-   
-   // Fill stress tensor
-   /* for (size_t i = 0; i < dim; i++)
-   {
-      for (size_t j = 0; j < dim; j++)
-      {
-         double temp = 0.0;
-         for (size_t k = 0; k < dof; k++)
-         {
-            temp += PMatI(k,j) * DS(k,i);
-            temp += PMatI(k,i) * DS(k,j);
-         }
-         temp *= M;
-         
-         P(i,j) = temp;
-         if (i == j)
-         {
-            P(i,j) += L * e_div;
-         }
-         
-      }
-   } */
-//} 
-
 void TestLinModel::SetML(ElementTransformation &Trans, const IntegrationPoint &ip)
 {
    mu = c_mu->Eval(Trans, ip);
@@ -217,53 +156,6 @@ void TestLinModel::SetML(FaceElementTransformations &Trans, const IntegrationPoi
    mu = c_mu->Eval(Trans, ip);
    lambda = c_lambda->Eval(Trans, ip);
 }
-
-/* void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
-{
-   const int dof = el.GetDof();
-    const int dim = el.GetDim();
-    double L, M;
- 
-    DenseMatrix dshape(dof, dim);
-    double gh_data[9], grad_data[9];
-    DenseMatrix gh(gh_data, dim, dim);
-    DenseMatrix grad(grad_data, dim, dim);
-
-   el.CalcDShape(ip, dshape);
-   MultAtB(PMatI, dshape, gh);
-   
-   Mult(gh, Trans.InverseJacobian(), grad);
-   
-   M = c_mu->Eval(Trans, ip);
-
-   L = c_lambda->Eval(Trans, ip);
-
-   // stress = 2*M*e(u) + L*tr(e(u))*I, where
-   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
-   const double M2 = 2.0*M;
-   if (dim == 2)
-   {
-      L *= (grad(0,0) + grad(1,1));
-      P(0,0) = M2*grad(0,0) + L;
-      P(1,1)  = M2*grad(1,1) + L;
-      P(1,0)  = M*(grad(0,1) + grad(1,0));
-      P(0,1)  = M*(grad(0,1) + grad(1,0));
-   }
-   else if (dim == 3)
-   {
-      L *= (grad(0,0) + grad(1,1) + grad(2,2));
-      P(0,0) = M2*grad(0,0) + L;
-      P(1,1) = M2*grad(1,1) + L;
-      P(2,2) = M2*grad(2,2) + L;
-      P(0,1) = M*(grad(0,1) + grad(1,0));
-      P(1,0) = M*(grad(0,1) + grad(1,0));
-      P(0,2) = M*(grad(0,2) + grad(2,0));
-      P(2,0) = M*(grad(0,2) + grad(2,0));
-      P(1,2) = M*(grad(1,2) + grad(2,1));
-      P(2,1) = M*(grad(1,2) + grad(2,1));
-   }
-}
- */
 
 void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
 {
@@ -295,11 +187,8 @@ void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
    }
 }
 
-void TestLinModel::EvalDmat(const int dim, const int dof, const IntegrationPoint ip, FaceElementTransformations &Trans, 
-const DenseMatrix gshape, DenseMatrix &Dmat)
+void TestLinModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat)
 {
-   double M = c_mu->Eval(Trans, ip);
-   double L = c_lambda->Eval(Trans, ip);
 for (size_t i = 0; i < dim; i++) 
       {
          for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
@@ -310,14 +199,14 @@ for (size_t i = 0; i < dim; i++)
             for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
             {
                const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
+               Dmat(S_ij, U_mn) = ((i == j) ? lambda * gshape(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? mu * gshape(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? mu * gshape(m,i) : 0.0);
             }
          }
       }
 }
-
+/* 
 void TestLinModel::EvalDmat(const int dim, const int dof, const IntegrationPoint ip, ElementTransformation &Trans, 
 const DenseMatrix gshape, DenseMatrix &Dmat)
 {
@@ -339,7 +228,7 @@ for (size_t i = 0; i < dim; i++)
             }
          }
       }
-}
+} */
 
 void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                      const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans)
@@ -358,7 +247,9 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
       gshape.GradToDiv(divshape);
 
       DenseMatrix Dmat(dim * dim, dim * dof);
-      EvalDmat(dim, dof, ip, Trans, gshape, Dmat);
+      SetML(Trans,ip);
+
+      EvalDmat(dim, dof, gshape, Dmat);
    
       //Assemble elmat
       for (size_t i = 0; i < dof; i++) 
@@ -384,6 +275,7 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
       }
 
        }; 
+
 void _PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename)
 {
@@ -761,7 +653,10 @@ const int dim = el1.GetDim();
       Mult(DSh2, adjJ2, dshape2_ps);
 
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
-      model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
+      model->SetML(Tr,eip2);
+
+      model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
+      //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
       wLM = model->EvalwLM(w2, *Tr.Elem2, eip2);
       wnor2.Set(w2,nor);
@@ -779,7 +674,10 @@ const int dim = el1.GetDim();
       CalcAdjugate(Tr.Elem1->Jacobian(), adjJ1);
       Mult(DSh1, adjJ1, dshape1_ps);
 
-      model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
+      //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
+      model->SetML(Tr,eip1);
+
+      model->EvalDmat(dim, ndofs1, dshape1_ps, Dmat1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
