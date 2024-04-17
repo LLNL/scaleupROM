@@ -207,37 +207,6 @@ for (size_t i = 0; i < dim; i++)
       }
 }
 
-void TestLinModel::AssembleH(const int dim, const int dof, const DenseMatrix &J, const double w, DenseMatrix &elmat)
-      {
-      DenseMatrix Dmat(dim * dim, dim * dof); // TODO: Add to class
-
-      EvalDmat(dim, dof, J, Dmat);
-   
-      //Assemble elmat
-      for (size_t i = 0; i < dof; i++) 
-      {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int ij = j * dof + i;
-
-            for (size_t m = 0; m < dof; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
-            {
-               const int mn = n * dof + m;
-               double temp = 0.0;
-               for (size_t k = 0; k < dim; k++)
-               {
-                  const int S_jk = k * dim + j;
-                  temp += Dmat(S_jk, mn) * w * J(i,k);
-               }
-               elmat(ij, mn) += temp;
-               
-            }
-         }
-      }
-
-       }; 
-
 void _PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename)
 {
@@ -382,11 +351,9 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       el2.CalcDShape(eip2, DSh2);
       DenseMatrix adjJ2(dim);
       CalcAdjugate(Trans.Elem2->Jacobian(), adjJ2);
-      //Mult(DSh2, Jrt, DS2);
       Mult(DSh2, adjJ2, DS2);
       MultAtB(PMatI2, DS2, Jpt2);
       model->SetML(Trans, eip2);
-      //model->EvalP(el2, eip2, PMatI2, Trans, P2);
 
       model->EvalP(Jpt2, P2);
 
@@ -397,22 +364,13 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       P2.Mult(nor, tau2);
       }
 
-      /* el1.CalcShape(eip1, shape1);
-      el1.CalcDShape(eip1, DSh1);
-      Mult(DSh1, Jrt, DS1);
-      MultAtB(PMatI1, DS1, Jpt1);
-
-      //model->EvalP(el1, eip1, PMatI1, Trans, P1);
-      model->SetML(Trans, eip1); */
       el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
       DenseMatrix adjJ1(dim);
       CalcAdjugate(Trans.Elem1->Jacobian(), adjJ1);
-      //Mult(DSh1, Jrt, DS1);
       Mult(DSh1, adjJ1, DS1);
       MultAtB(PMatI1, DS1, Jpt1);
       model->SetML(Trans, eip1);
-      //model->EvalP(el2, eip2, PMatI2, Trans, P2);
 
       model->EvalP(Jpt1, P1);
 
@@ -643,14 +601,14 @@ const int dim = el1.GetDim();
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
-      // (1,1) block //works
+      // (1,1) block
       wnor1.Set(w1,nor);
       AssembleBlock(dim, ndofs1, ndofs1, 0, 0, shape1, shape1, jmatcoef, wnor1,Dmat1, elmat,jmat);
  
       if (ndofs2 == 0) {continue;}
        shape2.Neg(); 
 
-       // (1,2) block works
+       // (1,2) block
       AssembleBlock(dim, ndofs1, ndofs2, 0, dim*ndofs1, shape1, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
 
        // (2,1) block
@@ -756,7 +714,6 @@ void HyperelasticNLFIntegratorHR::AssembleElementVector(const FiniteElement &el,
        MultAtB(PMatI, DS, Jpt);
  
        model->EvalP(Jpt, P);
-       //model->EvalP(el, ip, PMatI, Ttr, P);
  
        P *= ip.weight * Ttr.Weight();
        AddMultABt(DS, P, PMatO);
@@ -767,7 +724,8 @@ void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
                                     ElementTransformation &Ttr,
                                     const Vector &elfun,
                                     DenseMatrix &elmat){
-int dof = el.GetDof(), dim = el.GetDim();
+   int dof = el.GetDof(), dim = el.GetDim();
+   Dmat.SetSize(dim * dim, dim * dof);
  
     DSh.SetSize(dof, dim);
     DS.SetSize(dof, dim);
@@ -784,6 +742,7 @@ int dof = el.GetDof(), dim = el.GetDim();
  
     elmat = 0.0;
     model->SetTransformation(Ttr);
+    
     for (int i = 0; i < ir->GetNPoints(); i++)
     {
        const IntegrationPoint &ip = ir->IntPoint(i);
@@ -794,13 +753,41 @@ int dof = el.GetDof(), dim = el.GetDim();
        Mult(DSh, Jrt, DS);
        MultAtB(PMatI, DS, Jpt);
  
-       //model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat);
        model->SetML(Ttr,ip);
-       model->AssembleH(dim, dof, DS, ip.weight * Ttr.Weight(), elmat);
 
-       //model->AssembleH(DS, DS, ip.weight * Ttr.Weight(), elmat, el, ip, Ttr);
+       model->EvalDmat(dim, dof, DS, Dmat);
+       AssembleH(dim, dof, ip.weight * Ttr.Weight(), DS, elmat);
+
     }
                                     };
+
+
+void HyperelasticNLFIntegratorHR::AssembleH(const int dim, const int dof, const double w, const DenseMatrix &J, DenseMatrix &elmat)
+      {
+      //Assemble elmat
+      for (size_t i = 0; i < dof; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int ij = j * dof + i;
+
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int mn = n * dof + m;
+               double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
+               {
+                  const int S_jk = k * dim + j;
+                  temp += Dmat(S_jk, mn) * w * J(i,k);
+               }
+               elmat(ij, mn) += temp;
+               
+            }
+         }
+      }
+
+       }; 
  
 
 //RHS
