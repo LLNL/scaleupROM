@@ -23,12 +23,14 @@ namespace mfem
        : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
  
     void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
+    void SetML(ElementTransformation &Trans, const IntegrationPoint &ip);
+    void SetML(FaceElementTransformations &Trans, const IntegrationPoint &ip);
     double EvalW(const DenseMatrix &J);
 
    double EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
-
-    void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P);
-    void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P);
+    void EvalP(const DenseMatrix &J, DenseMatrix &P);
+    //void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P);
+    //void EvalP(const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P);
     
     void EvalDmat(const int dim, const int dof, const IntegrationPoint ip, FaceElementTransformations &Trans, const DenseMatrix gshape, DenseMatrix &Dmat);
     void EvalDmat(const int dim, const int dof, const IntegrationPoint ip, ElementTransformation &Trans, const DenseMatrix gshape, DenseMatrix &Dmat);

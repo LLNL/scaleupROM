@@ -145,47 +145,46 @@ const double wM = w * c_mu->Eval(Ttr, ip);
 return wL + 2.0*wM;
 }
 
-void TestLinModel::EvalP(
-    const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, FaceElementTransformations &Trans, DenseMatrix &P)
+/* void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
 {
-   const int dof = el.GetDof();
-    const int dim = el.GetDim();
-    double L, M;
+   //const int dof = el.GetDof();
+    //const int dim = el.GetDim();
+    //double L, M;
  
-    DenseMatrix dshape(dof, dim);
-    double gh_data[9], grad_data[9];
-    DenseMatrix gh(gh_data, dim, dim);
-    DenseMatrix grad(grad_data, dim, dim);
+    //DenseMatrix dshape(dof, dim);
+    //double gh_data[9], grad_data[9];
+    //DenseMatrix gh(gh_data, dim, dim);
+    //DenseMatrix grad(grad_data, dim, dim);
 
-   el.CalcDShape(ip, dshape);
-   MultAtB(PMatI, dshape, gh);
+   //el.CalcDShape(ip, dshape);
+   //MultAtB(PMatI, dshape, gh);
 
-   Mult(gh, Trans.InverseJacobian(), grad);
+   //Mult(gh, Trans.InverseJacobian(), grad);
 
    // The part below has been changed
    // TODO: This isn't correct in general
-   DenseMatrix tempadj(dim, dim);
-   CalcAdjugate(Trans.Elem1->Jacobian(), tempadj);
-   Mult(gh, tempadj, grad);
-   M = c_mu->Eval(Trans, ip);
-   L = c_lambda->Eval(Trans, ip);
+   //DenseMatrix tempadj(dim, dim);
+   //CalcAdjugate(Trans.Elem1->Jacobian(), tempadj);
+   //Mult(gh, tempadj, grad);
+   //M = c_mu->Eval(Trans, ip);
+   //L = c_lambda->Eval(Trans, ip);
 
-   DenseMatrix DS(dof, dim);
-   Mult(dshape, tempadj, DS);
+   //DenseMatrix DS(dof, dim);
+   //Mult(dshape, tempadj, DS);
 
    P = 0.0;
    // Calculate divergence of strain tensor
-   double e_div = 0.0;
+   /* double e_div = 0.0;
    for (size_t i = 0; i < dim; i++)
    {
       for (size_t j = 0; j < dof; j++)
       {
          e_div += PMatI(j,i) * DS(j,i);
       }
-   }
+   } */
    
    // Fill stress tensor
-   for (size_t i = 0; i < dim; i++)
+   /* for (size_t i = 0; i < dim; i++)
    {
       for (size_t j = 0; j < dim; j++)
       {
@@ -204,11 +203,22 @@ void TestLinModel::EvalP(
          }
          
       }
-   }
+   } */
+//} 
+
+void TestLinModel::SetML(ElementTransformation &Trans, const IntegrationPoint &ip)
+{
+   mu = c_mu->Eval(Trans, ip);
+   lambda = c_lambda->Eval(Trans, ip);
 }
 
-void TestLinModel::EvalP(
-    const FiniteElement &el, const IntegrationPoint &ip, const DenseMatrix &PMatI, ElementTransformation &Trans, DenseMatrix &P)
+void TestLinModel::SetML(FaceElementTransformations &Trans, const IntegrationPoint &ip)
+{
+   mu = c_mu->Eval(Trans, ip);
+   lambda = c_lambda->Eval(Trans, ip);
+}
+
+/* void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
 {
    const int dof = el.GetDof();
     const int dim = el.GetDim();
@@ -251,6 +261,37 @@ void TestLinModel::EvalP(
       P(2,0) = M*(grad(0,2) + grad(2,0));
       P(1,2) = M*(grad(1,2) + grad(2,1));
       P(2,1) = M*(grad(1,2) + grad(2,1));
+   }
+}
+ */
+
+void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
+{
+   // stress = 2*M*e(u) + L*tr(e(u))*I, where
+   //   e(u) = (1/2)*(grad(u) + grad(u)^T)
+   const int dim = J.Size();
+   double L = lambda;
+   const double mu2 = 2.0*mu;
+   if (dim == 2)
+   {
+      L *= (J(0,0) + J(1,1));
+      P(0,0) = mu2*J(0,0) + L;
+      P(1,1)  = mu2*J(1,1) + L;
+      P(1,0)  = mu*(J(0,1) + J(1,0));
+      P(0,1)  = mu*(J(0,1) + J(1,0));
+   }
+   else if (dim == 3)
+   {
+      L *= (J(0,0) + J(1,1) + J(2,2));
+      P(0,0) = mu2*J(0,0) + L;
+      P(1,1) = mu2*J(1,1) + L;
+      P(2,2) = mu2*J(2,2) + L;
+      P(0,1) = mu*(J(0,1) + J(1,0));
+      P(1,0) = mu*(J(0,1) + J(1,0));
+      P(0,2) = mu*(J(0,2) + J(2,0));
+      P(2,0) = mu*(J(0,2) + J(2,0));
+      P(1,2) = mu*(J(1,2) + J(2,1));
+      P(2,1) = mu*(J(1,2) + J(2,1));
    }
 }
 
@@ -485,10 +526,16 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
-      Mult(DSh2, Jrt, DS2);
+      DenseMatrix adjJ2(dim);
+      CalcAdjugate(Trans.Elem2->Jacobian(), adjJ2);
+      //Mult(DSh2, Jrt, DS2);
+      Mult(DSh2, adjJ2, DS2);
       MultAtB(PMatI2, DS2, Jpt2);
+      model->SetML(Trans, eip2);
+      //model->EvalP(el2, eip2, PMatI2, Trans, P2);
 
-      model->EvalP(el2, eip2, PMatI2, Trans, P2);
+      model->EvalP(Jpt2, P2);
+
 
       double w2 = w / Trans.Elem2->Weight();
       wLM = model->EvalwLM(w2, *Trans.Elem2, eip2);
@@ -496,12 +543,25 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       P2.Mult(nor, tau2);
       }
 
-      el1.CalcShape(eip1, shape1);
+      /* el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
       Mult(DSh1, Jrt, DS1);
       MultAtB(PMatI1, DS1, Jpt1);
 
-      model->EvalP(el1, eip1, PMatI1, Trans, P1);
+      //model->EvalP(el1, eip1, PMatI1, Trans, P1);
+      model->SetML(Trans, eip1); */
+      el1.CalcShape(eip1, shape1);
+      el1.CalcDShape(eip1, DSh1);
+      DenseMatrix adjJ1(dim);
+      CalcAdjugate(Trans.Elem1->Jacobian(), adjJ1);
+      //Mult(DSh1, Jrt, DS1);
+      Mult(DSh1, adjJ1, DS1);
+      MultAtB(PMatI1, DS1, Jpt1);
+      model->SetML(Trans, eip1);
+      //model->EvalP(el2, eip2, PMatI2, Trans, P2);
+
+      model->EvalP(Jpt1, P1);
+
 
       double w1 = w / Trans.Elem1->Weight();
       wLM += model->EvalwLM(w1, *Trans.Elem1, eip1);
@@ -835,8 +895,8 @@ void HyperelasticNLFIntegratorHR::AssembleElementVector(const FiniteElement &el,
        Mult(DSh, Jrt, DS);
        MultAtB(PMatI, DS, Jpt);
  
-       //model->EvalP(Jpt, P);
-       model->EvalP(el, ip, PMatI, Ttr, P);
+       model->EvalP(Jpt, P);
+       //model->EvalP(el, ip, PMatI, Ttr, P);
  
        P *= ip.weight * Ttr.Weight();
        AddMultABt(DS, P, PMatO);
