@@ -7,7 +7,7 @@
 using namespace std;
 namespace mfem
 {
-
+/* 
 double StVenantKirchhoffModel::EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
 {const double wL = w * c_lambda->Eval(Ttr, ip);
 const double wM = w * c_mu->Eval(Ttr, ip);
@@ -134,7 +134,7 @@ void StVenantKirchhoffModel::AssembleH(const DenseMatrix &Dmat, const DenseMatri
          }
       }
        }; 
-
+ */
 double TestLinModel::EvalW(const DenseMatrix &J)
 {MFEM_ABORT("TODO")};
 
