@@ -11,7 +11,7 @@
 namespace mfem
 {
 
-   class TestLinModel //: public HyperelasticModel
+   class LinElastMaterialModel //: public HyperelasticModel
    {
    protected:
       mutable double mu, lambda;
@@ -19,20 +19,19 @@ namespace mfem
       ElementTransformation *Ttr;
 
    public:
-      TestLinModel(double mu_, double lambda_)
+      LinElastMaterialModel(double mu_, double lambda_)
           : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
 
       void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
-      void SetML(ElementTransformation &Trans, const IntegrationPoint &ip);
-      void SetML(FaceElementTransformations &Trans, const IntegrationPoint &ip);
+      void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip);
+      void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip);
       double EvalW(const DenseMatrix &J);
 
-      double EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
+      double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
       void EvalP(const DenseMatrix &J, DenseMatrix &P);
 
       void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat);
 
-      // void AssembleH(const int dim, const int dof, const DenseMatrix &J, const double w, DenseMatrix &elmat);
    };
 
    class StVenantKirchhoffModel //: public HyperelasticModel
@@ -50,7 +49,7 @@ namespace mfem
       void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
       double EvalW(const DenseMatrix &J);
 
-      double EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
+      double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
 
       void EvalP(const DenseMatrix &Jpt, const double lambda, const double mu, DenseMatrix &P);
 
@@ -74,7 +73,7 @@ namespace mfem
       void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
       double EvalW(const DenseMatrix &J);
 
-      double EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
+      double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
 
       void EvalP(const DenseMatrix &Jpt, const double lambda, const double mu, DenseMatrix &P);
 
@@ -89,7 +88,7 @@ namespace mfem
    {
 
    public:
-      DGHyperelasticNLFIntegrator(TestLinModel *m, double alpha_, double kappa_)
+      DGHyperelasticNLFIntegrator(LinElastMaterialModel *m, double alpha_, double kappa_)
           : HyperReductionIntegrator(false), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) {}
 
       virtual void AssembleFaceVector(const FiniteElement &el1,
@@ -103,7 +102,7 @@ namespace mfem
                                     const Vector &elfun, DenseMatrix &elmat);
       // values of all scalar basis functions for one component of u (which is a
    protected:
-      TestLinModel *model;
+      LinElastMaterialModel *model;
       Coefficient *lambda, *mu;
       double alpha, kappa; // vector) at the integration point in the reference space
 #ifndef MFEM_THREAD_SAFE
@@ -148,7 +147,7 @@ namespace mfem
    {
 
    private:
-      TestLinModel *model;
+      LinElastMaterialModel *model;
       //   Jrt: the Jacobian of the target-to-reference-element transformation.
       //   Jpr: the Jacobian of the reference-to-physical-element transformation.
       //   Jpt: the Jacobian of the target-to-physical-element transformation.
@@ -162,7 +161,7 @@ namespace mfem
       DenseMatrix DSh, DS, Jrt, Jpr, Jpt, P, PMatI, PMatO, Dmat;
 
    public:
-      HyperelasticNLFIntegratorHR(TestLinModel *m) : HyperReductionIntegrator(false), model(m)
+      HyperelasticNLFIntegratorHR(LinElastMaterialModel *m) : HyperReductionIntegrator(false), model(m)
       {
       }
 
@@ -186,7 +185,7 @@ namespace mfem
    {
    protected:
       VectorCoefficient &uD;
-      TestLinModel *model;
+      LinElastMaterialModel *model;
       Coefficient *lambda, *mu;
       double alpha, kappa;
 
@@ -203,7 +202,7 @@ namespace mfem
 
    public:
       DGHyperelasticDirichletNLFIntegrator(VectorCoefficient &uD_,
-                                           TestLinModel *m,
+                                           LinElastMaterialModel *m,
                                            double alpha_, double kappa_)
           : uD(uD_), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) {}
 

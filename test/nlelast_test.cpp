@@ -346,7 +346,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    a1.Assemble();
    cout<<"a1.Height() is: "<<a1.Height()<<endl;
 
-   TestLinModel model(_mu, _lambda);
+   LinElastMaterialModel model(_mu, _lambda);
    NonlinearForm a2(&fespace);
    a2.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
    a2.AddInteriorFaceIntegrator(

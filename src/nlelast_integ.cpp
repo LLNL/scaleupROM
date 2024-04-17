@@ -8,7 +8,7 @@ using namespace std;
 namespace mfem
 {
 /* 
-double StVenantKirchhoffModel::EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
+double StVenantKirchhoffModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
 {const double wL = w * c_lambda->Eval(Ttr, ip);
 const double wM = w * c_mu->Eval(Ttr, ip);
 return wL + 2.0*wM;
@@ -135,29 +135,29 @@ void StVenantKirchhoffModel::AssembleH(const DenseMatrix &Dmat, const DenseMatri
       }
        }; 
  */
-double TestLinModel::EvalW(const DenseMatrix &J)
+double LinElastMaterialModel::EvalW(const DenseMatrix &J)
 {MFEM_ABORT("TODO")};
 
-double TestLinModel::EvalwLM(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
+double LinElastMaterialModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
 {
 const double wL = w * c_lambda->Eval(Ttr, ip);
 const double wM = w * c_mu->Eval(Ttr, ip);
 return wL + 2.0*wM;
 }
 
-void TestLinModel::SetML(ElementTransformation &Trans, const IntegrationPoint &ip)
+void LinElastMaterialModel::SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip)
 {
    mu = c_mu->Eval(Trans, ip);
    lambda = c_lambda->Eval(Trans, ip);
 }
 
-void TestLinModel::SetML(FaceElementTransformations &Trans, const IntegrationPoint &ip)
+void LinElastMaterialModel::SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip)
 {
    mu = c_mu->Eval(Trans, ip);
    lambda = c_lambda->Eval(Trans, ip);
 }
 
-void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
+void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
 {
    // stress = 2*M*e(u) + L*tr(e(u))*I, where
    //   e(u) = (1/2)*(grad(u) + grad(u)^T)
@@ -187,7 +187,7 @@ void TestLinModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
    }
 }
 
-void TestLinModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat)
+void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat)
 {
 for (size_t i = 0; i < dim; i++) 
       {
@@ -353,13 +353,13 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       CalcAdjugate(Trans.Elem2->Jacobian(), adjJ2);
       Mult(DSh2, adjJ2, DS2);
       MultAtB(PMatI2, DS2, Jpt2);
-      model->SetML(Trans, eip2);
+      model->SetMatParam(Trans, eip2);
 
       model->EvalP(Jpt2, P2);
 
 
       double w2 = w / Trans.Elem2->Weight();
-      wLM = model->EvalwLM(w2, *Trans.Elem2, eip2);
+      wLM = model->EvalDGWeight(w2, *Trans.Elem2, eip2);
       P2 *= w2;
       P2.Mult(nor, tau2);
       }
@@ -370,13 +370,13 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       CalcAdjugate(Trans.Elem1->Jacobian(), adjJ1);
       Mult(DSh1, adjJ1, DS1);
       MultAtB(PMatI1, DS1, Jpt1);
-      model->SetML(Trans, eip1);
+      model->SetMatParam(Trans, eip1);
 
       model->EvalP(Jpt1, P1);
 
 
       double w1 = w / Trans.Elem1->Weight();
-      wLM += model->EvalwLM(w1, *Trans.Elem1, eip1);
+      wLM += model->EvalDGWeight(w1, *Trans.Elem1, eip1);
       P1 *= w1;
       P1.Mult(nor, tau1);
 
@@ -573,12 +573,12 @@ const int dim = el1.GetDim();
       Mult(DSh2, adjJ2, dshape2_ps);
 
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
-      model->SetML(Tr,eip2);
+      model->SetMatParam(Tr,eip2);
 
       model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
       //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
-      wLM = model->EvalwLM(w2, *Tr.Elem2, eip2);
+      wLM = model->EvalDGWeight(w2, *Tr.Elem2, eip2);
       wnor2.Set(w2,nor);
       }
 
@@ -587,7 +587,7 @@ const int dim = el1.GetDim();
       Mult(DSh1, Jrt, DS1);
 
       double w1 = w / Tr.Elem1->Weight();
-      wLM += model->EvalwLM(w1, *Tr.Elem1, eip1);
+      wLM += model->EvalDGWeight(w1, *Tr.Elem1, eip1);
 
       // Temporary stuff
       DenseMatrix adjJ1(dim);
@@ -595,7 +595,7 @@ const int dim = el1.GetDim();
       Mult(DSh1, adjJ1, dshape1_ps);
 
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
-      model->SetML(Tr,eip1);
+      model->SetMatParam(Tr,eip1);
 
       model->EvalDmat(dim, ndofs1, dshape1_ps, Dmat1);
 
@@ -753,7 +753,7 @@ void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
        Mult(DSh, Jrt, DS);
        MultAtB(PMatI, DS, Jpt);
  
-       model->SetML(Ttr,ip);
+       model->SetMatParam(Ttr,ip);
 
        model->EvalDmat(dim, dof, DS, Dmat);
        AssembleH(dim, dof, ip.weight * Ttr.Weight(), DS, elmat);
@@ -859,7 +859,7 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
        double wLM;
 
       const double w = ip.weight / Tr.Elem1->Weight();
-      wLM = model->EvalwLM(w, *Tr.Elem1, eip);
+      wLM = model->EvalDGWeight(w, *Tr.Elem1, eip);
       jcoef = kappa * wLM * (nor*nor);
 
  
