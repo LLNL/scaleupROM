@@ -65,7 +65,7 @@ namespace mfem
                 A(k+d*dof,i+d*dof) += s;
              }
        }
- 
+  
     a *= (-2.0/dim);
  
     // 2.
@@ -75,64 +75,69 @@ namespace mfem
              for (int l = 0; l < dim; l++)
              {
                 A(i+j*dof,k+l*dof) +=
-                   a*(C(i,j)*G(k,l) + G(i,j)*C(k,l)) +
-                   b*G(i,l)*G(k,j) + c*G(i,j)*G(k,l);
+                   a * (C(i,j)*G(k,l) + G(i,j)*C(k,l)) +
+                   b*G(i,l)*G(k,j)  + c*G(i,j)*G(k,l); 
              }
  }
-/* 
-void SimpleAssembleH(const DenseMatrix &J, const DenseMatrix &DS,
-                                 const double weight, DenseMatrix &A) const
-{
-    int num_rows = DS.Height(); // Number of rows in DS
-    int num_cols = DS.Width();  // Number of columns in DS
 
-    // Initialize matrices
+void SimpleAssembleH(const DenseMatrix &J, const DenseMatrix &DS,
+                                 const double weight, DenseMatrix &A)
+{
+   /// set params
+    double g = 1.34;
+    double mu = 3.14;
+    double K = 4.13;
+
+    int dof = DS.Height(), dim = DS.Width();
+ 
     DenseMatrix Z(dim);
     DenseMatrix G(dof, dim);
     DenseMatrix C(dof, dim);
-
-    // Calculate determinant of J
+ 
     double dJ = J.Det();
-    double sJ = dJ / g;
-    double a = mu * pow(dJ, -2.0 / num_cols);
-    double bc = a * (J * J) / num_cols;
-    double b = bc - K * sJ * (sJ - 1.0);
-    double c = 2.0 * bc / num_cols + K * sJ * (2.0 * sJ - 1.0);
-
-    // Calculate adjugate transpose of J
+    double sJ = dJ/g;
+    double a  = mu*pow(dJ, -2.0/dim);
+    double bc = a*(J*J)/dim;
+    double b  = bc - K*sJ*(sJ - 1.0);
+    double c  = 2.0*bc/dim + K*sJ*(2.0*sJ - 1.0);
+ 
     CalcAdjugateTranspose(J, Z);
-    Z *= (1.0 / dJ); // Z = J^{-t}
-
-    // Calculate products DS J^t and DS J^{-1}
+    Z *= (1.0/dJ); // Z = J^{-t}
+ 
     MultABt(DS, J, C); // C = DS J^t
     MultABt(DS, Z, G); // G = DS J^{-1}
-
-    // Scale coefficients by weight
+ 
     a *= weight;
     b *= weight;
     c *= weight;
+    const double a2 = a * (-2.0/dim);
 
-    // Calculate the first part of the assembly using matrix operations
-    DenseMatrix DS_transpose = Transpose(DS); // Transpose of DS
-    DenseMatrix DS_product = DS * DS_transpose; // Product of DS and its transpose
-    DenseMatrix A_first_part = a * DS_product; // Scale the product by coefficient 'a'
+   for (size_t i = 0; i < dof; i++) 
+      {
+         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+         {
+            const int ij = j * dof + i;
 
-    // Update A matrix with the first part of the assembly
-    A.AddSubMatrix(num_rows, num_rows, 0, 0, A_first_part);
-    A.AddSubMatrix(num_rows, num_rows, num_rows, num_rows, A_first_part.Transpose());
+            for (size_t m = 0; m < dof; m++) 
+            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+            {
+               const int mn = n * dof + m;
+               double temp = 0.0;
+               for (size_t k = 0; k < dim; k++)
+               {
+                  const int S_jk = k * dim + j;
+                  //temp += Dmat(S_jk, mn) * w * gshape(i,k);
+                  const double s1 = (j==n) ?  a * DS(m,k) : 0.0;
+                  const double s2 = a2 * (J(j,k)*G(m,n) + Z(j,k)*C(m,n))
+                    + b*Z(n,k)*G(m,j) + c*Z(j,k)*G(m,n);
 
-    // Calculate the second part of the assembly using matrix operations
-    DenseMatrix G_transpose = Transpose(G); // Transpose of G
-    DenseMatrix CG_product = C * G; // Product of C and G
-    DenseMatrix GC_product = G * C; // Product of G and C
-    DenseMatrix GG_product = G * G_transpose; // Product of G and its transpose
-
-    // Combine terms with coefficients 'a', 'b', and 'c'
-    DenseMatrix A_second_part = a * (CG_product + GC_product) + b * GG_product + c * GG_product;
-
-    // Update A matrix with the second part of the assembly
-    A.AddSubMatrix(num_rows, num_rows, 0, 0, A_second_part);
-} */
+                  temp += DS(i,k)*(s1 + s2);
+               } 
+               A(ij, mn) += temp;
+            }
+         }
+      }
+} 
 } //namespace mfem
 
 /**
@@ -151,8 +156,10 @@ TEST(Assemble_H, Test_NLElast)
    DenseMatrix J(dim);
    DenseMatrix DS(ndofs, dim);
    const double w = 1.2;
-   DenseMatrix A(ndofs*dim, ndofs*dim);
-   A = 0.0;
+   DenseMatrix A1(ndofs*dim, ndofs*dim);
+   DenseMatrix A2(ndofs*dim, ndofs*dim);
+   A1 = 0.0;
+   A2 = 0.0;
 
    double lower_bound = -1;
    double upper_bound = 1;
@@ -173,14 +180,16 @@ TEST(Assemble_H, Test_NLElast)
       DS(i,j) = unif(re);
     }
     
-   MFEMAssembleH(J, DS, w, A);
+   MFEMAssembleH(J, DS, w, A1);
+   SimpleAssembleH(J, DS, w, A2);
 
-    //diff_matrix.Add(-1.0, a1.SpMat());
-    
-   double norm_diff = A.FNorm();
+   PrintMatrix(A1, "A1.txt");
+   PrintMatrix(A2, "A2.txt");
 
-    //cout << "Nonlinear Stiffness matrix norm: " << J->MaxNorm() << endl;
-    //cout << "Linear Stiffness matrix norm: " << a1.SpMat().MaxNorm() << endl;
+    cout << "MFEM Stiffness matrix norm: " << A1.FNorm() << endl;
+    cout << "ScaleupROM Stiffness matrix norm: " << A2.FNorm() << endl;
+    A1.Add(-1.0, A2);
+   double norm_diff = A1.FNorm();
     cout << "Stiffness matrix difference norm: " << norm_diff << endl;
 
    return;
