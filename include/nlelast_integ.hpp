@@ -32,8 +32,8 @@ namespace mfem
 
    void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat);
 
-    void AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
-                     const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans);
+    void AssembleH(const int dim, const int dof, const DenseMatrix &J, const double w, DenseMatrix &elmat);
+
  };
 
  class StVenantKirchhoffModel //: public HyperelasticModel

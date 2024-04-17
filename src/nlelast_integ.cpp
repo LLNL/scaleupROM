@@ -206,50 +206,12 @@ for (size_t i = 0; i < dim; i++)
          }
       }
 }
-/* 
-void TestLinModel::EvalDmat(const int dim, const int dof, const IntegrationPoint ip, ElementTransformation &Trans, 
-const DenseMatrix gshape, DenseMatrix &Dmat)
-{
-   double M = c_mu->Eval(Trans, ip);
-   double L = c_lambda->Eval(Trans, ip);
-for (size_t i = 0; i < dim; i++) 
+
+void TestLinModel::AssembleH(const int dim, const int dof, const DenseMatrix &J, const double w, DenseMatrix &elmat)
       {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int S_ij = j * dim + i;
+      DenseMatrix Dmat(dim * dim, dim * dof); // TODO: Add to class
 
-            for (size_t m = 0; m < dof; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
-            {
-               const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? L * gshape(m,n) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == i) ? M * gshape(m,j) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == j) ? M * gshape(m,i) : 0.0);
-            }
-         }
-      }
-} */
-
-void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
-                     const double w, DenseMatrix &elmat, const FiniteElement &el, const IntegrationPoint &ip,ElementTransformation &Trans)
-      {
-      const int dof = el.GetDof();
-      const int dim = el.GetDim();
-      double L, M;
-      DenseMatrix dshape(dof, dim), gshape(dof, dim), pelmat(dof);
-      Vector divshape(dim*dof);
-
-      el.CalcDShape(ip, dshape);
-
-      Trans.SetIntPoint(&ip);
-      Mult(dshape, Trans.InverseJacobian(), gshape);
-      MultAAt(gshape, pelmat);
-      gshape.GradToDiv(divshape);
-
-      DenseMatrix Dmat(dim * dim, dim * dof);
-      SetML(Trans,ip);
-
-      EvalDmat(dim, dof, gshape, Dmat);
+      EvalDmat(dim, dof, J, Dmat);
    
       //Assemble elmat
       for (size_t i = 0; i < dof; i++) 
@@ -266,7 +228,7 @@ void TestLinModel::AssembleH(const DenseMatrix &J, const DenseMatrix &DS,
                for (size_t k = 0; k < dim; k++)
                {
                   const int S_jk = k * dim + j;
-                  temp += Dmat(S_jk, mn) * w * gshape(i,k);
+                  temp += Dmat(S_jk, mn) * w * J(i,k);
                }
                elmat(ij, mn) += temp;
                
@@ -833,7 +795,10 @@ int dof = el.GetDof(), dim = el.GetDim();
        MultAtB(PMatI, DS, Jpt);
  
        //model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat);
-       model->AssembleH(Jpt, DS, ip.weight * Ttr.Weight(), elmat, el, ip, Ttr);
+       model->SetML(Ttr,ip);
+       model->AssembleH(dim, dof, DS, ip.weight * Ttr.Weight(), elmat);
+
+       //model->AssembleH(DS, DS, ip.weight * Ttr.Weight(), elmat, el, ip, Ttr);
     }
                                     };
  
