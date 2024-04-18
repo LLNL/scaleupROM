@@ -394,25 +394,6 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
    double norm_diff = 0.0;
    cout << "Linear residual norm: " << y1.Norml2() << endl;
     cout << "Nonlinear residual norm: " << y2.Norml2() << endl;
-/* 
-cout << "print y1: "<< endl;
-    for (size_t i = 0; i < y1.Size(); i++)
-    {
-      cout<<y1[i]<<endl;
-    }
- 
-    cout << "print y2: "<< endl;
-    for (size_t i = 0; i < y2.Size(); i++)
-    {
-      cout<<y2[i]<<endl;
-    }
-
-    cout << "print y1/y2: "<< endl;
-    for (size_t i = 0; i < y2.Size(); i++)
-    {
-      cout<<y1[i]/y2[i]<<endl;
-    } */
-
 
     y1 -= y2;
     norm_diff = y1.Norml2();

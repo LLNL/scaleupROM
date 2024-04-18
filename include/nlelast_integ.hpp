@@ -11,30 +11,51 @@
 namespace mfem
 {
 
-   class LinElastMaterialModel //: public HyperelasticModel
+   /// Abstract class for hyperelastic models that work with DG methods
+   class DGHyperelasticModel
+   {
+   protected:
+      ElementTransformation *Ttr; /**< Reference-element to target-element
+                                       transformation. */
+
+   public:
+      DGHyperelasticModel() : Ttr(NULL) {}
+      virtual ~DGHyperelasticModel() {}
+
+      void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
+      virtual double EvalW(const DenseMatrix &Jpt) const = 0;
+      virtual void EvalP(const DenseMatrix &Jpt, DenseMatrix &P) const = 0;
+      virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip)const = 0;
+      virtual void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip)const = 0;
+
+      virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const = 0;
+
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat)const = 0;
+   };
+
+   class LinElastMaterialModel : public DGHyperelasticModel
    {
    protected:
       mutable double mu, lambda;
       Coefficient *c_mu, *c_lambda;
-      ElementTransformation *Ttr;
+      // ElementTransformation *Ttr;
 
    public:
       LinElastMaterialModel(double mu_, double lambda_)
           : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
 
-      void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
-      void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip);
-      void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip);
-      double EvalW(const DenseMatrix &J);
+      //void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
+      virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const;
+      virtual void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const;
+      virtual double EvalW(const DenseMatrix &J) const;
 
-      double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
-      void EvalP(const DenseMatrix &J, DenseMatrix &P);
+      virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const;
+      virtual void EvalP(const DenseMatrix &J, DenseMatrix &P) const;
 
-      void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat);
-
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const;
    };
 
-   class StVenantKirchhoffModel //: public HyperelasticModel
+   class StVenantKirchhoffModel //: public DGHyperelasticModel
    {
    protected:
       mutable double mu, lambda;
@@ -58,7 +79,7 @@ namespace mfem
       void AssembleH(const DenseMatrix &Dmat, const DenseMatrix &DS, const double w, DenseMatrix &elmat);
    };
 
-   class NeoHookeanHypModel //: public HyperelasticModel
+   class NeoHookeanHypModel //: public DGHyperelasticModel
    {
    protected:
       mutable double mu, lambda;
@@ -175,7 +196,7 @@ namespace mfem
                                        const Vector &elfun,
                                        DenseMatrix &elmat);
 
-      virtual void AssembleH(const int dim, const int dof, const double w, 
+      virtual void AssembleH(const int dim, const int dof, const double w,
                              const DenseMatrix &J, DenseMatrix &elmat);
    };
 

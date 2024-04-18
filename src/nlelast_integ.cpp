@@ -135,29 +135,29 @@ void StVenantKirchhoffModel::AssembleH(const DenseMatrix &Dmat, const DenseMatri
       }
        }; 
  */
-double LinElastMaterialModel::EvalW(const DenseMatrix &J)
+double LinElastMaterialModel::EvalW(const DenseMatrix &J) const
 {MFEM_ABORT("TODO")};
 
-double LinElastMaterialModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
+double LinElastMaterialModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const
 {
 const double wL = w * c_lambda->Eval(Ttr, ip);
 const double wM = w * c_mu->Eval(Ttr, ip);
 return wL + 2.0*wM;
 }
 
-void LinElastMaterialModel::SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip)
+void LinElastMaterialModel::SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const
 {
    mu = c_mu->Eval(Trans, ip);
    lambda = c_lambda->Eval(Trans, ip);
 }
 
-void LinElastMaterialModel::SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip)
+void LinElastMaterialModel::SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const
 {
    mu = c_mu->Eval(Trans, ip);
    lambda = c_lambda->Eval(Trans, ip);
 }
 
-void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
+void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
 {
    // stress = 2*M*e(u) + L*tr(e(u))*I, where
    //   e(u) = (1/2)*(grad(u) + grad(u)^T)
@@ -187,7 +187,7 @@ void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P)
    }
 }
 
-void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat)
+void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const
 {
 for (size_t i = 0; i < dim; i++) 
       {
