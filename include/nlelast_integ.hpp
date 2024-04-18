@@ -38,7 +38,6 @@ namespace mfem
    protected:
       mutable double mu, lambda;
       Coefficient *c_mu, *c_lambda;
-      // ElementTransformation *Ttr;
 
    public:
       LinElastMaterialModel(double mu_, double lambda_)
@@ -106,7 +105,7 @@ namespace mfem
    {
 
    public:
-      DGHyperelasticNLFIntegrator(LinElastMaterialModel *m, double alpha_, double kappa_)
+      DGHyperelasticNLFIntegrator(DGHyperelasticModel *m, double alpha_, double kappa_)
           : HyperReductionIntegrator(false), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) {}
 
       virtual void AssembleFaceVector(const FiniteElement &el1,
@@ -120,7 +119,7 @@ namespace mfem
                                     const Vector &elfun, DenseMatrix &elmat);
       // values of all scalar basis functions for one component of u (which is a
    protected:
-      LinElastMaterialModel *model;
+      DGHyperelasticModel *model;
       Coefficient *lambda, *mu;
       double alpha, kappa; // vector) at the integration point in the reference space
 #ifndef MFEM_THREAD_SAFE
@@ -165,7 +164,7 @@ namespace mfem
    {
 
    private:
-      LinElastMaterialModel *model;
+      DGHyperelasticModel *model;
       //   Jrt: the Jacobian of the target-to-reference-element transformation.
       //   Jpr: the Jacobian of the reference-to-physical-element transformation.
       //   Jpt: the Jacobian of the target-to-physical-element transformation.
@@ -179,7 +178,7 @@ namespace mfem
       DenseMatrix DSh, DS, Jrt, Jpr, Jpt, P, PMatI, PMatO, Dmat;
 
    public:
-      HyperelasticNLFIntegratorHR(LinElastMaterialModel *m) : HyperReductionIntegrator(false), model(m)
+      HyperelasticNLFIntegratorHR(DGHyperelasticModel *m) : HyperReductionIntegrator(false), model(m)
       {
       }
 
@@ -203,7 +202,7 @@ namespace mfem
    {
    protected:
       VectorCoefficient &uD;
-      LinElastMaterialModel *model;
+      DGHyperelasticModel *model;
       Coefficient *lambda, *mu;
       double alpha, kappa;
 
@@ -220,7 +219,7 @@ namespace mfem
 
    public:
       DGHyperelasticDirichletNLFIntegrator(VectorCoefficient &uD_,
-                                           LinElastMaterialModel *m,
+                                           DGHyperelasticModel *m,
                                            double alpha_, double kappa_)
           : uD(uD_), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) {}
 

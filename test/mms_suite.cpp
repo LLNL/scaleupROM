@@ -662,7 +662,7 @@ namespace nlelast
       {
          model = new LinElastMaterialModel(mu, lambda);
       }
-      
+
       NLElastSolver *test = new NLElastSolver(model);
       
       dim = test->GetDim();

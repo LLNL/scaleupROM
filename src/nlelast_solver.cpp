@@ -224,7 +224,7 @@ void NLElastSolver::BuildDomainOperators()
 void NLElastSolver::Assemble()
 {
    AssembleRHS();
-   AssembleOperator();
+   //AssembleOperator();
 }
 
 void NLElastSolver::AssembleRHS()
@@ -244,11 +244,12 @@ void NLElastSolver::AssembleRHS()
 
 void NLElastSolver::AssembleOperator()
 {
-   // SanityCheckOnCoeffs();
-   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
+   "AssembleOperator is not needed for NLElastSolver!\n";
+   /* // SanityCheckOnCoeffs();
+   MFEM_ASSERT(as.Size() == numSub, "NonlinearForm bs != numSub.\n");
    for (int m = 0; m < numSub; m++)
    {
-      MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
+      MFEM_ASSERT(as[m], "LinearForm or NonlinearForm pointer of a subdomain is not associated!\n");
       as[m]->Assemble();
    }
    mats.SetSize(numSub, numSub);
@@ -299,7 +300,7 @@ void NLElastSolver::AssembleOperator()
       mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
       mumps->SetOperator(*globalMat_hypre);
-   }
+   } */
 }
 
 void NLElastSolver::AssembleInterfaceMatrices()
@@ -310,7 +311,7 @@ void NLElastSolver::AssembleInterfaceMatrices()
 
 bool NLElastSolver::Solve()
 {
-   // If using direct solver, returns always true.
+   /* // If using direct solver, returns always true.
    bool converged = true;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
@@ -382,7 +383,89 @@ bool NLElastSolver::Solve()
             delete globalPrec;
       }
       delete solver;
+   } */
+   int maxIter = config.GetOption<int>("solver/max_iter", 100);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
+   int print_level = config.GetOption<int>("solver/print_level", 0);
+
+   int jac_maxIter = config.GetOption<int>("solver/jacobian/max_iter", 10000);
+   double jac_rtol = config.GetOption<double>("solver/jacobian/relative_tolerance", 1.e-10);
+   double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
+   int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
+
+   bool lbfgs = config.GetOption<bool>("solver/use_lbfgs", false);
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file;
+   if (use_restart)
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+
+   // same size as var_offsets, but sorted by variables first (then by subdomain).
+   Array<int> offsets_byvar(num_var * numSub + 1);
+   offsets_byvar = 0;
+   for (int k = 0; k < numSub; k++)
+   {
+      offsets_byvar[k+1] = u_offsets[k+1];
+      offsets_byvar[k+1 + numSub] = p_offsets[k+1] + u_offsets.Last();
    }
+
+   // sort out solution/rhs by variables.
+   BlockVector rhs_byvar(offsets_byvar);
+   BlockVector sol_byvar(offsets_byvar);
+   SortByVariables(*RHS, rhs_byvar);
+   if (use_restart)
+   {
+      LoadSolution(restart_file);
+      SortByVariables(*U, sol_byvar);
+   }
+   else
+      sol_byvar = 0.0;
+
+   SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve); //TODO: Replace
+
+   if (direct_solve)
+   {
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      mumps->SetPrintLevel(jac_print_level);
+      J_solver = mumps;
+   }
+   else
+   {
+      J_gmres = new GMRESSolver;
+      J_gmres->SetAbsTol(jac_atol);
+      J_gmres->SetRelTol(jac_rtol);
+      J_gmres->SetMaxIter(jac_maxIter);
+      J_gmres->SetPrintLevel(jac_print_level);
+      J_solver = J_gmres;
+   }
+
+   if (lbfgs)
+      newton_solver = new LBFGSSolver;
+   else
+      newton_solver = new NewtonSolver;
+   newton_solver->SetSolver(*J_solver);
+   newton_solver->SetOperator(oper);
+   newton_solver->SetPrintLevel(print_level); // print Newton iterations
+   newton_solver->SetRelTol(rtol);
+   newton_solver->SetAbsTol(atol);
+   newton_solver->SetMaxIter(maxIter);
+
+   newton_solver->Mult(rhs_byvar, sol_byvar);
+   bool converged = newton_solver->GetConverged();
+
+   /* // orthogonalize the pressure.
+   if (!pres_dbc)
+   {
+      Vector pres_view(sol_byvar, vblock_offsets[1], vblock_offsets[2] - vblock_offsets[1]);
+
+      // TODO(kevin): parallelization.
+      double tmp = pres_view.Sum() / pres_view.Size();
+      pres_view -= tmp;
+   }
+  */
+ 
+   SortBySubdomains(sol_byvar, *U);
 
    return converged;
 }
