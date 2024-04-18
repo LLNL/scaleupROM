@@ -55,6 +55,7 @@ class NLElastSolver : public MultiBlockSolver
 {
 
    friend class ParameterizedProblem;
+   friend class NLElastOperator;
 
 protected:
    // interface integrator
@@ -73,6 +74,15 @@ protected:
    HYPRE_BigInt sys_row_starts[2];
    HypreParMatrix *globalMat_hypre = NULL;
    MUMPSSolver *mumps = NULL;
+
+   // Temporary for nonlinear solve implementation
+   Array<int> u_offsets, p_offsets, vblock_offsets;
+   BlockMatrix *systemOp = NULL;
+   Array<NonlinearForm *> hs;
+   InterfaceForm *nl_itf = NULL;
+   Solver *J_solver = NULL;
+   GMRESSolver *J_gmres = NULL;
+   NewtonSolver *newton_solver = NULL;
 
    // operators
    Array<LinearForm *> bs;
