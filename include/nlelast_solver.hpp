@@ -13,6 +13,44 @@
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
+
+// A proxy Operator used for FOM Newton Solver.
+// Similar to SteadyNSOperator.
+class NLElastOperator : public Operator
+{
+protected:
+   bool direct_solve;
+
+   mutable Vector x_u, y_u;
+
+   Array<int> u_offsets, vblock_offsets;
+   InterfaceForm *nl_itf = NULL;
+   Array<NonlinearForm *> hs;
+   BlockOperator *Hop = NULL;
+
+   BlockMatrix *linearOp = NULL;
+   SparseMatrix *M = NULL, *B = NULL, *Bt = NULL;
+
+   // Jacobian matrix objects
+   mutable BlockMatrix *system_jac = NULL;
+   mutable Array2D<SparseMatrix *> hs_mats;
+   mutable BlockMatrix *hs_jac = NULL;
+   mutable SparseMatrix *uu_mono = NULL;
+   mutable SparseMatrix *mono_jac = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
+   HYPRE_BigInt sys_glob_size;
+   mutable HYPRE_BigInt sys_row_starts[2];
+public:
+   NLElastOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+                    Array<int> &u_offsets_, const bool direct_solve_=true);
+
+   virtual ~NLElastOperator();
+
+   virtual void Mult(const Vector &x, Vector &y) const;
+   virtual Operator &GetGradient(const Vector &x) const;
+};
+
 class NLElastSolver : public MultiBlockSolver
 {
 

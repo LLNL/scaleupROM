@@ -10,6 +10,121 @@
 using namespace std;
 using namespace mfem;
 
+
+/* NLElastOperator */
+
+NLElastOperator::NLElastOperator(
+   BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+   Array<int> &u_offsets_, const bool direct_solve_)
+   : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), nl_itf(nl_itf_),
+     u_offsets(u_offsets_), direct_solve(direct_solve_),
+     M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0)))
+{
+   vblock_offsets.SetSize(3);
+   vblock_offsets[0] = 0;
+   vblock_offsets[1] = u_offsets.Last();
+   vblock_offsets[2] = height;
+
+   // TODO: this needs to be changed for parallel implementation.
+   sys_glob_size = height;
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = height;
+
+   Hop = new BlockOperator(u_offsets);
+   for (int m = 0; m < hs_.Size(); m++)
+   {
+      assert(hs_[m]);
+      Hop->SetDiagonalBlock(m, hs_[m]);
+   }
+
+   hs_mats.SetSize(hs.Size(), hs.Size());
+   hs_mats = NULL;
+}
+
+NLElastOperator::~NLElastOperator()
+{
+   delete Hop;
+   delete system_jac;
+   // NonlinearForm owns the gradient operator.
+   // DeletePointers(hs_mats);
+   delete hs_jac;
+   delete uu_mono;
+   delete mono_jac;
+   delete jac_hypre;
+}
+
+void NLElastOperator::Mult(const Vector &x, Vector &y) const
+{
+   assert(linearOp);
+   x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
+   y_u.MakeRef(y, 0, u_offsets.Last());
+
+   y = 0.0;
+
+   Hop->Mult(x_u, y_u);
+   if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u);
+   linearOp->AddMult(x, y);
+}
+
+Operator& NLElastOperator::GetGradient(const Vector &x) const
+{
+   // NonlinearForm owns the gradient operator.
+   // DeletePointers(hs_mats);
+   delete hs_jac;
+   delete uu_mono;
+   delete system_jac;
+   delete mono_jac;
+   delete jac_hypre;
+
+   hs_jac = new BlockMatrix(u_offsets);
+   for (int i = 0; i < hs.Size(); i++)
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         if (i == j)
+         {
+            x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
+            hs_mats(i, j) = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+         }
+         else
+         {
+            delete hs_mats(i, j);
+            hs_mats(i, j) = new SparseMatrix(u_offsets[i+1] - u_offsets[i], u_offsets[j+1] - u_offsets[j]);
+         }
+      }
+
+   x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
+   if (nl_itf) nl_itf->InterfaceGetGradient(x_u, hs_mats);
+
+   for (int i = 0; i < hs.Size(); i++)
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         hs_mats(i, j)->Finalize();
+         hs_jac->SetBlock(i, j, hs_mats(i, j));
+      }
+
+   SparseMatrix *hs_jac_mono = hs_jac->CreateMonolithic();
+   uu_mono = Add(*M, *hs_jac_mono);
+   delete hs_jac_mono;
+
+   assert(B && Bt);
+
+   system_jac = new BlockMatrix(vblock_offsets);
+   system_jac->SetBlock(0,0, uu_mono);
+   system_jac->SetBlock(0,1, Bt);
+   system_jac->SetBlock(1,0, B);
+
+   mono_jac = system_jac->CreateMonolithic();
+   if (direct_solve)
+   {
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
+      return *jac_hypre;
+   }  
+   else
+      return *mono_jac;
+}
+
+/* NLElastSolver */
+
 NLElastSolver::NLElastSolver(DGHyperelasticModel* _model)
     : MultiBlockSolver()
 {
@@ -245,62 +360,6 @@ void NLElastSolver::AssembleRHS()
 void NLElastSolver::AssembleOperator()
 {
    "AssembleOperator is not needed for NLElastSolver!\n";
-   /* // SanityCheckOnCoeffs();
-   MFEM_ASSERT(as.Size() == numSub, "NonlinearForm bs != numSub.\n");
-   for (int m = 0; m < numSub; m++)
-   {
-      MFEM_ASSERT(as[m], "LinearForm or NonlinearForm pointer of a subdomain is not associated!\n");
-      as[m]->Assemble();
-   }
-   mats.SetSize(numSub, numSub);
-   for (int i = 0; i < numSub; i++)
-   {
-      for (int j = 0; j < numSub; j++)
-      {
-         if (i == j)
-         {
-            mats(i, i) = &(as[i]->SpMat());
-         }
-         else
-         {
-            mats(i, j) = new SparseMatrix(fes[i]->GetTrueVSize(), fes[j]->GetTrueVSize());
-         }
-      }
-   }
-   AssembleInterfaceMatrices();
-   for (int m = 0; m < numSub; m++)
-      as[m]->Finalize();
-
-   // globalMat = new BlockOperator(block_offsets);
-   // NOTE: currently, domain-decomposed system will have a significantly different sparsity pattern.
-   // This is especially true for vector solution, where ordering of component is changed.
-   // This is quite inevitable, but is it desirable?
-   globalMat = new BlockMatrix(var_offsets);
-   for (int i = 0; i < numSub; i++)
-   {
-      for (int j = 0; j < numSub; j++)
-      {
-         if (i != j)
-            mats(i, j)->Finalize();
-
-         globalMat->SetBlock(i, j, mats(i, j));
-      }
-   }
-
-   if (use_amg || direct_solve)
-   {
-      globalMat_mono = globalMat->CreateMonolithic();
-
-      // TODO: need to change when the actual parallelization is implemented.
-      sys_glob_size = globalMat_mono->NumRows();
-      sys_row_starts[0] = 0;
-      sys_row_starts[1] = globalMat_mono->NumRows();
-      globalMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, globalMat_mono);
-
-      mumps = new MUMPSSolver(MPI_COMM_SELF);
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
-      mumps->SetOperator(*globalMat_hypre);
-   } */
 }
 
 void NLElastSolver::AssembleInterfaceMatrices()
@@ -311,79 +370,6 @@ void NLElastSolver::AssembleInterfaceMatrices()
 
 bool NLElastSolver::Solve()
 {
-   /* // If using direct solver, returns always true.
-   bool converged = true;
-
-   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
-   int print_level = config.GetOption<int>("solver/print_level", 0);
-
-   // TODO: need to change when the actual parallelization is implemented.
-   cout << "direct_solve is: " << direct_solve << endl;
-   if (direct_solve)
-   {
-      assert(mumps);
-      mumps->SetPrintLevel(print_level);
-      mumps->Mult(*RHS, *U);
-   }
-   else
-   {
-      CGSolver *solver = NULL;
-      HypreBoomerAMG *M = NULL;
-      BlockDiagonalPreconditioner *globalPrec = NULL;
-
-      // HypreBoomerAMG makes a meaningful difference in computation time.
-      if (use_amg)
-      {
-         // Initializating HypreParMatrix needs the monolithic sparse matrix.
-         assert(globalMat_mono != NULL);
-
-         solver = new CGSolver(MPI_COMM_WORLD);
-
-         M = new HypreBoomerAMG(*globalMat_hypre);
-         M->SetPrintLevel(print_level);
-
-         solver->SetPreconditioner(*M);
-         solver->SetOperator(*globalMat_hypre);
-      }
-      else
-      {
-         solver = new CGSolver();
-
-         if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
-         {
-            globalPrec = new BlockDiagonalPreconditioner(var_offsets);
-            solver->SetPreconditioner(*globalPrec);
-         }
-         solver->SetOperator(*globalMat);
-      }
-      solver->SetAbsTol(atol);
-      solver->SetRelTol(rtol);
-      solver->SetMaxIter(maxIter);
-      solver->SetPrintLevel(print_level);
-
-      *U = 0.0;
-      // The time for the setup above is much smaller than this Mult().
-      // StopWatch test;
-      // test.Start();
-      solver->Mult(*RHS, *U);
-      // test.Stop();
-      // printf("test: %f seconds.\n", test.RealTime());
-      converged = solver->GetConverged();
-
-      // delete the created objects.
-      if (use_amg)
-      {
-         delete M;
-      }
-      else
-      {
-         if (globalPrec != NULL)
-            delete globalPrec;
-      }
-      delete solver;
-   } */
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
@@ -421,7 +407,7 @@ bool NLElastSolver::Solve()
    else
       sol_byvar = 0.0;
 
-   SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve); //TODO: Replace
+   NLElastOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);
 
    if (direct_solve)
    {
@@ -464,7 +450,7 @@ bool NLElastSolver::Solve()
       pres_view -= tmp;
    }
   */
- 
+
    SortBySubdomains(sol_byvar, *U);
 
    return converged;
