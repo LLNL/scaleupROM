@@ -98,11 +98,12 @@ namespace nlelast
 static const double pi = 4.0 * atan(1.0);
 static const double mu = 1.0; //only test case when mu = 1.0 (homogenous material)
 static double K = 1.0;
+static double lambda = K;
 static int dim;
 static void ExactSolution(const Vector & x, Vector & u);
 static void ExactRHS(const Vector & x, Vector & u);
 NLElastSolver *SolveWithRefinement(const int num_refinement);
-void CheckConvergence();
+void CheckConvergence(bool nonlinear);
 
 }  // namespace nlelast
 

@@ -50,11 +50,13 @@ protected:
    double alpha = -1.0;
    double kappa = -1.0;
 
+   DGHyperelasticModel* model;
+
    // Initial positions
    VectorFunctionCoefficient *init_x = NULL;
 
 public:
-   NLElastSolver();
+   NLElastSolver(DGHyperelasticModel* _model = NULL);
 
    virtual ~NLElastSolver();
 

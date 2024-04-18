@@ -10,12 +10,14 @@
 using namespace std;
 using namespace mfem;
 
-NLElastSolver::NLElastSolver()
+NLElastSolver::NLElastSolver(DGHyperelasticModel* _model)
     : MultiBlockSolver()
 {
    //alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
    alpha = 0.0; // Currently only allow IIPG mode
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
+
+   model = _model;
 
    var_names = GetVariableNames();
    num_var = var_names.size();

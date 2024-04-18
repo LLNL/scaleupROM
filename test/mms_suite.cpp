@@ -654,14 +654,16 @@ namespace nlelast
          double lambda = K;
       if (nonlinear)
       {
-         model = new NeoHookeanHypModel(mu, K);
+         //model = new NeoHookeanHypModel(mu, K);
+         model = new LinElastMaterialModel(mu, lambda);
+
       }
       else
       {
          model = new LinElastMaterialModel(mu, lambda);
       }
       
-      NLElastSolver *test = new NLElastSolver(*model);
+      NLElastSolver *test = new NLElastSolver(model);
       
       dim = test->GetDim();
 
@@ -701,8 +703,16 @@ namespace nlelast
 
       // Compare with exact solution
       int dim = 2; // only check two dimensions
-      VectorFunctionCoefficient exact_sol(dim, ExactSolution);
-
+      VectorFunctionCoefficient* exact_sol;
+      if (nonlinear)
+      {
+      exact_sol = new VectorFunctionCoefficient(dim, ExactSolutionNeoHooke);
+      }
+      else
+      {
+      exact_sol = new VectorFunctionCoefficient(dim, ExactSolutionLinear);
+      }
+      
       printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
 
       Vector conv_rate(num_refine);
@@ -725,7 +735,7 @@ namespace nlelast
          for (int k = 0; k < test->GetNumSubdomains(); k++)
          {
             Mesh *mk = test->GetMesh(k);
-            norm += pow(ComputeLpNorm(2.0, exact_sol, *mk, irs), 2);
+            norm += pow(ComputeLpNorm(2.0, *exact_sol, *mk, irs), 2);
             numEl += mk->GetNE();
          }
          norm = sqrt(norm);
@@ -734,7 +744,7 @@ namespace nlelast
          for (int k = 0; k < test->GetNumSubdomains(); k++)
          {
             GridFunction *uk = test->GetGridFunction(k);
-            error += pow(uk->ComputeLpError(2, exact_sol), 2);
+            error += pow(uk->ComputeLpError(2, *exact_sol), 2);
          }
          error = sqrt(error);
          error /= norm;
