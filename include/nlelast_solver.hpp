@@ -38,7 +38,7 @@ protected:
 
    // operators
    Array<LinearForm *> bs;
-   Array<BilinearForm *> as;
+   Array<NonlinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
    Array<ConstantCoefficient *> lambda_c;

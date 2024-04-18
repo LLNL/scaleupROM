@@ -13,14 +13,13 @@ using namespace mfem;
 NLElastSolver::NLElastSolver(DGHyperelasticModel* _model)
     : MultiBlockSolver()
 {
-   //alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
-   alpha = 0.0; // Currently only allow IIPG mode
+   alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
-
-   model = _model;
 
    var_names = GetVariableNames();
    num_var = var_names.size();
+
+   model = _model;
 
    // solution dimension is determined by initialization.
    udim = dim;
@@ -182,9 +181,11 @@ void NLElastSolver::SetupRHSBCOperators()
 
          switch (bdr_type[b])
          {
-            case BoundaryType::DIRICHLET:
-               bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
-                  *bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+               case BoundaryType::DIRICHLET:
+               //bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
+                  //*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+               bs[m]->AddBdrFaceIntegrator(new DGHyperelasticDirichletNLFIntegrator(
+               *bdr_coeffs[b], model, alpha, kappa), *bdr_markers[b]);
                break;
             case BoundaryType::NEUMANN:
                bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
@@ -206,13 +207,13 @@ void NLElastSolver::BuildDomainOperators()
 
    for (int m = 0; m < numSub; m++)
    {
-      as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c[m]), *(mu_c[m])));
+      as[m] = new NonlinearForm(fes[m]);
+      as[m]->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(model));
 
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
-             new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa));
+             new DGHyperelasticNLFIntegrator(model, alpha, kappa));
       }
    }
 
@@ -419,7 +420,7 @@ void NLElastSolver::SetupBCOperators()
 
 void NLElastSolver::SetupDomainBCOperators()
 {
-   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
+   MFEM_ASSERT(as.Size() == numSub, "NonlinearForm bs != numSub.\n");
    if (full_dg)
    {
       for (int m = 0; m < numSub; m++)
@@ -433,8 +434,10 @@ void NLElastSolver::SetupDomainBCOperators()
                continue;
 
             if (bdr_type[b] == BoundaryType::DIRICHLET)
-               as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
-                  *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+               //as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
+                 // *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+               as[m]->AddBdrFaceIntegrator(
+                  new DGHyperelasticNLFIntegrator(model, alpha, kappa), *(bdr_markers[b]));
          }
       }
    }
@@ -591,4 +594,4 @@ void NLElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_co
          for (int j = 0; j < 2; j++) delete spmats(i, j);
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
-void NLElastSolver::SanityCheckOnCoeffs() { "NLElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
+//void NLElastSolver::SanityCheckOnCoeffs() { "NLElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
