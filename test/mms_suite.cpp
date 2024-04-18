@@ -599,7 +599,26 @@ namespace linelast
 
 namespace nlelast
 {
-   void ExactSolution(const Vector &x, Vector &u)
+   void ExactSolutionLinear(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = pow(x(i), 3.0);
+      }
+   }
+
+   void ExactRHSLinear(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = 6.0 * x(i) * (lambda + 2.0 * mu);
+      }
+      u *= -1.0;
+   }
+
+   void ExactSolutionNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
       assert(dim == 2);
@@ -609,7 +628,7 @@ namespace nlelast
       }
    }
 
-   void ExactRHS(const Vector &x, Vector &u)
+   void ExactRHSNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
       assert(dim == 2);
@@ -625,22 +644,45 @@ namespace nlelast
       //u *= -1.0;
    }
 
-   NLElastSolver *SolveWithRefinement(const int num_refinement)
+   NLElastSolver *SolveWithRefinement(const int num_refinement, const bool nonlinear)
    {
       config.dict_["mesh"]["uniform_refinement"] = num_refinement;
-      NLElastSolver *test = new NLElastSolver();
+      DGHyperelasticModel *model = NULL;
 
+         double mu = 3.14;
+         double K = 2.13;
+         double lambda = K;
+      if (nonlinear)
+      {
+         model = new NeoHookeanHypModel(mu, K);
+      }
+      else
+      {
+         model = new LinElastMaterialModel(mu, lambda);
+      }
+      
+      NLElastSolver *test = new NLElastSolver(*model);
+      
       dim = test->GetDim();
 
       test->InitVariables();
       test->InitVisualization();
-
-      test->AddBCFunction(ExactSolution, 1);
-      test->AddBCFunction(ExactSolution, 2);
-      test->AddBCFunction(ExactSolution, 3);
+      if (nonlinear)
+      {
+      test->AddBCFunction(ExactSolutionNeoHooke, 1);
+      test->AddBCFunction(ExactSolutionNeoHooke, 2);
+      test->AddBCFunction(ExactSolutionNeoHooke, 3);
+      test->AddRHSFunction(ExactRHSNeoHooke);
+      }
+      else
+      {
+      test->AddBCFunction(ExactSolutionLinear, 1);
+      test->AddBCFunction(ExactSolutionLinear, 2);
+      test->AddBCFunction(ExactSolutionLinear, 3);
+      test->AddRHSFunction(ExactRHSLinear);
+      }
       test->SetBdrType(BoundaryType::DIRICHLET);
-      test->AddRHSFunction(ExactRHS);
-
+      
       test->BuildOperators();
 
       test->SetupBCOperators();
@@ -652,7 +694,7 @@ namespace nlelast
       return test;
    }
 
-   void CheckConvergence()
+   void CheckConvergence(const bool nonlinear)
    {
       int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
       int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
@@ -668,7 +710,7 @@ namespace nlelast
       double error1 = 0.0;
       for (int r = base_refine; r < num_refine; r++)
       {
-         NLElastSolver *test = SolveWithRefinement(r);
+         NLElastSolver *test = SolveWithRefinement(r, nonlinear);
 
          int order = test->GetDiscretizationOrder();
          int order_quad = max(2, 2 * order + 1);
