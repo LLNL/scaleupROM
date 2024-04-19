@@ -40,6 +40,7 @@ protected:
    Array<BilinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
+   double lambda, mu;
    Array<ConstantCoefficient *> lambda_c;
    Array<ConstantCoefficient *> mu_c;
    Array<VectorFunctionCoefficient *> bdr_coeffs;
@@ -53,7 +54,7 @@ protected:
    VectorFunctionCoefficient *init_x = NULL;
 
 public:
-   LinElastSolver();
+   LinElastSolver(const double lambda_ = 1.0, const double mu_ = 1.0);
 
    virtual ~LinElastSolver();
 

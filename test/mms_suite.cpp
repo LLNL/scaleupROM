@@ -696,6 +696,52 @@ namespace nlelast
       return test;
    }
 
+
+   void CompareLinMat()
+   {
+      int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+      int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+      // Compare with exact solution
+      config.dict_["mesh"]["uniform_refinement"] = 0;
+      double mu = 3.14;
+      double K = 2.13;
+      double lambda = K;
+      LinElastMaterialModel* model = new LinElastMaterialModel(mu, lambda);
+      NLElastSolver *test1 = new NLElastSolver(model);
+
+      LinElastSolver *test2 = new LinElastSolver(mu, lambda);
+      dim = test2->GetDim();
+      assert(dim == 2);
+      test2->InitVariables();
+      test2->InitVisualization();
+      test2->AddBCFunction(ExactSolutionLinear, 1);
+      test2->AddBCFunction(ExactSolutionLinear, 2);
+      test2->AddBCFunction(ExactSolutionLinear, 3);
+      test2->SetBdrType(BoundaryType::DIRICHLET);
+      test2->AddRHSFunction(ExactRHSLinear);
+      test2->BuildOperators();
+      test2->SetupBCOperators();
+      test2->Assemble();
+      test2->Solve();
+      
+      dim = test1->GetDim();
+      assert(dim == 2);
+      test1->InitVariables();
+      test1->InitVisualization();
+      test1->AddBCFunction(ExactSolutionLinear, 1);
+      test1->AddBCFunction(ExactSolutionLinear, 2);
+      test1->AddBCFunction(ExactSolutionLinear, 3);
+      test1->SetBdrType(BoundaryType::DIRICHLET);
+      test1->AddRHSFunction(ExactRHSLinear);
+      test1->BuildOperators();
+      test1->SetupBCOperators();
+      test1->Assemble();
+      test1->Solve();
+
+      return;
+   }
+
    void CheckConvergence(const bool nonlinear)
    {
       int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);

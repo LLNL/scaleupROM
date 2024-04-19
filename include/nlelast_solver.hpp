@@ -42,7 +42,7 @@ protected:
    HYPRE_BigInt sys_glob_size;
    mutable HYPRE_BigInt sys_row_starts[2];
 public:
-   NLElastOperator(BlockMatrix *linearOp_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+   NLElastOperator(const int height_, const int width_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
                     Array<int> &u_offsets_, const bool direct_solve_=true);
 
    virtual ~NLElastOperator();

@@ -10,11 +10,15 @@
 using namespace std;
 using namespace mfem;
 
-LinElastSolver::LinElastSolver()
+LinElastSolver::LinElastSolver(const double  mu_, const double lambda_)
     : MultiBlockSolver()
 {
    alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
+   alpha = 0.0; // TEMP
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
+   mu = mu_;
+   lambda = lambda_;
+
 
    var_names = GetVariableNames();
    num_var = var_names.size();
@@ -75,17 +79,7 @@ void LinElastSolver::SetupBCVariables()
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   lambda_c.SetSize(numSub);
-   lambda_c = NULL;
-
-   mu_c.SetSize(numSub);
-   mu_c = NULL;
-
-   for (size_t i = 0; i < numSub; i++)
-   {
-      lambda_c[i] = new ConstantCoefficient(1.0);
-      mu_c[i] = new ConstantCoefficient(1.0);
-   }
+   
 }
 
 void LinElastSolver::InitVariables()
@@ -108,6 +102,18 @@ void LinElastSolver::InitVariables()
    block_offsets.PartialSum();
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
+
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
+
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
+
+   for (size_t i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new ConstantCoefficient(lambda);
+      mu_c[i] = new ConstantCoefficient(mu);
+   }
 
    SetupBCVariables();
 
@@ -293,7 +299,15 @@ void LinElastSolver::AssembleOperator()
       globalMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, globalMat_mono);
 
       mumps = new MUMPSSolver(MPI_COMM_SELF);
+      if (alpha != -1.0)
+      {
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      }
+      else
+      {
       mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
+      }
+      
       mumps->SetOperator(*globalMat_hypre);
    }
 }
@@ -319,6 +333,11 @@ bool LinElastSolver::Solve()
    if (direct_solve)
    {
       assert(mumps);
+      if (alpha!=-1.0)
+      {
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      }
+      
       mumps->SetPrintLevel(print_level);
       mumps->Mult(*RHS, *U);
    }
@@ -379,6 +398,11 @@ bool LinElastSolver::Solve()
       }
       delete solver;
    }
+
+      PrintMatrix(*(globalMat->CreateMonolithic()->ToDenseMatrix()), "test_KLin.txt");
+      PrintVector(*RHS, "RhsLin.txt");
+      PrintVector(*U, "ULin2.txt");
+
 
    return converged;
 }

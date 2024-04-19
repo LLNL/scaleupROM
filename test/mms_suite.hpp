@@ -104,6 +104,7 @@ static void ExactSolution(const Vector & x, Vector & u);
 static void ExactRHS(const Vector & x, Vector & u);
 NLElastSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence(bool nonlinear);
+void CompareLinMat();
 
 }  // namespace nlelast
 
