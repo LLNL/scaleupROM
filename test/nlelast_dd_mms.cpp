@@ -50,10 +50,10 @@ TEST(DDSerialTest, CompareSolvers)
    config.dict_["domain-decomposition"]["type"] = "none";
    bool nonlinear = false;
    config.dict_["discretization"]["interface/alpha"] = 0.0;
-   int order = 1;
-   config.dict_["discretization"]["interface/kappa"] = (order + 1) * (order + 1);
+   //int order = 1;
+   //config.dict_["discretization"]["interface/kappa"] = (order + 1) * (order + 1);
    CompareLinMat();
-
+   CheckConvergence(nonlinear);
    return;
 }
 
