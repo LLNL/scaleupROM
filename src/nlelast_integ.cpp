@@ -157,6 +157,13 @@ void LinElastMaterialModel::SetMatParam(FaceElementTransformations &Trans, const
    lambda = c_lambda->Eval(Trans, ip);
 }
 
+void LinElastMaterialModel::GetMatParam(Vector &params) const
+{
+   params.SetSize(2);
+   params[0] = lambda;
+   params[1] = mu;
+}
+
 void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
 {
    // stress = 2*M*e(u) + L*tr(e(u))*I, where

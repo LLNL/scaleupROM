@@ -28,7 +28,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound)
    return;
 } */
 
-/* TEST(DDSerialTest, Test_direct_solver_DG)
+TEST(DDSerialTest, Test_direct_solver_DG)
 {
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
@@ -39,7 +39,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound)
    CheckConvergence(nonlinear);
 
    return;
-} */
+}
 
 TEST(DDSerialTest, CompareSolvers)
 {
@@ -50,10 +50,8 @@ TEST(DDSerialTest, CompareSolvers)
    config.dict_["domain-decomposition"]["type"] = "none";
    bool nonlinear = false;
    config.dict_["discretization"]["interface/alpha"] = 0.0;
-   //int order = 1;
-   //config.dict_["discretization"]["interface/kappa"] = (order + 1) * (order + 1);
+
    CompareLinMat();
-   CheckConvergence(nonlinear);
    return;
 }
 

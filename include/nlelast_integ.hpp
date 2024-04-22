@@ -27,6 +27,7 @@ namespace mfem
       virtual void EvalP(const DenseMatrix &Jpt, DenseMatrix &P) const = 0;
       virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip)const = 0;
       virtual void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip)const = 0;
+      virtual void GetMatParam(Vector &params) const = 0;
 
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const = 0;
 
@@ -36,8 +37,8 @@ namespace mfem
    class LinElastMaterialModel : public DGHyperelasticModel
    {
    protected:
-      mutable double mu, lambda;
       Coefficient *c_mu, *c_lambda;
+      mutable double mu, lambda;
 
    public:
       LinElastMaterialModel(double mu_, double lambda_)
@@ -45,12 +46,14 @@ namespace mfem
 
       virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const;
       virtual void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const;
+      virtual void GetMatParam(Vector &params) const;
       virtual double EvalW(const DenseMatrix &J) const;
 
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const;
       virtual void EvalP(const DenseMatrix &J, DenseMatrix &P) const;
 
       virtual void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const;
+
    };
 
    class StVenantKirchhoffModel //: public DGHyperelasticModel
@@ -91,6 +94,7 @@ namespace mfem
 
      virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const;
       virtual void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const;
+      virtual void GetMatParam(Vector &params) const;
       virtual double EvalW(const DenseMatrix &J) const;
 
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const;

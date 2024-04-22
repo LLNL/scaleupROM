@@ -329,7 +329,6 @@ bool LinElastSolver::Solve()
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    // TODO: need to change when the actual parallelization is implemented.
-   cout << "direct_solve is: " << direct_solve << endl;
    if (direct_solve)
    {
       assert(mumps);

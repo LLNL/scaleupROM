@@ -18,10 +18,6 @@ NLElastOperator::NLElastOperator(const int height_, const int width_, Array<Nonl
    : Operator(height_, width_), hs(hs_), nl_itf(nl_itf_),
      u_offsets(u_offsets_), direct_solve(direct_solve_)
 {
-   //vblock_offsets.SetSize(3);
-   //vblock_offsets[0] = 0;
-   //vblock_offsets[1] = u_offsets.Last();
-   //vblock_offsets[2] = height;
 
    // TODO: this needs to be changed for parallel implementation.
    sys_glob_size = height;
@@ -43,8 +39,6 @@ NLElastOperator::~NLElastOperator()
 {
    delete Hop;
    delete system_jac;
-   // NonlinearForm owns the gradient operator.
-   // DeletePointers(hs_mats);
    delete hs_jac;
    delete uu_mono;
    delete mono_jac;
@@ -53,26 +47,15 @@ NLElastOperator::~NLElastOperator()
 
 void NLElastOperator::Mult(const Vector &x, Vector &y) const
 {
-   //assert(linearOp);
-   //x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
-   //y_u.MakeRef(y, 0, u_offsets.Last());
-
    y = 0.0;
 
-   //Hop->Mult(x_u, y_u);
    Hop->Mult(x, y);
-   if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u); // TODO: Add this when interface integrator is there
-   //linearOp->AddMult(x, y);
+   //if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u); // TODO: Add this when interface integrator is there
 }
 
 Operator& NLElastOperator::GetGradient(const Vector &x) const
 {
-   // NonlinearForm owns the gradient operator.
-   // DeletePointers(hs_mats);
    delete hs_jac;
-   //delete uu_mono;
-   //delete system_jac;
-   //delete mono_jac;
    delete jac_hypre;
 
    hs_jac = new BlockMatrix(u_offsets);
@@ -101,22 +84,9 @@ Operator& NLElastOperator::GetGradient(const Vector &x) const
          hs_jac->SetBlock(i, j, hs_mats(i, j));
       }
 
-   //SparseMatrix *hs_jac_mono = hs_jac->CreateMonolithic();
-   /* uu_mono = Add(*M, *hs_jac_mono);
-   delete hs_jac_mono;
-
-   assert(B && Bt);
-
-   system_jac = new BlockMatrix(vblock_offsets);
-   system_jac->SetBlock(0,0, uu_mono);
-   system_jac->SetBlock(0,1, Bt);
-   system_jac->SetBlock(1,0, B);
- */
-   //mono_jac = system_jac->CreateMonolithic();
    mono_jac = hs_jac->CreateMonolithic();
 
-   //return *mono_jac;
-   if (direct_solve) //TEMP
+   if (direct_solve)
    {
       jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
       return *jac_hypre;
@@ -130,8 +100,6 @@ Operator& NLElastOperator::GetGradient(const Vector &x) const
 NLElastSolver::NLElastSolver(DGHyperelasticModel* _model)
     : MultiBlockSolver()
 {
-   //alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
-   cout<<"nl elast"<<endl;
    alpha = 0.0; // Only allow IIPG
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
 
@@ -389,40 +357,20 @@ bool NLElastSolver::Solve()
    std::string restart_file;
    if (use_restart)
       restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+   
+   cout << "direct_solve is: " << direct_solve << endl;
 
-   // same size as var_offsets, but sorted by variables first (then by subdomain).
-   /* Array<int> offsets_byvar(num_var * numSub + 1);
-   offsets_byvar = 0;
-   for (int k = 0; k < numSub; k++)
-   {
-      offsets_byvar[k+1] = u_offsets[k+1];
-      offsets_byvar[k+1 + numSub] = p_offsets[k+1] + u_offsets.Last();
-   } */
-
-   // sort out solution/rhs by variables.
-  /*  BlockVector rhs_byvar(offsets_byvar);
-   BlockVector sol_byvar(offsets_byvar);
-   SortByVariables(*RHS, rhs_byvar);
-   if (use_restart)
-   {
-      LoadSolution(restart_file);
-      SortByVariables(*U, sol_byvar);
-   }
-   else
-      sol_byvar = 0.0; */
-
-   //NLElastOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);
    const int hw = U->Size();
    NLElastOperator oper(hw, hw, as, a_itf, var_offsets, direct_solve);
 
-   /* if (direct_solve)
+   if (direct_solve)
    {
       mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;
    }
-   else */
+   else 
    {
       J_gmres = new GMRESSolver;
       J_gmres->SetAbsTol(jac_atol);
@@ -432,15 +380,13 @@ bool NLElastSolver::Solve()
       J_solver = J_gmres;
    }
 
-
-   //newton_solver->Mult(rhs_byvar, sol_byvar);
     Operator *J_op = &(oper.GetGradient(*U));
    //Operator *J_op = &(a2.GetGradient(x));
     SparseMatrix *J = dynamic_cast<SparseMatrix *>(J_op);
     //std::ofstream outfFile("test_Knl.txt");
     //J->Print(outfFile);
    //PrintMatrix(*(J->ToDenseMatrix()), "test_Knl.txt");
-   PrintVector(*RHS, "RhsNL.txt");
+   //PrintVector(*RHS, "RhsNL.txt");
 
    newton_solver = new NewtonSolver;
    newton_solver->SetSolver(*J_solver);
@@ -451,27 +397,10 @@ bool NLElastSolver::Solve()
    newton_solver->SetMaxIter(maxIter);
 
    newton_solver->Mult(*RHS, *U);
-   
 
-         /* mumps = new MUMPSSolver(MPI_COMM_SELF);
+   //PrintVector(*U, "UNL2.txt");
 
-      if (alpha!=-1.0)
-      {
-         cout<<"jaoo"<<endl;
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
-      }
-      
-      mumps->SetPrintLevel(print_level);
-      mumps->SetOperator(*J_op); */
-
-      //mumps->Mult(*RHS, *U);
-
-   PrintVector(*U, "UNL2.txt");
-
-   //bool converged = newton_solver->GetConverged();
-   bool converged = true;
-
-   //SortBySubdomains(sol_byvar, *U);
+   bool converged = newton_solver->GetConverged();
 
    return converged;
 }
