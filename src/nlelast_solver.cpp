@@ -357,12 +357,11 @@ bool NLElastSolver::Solve()
    std::string restart_file;
    if (use_restart)
       restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
-   
-   cout << "direct_solve is: " << direct_solve << endl;
 
    const int hw = U->Size();
    NLElastOperator oper(hw, hw, as, a_itf, var_offsets, direct_solve);
 
+   cout<<"direct_solve is: "<<direct_solve<<endl;
    if (direct_solve)
    {
       mumps = new MUMPSSolver(MPI_COMM_SELF);
@@ -380,15 +379,10 @@ bool NLElastSolver::Solve()
       J_solver = J_gmres;
    }
 
-    Operator *J_op = &(oper.GetGradient(*U));
-   //Operator *J_op = &(a2.GetGradient(x));
-    SparseMatrix *J = dynamic_cast<SparseMatrix *>(J_op);
-    //std::ofstream outfFile("test_Knl.txt");
-    //J->Print(outfFile);
-   //PrintMatrix(*(J->ToDenseMatrix()), "test_Knl.txt");
-   //PrintVector(*RHS, "RhsNL.txt");
-
-   newton_solver = new NewtonSolver;
+   if (lbfgs)
+      newton_solver = new LBFGSSolver;
+   else
+      newton_solver = new NewtonSolver;
    newton_solver->SetSolver(*J_solver);
    newton_solver->SetOperator(oper);
    newton_solver->SetPrintLevel(print_level); // print Newton iterations
@@ -397,8 +391,6 @@ bool NLElastSolver::Solve()
    newton_solver->SetMaxIter(maxIter);
 
    newton_solver->Mult(*RHS, *U);
-
-   //PrintVector(*U, "UNL2.txt");
 
    bool converged = newton_solver->GetConverged();
 

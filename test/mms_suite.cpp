@@ -781,7 +781,6 @@ namespace nlelast
          for (int k = 0; k < test->GetNumSubdomains(); k++)
          {
             GridFunction *uk = test->GetGridFunction(k);
-            cout<<"uk->Size() is: "<<uk->Size()<<endl;
             error += pow(uk->ComputeLpError(2, *exact_sol), 2);
          }
          error = sqrt(error);
