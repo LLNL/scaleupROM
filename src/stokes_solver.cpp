@@ -284,8 +284,8 @@ void StokesSolver::BuildDomainOperators()
 
    m_itf = new InterfaceForm(meshes, ufes, topol_handler);
    b_itf = new MixedInterfaceForm(meshes, ufes, pfes, topol_handler);
-   m_itf->AddIntefaceIntegrator(new InterfaceDGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
-   b_itf->AddIntefaceIntegrator(new InterfaceDGNormalFluxIntegrator);
+   m_itf->AddInterfaceIntegrator(new InterfaceDGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa));
+   b_itf->AddInterfaceIntegrator(new InterfaceDGNormalFluxIntegrator);
 
    // pressure mass matrix for preconditioner.
    pms.SetSize(numSub);

@@ -369,7 +369,7 @@ void SteadyNSSolver::BuildDomainOperators()
    if (oper_type == OperType::TEMAM)
    {
       nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
-      nl_itf->AddIntefaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
+      nl_itf->AddInterfaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
       // nl_interface->SetIntRule(ir_nl);
    }
 }

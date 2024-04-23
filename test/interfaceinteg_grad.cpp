@@ -48,7 +48,7 @@ void CheckGradient(InterfaceNonlinearFormIntegrator *integ)
    }
 
    InterfaceForm *a_itf = new InterfaceForm(meshes, fes, submesh);
-   a_itf->AddIntefaceIntegrator(integ);
+   a_itf->AddInterfaceIntegrator(integ);
 
    Vector Nx(x.Size());
    Nx = 0.0;

@@ -27,7 +27,6 @@ protected:
 
    /// Set of interior face Integrators to be assembled (added).
    Array<InterfaceNonlinearFormIntegrator*> fnfi; // owned
-   // Array<Array<SampleInfo> *> fnfi_sample;
 
    // For Mult and GetGradient.
    mutable BlockVector x_tmp, y_tmp;
@@ -43,10 +42,9 @@ public:
    virtual ~InterfaceForm();
 
    /// Adds new Interior Face Integrator.
-   void AddIntefaceIntegrator(InterfaceNonlinearFormIntegrator *nlfi)
+   virtual void AddInterfaceIntegrator(InterfaceNonlinearFormIntegrator *nlfi)
    {
       fnfi.Append(nlfi);
-      // fnfi_sample.Append(NULL);
    }
 
    /** @brief Access all interface integrators added with
@@ -58,9 +56,9 @@ public:
 
    void AssembleInterfaceMatrixAtPort(const int p, Array<FiniteElementSpace *> &fes_comp, Array2D<SparseMatrix *> &mats_p) const;
 
-   void InterfaceAddMult(const Vector &x, Vector &y) const;
+   virtual void InterfaceAddMult(const Vector &x, Vector &y) const;
 
-   void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const;
+   virtual void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const;
 
 protected:
 
@@ -116,7 +114,7 @@ public:
    virtual ~MixedInterfaceForm();
 
    /// Adds new Interior Face Integrator.
-   void AddIntefaceIntegrator(InterfaceNonlinearFormIntegrator *nlfi)
+   void AddInterfaceIntegrator(InterfaceNonlinearFormIntegrator *nlfi)
    {
       fnfi.Append(nlfi);
       // fnfi_sample.Append(NULL);
