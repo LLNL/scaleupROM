@@ -191,8 +191,8 @@ set(scaleupROMObj_SOURCES
   include/interface_form.hpp
   src/interface_form.cpp
 
-  # include/multiblock_bilinearform.hpp
-  # src/multiblock_bilinearform.cpp
+  include/rom_interfaceform.hpp
+  src/rom_interfaceform.cpp
 
   include/multiblock_solver.hpp
   src/multiblock_solver.cpp

@@ -53,10 +53,18 @@ jobs:
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
             ./nonlinear_integ_grad
+      - name: Test nonlinear interface integrator gradient
+        run: |
+            cd ${GITHUB_WORKSPACE}/build/test
+            ./interfaceinteg_grad
       - name: Test ROM NonlinearForm
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
             ./test_rom_nonlinearform
+      - name: Test ROM InterfaceForm
+        run: |
+            cd ${GITHUB_WORKSPACE}/build/test
+            ./test_rom_interfaceform
       - name: Test Poisson DD solver
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
