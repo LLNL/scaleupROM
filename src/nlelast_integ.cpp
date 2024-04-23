@@ -274,10 +274,10 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     double bc = a*(J*J)/dim;
     double b  = bc - K*sJ*(sJ - 1.0);
     double c  = 2.0*bc/dim + K*sJ*(2.0*sJ - 1.0);
-    cout<<"Jnorm = "<<J.FNorm()<<endl;
-    cout<<"-2.0/dim = "<<-2.0/dim<<endl;
-    cout<<"mu = "<<mu<<endl;
-    cout<<"a = "<<a<<endl;
+    //cout<<"Jnorm = "<<J.FNorm()<<endl;
+    //cout<<"-2.0/dim = "<<-2.0/dim<<endl;
+    //cout<<"mu = "<<mu<<endl;
+    //cout<<"a = "<<a<<endl;
 
     Z.SetSize(dim);
      G.SetSize(dof, dim);
@@ -326,11 +326,12 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
          const int U_mn = n * dof + m;
 
          const double s1 = (i==n) ?  a * DS(m,j) : 0.0;
-         const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
-               + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n);
+         /* const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
+               + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n); */
+         double s2 = 0.0;
 
          
-         Dmat(S_ij, U_mn) = s1 + s2;       
+         //Dmat(S_ij, U_mn) = s1 + s2;       
       }
    }
 
@@ -613,16 +614,19 @@ const int dim = el1.GetDim();
    Vector elfun_copy(elfun); // FIXME: How to avoid this
     nor.SetSize(dim);
     Jrt.SetSize(dim);
-   cout<<"2"<<endl;
-   cout<<"nvdofs: "<<nvdofs<<endl;
-   cout<<"elmat(0): "<<elmat(0,0)<<endl;
+   //cout<<"2"<<endl;
+   //cout<<"nvdofs: "<<nvdofs<<endl;
+   //cout<<"elmat(0): "<<elmat(0,0)<<endl;
+   //cout<<"elmat.Size: "<<elmat.Size()<<endl;
+   //cout<<"&elmat: "<< &elmat<<endl;
+
    elmat.SetSize(nvdofs);
-   cout<<"postsetsize"<<&nvdofs<<endl;
+   //cout<<"postsetsize"<<&nvdofs<<endl;
 
    elmat = 0.0;
-   cout<<"pretrans"<<endl;
+   //cout<<"pretrans"<<endl;
    model->SetTransformation(Tr);
-   cout<<"posttrans"<<endl;
+   //cout<<"posttrans"<<endl;
 
    const bool kappa_is_nonzero = (kappa != 0.0);
     if (kappa_is_nonzero)
@@ -743,9 +747,9 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
       MultAtB(PMatI1, DS1, Jpt1);
-      cout<<"preDmat"<<endl;
+      //cout<<"preDmat"<<endl;
       model->EvalDmat(dim, ndofs1, DS1, Jpt1, Dmat1);
-      cout<<"postDmat"<<endl;
+      //cout<<"postDmat"<<endl;
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
@@ -783,7 +787,7 @@ const int dim = el1.GetDim();
           elmat(i,i) += jmat(i,i);
        } 
     }
-      cout<<"jmatt"<<endl;
+      //cout<<"jmatt"<<endl;
          
    };
 
