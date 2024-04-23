@@ -48,13 +48,16 @@ NLElastOperator::~NLElastOperator()
 void NLElastOperator::Mult(const Vector &x, Vector &y) const
 {
    y = 0.0;
-
+   cout<<"in mult"<<endl;
    Hop->Mult(x, y);
+   cout<<"out mult"<<endl;
    //if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u); // TODO: Add this when interface integrator is there
 }
 
 Operator& NLElastOperator::GetGradient(const Vector &x) const
 {
+   cout<<"in grad"<<endl;
+
    delete hs_jac;
    delete jac_hypre;
 
@@ -65,7 +68,11 @@ Operator& NLElastOperator::GetGradient(const Vector &x) const
          if (i == j)
          {
             x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
+         cout<<"before getgrad"<<endl;
+
             hs_mats(i, j) = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+         cout<<"after getgrad"<<endl;
+
          }
          else
          {
@@ -85,6 +92,7 @@ Operator& NLElastOperator::GetGradient(const Vector &x) const
       }
 
    mono_jac = hs_jac->CreateMonolithic();
+   cout<<"out grad"<<endl;
 
    if (direct_solve)
    {
@@ -361,7 +369,7 @@ bool NLElastSolver::Solve()
    const int hw = U->Size();
    NLElastOperator oper(hw, hw, as, a_itf, var_offsets, direct_solve);
 
-   cout<<"direct_solve is: "<<direct_solve<<endl;
+   cout<<"1 "<<endl;
    if (direct_solve)
    {
       mumps = new MUMPSSolver(MPI_COMM_SELF);
@@ -378,6 +386,7 @@ bool NLElastSolver::Solve()
       J_gmres->SetPrintLevel(jac_print_level);
       J_solver = J_gmres;
    }
+   cout<<"2 "<<endl;
 
    if (lbfgs)
       newton_solver = new LBFGSSolver;
@@ -389,10 +398,13 @@ bool NLElastSolver::Solve()
    newton_solver->SetRelTol(rtol);
    newton_solver->SetAbsTol(atol);
    newton_solver->SetMaxIter(maxIter);
+   cout<<"4 "<<endl;
 
    newton_solver->Mult(*RHS, *U);
+   cout<<"5 "<<endl;
 
    bool converged = newton_solver->GetConverged();
+   cout<<"6 "<<endl;
 
    return converged;
 }

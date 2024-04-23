@@ -31,7 +31,8 @@ namespace mfem
 
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const = 0;
 
-      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat)const = 0;
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat)const = 0;
+
    };
 
    class LinElastMaterialModel : public DGHyperelasticModel
@@ -52,7 +53,8 @@ namespace mfem
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const;
       virtual void EvalP(const DenseMatrix &J, DenseMatrix &P) const;
 
-      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const;
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const;
+
 
    };
 
@@ -83,14 +85,16 @@ namespace mfem
    class NeoHookeanHypModel : public DGHyperelasticModel
    {
    protected:
-      mutable double mu, lambda;
-      Coefficient *c_mu, *c_lambda;
+      mutable double mu, K, g;
+      Coefficient *c_mu, *c_K, *c_g;
       ElementTransformation *Ttr;
-      DenseMatrix E, S;
+      //DenseMatrix E, S;
+      mutable DenseMatrix Z;    // dim x dim
+      mutable DenseMatrix G, C; // dof x dim
 
    public:
-      NeoHookeanHypModel(double mu_, double lambda_)
-          : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
+      NeoHookeanHypModel(double mu_, double K_, double g_ = 1.0)
+          : mu(mu_), K(K_), g(g_) { c_mu = new ConstantCoefficient(mu), c_K = new ConstantCoefficient(K), c_g = new ConstantCoefficient(g); }
 
      virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const;
       virtual void SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const;
@@ -100,7 +104,7 @@ namespace mfem
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const;
       virtual void EvalP(const DenseMatrix &J, DenseMatrix &P) const;
 
-      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const;
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const;
    };
 
    // DG boundary integrator for nonlinear elastic DG.

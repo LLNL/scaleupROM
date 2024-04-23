@@ -649,8 +649,7 @@ namespace nlelast
 
       if (nonlinear)
       {
-         //model = new NeoHookeanHypModel(mu, K);
-         model = new LinElastMaterialModel(mu, lambda);
+         model = new NeoHookeanHypModel(mu, K);
 
       }
       else

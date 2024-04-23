@@ -194,7 +194,7 @@ void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
    }
 }
 
-void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const
+void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const
 {
 for (size_t i = 0; i < dim; i++) 
       {
@@ -206,13 +206,105 @@ for (size_t i = 0; i < dim; i++)
             for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
             {
                const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? lambda * gshape(m,n) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == i) ? mu * gshape(m,j) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == j) ? mu * gshape(m,i) : 0.0);
+               Dmat(S_ij, U_mn) = ((i == j) ? lambda * DS(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? mu * DS(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? mu * DS(m,i) : 0.0);
             }
          }
       }
 }
+
+double NeoHookeanHypModel::EvalW(const DenseMatrix &J) const
+{  int dim = J.Width();
+ 
+    double dJ = J.Det();
+    double sJ = dJ/g;
+    double bI1 = pow(dJ, -2.0/dim)*(J*J); // \bar{I}_1
+ 
+    return 0.5*(mu*(bI1 - dim) + K*(sJ - 1.0)*(sJ - 1.0));
+    }
+
+double NeoHookeanHypModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const
+{
+const double wL = w * c_K->Eval(Ttr, ip);
+const double wM = w * c_mu->Eval(Ttr, ip);
+return wL + 2.0*wM;
+}
+
+void NeoHookeanHypModel::SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const
+{
+   mu = c_mu->Eval(Trans, ip);
+   K = c_K->Eval(Trans, ip);
+}
+
+void NeoHookeanHypModel::SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const
+{
+   mu = c_mu->Eval(Trans, ip);
+   K = c_K->Eval(Trans, ip);
+}
+
+void NeoHookeanHypModel::GetMatParam(Vector &params) const
+{
+   params.SetSize(2);
+   params[0] = K;
+   params[1] = mu;
+}
+
+void NeoHookeanHypModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
+{
+   int dim = J.Width();
+ 
+    Z.SetSize(dim);
+    CalcAdjugateTranspose(J, Z);
+ 
+    double dJ = J.Det();
+    double a  = mu*pow(dJ, -2.0/dim);
+    double b  = K*(dJ/g - 1.0)/g - a*(J*J)/(dim*dJ);
+ 
+    P = 0.0;
+    P.Add(a, J);
+    P.Add(b, Z);
+}
+
+void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const
+{
+    double dJ = J.Det();
+    double sJ = dJ/g;
+    double a  = mu*pow(dJ, -2.0/dim);
+    double bc = a*(J*J)/dim;
+    double b  = bc - K*sJ*(sJ - 1.0);
+    double c  = 2.0*bc/dim + K*sJ*(2.0*sJ - 1.0);
+ 
+    CalcAdjugateTranspose(J, Z);
+    Z *= (1.0/dJ); // Z = J^{-t}
+ 
+    MultABt(DS, J, C); // C = DS J^t
+    MultABt(DS, Z, G); // G = DS J^{-1}
+ 
+    /* a *= weight;
+    b *= weight;
+    c *= weight; */
+    const double a2 = a * (-2.0/dim);
+
+   for (size_t i = 0; i < dof; i++) 
+   for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+   {
+      const int S_ij = j * dim + i;
+
+      for (size_t m = 0; m < dof; m++) 
+      for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+      {
+         const int U_mn = n * dof + m;
+
+         const double s1 = (i==n) ?  a * DS(m,j) : 0.0;
+         const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
+               + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n);
+         Dmat(S_ij, U_mn) = s1 + s2;       
+      }
+   }
+
+}
+
 
 void _PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename)
@@ -574,15 +666,18 @@ const int dim = el1.GetDim();
       w /= 2.0;
       el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
-      Mult(DSh2, Jrt, DS2);
+      //Mult(DSh2, Jrt, DS2);
 
       CalcAdjugate(Tr.Elem2->Jacobian(), adjJ2);
-      Mult(DSh2, adjJ2, dshape2_ps);
+      Mult(DSh2, adjJ2, DS2);
 
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->SetMatParam(Tr,eip2);
 
-      model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
+      //model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
+      MultAtB(PMatI1, DS2, Jpt2);
+
+      model->EvalDmat(dim, ndofs2, DS2, Jpt2, Dmat2);
       //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
       wLM = model->EvalDGWeight(w2, *Tr.Elem2, eip2);
@@ -591,7 +686,7 @@ const int dim = el1.GetDim();
 
       el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
-      Mult(DSh1, Jrt, DS1);
+      //Mult(DSh1, Jrt, DS1);
 
       double w1 = w / Tr.Elem1->Weight();
       wLM += model->EvalDGWeight(w1, *Tr.Elem1, eip1);
@@ -599,12 +694,13 @@ const int dim = el1.GetDim();
       // Temporary stuff
       DenseMatrix adjJ1(dim);
       CalcAdjugate(Tr.Elem1->Jacobian(), adjJ1);
-      Mult(DSh1, adjJ1, dshape1_ps);
+      Mult(DSh1, adjJ1, DS1);
 
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
+      MultAtB(PMatI1, DS1, Jpt1);
 
-      model->EvalDmat(dim, ndofs1, dshape1_ps, Dmat1);
+      model->EvalDmat(dim, ndofs1, DS1, Jpt1, Dmat1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
@@ -762,7 +858,7 @@ void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
  
        model->SetMatParam(Ttr,ip);
 
-       model->EvalDmat(dim, dof, DS, Dmat);
+       model->EvalDmat(dim, dof, DS, Jpt, Dmat);
        AssembleH(dim, dof, ip.weight * Ttr.Weight(), DS, elmat);
 
     }
