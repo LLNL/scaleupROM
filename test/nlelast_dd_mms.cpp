@@ -53,10 +53,9 @@ TEST(DDSerialTest, Test_direct_solver_DG)
    config.dict_["domain-decomposition"]["type"] = "none";
    bool nonlinear = true;
    CheckConvergence(nonlinear);
-
    return;
-}
-
+} 
+ 
 /* TEST(DDSerialTest, Test_convergence_DG_DD)
 {
    config = InputParser("inputs/dd_mms.yml");

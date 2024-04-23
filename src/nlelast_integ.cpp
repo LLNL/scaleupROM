@@ -274,7 +274,15 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     double bc = a*(J*J)/dim;
     double b  = bc - K*sJ*(sJ - 1.0);
     double c  = 2.0*bc/dim + K*sJ*(2.0*sJ - 1.0);
- 
+    cout<<"Jnorm = "<<J.FNorm()<<endl;
+    cout<<"-2.0/dim = "<<-2.0/dim<<endl;
+    cout<<"mu = "<<mu<<endl;
+    cout<<"a = "<<a<<endl;
+
+    Z.SetSize(dim);
+     G.SetSize(dof, dim);
+     C.SetSize(dof, dim);
+
     CalcAdjugateTranspose(J, Z);
     Z *= (1.0/dJ); // Z = J^{-t}
  
@@ -285,6 +293,27 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     b *= weight;
     c *= weight; */
     const double a2 = a * (-2.0/dim);
+
+
+         if (isnan(a))
+         {
+            cout<<"Nan a"<<endl;
+         }
+
+         if (isnan(a2))
+         {
+            cout<<"Nan a2"<<endl;
+         }
+
+         /* if (isnan(b))
+         {
+            cout<<"Nan b"<<endl;
+         }
+
+         if (isnan(c))
+         {
+            cout<<"Nan c"<<endl;
+         } */
 
    for (size_t i = 0; i < dof; i++) 
    for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
@@ -299,6 +328,8 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
          const double s1 = (i==n) ?  a * DS(m,j) : 0.0;
          const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
                + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n);
+
+         
          Dmat(S_ij, U_mn) = s1 + s2;       
       }
    }
@@ -569,18 +600,29 @@ void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                               const FiniteElement &el2,
                               FaceElementTransformations &Tr,
                               const Vector &elfun, DenseMatrix &elmat){
+
+                                 cout<<"in face grad"<<endl;
 const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
    const int ndofs2 = (Tr.Elem2No >= 0) ? el2.GetDof() : 0;
+                                 cout<<"1"<<endl;
+
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
-   Vector elfun_copy(elfun); // FIXME: How to avoid this?
+   Vector elfun_copy(elfun); // FIXME: How to avoid this
     nor.SetSize(dim);
     Jrt.SetSize(dim);
+   cout<<"2"<<endl;
+   cout<<"nvdofs: "<<nvdofs<<endl;
+   cout<<"elmat(0): "<<elmat(0,0)<<endl;
    elmat.SetSize(nvdofs);
+   cout<<"postsetsize"<<&nvdofs<<endl;
+
    elmat = 0.0;
+   cout<<"pretrans"<<endl;
    model->SetTransformation(Tr);
+   cout<<"posttrans"<<endl;
 
    const bool kappa_is_nonzero = (kappa != 0.0);
     if (kappa_is_nonzero)
@@ -637,6 +679,8 @@ const int dim = el1.GetDim();
    DenseMatrix dshape1_ps(ndofs1, dim);
    DenseMatrix dshape2_ps(ndofs2, dim);
 
+   cout<<"pre loop"<<endl;
+
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
@@ -675,7 +719,7 @@ const int dim = el1.GetDim();
       model->SetMatParam(Tr,eip2);
 
       //model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
-      MultAtB(PMatI1, DS2, Jpt2);
+      MultAtB(PMatI2, DS2, Jpt2);
 
       model->EvalDmat(dim, ndofs2, DS2, Jpt2, Dmat2);
       //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
@@ -699,8 +743,9 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
       MultAtB(PMatI1, DS1, Jpt1);
-
+      cout<<"preDmat"<<endl;
       model->EvalDmat(dim, ndofs1, DS1, Jpt1, Dmat1);
+      cout<<"postDmat"<<endl;
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
@@ -719,6 +764,7 @@ const int dim = el1.GetDim();
 
        // (2,2) block
       AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
+      cout<<"Block assemblies"<<endl;
 
    }
 
@@ -737,6 +783,8 @@ const int dim = el1.GetDim();
           elmat(i,i) += jmat(i,i);
        } 
     }
+      cout<<"jmatt"<<endl;
+         
    };
 
 void DGHyperelasticNLFIntegrator::AssembleBlock(
@@ -859,7 +907,9 @@ void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
        model->SetMatParam(Ttr,ip);
 
        model->EvalDmat(dim, dof, DS, Jpt, Dmat);
+       //cout<<"before asshemble"<<endl;
        AssembleH(dim, dof, ip.weight * Ttr.Weight(), DS, elmat);
+       //cout<<"after asshemble"<<endl;
 
     }
                                     };
@@ -883,8 +933,17 @@ void HyperelasticNLFIntegratorHR::AssembleH(const int dim, const int dof, const 
                {
                   const int S_jk = k * dim + j;
                   temp += Dmat(S_jk, mn) * w * J(i,k);
+                  /* if (isnan(Dmat(S_jk, mn)))
+               {
+                  cout<<"Not good"<<endl;
+               } */
                }
                elmat(ij, mn) += temp;
+               /* if (isnan(elmat(ij, mn)))
+               {
+                  cout<<"Oh no!"<<endl;
+               } */
+               
                
             }
          }
