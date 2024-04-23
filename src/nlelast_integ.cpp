@@ -315,7 +315,7 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
             cout<<"Nan c"<<endl;
          } */
 
-   for (size_t i = 0; i < dof; i++) 
+   for (size_t i = 0; i < dim; i++) 
    for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
    {
       const int S_ij = j * dim + i;
@@ -326,12 +326,15 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
          const int U_mn = n * dof + m;
 
          const double s1 = (i==n) ?  a * DS(m,j) : 0.0;
-         /* const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
-               + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n); */
-         double s2 = 0.0;
+         const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
+               + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n);
+         //double s2 = 0.0;
 
-         
-         //Dmat(S_ij, U_mn) = s1 + s2;       
+/* cout<<"Dmat.Width() is: "<<Dmat.Width()<<endl;        
+cout<<"Dmat.Height() is: "<<Dmat.Height()<<endl;        
+ cout<<"S_ij is: "<<S_ij<<endl;
+         cout<<"U_mn is: "<<U_mn<<endl; */
+         Dmat(S_ij, U_mn) = s1 + s2;       
       }
    }
 
@@ -602,11 +605,11 @@ void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                               FaceElementTransformations &Tr,
                               const Vector &elfun, DenseMatrix &elmat){
 
-                                 cout<<"in face grad"<<endl;
+                                 //cout<<"in face grad"<<endl;
 const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
    const int ndofs2 = (Tr.Elem2No >= 0) ? el2.GetDof() : 0;
-                                 cout<<"1"<<endl;
+                                 //cout<<"1"<<endl;
 
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
@@ -683,7 +686,7 @@ const int dim = el1.GetDim();
    DenseMatrix dshape1_ps(ndofs1, dim);
    DenseMatrix dshape2_ps(ndofs2, dim);
 
-   cout<<"pre loop"<<endl;
+   //cout<<"pre loop"<<endl;
 
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
@@ -768,7 +771,7 @@ const int dim = el1.GetDim();
 
        // (2,2) block
       AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
-      cout<<"Block assemblies"<<endl;
+      //cout<<"Block assemblies"<<endl;
 
    }
 

@@ -56,7 +56,7 @@ void NLElastOperator::Mult(const Vector &x, Vector &y) const
 
 Operator& NLElastOperator::GetGradient(const Vector &x) const
 {
-   cout<<"in grad"<<endl;
+   //cout<<"in grad"<<endl;
 
    delete hs_jac;
    delete jac_hypre;
@@ -92,12 +92,12 @@ Operator& NLElastOperator::GetGradient(const Vector &x) const
       }
 
    mono_jac = hs_jac->CreateMonolithic();
-   cout<<"out grad"<<endl;
+   //cout<<"out grad"<<endl;
 
    if (direct_solve)
    {
       jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
-   cout<<"out grad1"<<endl;
+   //cout<<"out grad1"<<endl;
       return *jac_hypre;
 
    }  
