@@ -52,6 +52,24 @@ public:
                                        FaceElementTransformations &Trans2,
                                        Array2D<DenseMatrix*> &elmats)
    { mfem_error("Abstract method InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix!\n"); }
+
+   virtual void AssembleQuadratureVector(const FiniteElement &el1,
+                                          const FiniteElement &el2,
+                                          FaceElementTransformations &Tr1,
+                                          FaceElementTransformations &Tr2,
+                                          const IntegrationPoint &ip,
+                                          const double &iw,
+                                          const Vector &eltest1, const Vector &eltest2,
+                                          Vector &elquad1, Vector &elquad2);
+
+   virtual void AssembleQuadratureGrad(const FiniteElement &el1,
+                                          const FiniteElement &el2,
+                                          FaceElementTransformations &Tr1,
+                                          FaceElementTransformations &Tr2,
+                                          const IntegrationPoint &ip,
+                                          const double &iw,
+                                          const Vector &eltest1, const Vector &eltest2,
+                                          Array2D<DenseMatrix*> &quadmats);
 };
 
 class InterfaceDGDiffusionIntegrator : public InterfaceNonlinearFormIntegrator
@@ -317,6 +335,15 @@ public:
                               FaceElementTransformations &Tr2,
                               const Vector &elfun1, const Vector &elfun2,
                               Array2D<DenseMatrix *> &elmats) override;
+
+   void AssembleQuadratureVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr1,
+                                 FaceElementTransformations &Tr2,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest1, const Vector &eltest2,
+                                 Vector &elquad1, Vector &elquad2) override;
 
 private:
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 

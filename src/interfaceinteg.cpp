@@ -41,6 +41,28 @@ void InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix(
              "   is not implemented for this class.");
 }
 
+
+void InterfaceNonlinearFormIntegrator::AssembleQuadratureVector(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const IntegrationPoint &ip, const double &iw,
+   const Vector &eltest1, const Vector &eltest2,
+   Vector &elquad1, Vector &elquad2)
+{
+   mfem_error("InterfaceNonlinearFormIntegrator::AssembleQuadratureVector\n"
+             "   is not implemented for this class.");
+}
+
+void InterfaceNonlinearFormIntegrator::AssembleQuadratureGrad(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const IntegrationPoint &ip, const double &iw,
+   const Vector &eltest1, const Vector &eltest2, Array2D<DenseMatrix*> &quadmats)
+{
+   mfem_error("InterfaceNonlinearFormIntegrator::AssembleQuadratureGrad\n"
+             "   is not implemented for this class.");
+}
+
 void InterfaceDGDiffusionIntegrator::AssembleInterfaceMatrix(
   const FiniteElement &el1, const FiniteElement &el2,
   FaceElementTransformations &Trans1, FaceElementTransformations &Trans2,
@@ -2122,7 +2144,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceVector(
       udof2.MultTranspose(shape2, u2);
 
       w = 0.5 * ip.weight * Tr1.Weight();
-      if (Q) { w *= Q->Eval(*Tr1.Elem1, eip1); }
+      if (Q) { w *= Q->Eval(Tr1, ip); }
 
       nor *= w;
 
@@ -2218,7 +2240,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
       udof2.MultTranspose(shape2, u2);
 
       w = ip.weight * Tr1.Weight();
-      if (Q) { w *= Q->Eval(*Tr1.Elem1, eip1); }
+      if (Q) { w *= Q->Eval(Tr1, ip); }
 
       nor *= w;
       // Just for the average operator gradient.
@@ -2294,6 +2316,88 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
          }
       }
    }
+}
+
+void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureVector(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
+   const IntegrationPoint &ip, const double &iw,
+   const Vector &eltest1, const Vector &eltest2, Vector &elquad1, Vector &elquad2)
+{
+   dim = el1.GetDim();
+   ndofs1 = el1.GetDof();
+   // ndofs2 = (T.Elem2No >= 0) ? el2.GetDof() : 0;
+   ndofs2 = el2.GetDof();
+   nvdofs = dim * (ndofs1 + ndofs2);
+   elquad1.SetSize(dim * ndofs1);
+   elquad2.SetSize(dim * ndofs2);
+
+   nor.SetSize(dim);
+   flux.SetSize(dim);
+
+   udof1.UseExternalData(eltest1.GetData(), ndofs1, dim);
+   elv1.UseExternalData(elquad1.GetData(), ndofs1, dim);
+   shape1.SetSize(ndofs1);
+   u1.SetSize(dim);
+   
+   udof2.UseExternalData(eltest2.GetData(), ndofs2, dim);
+   elv2.UseExternalData(elquad2.GetData(), ndofs2, dim);
+   shape2.SetSize(ndofs2);
+   u2.SetSize(dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      // a simple choice for the integration order; is this OK?
+      const int order = (int)(ceil(1.5 * (2 * max(el1.GetOrder(), el2.GetOrder()) - 1)));
+      ir = &IntRules.Get(Tr1.GetGeometryType(), order);
+   }
+
+   elquad1 = 0.0; elquad2 = 0.0;
+
+   // Set the integration point in the face and the neighboring elements
+   Tr1.SetAllIntPoints(&ip);
+   Tr2.SetAllIntPoints(&ip);
+
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = Tr1.GetElement1IntPoint();
+   const IntegrationPoint &eip2 = Tr2.GetElement1IntPoint();
+
+   el1.CalcShape(eip1, shape1);
+   udof1.MultTranspose(shape1, u1);
+
+   if (dim == 1)
+   {
+      nor(0) = 2*eip1.x - 1.0;
+   }
+   else
+   {
+      CalcOrtho(Tr1.Jacobian(), nor);
+   }
+
+   el2.CalcShape(eip2, shape2);
+   udof2.MultTranspose(shape2, u2);
+
+   w = 0.5 * iw * Tr1.Weight();
+   if (Q) { w *= Q->Eval(Tr1, ip); }
+
+   nor *= w;
+
+   un1 = nor * u1;
+   un2 = (ndofs2) ? nor * u2 : 0.0;
+
+   flux.Set(un1, u1);
+   flux.Add(un2, u2);
+
+   un = 2.0 * max(abs(un1), abs(un2));
+   flux.Add(un, u1);
+   if (ndofs2)
+      flux.Add(-un, u2);
+
+   AddMultVWt(shape1, flux, elv1);
+   if (ndofs2)
+      AddMult_a_VWt(-1.0, shape2, flux, elv2);   
 }
 
 }
