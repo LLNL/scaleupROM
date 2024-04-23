@@ -71,6 +71,8 @@ add_executable(test_linalg_utils test_linalg_utils.cpp $<TARGET_OBJECTS:scaleupR
 
 add_executable(test_rom_nonlinearform test_rom_nonlinearform.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
+add_executable(test_rom_interfaceform test_rom_interfaceform.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
 add_executable(test_ns_parallel test_ns_parallel.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
 function(add_test_dir TEST_DIR)
