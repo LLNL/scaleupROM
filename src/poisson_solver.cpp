@@ -194,7 +194,7 @@ void PoissonSolver::BuildDomainOperators()
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler);
-   a_itf->AddIntefaceIntegrator(new InterfaceDGDiffusionIntegrator(sigma, kappa));
+   a_itf->AddInterfaceIntegrator(new InterfaceDGDiffusionIntegrator(sigma, kappa));
 }
 
 bool PoissonSolver::BCExistsOnBdr(const int &global_battr_idx)
