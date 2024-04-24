@@ -488,7 +488,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
       U = 0.0;
       for (size_t i = 0; i < U.Size()/dim; i++)
       {
-         U(i) = X(i);
+         U(i) = pow(X( i), 2.0) + X( i);
          U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
       }
    }
@@ -594,8 +594,8 @@ TEST(TempNeoHookeanStiffnessMatrices, Test_NLElast)
       cout<<"y0["<<i<<"] is: "<<y0[i]<<endl<<endl;
     } 
 
-    a1.Mult(y0, y1);
-    a2.Mult(y0, y2);
+    a1.Mult(y0, y1); //ScaleupROM Neohookean
+    a2.Mult(y0, y2); //MFEM Neohookean
 
     cout<<"couting y1 and y3"<<endl;
     for (size_t i = 0; i < y0.Size(); i++)

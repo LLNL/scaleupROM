@@ -233,7 +233,7 @@ void NLElastSolver::InitVariables()
       // Does this make any difference?
       meshes[m]->GetNodes(*us[m]);
       us[m]->SetTrueVector();
-      PrintVector(U->GetBlock(m), "ub.txt");
+      //PrintVector(U->GetBlock(m), "ub.txt");
    }
    if (use_rom)
      MultiBlockSolver::InitROMHandler();
