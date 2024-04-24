@@ -219,6 +219,7 @@ void NLElastSolver::InitVariables()
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
+      meshes[m]->GetNodes(*us[m]);
       us[m]->SetTrueVector();
    }
    if (use_rom)
