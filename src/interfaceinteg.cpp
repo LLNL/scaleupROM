@@ -2215,6 +2215,16 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
    {
       const IntegrationPoint &ip = ir->IntPoint(pind);
 
+      // /* This should be equivalent to the rest of the loop */
+      // Array2D<DenseMatrix *> quadmats(2, 2);
+      // for (int i = 0; i < 2; i++)
+      //    for (int j = 0; j < 2; j++) quadmats(i, j) = new DenseMatrix;
+      // AssembleQuadratureGrad(el1, el2, Tr1, Tr2, ip, ip.weight, elfun1, elfun2, quadmats);
+      // for (int i = 0; i < 2; i++)
+      //    for (int j = 0; j < 2; j++) *(elmats(i, j)) += *(quadmats(i, j));
+      // DeletePointers(quadmats);
+      // continue;
+
       // Set the integration point in the face and the neighboring elements
       Tr1.SetAllIntPoints(&ip);
       Tr2.SetAllIntPoints(&ip);
@@ -2543,7 +2553,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
          else
          {
             quadmats(0, 1)->AddMatrix(sgn * u1(di) * nor(dj), elmat_comp12, di * ndofs1, dj * ndofs2);
-            quadmats(0, 1)->AddMatrix(-sgn * u1(di) * nor(dj), elmat_comp22, di * ndofs2, dj * ndofs2);
+            quadmats(1, 1)->AddMatrix(-sgn * u1(di) * nor(dj), elmat_comp22, di * ndofs2, dj * ndofs2);
          }
       }
    }

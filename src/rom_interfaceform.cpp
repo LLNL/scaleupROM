@@ -110,7 +110,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
          assert(interface_infos);
 
          sample_info = fnfi_sample[p + k * numPorts];
-         assert(sample_info != NULL);
+         if (!sample_info) continue;
 
          int prev_itf = -1;
          SampleInfo *sample = sample_info->GetData();
@@ -233,7 +233,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
          assert(interface_infos);
 
          sample_info = fnfi_sample[p + k * numPorts];
-         assert(sample_info != NULL);
+         if (!sample_info) continue;
 
          int prev_itf = -1;
          SampleInfo *sample = sample_info->GetData();
