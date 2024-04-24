@@ -139,6 +139,154 @@ TEST(ROMInterfaceForm, InterfaceAddMult)
    delete submesh;
 }
 
+TEST(ROMInterfaceForm, InterfaceGetGradient)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   const int order = UniformRandom(1, 3);
+
+   SubMeshTopologyHandler *submesh = new SubMeshTopologyHandler();
+   assert(submesh->GetNumSubdomains() > 1);
+
+   Array<Mesh *> meshes;
+   TopologyData topol_data;
+   submesh->ExportInfo(meshes, topol_data);
+   const int dim = topol_data.dim;
+   const int numSub = topol_data.numSub;
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+
+   Array<FiniteElementSpace *> fes(numSub);
+   for (int m = 0; m < numSub; m++)
+      fes[m] = new FiniteElementSpace(meshes[m], dg_coll, dim);
+
+   /* Fictitious bases */
+   const int num_basis = 10;
+   Array<DenseMatrix *> basis(numSub);
+   for (int m = 0; m < numSub; m++)
+   {
+      const int ndofs = fes[m]->GetTrueVSize();
+      basis[m] = new DenseMatrix(ndofs, num_basis);
+      for (int i = 0; i < ndofs; i++)
+         for (int j = 0; j < num_basis; j++)
+            (*basis[m])(i, j) = UniformRandom();
+   }
+
+   Array<int> block_offsets(numSub+1), rom_block_offsets(numSub+1);
+   block_offsets[0] = 0;
+   for (int m = 0; m < numSub; m++)
+      block_offsets[m+1] = fes[m]->GetTrueVSize();
+   block_offsets.PartialSum();
+
+   rom_block_offsets = num_basis;
+   rom_block_offsets[0] = 0;
+   rom_block_offsets.PartialSum();
+
+   const IntegrationRule *ir = NULL;
+   for (int be = 0; be < fes[0]->GetNBE(); be++)
+   {
+      FaceElementTransformations *tr = meshes[0]->GetBdrFaceTransformations(be);
+      if (tr != NULL)
+      {
+         ir = &IntRules.Get(tr->GetGeometryType(),
+                            (int)(ceil(1.5 * (2 * fes[0]->GetMaxElementOrder() - 1))));
+         break;
+      }
+   }
+   assert(ir);
+
+   ConstantCoefficient pi(3.141592);
+   auto *integ2 = new DGLaxFriedrichsFluxIntegrator(pi);
+   integ2->SetIntRule(ir);
+
+   BlockVector rom_u(rom_block_offsets);
+   for (int k = 0; k < rom_u.Size(); k++)
+      rom_u(k) = UniformRandom();
+
+   BlockVector rom_y(rom_block_offsets);
+
+   ROMInterfaceForm *rform = new ROMInterfaceForm(meshes, fes, submesh);
+   rform->AddInterfaceIntegrator(integ2);
+   for (int m = 0; m < numSub; m++)
+      rform->SetBasisAtSubdomain(m, *basis[m]);
+   rform->UpdateBlockOffsets();
+
+   // we set the full elements/quadrature points,
+   // so that the resulting vector is equilvalent to FOM.
+   const int nport = submesh->GetNumPorts();
+   const int nqe = ir->GetNPoints();
+   Array<double> const& w_el = ir->GetWeights();
+   for (int p = 0; p < nport; p++)
+   {
+      Array<InterfaceInfo> *interface_infos = submesh->GetInterfaceInfos(p);
+      Array<int> sample_itf(0), sample_qp(0);
+      Array<double> sample_qw(0);
+      for (int itf = 0; itf < interface_infos->Size(); itf++)
+         for (int q = 0; q < nqe; q++)
+         {
+            sample_itf.Append(itf);
+            sample_qp.Append(q);
+            sample_qw.Append(w_el[q]);
+         }
+
+      rform->UpdateInterFaceIntegratorSampling(0, p, sample_itf, sample_qp, sample_qw);
+   }
+   
+   rom_y = 0.0; 
+   rform->InterfaceAddMult(rom_u, rom_y);
+
+   Array2D<SparseMatrix *> jac_mats(numSub, numSub);
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+         jac_mats(i, j) = new SparseMatrix(num_basis);
+
+   rform->InterfaceGetGradient(rom_u, jac_mats);
+
+   BlockMatrix jac(rom_block_offsets);
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+         jac.SetBlock(i, j, jac_mats(i, j));
+
+   double J0 = 0.5 * (rom_y * rom_y);
+   BlockVector grad(rom_block_offsets);
+   jac.MultTranspose(rom_y, grad);
+   double gg = sqrt(grad * grad);
+   printf("J0: %.15E\n", J0);
+   printf("grad: %.15E\n", gg);
+
+   BlockVector du(grad);
+   du /= gg;
+
+   BlockVector rom_y1(rom_block_offsets);
+   const int Nk = 40;
+   double error1 = 1e100, error;
+   printf("amp\tJ1\tdJdx\terror\n");
+   for (int k = 0; k < Nk; k++)
+   {
+      double amp = pow(10.0, -0.25 * k);
+      BlockVector rom_u1(rom_u);
+      rom_u1.Add(amp, du);
+
+      rom_y1 = 0.0;
+      rform->InterfaceAddMult(rom_u1, rom_y1);
+      double J1 = 0.5 * (rom_y1 * rom_y1);
+      double dJdx = (J1 - J0) / amp;
+      error = abs(dJdx - gg) / gg;
+
+      printf("%.5E\t%.5E\t%.5E\t%.5E\n", amp, J1, dJdx, error);
+      if (error >= error1)
+         break;
+      error1 = error;
+   }
+   EXPECT_TRUE(min(error, error1) < grad_thre);
+   
+   delete rform;
+   delete dg_coll;
+   DeletePointers(fes);
+   DeletePointers(basis);
+   DeletePointers(jac_mats);
+   delete submesh;
+}
+
 int main(int argc, char* argv[])
 {
    MPI_Init(&argc, &argv);

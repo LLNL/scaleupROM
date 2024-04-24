@@ -345,6 +345,15 @@ public:
                                  const Vector &eltest1, const Vector &eltest2,
                                  Vector &elquad1, Vector &elquad2) override;
 
+   void AssembleQuadratureGrad(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr1,
+                                 FaceElementTransformations &Tr2,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest1, const Vector &eltest2,
+                                 Array2D<DenseMatrix*> &quadmats) override;
+
 private:
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
                                     FaceElementTransformations *T,
