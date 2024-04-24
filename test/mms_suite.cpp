@@ -656,7 +656,7 @@ namespace nlelast
 
       if (nonlinear)
       {
-         model = new NeoHookeanHypModel(mu, K);
+         //model = new NeoHookeanHypModel(mu, K); TEMP
 
       }
       else

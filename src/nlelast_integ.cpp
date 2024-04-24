@@ -214,6 +214,133 @@ for (size_t i = 0; i < dim; i++)
       }
 }
 
+
+double NeoHookeanHypModel::EvalW(const DenseMatrix &J) const
+{  int dim = J.Width();
+ 
+    double dJ = J.Det();
+    double sJ = dJ/g;
+    double bI1 = pow(dJ, -2.0/dim)*(J*J); // \bar{I}_1
+ 
+    return 0.5*(mu*(bI1 - dim) + K*(sJ - 1.0)*(sJ - 1.0));
+    }
+
+double NeoHookeanHypModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const
+{
+const double wL = w * c_K->Eval(Ttr, ip);
+const double wM = w * c_mu->Eval(Ttr, ip);
+return wL + 2.0*wM;
+}
+
+void NeoHookeanHypModel::SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const
+{
+   mu = c_mu->Eval(Trans, ip);
+   K = c_K->Eval(Trans, ip);
+}
+
+void NeoHookeanHypModel::SetMatParam(FaceElementTransformations &Trans, const IntegrationPoint &ip) const
+{
+   mu = c_mu->Eval(Trans, ip);
+   K = c_K->Eval(Trans, ip);
+}
+
+void NeoHookeanHypModel::GetMatParam(Vector &params) const
+{
+   params.SetSize(2);
+   params[0] = K;
+   params[1] = mu;
+}
+
+void NeoHookeanHypModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
+{
+   int dim = J.Width();
+ 
+    Z.SetSize(dim);
+    CalcAdjugateTranspose(J, Z);
+ 
+    double dJ = J.Det();
+    double a  = mu*pow(dJ, -2.0/dim);
+    double b  = K*(dJ/g - 1.0)/g - a*(J*J)/(dim*dJ);
+ 
+    P = 0.0;
+    P.Add(a, J);
+    P.Add(b, Z);
+}
+
+void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const
+{
+    double dJ = J.Det();
+    double sJ = dJ/g;
+    double a  = mu*pow(dJ, -2.0/dim);
+    double bc = a*(J*J)/dim;
+    double b  = bc - K*sJ*(sJ - 1.0);
+    double c  = 2.0*bc/dim + K*sJ*(2.0*sJ - 1.0);
+    //cout<<"Jnorm = "<<J.FNorm()<<endl;
+    //cout<<"-2.0/dim = "<<-2.0/dim<<endl;
+    //cout<<"mu = "<<mu<<endl;
+    //cout<<"a = "<<a<<endl;
+
+    Z.SetSize(dim);
+     G.SetSize(dof, dim);
+     C.SetSize(dof, dim);
+
+    CalcAdjugateTranspose(J, Z);
+    Z *= (1.0/dJ); // Z = J^{-t}
+ 
+    MultABt(DS, J, C); // C = DS J^t
+    MultABt(DS, Z, G); // G = DS J^{-1}
+ 
+    /* a *= weight;
+    b *= weight;
+    c *= weight; */
+    const double a2 = a * (-2.0/dim);
+
+
+         if (isnan(a))
+         {
+            cout<<"Nan a"<<endl;
+         }
+
+         if (isnan(a2))
+         {
+            cout<<"Nan a2"<<endl;
+         }
+
+         /* if (isnan(b))
+         {
+            cout<<"Nan b"<<endl;
+         }
+
+         if (isnan(c))
+         {
+            cout<<"Nan c"<<endl;
+         } */
+
+   for (size_t i = 0; i < dim; i++) 
+   for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
+   {
+      const int S_ij = j * dim + i;
+
+      for (size_t m = 0; m < dof; m++) 
+      for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
+      {
+         const int U_mn = n * dof + m;
+
+         const double s1 = (i==n) ?  a * DS(m,j) : 0.0;
+         const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
+               + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n);
+         //double s2 = 0.0;
+
+/* cout<<"Dmat.Width() is: "<<Dmat.Width()<<endl;        
+cout<<"Dmat.Height() is: "<<Dmat.Height()<<endl;        
+ cout<<"S_ij is: "<<S_ij<<endl;
+         cout<<"U_mn is: "<<U_mn<<endl; */
+         Dmat(S_ij, U_mn) = s1 + s2;       
+      }
+   }
+
+}
+
 void _PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename)
 {
