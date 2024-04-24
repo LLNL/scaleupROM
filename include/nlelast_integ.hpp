@@ -32,6 +32,7 @@ namespace mfem
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const = 0;
 
       virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat)const = 0;
+
    };
 
    class LinElastMaterialModel : public DGHyperelasticModel
@@ -53,6 +54,7 @@ namespace mfem
       virtual void EvalP(const DenseMatrix &J, DenseMatrix &P) const;
 
       virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const;
+
 
    };
 
@@ -91,7 +93,7 @@ namespace mfem
       mutable DenseMatrix G, C; // dof x dim
 
    public:
-            NeoHookeanHypModel(double mu_, double K_, double g_ = 1.0)
+      NeoHookeanHypModel(double mu_, double K_, double g_ = 1.0)
           : mu(mu_), K(K_), g(g_) { c_mu = new ConstantCoefficient(mu), c_K = new ConstantCoefficient(K), c_g = new ConstantCoefficient(g); }
 
      virtual void SetMatParam(ElementTransformation &Trans, const IntegrationPoint &ip) const;

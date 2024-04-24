@@ -708,7 +708,7 @@ const int dim = el1.GetDim();
 
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->SetMatParam(Tr,eip2);
-
+      MultAtB(PMatI2, DS2, Jpt2);
       model->EvalDmat(dim, ndofs2, DS2, Jpt2, Dmat2);
       //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
@@ -731,6 +731,7 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
 
+      MultAtB(PMatI1, DS1, Jpt1);
       model->EvalDmat(dim, ndofs1, DS1, Jpt1, Dmat1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
