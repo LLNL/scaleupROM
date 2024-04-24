@@ -194,7 +194,7 @@ void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
    }
 }
 
-void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix gshape, DenseMatrix &Dmat) const
+void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix &DS, DenseMatrix &Dmat) const
 {
 for (size_t i = 0; i < dim; i++) 
       {
@@ -206,9 +206,9 @@ for (size_t i = 0; i < dim; i++)
             for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to U
             {
                const int U_mn = n * dof + m;
-               Dmat(S_ij, U_mn) = ((i == j) ? lambda * gshape(m,n) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == i) ? mu * gshape(m,j) : 0.0);
-               Dmat(S_ij, U_mn) += ((n == j) ? mu * gshape(m,i) : 0.0);
+               Dmat(S_ij, U_mn) = ((i == j) ? lambda * DS(m,n) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == i) ? mu * DS(m,j) : 0.0);
+               Dmat(S_ij, U_mn) += ((n == j) ? mu * DS(m,i) : 0.0);
             }
          }
       }
