@@ -194,7 +194,7 @@ void LinElastMaterialModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
    }
 }
 
-void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix &DS, DenseMatrix &Dmat) const
+void LinElastMaterialModel::EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const
 {
 for (size_t i = 0; i < dim; i++) 
       {
@@ -709,7 +709,7 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->SetMatParam(Tr,eip2);
 
-      model->EvalDmat(dim, ndofs2, DS2, Dmat2);
+      model->EvalDmat(dim, ndofs2, DS2, Jpt2, Dmat2);
       //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
       wLM = model->EvalDGWeight(w2, *Tr.Elem2, eip2);
@@ -731,7 +731,7 @@ const int dim = el1.GetDim();
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
 
-      model->EvalDmat(dim, ndofs1, DS1, Dmat1);
+      model->EvalDmat(dim, ndofs1, DS1, Jpt1, Dmat1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
@@ -889,7 +889,7 @@ void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
  
        model->SetMatParam(Ttr,ip);
 
-       model->EvalDmat(dim, dof, DS, Dmat);
+       model->EvalDmat(dim, dof, DS, Jpt, Dmat);
        AssembleH(dim, dof, ip.weight * Ttr.Weight(), DS, elmat);
 
     }

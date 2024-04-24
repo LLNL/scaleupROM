@@ -31,7 +31,7 @@ namespace mfem
 
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const = 0;
 
-      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, DenseMatrix &Dmat)const = 0;
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat)const = 0;
    };
 
    class LinElastMaterialModel : public DGHyperelasticModel
@@ -52,7 +52,7 @@ namespace mfem
       virtual double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip) const;
       virtual void EvalP(const DenseMatrix &J, DenseMatrix &P) const;
 
-      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, DenseMatrix &Dmat) const;
+      virtual void EvalDmat(const int dim, const int dof, const DenseMatrix &DS, const DenseMatrix &J, DenseMatrix &Dmat) const;
 
    };
 
