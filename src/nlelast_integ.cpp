@@ -701,15 +701,15 @@ const int dim = el1.GetDim();
       w /= 2.0;
       el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
-      Mult(DSh2, Jrt, DS2);
+      //Mult(DSh2, Jrt, DS2);
 
       CalcAdjugate(Tr.Elem2->Jacobian(), adjJ2);
-      Mult(DSh2, adjJ2, dshape2_ps);
+      Mult(DSh2, adjJ2, DS2);
 
       //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->SetMatParam(Tr,eip2);
 
-      model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
+      model->EvalDmat(dim, ndofs2, DS2, Dmat2);
       //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
       wLM = model->EvalDGWeight(w2, *Tr.Elem2, eip2);
@@ -718,7 +718,7 @@ const int dim = el1.GetDim();
 
       el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
-      Mult(DSh1, Jrt, DS1);
+      //Mult(DSh1, Jrt, DS1);
 
       double w1 = w / Tr.Elem1->Weight();
       wLM += model->EvalDGWeight(w1, *Tr.Elem1, eip1);
@@ -726,12 +726,12 @@ const int dim = el1.GetDim();
       // Temporary stuff
       DenseMatrix adjJ1(dim);
       CalcAdjugate(Tr.Elem1->Jacobian(), adjJ1);
-      Mult(DSh1, adjJ1, dshape1_ps);
+      Mult(DSh1, adjJ1, DS1);
 
       //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
 
-      model->EvalDmat(dim, ndofs1, dshape1_ps, Dmat1);
+      model->EvalDmat(dim, ndofs1, DS1, Dmat1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
