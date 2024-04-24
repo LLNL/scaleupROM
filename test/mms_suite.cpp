@@ -622,10 +622,8 @@ namespace nlelast
    {
       u = 0.0;
       assert(dim == 2);
-      for (size_t i = 0; i < dim; i++)
-      {
-         u(i) = pow(x(i), 2.0) + x(i);
-      }
+      u(0) = pow(x(0), 2.0) + x(0);
+      u(1) = pow(x(1), 2.0) + x(1);
    }
 
    void ExactRHSNeoHooke(const Vector &x, Vector &u)
@@ -642,6 +640,15 @@ namespace nlelast
       //u *= -1.0;
    }
 
+   void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      assert(dim == 2);
+      assert(mu == 0.0);
+      u(0) = 2 * K * pow(1.0 + 2.0 * x(1), 2.0);
+      u(1) = 2 * K * pow(1.0 + 2.0 * x(0), 2.0); 
+   }
+
    NLElastSolver *SolveWithRefinement(const int num_refinement, const bool nonlinear)
    {
       config.dict_["mesh"]["uniform_refinement"] = num_refinement;
@@ -649,8 +656,7 @@ namespace nlelast
 
       if (nonlinear)
       {
-         //model = new NeoHookeanHypModel(mu, K);
-         model = new LinElastMaterialModel(mu, lambda);
+         model = new NeoHookeanHypModel(mu, K);
 
       }
       else
