@@ -452,6 +452,197 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 
    return;
 } 
+
+   void ExactSolutionNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      U = 0.0;
+      for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         U(i*dim) = pow(X(i*dim), 2.0) + X(i*dim);
+         U(i*dim+1) = pow(X(i*dim + 1), 2.0) + X(i*dim + 1);
+      }
+   }
+
+   void ExactRHSNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      double K = 3.14; 
+      double mu = 2.33;
+      U = 0.0;
+      for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         const double x_1 = X(i*dim);
+         const double x_2 = X(i*dim + 1);
+         U(i*dim) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 128.0*mu*x_1 + 384.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 128.0*mu*(pow(x_1,2)) + 384.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1), 4))*(pow((1 + 2*x_2),2)));
+         U(i*dim+1) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 384.0*mu*x_1 + 128.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 384.0*mu*(pow(x_1,2)) + 128.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1),2))*(pow((1 + 2*x_2),4)));
+      }
+      
+      //u *= -1.0;
+   }
+
+   void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      int dof = U.Size()/dim;
+      U = 0.0;
+      for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         U(i) = X(i);
+         U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
+      }
+   }
+
+   void SimpleExactRHSNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      int dof = U.Size()/dim;
+
+      double K = 3.14; 
+      //double mu = 2.33;
+/*       K = 2.33;
+      mu = 3.14; */
+      U = 0.0;
+         for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         U(i) = K;
+         U(dof + i) = K/2.0;
+      }
+
+      
+      //u *= -1.0;
+   }
+
+// Currently Domain test and Boundary test works. Todo: RHS, Boundary gradients
+TEST(TempNeoHookeanStiffnessMatrices, Test_NLElast)
+{
+   // Test that the nonlinear operators do the correct things
+    Mesh mesh("meshes/test.2x1.mesh", 1, 1);
+
+   int dim = mesh.Dimension();
+   int order = 1;
+   double alpha = 0.0; // IIPG
+   double kappa = -1.0; 
+   DG_FECollection fec(order, dim, BasisType::GaussLobatto);
+   FiniteElementSpace fespace(&mesh, &fec, dim);
+
+   VectorFunctionCoefficient init_x(dim, InitDisplacement);
+
+   Vector lambda(mesh.attributes.Max());
+   double _lambda = 3.14;      
+   lambda = _lambda;      // Set lambda for all element attributes.
+   PWConstCoefficient lambda_c(lambda);
+   Vector mu(mesh.attributes.Max());
+   double _mu = 2.33;  
+   _mu = 0.0;    
+   mu = _mu;       // Set mu = 1 for all element attributes.
+   PWConstCoefficient mu_c(mu);
+
+    Array<int> dir_bdr(mesh.bdr_attributes.Max());
+   dir_bdr = 0;
+   dir_bdr[0] = 1; // boundary attribute 1 is Dirichlet
+   dir_bdr[1] = 1; // boundary attribute 2 is Dirichlet
+
+   NeoHookeanHypModel model1(_mu, _lambda);
+   NonlinearForm a1(&fespace);
+   a1.AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model1));
+
+   NeoHookeanModel model2(_mu, _lambda);
+   NonlinearForm a2(&fespace);
+   a2.AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
+
+    // Create vectors to hold the values of the forms
+    Vector x, y0, y1, y2, y3;
+
+    GridFunction x_ref(&fespace);
+    mesh.GetNodes(x_ref);
+    x.SetSize(fespace.GetTrueVSize());
+    x = x_ref.GetTrueVector();
+
+    double lower_bound = -1;
+    double upper_bound = 1;
+ 
+    //uniform_real_distribution<double> unif(lower_bound,
+    //                                       upper_bound);
+    //default_random_engine re;
+    /* cout<<"couting xi"<<endl;
+    for (size_t i = 0; i < x.Size(); i++)
+    {
+      cout<<"x[i] is: "<<x[i]<<endl;
+    } */
+    
+    y0.SetSize(fespace.GetTrueVSize());
+    y0 = 0.0;
+
+    y1.SetSize(fespace.GetTrueVSize());
+    y1 = 0.0;
+
+    y2.SetSize(fespace.GetTrueVSize());
+    y2 = 0.0;
+
+    y3.SetSize(fespace.GetTrueVSize());
+    y3 = 0.0;
+
+    SimpleExactSolutionNeoHooke(x, y0);
+    //y0 = x;
+    SimpleExactRHSNeoHooke(y0, y3);
+
+    cout<<"couting y0 and x"<<endl;
+    for (size_t i = 0; i < y0.Size(); i++)
+    {
+      cout<<"x["<<i<<"] is: "<<x[i]<<endl;
+      cout<<"y0["<<i<<"] is: "<<y0[i]<<endl<<endl;
+    } 
+
+    a1.Mult(y0, y1);
+    a2.Mult(y0, y2);
+
+    cout<<"couting y1 and y3"<<endl;
+    for (size_t i = 0; i < y0.Size(); i++)
+    {
+      cout<<"y1["<<i<<"] is: "<<y1[i]<<endl;
+      cout<<"y3["<<i<<"] is: "<<y3[i]<<endl<<endl;
+    }
+
+   double norm_diff = 0.0;
+   cout << "Scaleup NeoHooke residual norm: " << y1.Norml2() << endl;
+    cout << "MFEM NeoHooke residual norm: " << y2.Norml2() << endl;
+    cout << "Analytic NeoHooke residual norm: " << y3.Norml2() << endl;
+
+    y1 -= y3; // Already tested y1 ==y2
+    norm_diff = y1.Norml2();
+    cout << "NeoHooke residual difference norm: " << norm_diff << endl;
+
+    /* a1.Mult(x, y1);
+    a2.Mult(x, y2);
+
+    y1/=y1.Norml2();
+    y2/=y2.Norml2();
+
+    cout << "Scaled Scaleup NeoHooke residual norm: " << y1.Norml2() << endl;
+    cout << "Scaled MFEM NeoHooke residual norm: " << y2.Norml2() << endl;
+
+    y1 -= y2;
+    norm_diff = y1.Norml2();
+    cout << "Scaled NeoHooke Residual difference norm: " << norm_diff << endl; */
+
+    Operator *J_op1 = &(a1.GetGradient(x));
+    SparseMatrix *J1 = dynamic_cast<SparseMatrix *>(J_op1);
+
+    Operator *J_op2 = &(a2.GetGradient(x));
+    SparseMatrix *J2 = dynamic_cast<SparseMatrix *>(J_op2);
+
+   //_PrintMatrix(*(diff_matrix.ToDenseMatrix()), "test_elmat1.txt");
+   //_PrintMatrix(*(a1view.ToDenseMatrix()), "test_elmat2.txt");
+
+    cout << "Scaleup NeoHooke matrix norm: " << J1->MaxNorm() << endl;
+    cout << "MFEM NeoHooke matrix norm: " << J2->MaxNorm() << endl;
+
+    J1->Add(-1.0, *J2);
+    cout << "Stiffness matrix difference norm: " << J1->MaxNorm() << endl;
+
+   return;
+} 
  
 
 int main(int argc, char *argv[])
