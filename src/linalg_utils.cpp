@@ -504,6 +504,22 @@ void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
    }
 }
 
+void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                      const DenseMatrix& A,
+                      const DenseMatrix& P, const Array<int> &Prows,
+                      SparseMatrix& RAP)
+{
+   DenseMatrix tmp;
+   AddSubMatrixRtAP(R, Rrows, A, P, Prows, tmp);
+   assert(tmp.NumRows() == RAP.NumRows());
+   assert(tmp.NumCols() == RAP.NumCols());
+
+   const double *d_tmp = tmp.Read();
+   for (int j = 0; j < tmp.NumCols(); j++)
+      for (int i = 0; i < tmp.NumRows(); i++, d_tmp++)
+         RAP.Add(i, j, (*d_tmp));
+}
+
 void TensorContract(const DenseTensor &tensor, const Vector &xi, const Vector &xj, Vector &yk)
 {
    assert(xi.Size() == tensor.SizeI());
