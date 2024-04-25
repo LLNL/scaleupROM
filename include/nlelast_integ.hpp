@@ -206,7 +206,7 @@ namespace mfem
 
    // RHS integrator for nonlinear elastic DG.
    // For this is just DGElasticityDirichletLFIntegrator with a different name
-   class DGHyperelasticDirichletNLFIntegrator : public LinearFormIntegrator // Should this be a nonlinear form later?
+   class DGHyperelasticDirichletLFIntegrator : public LinearFormIntegrator // Should this be a nonlinear form later?
    {
    protected:
       VectorCoefficient &uD;
@@ -226,7 +226,7 @@ namespace mfem
 #endif
 
    public:
-      DGHyperelasticDirichletNLFIntegrator(VectorCoefficient &uD_,
+      DGHyperelasticDirichletLFIntegrator(VectorCoefficient &uD_,
                                            DGHyperelasticModel *m,
                                            double alpha_, double kappa_)
           : uD(uD_), model(m), lambda(NULL), mu(NULL), alpha(alpha_), kappa(kappa_) {}

@@ -627,6 +627,15 @@ namespace nlelast
       u(1) = pow(x(1), 2.0) + x(1);
    }
 
+   void ExactSolutionNeoHookeBC(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      //assert(dim == 2);
+      assert(x.Size() == 2);
+      u(0) = pow(x(0), 2.0);
+      u(1) = pow(x(1), 2.0);
+   }
+
    void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
    {
       int dim = 2;
@@ -639,7 +648,7 @@ namespace nlelast
       }
    }
 
-   void ExactRHSNeoHooke(const Vector &x, Vector &u)
+   /* void ExactRHSNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
       assert(dim == 2);
@@ -651,7 +660,7 @@ namespace nlelast
 
       u(1) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 384.0*mu*x_1 + 128.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 384.0*mu*(pow(x_1,2)) + 128.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1),2))*(pow((1 + 2*x_2),4)));
       //u *= -1.0;
-   }
+   } */
 
    void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
    {
@@ -660,7 +669,7 @@ namespace nlelast
       assert(mu == 0.0);
       u(0) = 2 * K * pow(1.0 + 2.0 * x(1), 2.0);
       u(1) = 2 * K * pow(1.0 + 2.0 * x(0), 2.0); 
-      //u *= -1.0;
+      u *= -1.0;
    }
 
    NLElastSolver *SolveWithRefinement(const int num_refinement, const bool nonlinear)
@@ -686,10 +695,11 @@ namespace nlelast
       test->InitVisualization();
       if (nonlinear)
       {
-      test->AddBCFunction(ExactSolutionNeoHooke, 1);
-      test->AddBCFunction(ExactSolutionNeoHooke, 2);
-      test->AddBCFunction(ExactSolutionNeoHooke, 3);
+      test->AddBCFunction(ExactSolutionNeoHookeBC, 1);
+      test->AddBCFunction(ExactSolutionNeoHookeBC, 2);
+      test->AddBCFunction(ExactSolutionNeoHookeBC, 3);
       test->AddRHSFunction(SimpleExactRHSNeoHooke);
+      test->SetupIC(ExactSolutionNeoHooke);
       }
       else
       {

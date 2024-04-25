@@ -285,7 +285,7 @@ void NLElastSolver::SetupRHSBCOperators()
                case BoundaryType::DIRICHLET:
                //bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
                   //*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
-               bs[m]->AddBdrFaceIntegrator(new DGHyperelasticDirichletNLFIntegrator(
+               bs[m]->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
                *bdr_coeffs[b], model, alpha, kappa), *bdr_markers[b]);
                break;
             case BoundaryType::NEUMANN:
@@ -319,7 +319,7 @@ void NLElastSolver::BuildDomainOperators()
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
+   //a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
 }
 
 void NLElastSolver::Assemble()
@@ -375,7 +375,7 @@ bool NLElastSolver::Solve()
    const int hw = U->Size();
    NLElastOperator oper(hw, hw, as, a_itf, var_offsets, direct_solve);
 
-   //cout<<"1 "<<endl;
+   cout<<"full_dg is: "<<full_dg<<endl;
    if (direct_solve)
    {
       mumps = new MUMPSSolver(MPI_COMM_SELF);

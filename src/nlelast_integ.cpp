@@ -960,13 +960,13 @@ void HyperelasticNLFIntegratorHR::AssembleH(const int dim, const int dof, const 
  
 
 //RHS
-void DGHyperelasticDirichletNLFIntegrator::AssembleRHSElementVect(const FiniteElement &el,
+void DGHyperelasticDirichletLFIntegrator::AssembleRHSElementVect(const FiniteElement &el,
                                         ElementTransformation &Tr,
                                         Vector &elvect){
        mfem_error("DGElasticityDirichletLFIntegrator::AssembleRHSElementVect");
        };
 
-void DGHyperelasticDirichletNLFIntegrator::AssembleRHSElementVect(const FiniteElement &el,
+void DGHyperelasticDirichletLFIntegrator::AssembleRHSElementVect(const FiniteElement &el,
                                         FaceElementTransformations &Tr,
                                         Vector &elvect){
 MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
@@ -1012,6 +1012,14 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
  
        // Evaluate the Dirichlet b.c. using the face transformation.
        uD.Eval(u_dir, Tr, ip);
+
+       /* for (size_t i = 0; i < u_dir.Size(); i++)
+       {
+         cout<<"u_dir[i] is: "<<u_dir[i]<<endl;
+       } */
+       
+
+       //MFEM_ABORT("test");
  
        el.CalcShape(eip, shape);
  
@@ -1030,7 +1038,6 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
       const double w = ip.weight / Tr.Elem1->Weight();
       wLM = model->EvalDGWeight(w, *Tr.Elem1, eip);
       jcoef = kappa * wLM * (nor*nor);
-
  
        for (int im = 0, i = 0; im < dim; ++im)
        {

@@ -437,7 +437,7 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
 
    LinearForm b2(&fespace);
    b2.AddBdrFaceIntegrator(
-      new DGHyperelasticDirichletNLFIntegrator(
+      new DGHyperelasticDirichletLFIntegrator(
          init_x, &model, alpha, kappa), dir_bdr);
    b2.Assemble();
 
