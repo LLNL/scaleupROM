@@ -41,6 +41,9 @@ public:
        NonlinearFormIntegrator%s and gradient Operator. */
    virtual ~InterfaceForm();
 
+   /* access functions */
+   const Array<int>& GetBlockOffsets() { return block_offsets; }
+
    /// Adds new Interior Face Integrator.
    virtual void AddInterfaceIntegrator(InterfaceNonlinearFormIntegrator *nlfi)
    {
@@ -60,19 +63,23 @@ public:
 
    virtual void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const;
 
-protected:
-
-   // BilinearForm interface operator.
-   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
-      FiniteElementSpace *fes1, FiniteElementSpace *fes2,
-      Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats) const;
-
+   /*
+      this is public only for the sake of testing.
+      TODO(kevin): bring it back to protected.
+   */
    // NonlinearForm interface operator.
    void AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,
       FiniteElementSpace *fes1, FiniteElementSpace *fes2,
       Array<InterfaceInfo> *interface_infos,
       const Vector &x1, const Vector &x2,
       Vector &y1, Vector &y2) const;
+
+protected:
+
+   // BilinearForm interface operator.
+   void AssembleInterfaceMatrix(Mesh *mesh1, Mesh *mesh2,
+      FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+      Array<InterfaceInfo> *interface_infos, Array2D<SparseMatrix*> &mats) const;
 
    void AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
       FiniteElementSpace *fes1, FiniteElementSpace *fes2,
