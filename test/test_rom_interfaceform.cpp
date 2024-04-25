@@ -325,53 +325,74 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
 
    const int ndofs1 = fes1->GetTrueVSize();
    const int ndofs2 = fes2->GetTrueVSize();
-   const int num_snap = UniformRandom(3, 5);
-   const int num_basis = num_snap;
 
-   // a fictitious snapshots.
-   DenseMatrix snapshots1(ndofs1, num_snap);
-   DenseMatrix snapshots2(ndofs2, num_snap);
-   for (int j = 0; j < num_snap; j++)
-   {
-      for (int i = 0; i < ndofs1; i++)
+   /* number of snapshots on each domain */
+   const int nsnap1 = UniformRandom(3, 5);
+   const int nsnap2 = UniformRandom(3, 5);
+   /* same number of basis to fully represent snapshots */
+   const int num_basis1 = nsnap1;
+   const int num_basis2 = nsnap2;
+   const int NB = num_basis1 + num_basis2;
+   /* number of basis for other domains that do not belong to the port */
+   const int nb_def = min(num_basis1, num_basis2);
+   /* number of snapshot pairs for port EQP training */
+   const int num_snap = UniformRandom(3, 5);
+
+   /* fictitious snapshots */
+   DenseMatrix snapshots1(ndofs1, nsnap1);
+   DenseMatrix snapshots2(ndofs2, nsnap2);
+   for (int i = 0; i < ndofs1; i++)
+      for (int j = 0; j < nsnap1; j++)
          snapshots1(i, j) = 2.0 * UniformRandom() - 1.0;
-      for (int i = 0; i < ndofs2; i++)
+   for (int i = 0; i < ndofs2; i++)
+      for (int j = 0; j < nsnap2; j++)
          snapshots2(i, j) = 2.0 * UniformRandom() - 1.0;
+
+   /* fictitious pair indices */
+   Array<int> snap1_idx(num_snap), snap2_idx(num_snap);
+   for (int i = 0; i < num_snap; i++)
+   {
+      snap1_idx[i] = UniformRandom(0, nsnap1-1);
+      snap2_idx[i] = UniformRandom(0, nsnap2-1);
    }
 
    /* bases generated from fictitious snapshots */
-   DenseMatrix basis1(ndofs1, num_basis);
-   DenseMatrix basis2(ndofs2, num_basis);
+   DenseMatrix basis1(ndofs1, num_basis1);
+   DenseMatrix basis2(ndofs2, num_basis2);
    const CAROM::Matrix *carom_snapshots1, *carom_snapshots2;
    CAROM::BasisGenerator *basis1_generator, *basis2_generator;
    {
-      CAROM::Options options(ndofs1, num_snap, 1, true);
+      CAROM::Options options(ndofs1, nsnap1, 1, true);
       options.static_svd_preserve_snapshot = true;
       basis1_generator = new CAROM::BasisGenerator(options, false, "test_basis1");
       Vector snapshot(ndofs1);
-      for (int s = 0; s < num_snap; s++)
+      for (int s = 0; s < nsnap1; s++)
       {
          snapshots1.GetColumnReference(s, snapshot);
          basis1_generator->takeSample(snapshot.GetData());
       }
       basis1_generator->endSamples();
       carom_snapshots1 = basis1_generator->getSnapshotMatrix();
-      const CAROM::Matrix *carom_basis = basis1_generator->getSpatialBasis();
+
+      CAROM::BasisReader basis_reader("test_basis1");
+      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis1);
       CAROM::CopyMatrix(*carom_basis, basis1);
    }
    {
-      CAROM::Options options(ndofs2, num_snap, 1, true);
+      CAROM::Options options(ndofs2, nsnap2, 1, true);
       options.static_svd_preserve_snapshot = true;
       basis2_generator = new CAROM::BasisGenerator(options, false, "test_basis2");
       Vector snapshot(ndofs2);
-      for (int s = 0; s < num_snap; s++)
+      for (int s = 0; s < nsnap2; s++)
       {
          snapshots2.GetColumnReference(s, snapshot);
          basis2_generator->takeSample(snapshot.GetData());
       }
       basis2_generator->endSamples();
       carom_snapshots2 = basis2_generator->getSnapshotMatrix();
-      const CAROM::Matrix *carom_basis = basis2_generator->getSpatialBasis();
+
+      CAROM::BasisReader basis_reader("test_basis2");
+      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis2);
       CAROM::CopyMatrix(*carom_basis, basis2);
    }
 
@@ -406,7 +427,7 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    Array<DenseMatrix *> bases(numSub);
    for (int m = 0; m < bases.Size(); m++)
    {
-      bases[m] = new DenseMatrix(fes[m]->GetTrueVSize(), num_basis);
+      bases[m] = new DenseMatrix(fes[m]->GetTrueVSize(), nb_def);
       *bases[m] = 0.0;
       rform->SetBasisAtSubdomain(m, *bases[m]);
    }
@@ -415,8 +436,8 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    rform->UpdateBlockOffsets();
    // rform->SetPrecomputeMode(false);
 
-   CAROM::Vector rhs1(num_snap * num_basis * 2, false);
-   CAROM::Vector rhs2(num_snap * num_basis * 2, false);
+   CAROM::Vector rhs1(num_snap * NB, false);
+   CAROM::Vector rhs2(num_snap * NB, false);
    CAROM::Matrix Gt(1, 1, true);
 
    /* exact right-hand side by inner product of basis and fom vectors */
@@ -425,21 +446,21 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    Vector basis_col;
    for (int s = 0; s < num_snap; s++)
    {
-      snapshots1.GetColumnReference(s, snap1);
-      snapshots2.GetColumnReference(s, snap2);
+      snapshots1.GetColumnReference(snap1_idx[s], snap1);
+      snapshots2.GetColumnReference(snap2_idx[s], snap2);
 
       rhs_vec1 = 0.0; rhs_vec2 = 0.0;
       nform->AssembleInterfaceVector(mesh1, mesh2, fes1, fes2, itf_infos, snap1, snap2, rhs_vec1, rhs_vec2);
 
-      for (int b = 0; b < num_basis; b++)
+      for (int b = 0; b < num_basis1; b++)
       {
          basis1.GetColumnReference(b, basis_col);
-         rhs1(b + s * num_basis * 2) = basis_col * rhs_vec1;
+         rhs1(b + s * NB) = basis_col * rhs_vec1;
       }
-      for (int b = 0; b < num_basis; b++)
+      for (int b = 0; b < num_basis2; b++)
       {
          basis2.GetColumnReference(b, basis_col);
-         rhs1(b + num_basis + s * num_basis * 2) = basis_col * rhs_vec2;
+         rhs1(b + num_basis1 + s * NB) = basis_col * rhs_vec2;
       }
    }
 
@@ -454,42 +475,41 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
 
    /* equivalent operation must happen within this routine */
    rform->SetupEQPSystem(carom_snapshots1_work, carom_snapshots2_work,
-                         basis1, basis2, 0, 0, fes1, fes2,
-                         itf_infos, integ2, Gt, rhs2);
+                         snap1_idx, snap2_idx, basis1, basis2, 0, 0,
+                         fes1, fes2, itf_infos, integ2, Gt, rhs2);
 
    for (int k = 0; k < rhs1.dim(); k++)
       EXPECT_NEAR(rhs1(k), rhs2(k), threshold);
 
    double eqp_tol = 1.0e-10;
-   Array<int> sample_el, sample_qp;
-   Array<double> sample_qw;
+   Array<int> sample_el(0), sample_qp(0);
+   Array<double> sample_qw(0);
    const int nqe = ir->GetNPoints();
    rform->TrainEQPForIntegrator(nqe, Gt, rhs2, eqp_tol, sample_el, sample_qp, sample_qw);
    // if (rform->PrecomputeMode()) rform->PrecomputeCoefficients();
    rform->UpdateInterFaceIntegratorSampling(0, pidx, sample_el, sample_qp, sample_qw);
 
-   DenseMatrix rom_rhs1(rhs1.getData(), 2 * num_basis, num_snap), rom_rhs2(2 * num_basis, num_snap);
+   DenseMatrix rom_rhs1(rhs1.getData(), NB, num_snap), rom_rhs2(NB, num_snap);
    Array<int> rom_blocks = rform->GetBlockOffsets();
    BlockVector rom_sol(rom_blocks), rom_rhs2_vec(rom_blocks);
    for (int s = 0; s < num_snap; s++)
    {
-      rom_sol = 0.0;
-      snapshots1.GetColumnReference(s, snap1);
-      snapshots2.GetColumnReference(s, snap2);
+      snapshots1.GetColumnReference(snap1_idx[s], snap1);
+      snapshots2.GetColumnReference(snap2_idx[s], snap2);
 
+      rom_sol = 0.0;
       basis1.MultTranspose(snap1, rom_sol.GetBlock(midx[0]));
       basis2.MultTranspose(snap2, rom_sol.GetBlock(midx[1]));
       rom_rhs2_vec = 0.0;
       rform->InterfaceAddMult(rom_sol, rom_rhs2_vec);
 
-      for (int b = 0; b < num_basis; b++)
-      {
+      for (int b = 0; b < num_basis1; b++)
          rom_rhs2(b, s) = rom_rhs2_vec.GetBlock(midx[0])(b);
-         rom_rhs2(b + num_basis, s) = rom_rhs2_vec.GetBlock(midx[1])(b);
-      }
+      for (int b = 0; b < num_basis2; b++)
+         rom_rhs2(b + num_basis1, s) = rom_rhs2_vec.GetBlock(midx[1])(b);
    }
 
-   for (int i = 0; i < num_basis; i++)
+   for (int i = 0; i < NB; i++)
       for (int j = 0; j < num_snap; j++)
          EXPECT_NEAR(rom_rhs1(i, j), rom_rhs2(i, j), threshold);
 

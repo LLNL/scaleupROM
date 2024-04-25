@@ -71,6 +71,7 @@ public:
    void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const override;
 
    void SetupEQPSystem(const CAROM::Matrix &snapshot1, const CAROM::Matrix &snapshot2,
+                       const Array<int> &snap1_idx, const Array<int> &snap2_idx,
                        DenseMatrix &basis1, DenseMatrix &basis2,
                        const int &basis1_offset, const int &basis2_offset,
                        FiniteElementSpace *fes1, FiniteElementSpace *fes2,
