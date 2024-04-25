@@ -879,9 +879,10 @@ namespace nlelast
    //cout<<"pre error2"<<endl;
    
 
-   NeoHookeanModel model2(mu, K);
+   NeoHookeanHypModel model2(mu, K);
    NonlinearForm *nlform = new NonlinearForm(fes);
-   nlform->AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
+   //nlform->AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
+   nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model2));
     Vector x, y0, y1;
    //cout<<"pre error3"<<endl;
 
