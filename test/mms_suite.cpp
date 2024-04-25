@@ -826,14 +826,16 @@ namespace nlelast
       return;
    }
 
-   double test_fn(const Vector & x)
+   void test_fn(const Vector &x, Vector &u)
 {
    double xi(x(0));
    double yi(x(1));
 
    assert(x.Size() == 2);
 
-   return 2.0 * sin(xi)*sin(yi);
+   u(0) = sin(pi * x(0));
+   u(1) = sin(pi * x(1));
+   return;
 }
 
    double EvalWithRefinement(const int num_refinement, int &order_out)
@@ -846,6 +848,7 @@ namespace nlelast
 
    Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
    int dim = mesh->Dimension();
+   //cout<<"dim is: "<<dim<<endl;
 
    for (int l = 0; l < num_refinement; l++)
    {
@@ -856,40 +859,53 @@ namespace nlelast
    FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes;
+   //FiniteElementSpace fespace(mesh, &fe_coll, dim);
    assert(use_dg == false);
    if (use_dg)
    {
-      fes = new FiniteElementSpace(mesh, dg_coll);
+      fes = new FiniteElementSpace(mesh, dg_coll, dim);
    }
    else
    {
-      fes = new FiniteElementSpace(mesh, h1_coll);
+      fes = new FiniteElementSpace(mesh, h1_coll, dim);
    }
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
-   FunctionCoefficient v(test_fn);
+   //cout<<"pre error1"<<endl;
+   VectorFunctionCoefficient v(dim, test_fn);
    GridFunction p(fes);
    p.ProjectCoefficient(v);
+
+   //cout<<"pre error2"<<endl;
+   
 
    NeoHookeanModel model2(mu, K);
    NonlinearForm *nlform = new NonlinearForm(fes);
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
     Vector x, y0, y1;
+   //cout<<"pre error3"<<endl;
 
     GridFunction x_ref(fes);
+   //cout<<"pre error4"<<endl;
     mesh->GetNodes(x_ref);
+   //cout<<"pre error5"<<endl;
     int ndofs = fes->GetTrueVSize();
+    //cout<<"ndofs is: "<<ndofs<<endl;
+    //cout<<"x_ref.GetTrueVector().Size() is: "<<x_ref.GetTrueVector().Size()<<endl;
     x.SetSize(ndofs);
     x = x_ref.GetTrueVector();
 
     y0.SetSize(ndofs);
     y0 = 0.0;
-
     SimpleExactSolutionNeoHooke(x, y0);
 
     y1.SetSize(ndofs);
     y1 = 0.0;
-
+   /* for (size_t i = 0; i < y0.Size(); i++)
+   {
+      cout<<"y0[i] is: "<<y0[i]<<endl;
+   } */
+   
    nlform->Mult(y0, y1); //MFEM Neohookean
 
    double product = p * y1;
@@ -908,8 +924,8 @@ void CheckConvergenceIntegratorwise()
 {
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
 
-   double Lx = 1.0, Ly = 1.0;
-   double product_ex = sin(Lx) * cos(Lx) * (Ly - 0.5 * sin(2.0 * Ly)); // TODO: replace
+   //double product_ex = 26.0 * K / 3.0 * 1.5384588; // TODO: replace
+   double product_ex = -(104.0 * K)/(3.0 * pi); // TODO: replace
    printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
 
    printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
