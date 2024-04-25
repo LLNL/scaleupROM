@@ -293,6 +293,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
 
 void ROMInterfaceForm::SetupEQPSystem(
    const CAROM::Matrix &snapshot1, const CAROM::Matrix &snapshot2,
+   const Array<int> &snap1_idx, const Array<int> &snap2_idx,
    DenseMatrix &basis1, DenseMatrix &basis2,
    const int &basis1_offset, const int &basis2_offset,
    FiniteElementSpace *fes1, FiniteElementSpace *fes2,
@@ -329,14 +330,17 @@ void ROMInterfaceForm::SetupEQPSystem(
    const int NB1 = basis1.NumCols();
    const int NB2 = basis2.NumCols();
    const int NB = NB1 + NB2;
+
+   /*
+      We take the snapshot pairs given by snap1/2_idx.
+      These two arrays should have the same size.
+   */
+   const int nsnap = snap1_idx.Size();
+   assert(nsnap == snap2_idx.Size());
    const int nsnap1 = snapshot1.numColumns();
    const int nsnap2 = snapshot2.numColumns();
-   const int nsnap = nsnap1;
-   /*
-      We assume two snapshot matrices are exactly paired up.
-      In other words, the same column index indicates the same sample.
-   */
-   assert(nsnap1 == nsnap2);
+   assert((snap1_idx.Min() >= 0) && (snap1_idx.Max() < nsnap1));
+   assert((snap2_idx.Min() >= 0) && (snap2_idx.Max() < nsnap2));
 
    const int ne_global = itf_infos->Size();
    const int ne = CAROM::split_dimension(ne_global, MPI_COMM_WORLD);
@@ -372,9 +376,9 @@ void ROMInterfaceForm::SetupEQPSystem(
    {
       // NOTE(kevin): have to copy the vector since libROM matrix is row-major.
       for (int k = 0; k < fes1->GetTrueVSize(); ++k)
-         v1_i[k] = snapshot1(k, i);
+         v1_i[k] = snapshot1(k, snap1_idx[i]);
       for (int k = 0; k < fes2->GetTrueVSize(); ++k)
-         v2_i[k] = snapshot2(k, i);
+         v2_i[k] = snapshot2(k, snap2_idx[i]);
 
       for (int e = elem_offsets[rank], eidx = 0; e < elem_offsets[rank+1]; e++, eidx++)
       {
