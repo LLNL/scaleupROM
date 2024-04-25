@@ -621,9 +621,22 @@ namespace nlelast
    void ExactSolutionNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
-      assert(dim == 2);
+      //assert(dim == 2);
+      assert(x.Size() == 2);
       u(0) = pow(x(0), 2.0) + x(0);
       u(1) = pow(x(1), 2.0) + x(1);
+   }
+
+   void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      int dof = U.Size()/dim;
+      U = 0.0;
+      for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         U(i) = pow(X(i), 2.0) + X(i);
+         U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
+      }
    }
 
    void ExactRHSNeoHooke(const Vector &x, Vector &u)
@@ -647,6 +660,7 @@ namespace nlelast
       assert(mu == 0.0);
       u(0) = 2 * K * pow(1.0 + 2.0 * x(1), 2.0);
       u(1) = 2 * K * pow(1.0 + 2.0 * x(0), 2.0); 
+      //u *= -1.0;
    }
 
    NLElastSolver *SolveWithRefinement(const int num_refinement, const bool nonlinear)
@@ -811,6 +825,118 @@ namespace nlelast
 
       return;
    }
+
+   double test_fn(const Vector & x)
+{
+   double xi(x(0));
+   double yi(x(1));
+
+   assert(x.Size() == 2);
+
+   return 2.0 * sin(xi)*sin(yi);
+}
+
+   double EvalWithRefinement(const int num_refinement, int &order_out)
+{  
+   // 1. Parse command-line options.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+   bool use_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   int order = config.GetOption<int>("discretization/order", 1);
+   order_out = order;
+
+   Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
+   int dim = mesh->Dimension();
+
+   for (int l = 0; l < num_refinement; l++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+
+   FiniteElementSpace *fes;
+   assert(use_dg == false);
+   if (use_dg)
+   {
+      fes = new FiniteElementSpace(mesh, dg_coll);
+   }
+   else
+   {
+      fes = new FiniteElementSpace(mesh, h1_coll);
+   }
+
+   // 12. Create the grid functions u and p. Compute the L2 error norms.
+   FunctionCoefficient v(test_fn);
+   GridFunction p(fes);
+   p.ProjectCoefficient(v);
+
+   NeoHookeanModel model2(mu, K);
+   NonlinearForm *nlform = new NonlinearForm(fes);
+   nlform->AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
+    Vector x, y0, y1;
+
+    GridFunction x_ref(fes);
+    mesh->GetNodes(x_ref);
+    int ndofs = fes->GetTrueVSize();
+    x.SetSize(ndofs);
+    x = x_ref.GetTrueVector();
+
+    y0.SetSize(ndofs);
+    y0 = 0.0;
+
+    SimpleExactSolutionNeoHooke(x, y0);
+
+    y1.SetSize(ndofs);
+    y1 = 0.0;
+
+   nlform->Mult(y0, y1); //MFEM Neohookean
+
+   double product = p * y1;
+
+   // 17. Free the used memory.
+   delete nlform;
+   delete fes;
+   delete dg_coll;
+   delete h1_coll;
+   delete mesh;
+
+   return product;
+}
+
+void CheckConvergenceIntegratorwise()
+{
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+
+   double Lx = 1.0, Ly = 1.0;
+   double product_ex = sin(Lx) * cos(Lx) * (Ly - 0.5 * sin(2.0 * Ly)); // TODO: replace
+   printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
+
+   printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
+
+   Vector conv_rate(num_refine);
+   conv_rate = 0.0;
+   double error1 = 0.0;
+   for (int r = 0; r < num_refine; r++)
+   {
+      int order = -1;
+      double product = EvalWithRefinement(r, order);
+
+      double error = abs(product - product_ex) / abs(product_ex);
+      
+      if (r > 0)
+         conv_rate(r) = error1 / error;
+      printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\n", r, error, conv_rate(r), product, product_ex);
+
+      // reported convergence rate
+      if (r > 0)
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
+
+      error1 = error;
+   }
+
+   return;
+}
 
 } // namespace nlelast
 

@@ -96,14 +96,17 @@ namespace nlelast
 {
 
 static const double pi = 4.0 * atan(1.0);
-static const double mu = 3.14;
-static double K = 2.33;
+//static const double mu = 3.14;
+static const double mu = 0.0;
+//static double K = 2.33;
+static double K = 1.0;
 static double lambda = K;
 static int dim;
 static void ExactSolution(const Vector & x, Vector & u);
 static void ExactRHS(const Vector & x, Vector & u);
 NLElastSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence(bool nonlinear);
+void CheckConvergenceIntegratorwise();
 void CompareLinMat();
 
 }  // namespace nlelast

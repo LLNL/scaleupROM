@@ -102,7 +102,7 @@ Operator& NLElastOperator::GetGradient(const Vector &x) const
 
    }  
    else
-   cout<<"out gra2"<<endl;
+   //cout<<"out gra2"<<endl;
 
       return *mono_jac;
 }

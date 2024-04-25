@@ -17,10 +17,51 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound)
    SUCCEED();
 }
 
-/* TEST(DDSerialTest, CompareSolvers)
+TEST(DDSerialTest, Test_convergence_DG)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["discretization"]["full-discrete-galerkin"] = false;
+   config.dict_["domain-decomposition"]["type"] = "none";
+   bool nonlinear = true;
+   CheckConvergenceIntegratorwise();
+
+   return;
+}
+
+/* TEST(DDSerialTest, Test_convergence_DG)
 {
    config = InputParser("inputs/dd_mms.yml");
    config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["discretization"]["full-discrete-galerkin"] = false;
+   config.dict_["domain-decomposition"]["type"] = "none";
+   bool nonlinear = true;
+   CheckConvergence(nonlinear);
+
+   return;
+} */
+
+/* 
+TEST(DDSerialTest, Test_direct_solver_DG)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["discretization"]["full-discrete-galerkin"] = true;
+   config.dict_["domain-decomposition"]["type"] = "none";
+   bool nonlinear = true;
+   CheckConvergence(nonlinear);
+
+   return;
+} */
+
+/* TEST(DDSerialTest, CompareSolvers)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   //config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
+   config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
    config.dict_["solver"]["direct_solve"] = true;
    config.dict_["discretization"]["full-discrete-galerkin"] = true;
    config.dict_["domain-decomposition"]["type"] = "none";
@@ -31,32 +72,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound)
    return;
 } */
 
-/* TEST(DDSerialTest, Test_convergence_DG)
-{
-   config = InputParser("inputs/dd_mms.yml");
-   config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
-   config.dict_["discretization"]["full-discrete-galerkin"] = true;
-   config.dict_["domain-decomposition"]["type"] = "none";
-   bool nonlinear = false;
-   CheckConvergence(nonlinear);
 
-   return;
-}
- */
-
-TEST(DDSerialTest, Test_direct_solver_DG)
-{
-   config = InputParser("inputs/dd_mms.yml");
-   //config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
-   config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
-   config.dict_["solver"]["direct_solve"] = true;
-   config.dict_["discretization"]["full-discrete-galerkin"] = true;
-   config.dict_["domain-decomposition"]["type"] = "none";
-   bool nonlinear = false;
-   CheckConvergence(nonlinear);
-   return;
-} 
- 
 /* TEST(DDSerialTest, Test_convergence_DG_DD)
 {
    config = InputParser("inputs/dd_mms.yml");
