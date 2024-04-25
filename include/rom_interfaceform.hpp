@@ -70,6 +70,18 @@ public:
 
    void InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const override;
 
+   void SetupEQPSystem(const CAROM::Matrix &snapshot1, const CAROM::Matrix &snapshot2,
+                       DenseMatrix &basis1, DenseMatrix &basis2,
+                       const int &basis1_offset, const int &basis2_offset,
+                       FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+                       Array<InterfaceInfo>* const itf_infos,
+                       InterfaceNonlinearFormIntegrator* const nlfi,
+                       CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
+
+   void TrainEQPForIntegrator(const int nqe, const CAROM::Matrix &Gt,
+                              const CAROM::Vector &rhs_Gw, const double eqp_tol,
+                              Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+
 private:
    /* These methods are not available in this class */
    using InterfaceForm::AssembleInterfaceMatrices;
