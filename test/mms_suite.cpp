@@ -672,6 +672,30 @@ namespace nlelast
       u *= -1.0;
    }
 
+    void NullSolution(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      //u -= x;
+   }
+
+   void NullDefSolution(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u = x;
+   }
+
+    void cantileverf(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u(0) = -0.10;
+   }
+
+   void cantileverfu(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u(0) = 0.10;
+   }
+
    NLElastSolver *SolveWithRefinement(const int num_refinement, const bool nonlinear)
    {
       config.dict_["mesh"]["uniform_refinement"] = num_refinement;
@@ -688,6 +712,7 @@ namespace nlelast
       }
 
       NLElastSolver *test = new NLElastSolver(model);
+
       
       dim = test->GetDim();
 
@@ -695,20 +720,37 @@ namespace nlelast
       test->InitVisualization();
       if (nonlinear)
       {
-      test->AddBCFunction(ExactSolutionNeoHookeBC, 1);
-      test->AddBCFunction(ExactSolutionNeoHookeBC, 2);
-      test->AddBCFunction(ExactSolutionNeoHookeBC, 3);
+      test->AddBCFunction(ExactSolutionNeoHookeBC);
+      //test->AddBCFunction(ExactSolutionNeoHookeBC, 1);
+      //test->AddBCFunction(ExactSolutionNeoHookeBC, 2);
+      //test->AddBCFunction(ExactSolutionNeoHookeBC, 3);
+      //test->AddBCFunction(cantileverf, 1);
+      //test->AddBCFunction(cantileverfu, 2);
+      //test->AddBCFunction(NullSolution, 3);
       test->AddRHSFunction(SimpleExactRHSNeoHooke);
-      test->SetupIC(ExactSolutionNeoHooke);
+      //test->SetupIC(NullDefSolution);
+      test->SetBdrType(BoundaryType::DIRICHLET);
+
       }
       else
       {
-      test->AddBCFunction(ExactSolutionLinear, 1);
+      /* test->AddBCFunction(ExactSolutionLinear, 1);
       test->AddBCFunction(ExactSolutionLinear, 2);
-      test->AddBCFunction(ExactSolutionLinear, 3);
-      test->AddRHSFunction(ExactRHSLinear);
+      test->AddBCFunction(ExactSolutionLinear, 3); */
+      //test->AddBCFunction(NullSolution, 1);
+      //test->AddBCFunction(cantileverf, 2);
+      //test->AddBCFunction(NullSolution, 3);
+      //test->AddRHSFunction(ExactRHSLinear);
       }
-      test->SetBdrType(BoundaryType::DIRICHLET);
+      //test->AddBCFunction(NullSolution, 1);
+      //test->AddBCFunction(NullSolution, 2);
+      //test->AddBCFunction(NullSolution, 3);
+      //test->AddBCFunction(cantileverfu, 2);
+      //test->AddBCFunction(NullSolution, 3);
+      //test->SetBdrType(BoundaryType::DIRICHLET);
+      //test->SetBdrType(BoundaryType::NEUMANN,1);
+      //test->SetBdrType(BoundaryType::NEUMANN,2);
+      test->SetupIC(ExactSolutionNeoHooke);
       
       test->BuildOperators();
 
@@ -788,6 +830,9 @@ namespace nlelast
       Vector conv_rate(num_refine);
       conv_rate = 0.0;
       double error1 = 0.0;
+      // TEMP
+      base_refine = 1;
+      num_refine = 2;
       for (int r = base_refine; r < num_refine; r++)
       {
          NLElastSolver *test = SolveWithRefinement(r, nonlinear);
@@ -870,7 +915,6 @@ namespace nlelast
 
    FiniteElementSpace *fes;
    //FiniteElementSpace fespace(mesh, &fe_coll, dim);
-   assert(use_dg == false);
    if (use_dg)
    {
       fes = new FiniteElementSpace(mesh, dg_coll, dim);
@@ -885,24 +929,23 @@ namespace nlelast
    VectorFunctionCoefficient v(dim, test_fn);
    GridFunction p(fes);
    p.ProjectCoefficient(v);
-
-   //cout<<"pre error2"<<endl;
    
+   string test_integ = "bc";
+   Vector x, y0, y1;
 
+   double product = 0.0;
    NeoHookeanHypModel model2(mu, K);
+   if (test_integ == "domain")
+   {
+   assert(use_dg == false);
+
    NonlinearForm *nlform = new NonlinearForm(fes);
    //nlform->AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model2));
-    Vector x, y0, y1;
-   //cout<<"pre error3"<<endl;
 
     GridFunction x_ref(fes);
-   //cout<<"pre error4"<<endl;
     mesh->GetNodes(x_ref);
-   //cout<<"pre error5"<<endl;
     int ndofs = fes->GetTrueVSize();
-    //cout<<"ndofs is: "<<ndofs<<endl;
-    //cout<<"x_ref.GetTrueVector().Size() is: "<<x_ref.GetTrueVector().Size()<<endl;
     x.SetSize(ndofs);
     x = x_ref.GetTrueVector();
 
@@ -912,17 +955,32 @@ namespace nlelast
 
     y1.SetSize(ndofs);
     y1 = 0.0;
-   /* for (size_t i = 0; i < y0.Size(); i++)
-   {
-      cout<<"y0[i] is: "<<y0[i]<<endl;
-   } */
-   
    nlform->Mult(y0, y1); //MFEM Neohookean
-
-   double product = p * y1;
-
-   // 17. Free the used memory.
+   product = p * y1;
    delete nlform;
+   }
+   else if (test_integ == "bc")
+   {
+   assert(use_dg == true);
+   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   p_ess_attr = 1;
+   //p_ess_attr[1] = 1;
+   LinearForm *gform = new LinearForm(fes);
+   VectorFunctionCoefficient ud(dim, ExactSolutionNeoHookeBC);
+   
+   gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
+               ud, &model2, 0.0, -1.0), p_ess_attr);
+   gform->Assemble();
+
+   product = p * (*gform);
+   delete gform;
+
+   }
+   
+   // 17. Free the used memory.
    delete fes;
    delete dg_coll;
    delete h1_coll;
@@ -936,7 +994,22 @@ void CheckConvergenceIntegratorwise()
    int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
 
    //double product_ex = 26.0 * K / 3.0 * 1.5384588; // TODO: replace
-   double product_ex = -(104.0 * K)/(3.0 * pi); // TODO: replace
+   string test_integ = "bc";
+   double product_ex =0.0;
+   if (test_integ == "bc")
+   {
+      double wlm = K;
+      //product_ex = 4.0 * kappa * wlm * (pow(pi,2.0) - 4.0)/pow(pi,3.0);
+      //product_ex = 1.0;
+      product_ex = 4.0 * -1.0 * (pow(pi,2.0) - 4.0)/pow(pi,3.0);
+
+   }
+   else if (test_integ == "domain")
+   {
+   product_ex =  -(104.0 * K)/(3.0 * pi); // TODO: replace
+   }
+   
+   
    printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
 
    printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");

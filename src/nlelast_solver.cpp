@@ -167,7 +167,15 @@ void NLElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
    {
       assert(us[m]);
       us[m]->ProjectCoefficient(*init_x);
+
+      /* for (size_t i = 0; i < us[m]->Size(); i++)
+       {
+         cout<<"us[m]->Elem(i) is: "<<us[m]->Elem(i)<<endl;
+       }
+
+       cout<<endl<<endl; */
    }
+   //MFEM_ABORT("test")
 }
 
 void NLElastSolver::SetupBCVariables()
@@ -375,6 +383,83 @@ bool NLElastSolver::Solve()
    const int hw = U->Size();
    NLElastOperator oper(hw, hw, as, a_itf, var_offsets, direct_solve);
 
+   // Test mult
+   /* for (int i = 0; i < var_offsets.Size(); i++)
+   {
+      cout<<"var_offsets(i) is: "<<var_offsets[i]<<endl;
+   }
+   cout<<"hw is: "<<hw<<endl; */
+   Vector _U(U->GetBlock(0));
+   Vector _U0(_U);
+   Vector _RHS(RHS->GetBlock(0));
+   Vector _res(_U);
+   _res = 0.0;
+   cout<<"_U.Norml2() is: "<<_U.Norml2()<<endl;
+
+   cout<<"_RHS.Norml2() is: "<<_RHS.Norml2()<<endl;
+
+   oper.Mult(_U, _res);
+
+   cout<<"_res.Norml2() is: "<<_res.Norml2()<<endl;
+   
+   /* for (size_t i = 0; i < _res.Size(); i++)
+   {
+      
+      {
+        cout<<"_res(i) is: "<<_res(i)<<endl;
+        cout<<"i is: "<<i<<endl;
+        cout<<"_U(i) is: "<<_U(i)<<endl;
+        cout<<"_RHS(i) is: "<<_RHS(i)<<endl;
+        if (abs(_res(i) - _RHS(i)) > 0.0000001)
+        {
+         cout<<"ohnon "<< abs(_res(i) - _RHS(i))<<endl;
+        }
+        cout<<endl;
+      }
+      
+   } */
+
+   for (size_t i = 0; i < _U.Size(); i++)
+   {
+      double _x1 = 0.5 * (sqrt(4.0 * _U0(i) + 1.0) - 1.0);
+      _U0(i) = _x1;
+   }
+   
+
+   for (size_t i = 0; i < _res.Size()/2; i++)
+   {
+      if ((abs(_res(i) - _RHS(i)) <= 0.0000001) && abs(_res(i + _res.Size()/2) - _RHS(i + _res.Size()/2) <= 0.0000001))
+      {
+         cout<<"_resx is: "<<_res(i)<<endl;
+         cout<<"_resy is: "<<_res(i + _res.Size()/2)<<endl;
+         cout<<"_RHSx is: "<<_RHS(i)<<endl;
+         cout<<"_RHSy is: "<<_RHS(i + _res.Size()/2)<<endl;
+         cout<<"_U0x is: "<<_U0(i)<<endl;
+         cout<<"_U0y is: "<<_U0(i + _res.Size()/2)<<endl;
+        cout<<endl;
+
+      }
+      
+      
+      /* {
+        cout<<"_res(i) is: "<<_res(i)<<endl;
+        cout<<"i is: "<<i<<endl;
+        cout<<"_U(i) is: "<<_U(i)<<endl;
+        cout<<"_RHS(i) is: "<<_RHS(i)<<endl;
+        if (abs(_res(i) - _RHS(i)) > 0.0000001)
+        {
+         cout<<"ohnon "<< abs(_res(i) - _RHS(i))<<endl;
+        }
+        cout<<endl;
+      } */
+      
+   }
+   
+   _res -= _RHS;
+   
+   cout<<"(_res - RHS).Norml2() is: "<<_res.Norml2()<<endl;
+   MFEM_ABORT("test");
+
    cout<<"full_dg is: "<<full_dg<<endl;
    if (direct_solve)
    {
@@ -470,7 +555,7 @@ void NLElastSolver::SetupDomainBCOperators()
                   new DGHyperelasticNLFIntegrator(model, alpha, kappa), *(bdr_markers[b]));
          }
       }
-   }
+   } 
 }
 
 void NLElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)

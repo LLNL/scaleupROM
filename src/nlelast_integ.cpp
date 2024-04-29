@@ -278,6 +278,7 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     //cout<<"-2.0/dim = "<<-2.0/dim<<endl;
     //cout<<"mu = "<<mu<<endl;
     //cout<<"a = "<<a<<endl;
+    //cout<<"dJ is: "<<dJ<<endl;
 
     Z.SetSize(dim);
      G.SetSize(dof, dim);
@@ -295,7 +296,7 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     const double a2 = a * (-2.0/dim);
 
 
-         if (isnan(a))
+        /*  if (isnan(a))
          {
             cout<<"Nan a"<<endl;
          }
@@ -304,7 +305,7 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
          {
             cout<<"Nan a2"<<endl;
          }
-
+ */
          /* if (isnan(b))
          {
             cout<<"Nan b"<<endl;
@@ -403,6 +404,26 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
    // TODO: Assert ndofs1 == ndofs2
 
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
+   Vector el0(elfun);// The initial deformation FIXME: This is only for the analytical solution in MMS
+   for (size_t i = 0; i < nvdofs; i++)
+   {
+      double _x1 = 0.5 * (sqrt(4.0 * elfun(i) + 1.0) - 1.0);
+      double _x2 = 0.5 * (-sqrt(4.0 * elfun(i) + 1.0) - 1.0);
+      el0(i) = _x1;
+      cout<<"_x1  is: "<<_x1 <<endl;
+      cout<<"_x2 is: "<<_x2<<endl;
+      if (elfun(i) != _x1 + pow(_x1, 2.0))
+      {
+         cout<< "oh no!"<<endl;
+      }
+      
+      //cout<<"el0(i) is: "<<el0(i)<<endl;
+      //cout<<"elfun(i) is: "<<elfun(i)<<endl;
+      //cout<<endl;
+   }
+
+   MFEM_ABORT("te");
+
     nor.SetSize(dim);
     Jrt.SetSize(dim);
    elvect.SetSize(nvdofs);
@@ -559,7 +580,9 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        {
             for (size_t j = 0; j < nvdofs; j++)
          {
-            elvect(i) -= jmat(i,j) * elfun(j);
+            elvect(i) -= jmat(i,j) * (elfun(j) - el0(j));
+            //elvect(i) -= jmat(i,j) * (elfun(j));
+            //cout<<"elfun(j) - el0(j) is: "<<elfun(j) - el0(j)<<endl;
          }
        }
     }
@@ -1012,11 +1035,22 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
  
        // Evaluate the Dirichlet b.c. using the face transformation.
        uD.Eval(u_dir, Tr, ip);
+       double _x[3];
+         Vector _transip(_x, 3);
+ 
+      Tr.Transform(ip, _transip);
+/* 
+      for (size_t i = 0; i < _transip.Size(); i++)
+       {
+         cout<<"_transip[i] is: "<<_transip[i]<<endl;
+       }
 
-       /* for (size_t i = 0; i < u_dir.Size(); i++)
+       for (size_t i = 0; i < u_dir.Size(); i++)
        {
          cout<<"u_dir[i] is: "<<u_dir[i]<<endl;
-       } */
+       }
+
+       cout<<endl<<endl; */
        
 
        //MFEM_ABORT("test");
@@ -1038,6 +1072,7 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
       const double w = ip.weight / Tr.Elem1->Weight();
       wLM = model->EvalDGWeight(w, *Tr.Elem1, eip);
       jcoef = kappa * wLM * (nor*nor);
+      //jcoef = -1.0 * w * (nor*nor); //Temp
  
        for (int im = 0, i = 0; im < dim; ++im)
        {
@@ -1048,6 +1083,8 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
           }
        }
     }
+
+    //cout<<"elvect.l2Norm() is: "<<elvect.Norml2()<<endl;
 };
 
 } // namespace mfem
