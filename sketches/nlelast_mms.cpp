@@ -17,8 +17,7 @@ using namespace std;
 using namespace mfem;
 
 static double K = 1.0;
-
-
+static double mu = 0.0;
 
 // A proxy Operator used for FOM Newton Solver.
 // Similar to SteadyNSOperator.
@@ -65,6 +64,11 @@ Operator& SimpleNLElastOperator::GetGradient(const Vector &x) const
 // Define the analytical solution and forcing terms / boundary conditions
 void SimpleExactRHSNeoHooke(const Vector &x, Vector &u);
 void ExactSolutionNeoHooke(const Vector &x, Vector &u);
+void SimpleExactSolutionNeoHooke(const Vector &x, Vector &u);
+void ExactSolutionLinear(const Vector &x, Vector &u);
+void ExactRHSLinear(const Vector &x, Vector &u);
+void CheckGradient(SimpleNLElastOperator &oper, FiniteElementSpace* fes);
+
 
 double error(Operator &M, Vector &x, Vector &b)
 {
@@ -95,17 +99,6 @@ double diff(Vector &a, Vector &b)
 }
 
 
-void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
-   {
-      int dim = 2;
-      int dof = U.Size()/dim;
-      U = 0.0;
-      for (size_t i = 0; i < U.Size()/dim; i++)
-      {
-         U(i) = pow(X(i), 2.0) + X(i);
-         U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
-      }
-   }
 
 int main(int argc, char *argv[])
 {
@@ -124,6 +117,8 @@ int main(int argc, char *argv[])
    bool pa = false;
    const char *device_config = "cpu";
    bool visualization = 1;
+   bool solve = false;
+   bool check_grad = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -132,6 +127,10 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&refine, "-r", "--refine",
                   "Number of refinements.");
+   args.AddOption(&solve, "-s", "--solve","-ns", "--nosolve",
+                  "Solve the system.");
+   args.AddOption(&check_grad, "-cg", "--checkgrad","-ncg", "--nocheckgrad",
+                  "Check gradients.");
    args.Parse();
    if (!args.Good())
    {
@@ -166,6 +165,8 @@ int main(int argc, char *argv[])
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
    VectorFunctionCoefficient exact_sol(dim, ExactSolutionNeoHooke);
    VectorFunctionCoefficient exact_RHS(dim, SimpleExactRHSNeoHooke);
+   //VectorFunctionCoefficient exact_sol(dim, ExactSolutionLinear);
+   //VectorFunctionCoefficient exact_RHS(dim, ExactRHSLinear);
 
 
    // 8. Allocate memory (x, rhs) for the analytical solution and the right hand
@@ -179,19 +180,19 @@ int main(int argc, char *argv[])
    Vector x(fomsize), rhs(fomsize);
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
-   GridFunction u;
-   u.MakeRef(fes, x, 0);
+   GridFunction u(fes);
 
    u = 0.0;
    u.ProjectCoefficient(exact_sol);
+   x = u.GetTrueVector();
    
-
    double kappa = -1.0;
-   double mu = 0.0;
-   //double K = 1.0;
+
    NeoHookeanHypModel model(mu, K);
+   //LinElastMaterialModel model(mu, K);
 
    LinearForm *gform = new LinearForm(fes);
+   gform->Update(fes, rhs, 0);
    gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
                exact_sol, &model, 0.0, kappa));
    gform->Assemble();
@@ -204,37 +205,40 @@ int main(int argc, char *argv[])
 
    SimpleNLElastOperator oper(fomsize, *nlform);
 
+   if (check_grad)
+   {
+   CheckGradient(oper, fes);
+   }
+
    // Test applying nonlinear form
    Vector _x(x);
    Vector _y0(x);
    Vector _y1(x);
 
    GridFunction x_ref(fes);
-   mesh->GetNodes(x_ref);
+   //mesh->GetNodes(x_ref);
+   x_ref.ProjectCoefficient(exact_sol);
    _x = x_ref.GetTrueVector();
 
-    _y0 = 0.0;
-    SimpleExactSolutionNeoHooke(_x, _y0);
+   _y1 = 0.0;
+   nlform->Mult(_x, _y1); //MFEM Neohookean
 
-    _y1 = 0.0;
-   nlform->Mult(_y0, _y1); //MFEM Neohookean
-
-   cout<<"_y1.Norml2() is: "<<_y1.Norml2()<<endl;
+   double _y1_norm = _y1.Norml2();
 
    for (size_t i = 0; i < _y1.Size(); i++)
    {
-      cout<<"LHS(i) is: "<<_y1(i)<<endl;
-      cout<<"RHS(i) is: "<<gform->Elem(i)<<endl;
-      _y1(i) -= gform->Elem(i);
-      cout<<"res(i) is: "<<_y1(i)<<endl;
-      cout<<endl;
+      /* cout<<"LHS(i) is: "<<_y1(i)<<endl;
+      cout<<"RHS(i) is: "<<rhs(i)<<endl; */
+      _y1(i) -= rhs(i);
+      /* cout<<"res(i) is: "<<_y1(i)<<endl;
+      cout<<endl; */
 
    }
    
    cout<<"(_y1 - rhs).Norml2() is: "<<_y1.Norml2()<<endl;
+   cout<<"_y1_norm is: "<<_y1_norm<<endl;
+   cout<<"rel_err is: "<<_y1.Norml2()/_y1_norm<<endl;
 
-
-bool solve = true;
 if (solve)
 {
    int maxIter(10000);
@@ -255,11 +259,26 @@ if (solve)
    newton_solver.SetPrintLevel(1); // print Newton iterations
    newton_solver.SetRelTol(rtol);
    newton_solver.SetAbsTol(atol);
-   newton_solver.SetMaxIter(1);
+   newton_solver.SetMaxIter(10);
    newton_solver.Mult(rhs, x);
+  /*  for (size_t i = 0; i < x.Size(); i++)
+   {
+      cout<<"x(i) is: "<<x(i)<<endl;
+      cout<<"rhs(i) is: "<<rhs(i)<<endl;
+      cout<<endl;
+   } */
    
 }
 
+/* for (size_t i = 0; i < _x.Size(); i++)
+   {
+      cout<<"_x(i) is: "<<_x(i)<<endl;
+      cout<<"x(i) is: "<<x(i)<<endl;
+      _x(i) -= x(i);
+      cout<<"res(i) is: "<<_x(i)<<endl;
+      cout<<endl;
+   } */
+   
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
    for (int i=0; i < Geometry::NumGeom; ++i)
@@ -269,6 +288,9 @@ if (solve)
 
    double err_u  = u.ComputeL2Error(exact_sol, irs);
    double norm_u = ComputeLpNorm(2., exact_sol, *mesh, irs);
+
+   cout<<"err_u is: "<<err_u<<endl;
+   cout<<"norm_u is: "<<norm_u<<endl;
 
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
 
@@ -306,3 +328,98 @@ void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
       u(0) = pow(x(0), 2.0) + x(0);
       u(1) = pow(x(1), 2.0) + x(1);
    }
+
+void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      int dof = U.Size()/dim;
+      U = 0.0;
+      for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         U(i) = pow(X(i), 2.0) + X(i);
+         U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
+      }
+   }
+
+   void ExactSolutionLinear(const Vector &x, Vector &u)
+   {
+      int dim = 2;
+      u = 0.0;
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = pow(x(i), 3.0);
+      }
+   }
+
+   void ExactRHSLinear(const Vector &x, Vector &u)
+   {
+      int dim = 2;
+      u = 0.0;
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = 6.0 * x(i) * (K + 2.0 * mu);
+      }
+      u *= -1.0;
+   }
+
+
+void CheckGradient(SimpleNLElastOperator &oper, FiniteElementSpace *fes)
+{   
+   // if (!use_dg)
+   //    fes->GetEssentialTrueDofs(ess_attr, ess_tdof);
+
+   // 12. Create the grid functions u and p. Compute the L2 error norms.
+   GridFunction u(fes), us(fes);
+   for (int k = 0; k < u.Size(); k++)
+   {
+      u[k] = UniformRandom();
+      us[k] = UniformRandom();
+   }
+
+   ConstantCoefficient one(1.0);
+
+   Vector Nu(u.Size());
+   oper.Mult(u, Nu);
+   double J0 = us * (Nu);
+   printf("J0: %.5E\n", J0);
+
+   SparseMatrix *jac = dynamic_cast<SparseMatrix *>(&(oper.GetGradient(u)));
+   Vector grad(u.Size());
+   jac->MultTranspose(us, grad);
+   double gg = grad * grad;
+   printf("gg: %.5E\n", gg);
+
+   GridFunction u0(fes);
+   u0 = u;
+
+   double error1 = 1.0e10;
+   printf("%10s\t%10s\t%10s\t%10s\t%10s\n", "amp", "J0", "J1", "dJdx", "error");
+   for (int k = 0; k < 40; k++)
+   {
+      //double amp = pow(10.0, -0.25 * k);
+      double amp = pow(10.0, -5.0-0.25 * k);
+      double dx = amp;
+      if (gg > 1.0e-14) dx /= sqrt(gg);
+
+      u.Set(1.0, u0);
+      u.Add(dx, grad);
+
+      oper.Mult(u, Nu);
+      double J1 = us * (Nu);
+      double dJdx = (J1 - J0) / dx;
+      double error = abs((dJdx - gg));
+      if (gg > 1.0e-14) error /= abs(gg);
+
+      printf("%.5E\t%.5E\t%.5E\t%.5E\t%.5E\n", amp, J0, J1, dJdx, error);
+
+      if (k > 4)
+      {
+         if (error > error1)
+            break;
+         else
+            error1 = error;
+      }
+   }
+
+   return;
+}
