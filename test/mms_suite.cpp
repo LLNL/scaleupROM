@@ -682,6 +682,7 @@ namespace nlelast
    {
       u = 0.0;
       u = x;
+      //u = 1.0;
    }
 
     void cantileverf(const Vector &x, Vector &u)
@@ -720,7 +721,7 @@ namespace nlelast
       test->InitVisualization();
       if (nonlinear)
       {
-      test->AddBCFunction(ExactSolutionNeoHookeBC);
+      test->AddBCFunction(ExactSolutionNeoHooke);
       //test->AddBCFunction(ExactSolutionNeoHookeBC, 1);
       //test->AddBCFunction(ExactSolutionNeoHookeBC, 2);
       //test->AddBCFunction(ExactSolutionNeoHookeBC, 3);
@@ -831,7 +832,7 @@ namespace nlelast
       conv_rate = 0.0;
       double error1 = 0.0;
       // TEMP
-      base_refine = 1;
+      base_refine = 0;
       num_refine = 2;
       for (int r = base_refine; r < num_refine; r++)
       {
@@ -930,22 +931,36 @@ namespace nlelast
    GridFunction p(fes);
    p.ProjectCoefficient(v);
    
-   string test_integ = "bc";
+   string test_integ = "domain";
    Vector x, y0, y1;
 
    double product = 0.0;
    NeoHookeanHypModel model2(mu, K);
+    int ndofs = fes->GetTrueVSize();
    if (test_integ == "domain")
    {
-   assert(use_dg == false);
+   assert(use_dg == true);
+
+   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   p_ess_attr = 1;
+   double kappa = -1.0;
+   //kappa = 0.0;
+   LinearForm *gform = new LinearForm(fes);
+   VectorFunctionCoefficient ud(dim, ExactSolutionNeoHooke);
+   
+   gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
+               ud, &model2, 0.0, kappa), p_ess_attr);
+   gform->Assemble();
 
    NonlinearForm *nlform = new NonlinearForm(fes);
-   //nlform->AddDomainIntegrator(new HyperelasticNLFIntegrator(&model2));
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model2));
+   nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(&model2, 0.0, kappa),p_ess_attr);
 
     GridFunction x_ref(fes);
     mesh->GetNodes(x_ref);
-    int ndofs = fes->GetTrueVSize();
     x.SetSize(ndofs);
     x = x_ref.GetTrueVector();
 
@@ -956,8 +971,15 @@ namespace nlelast
     y1.SetSize(ndofs);
     y1 = 0.0;
    nlform->Mult(y0, y1); //MFEM Neohookean
+
+   for (size_t i = 0; i < y1.Size(); i++)
+   {
+      y1(i) -= gform->Elem(i);
+   }
+   
    product = p * y1;
    delete nlform;
+   delete gform;
    }
    else if (test_integ == "bc")
    {
@@ -969,13 +991,24 @@ namespace nlelast
    p_ess_attr = 1;
    //p_ess_attr[1] = 1;
    LinearForm *gform = new LinearForm(fes);
-   VectorFunctionCoefficient ud(dim, ExactSolutionNeoHookeBC);
+   VectorFunctionCoefficient ud(dim, ExactSolutionNeoHooke);
    
    gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
                ud, &model2, 0.0, -1.0), p_ess_attr);
    gform->Assemble();
 
-   product = p * (*gform);
+   NonlinearForm *nlform = new NonlinearForm(fes);
+   nlform->AddBdrFaceIntegrator(new DGHyperelasticNLFIntegrator(&model2, 0.0, -1.0), p_ess_attr);
+   y0.SetSize(ndofs);
+    y0 = 0.0;
+    SimpleExactSolutionNeoHooke(x, y0);
+
+    y1.SetSize(ndofs);
+    y1 = 0.0;
+   nlform->Mult(y0, y1); //MFEM Neohookean
+
+   //y1 -= gform;
+   product = y1.Norml2();
    delete gform;
 
    }
@@ -991,10 +1024,10 @@ namespace nlelast
 
 void CheckConvergenceIntegratorwise()
 {
-   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
-
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 5);
+   num_refine = 8;
    //double product_ex = 26.0 * K / 3.0 * 1.5384588; // TODO: replace
-   string test_integ = "bc";
+   string test_integ = "domain";
    double product_ex =0.0;
    if (test_integ == "bc")
    {

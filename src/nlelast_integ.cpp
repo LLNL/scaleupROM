@@ -380,7 +380,8 @@ void DGHyperelasticNLFIntegrator::AssembleJmat(
        const int io = row_offset + d*row_ndofs;
        for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
        {
-          const double sj = jmatcoef * col_shape(jdof);
+          const double sj = jmatcoef * col_shape(jdof); 
+          //const double sj = jmatcoef;
           for (int i = max(io,j), idof = i - io; idof < row_ndofs; ++idof, ++i)
           {
              jmat(i, j) += row_shape(idof) * sj;
@@ -401,28 +402,34 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
+   //cout<<"ndofs2 is: "<<ndofs2<<endl;
+   /* if (ndofs2)
+   {
+   MFEM_ABORT("testst");
+   } */
+   
    // TODO: Assert ndofs1 == ndofs2
 
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
    Vector el0(elfun);// The initial deformation FIXME: This is only for the analytical solution in MMS
-   for (size_t i = 0; i < nvdofs; i++)
+   /* for (size_t i = 0; i < nvdofs; i++)
    {
       double _x1 = 0.5 * (sqrt(4.0 * elfun(i) + 1.0) - 1.0);
       double _x2 = 0.5 * (-sqrt(4.0 * elfun(i) + 1.0) - 1.0);
       el0(i) = _x1;
-      cout<<"_x1  is: "<<_x1 <<endl;
+      /* cout<<"_x1  is: "<<_x1 <<endl;
       cout<<"_x2 is: "<<_x2<<endl;
       if (elfun(i) != _x1 + pow(_x1, 2.0))
       {
          cout<< "oh no!"<<endl;
       }
-      
-      //cout<<"el0(i) is: "<<el0(i)<<endl;
-      //cout<<"elfun(i) is: "<<elfun(i)<<endl;
+       
+      cout<<"el0(i) is: "<<el0(i)<<endl;
+      cout<<"elfun(i) is: "<<elfun(i)<<endl;
       //cout<<endl;
-   }
+   } */
 
-   MFEM_ABORT("te");
+   //MFEM_ABORT("te");
 
     nor.SetSize(dim);
     Jrt.SetSize(dim);
@@ -529,7 +536,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       model->EvalP(Jpt1, P1);
 
-
       double w1 = w / Trans.Elem1->Weight();
       wLM += model->EvalDGWeight(w1, *Trans.Elem1, eip1);
       P1 *= w1;
@@ -580,11 +586,22 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        {
             for (size_t j = 0; j < nvdofs; j++)
          {
-            elvect(i) -= jmat(i,j) * (elfun(j) - el0(j));
-            //elvect(i) -= jmat(i,j) * (elfun(j));
+            //elvect(i) -= jmat(i,j) * (elfun(j) - el0(j));
+            elvect(i) -= jmat(i,j) * (elfun(j));
+            
             //cout<<"elfun(j) - el0(j) is: "<<elfun(j) - el0(j)<<endl;
          }
        }
+
+       /* for (int im = 0, i = 0; im < dim; ++im)
+      {
+         for (int idof = 0; idof < ndofs1; ++idof, ++i)
+         {
+         elvect(i) -= jmatcoef* elfun(i) *shape1(idof);
+         }
+      } 
+ */
+       
     }
 
       if (ndofs2 == 0) {continue;}
@@ -616,9 +633,12 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
          elvect(i) += shape2(idof) * tau2(im);
          }
       }
+
+      
    
       }
 
+      
    elvect *= -1.0;
 
 }
@@ -1039,8 +1059,8 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
          Vector _transip(_x, 3);
  
       Tr.Transform(ip, _transip);
-/* 
-      for (size_t i = 0; i < _transip.Size(); i++)
+
+      /* for (size_t i = 0; i < _transip.Size(); i++)
        {
          cout<<"_transip[i] is: "<<_transip[i]<<endl;
        }
@@ -1073,6 +1093,7 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
       wLM = model->EvalDGWeight(w, *Tr.Elem1, eip);
       jcoef = kappa * wLM * (nor*nor);
       //jcoef = -1.0 * w * (nor*nor); //Temp
+      //cout<<"(nor*nor) is: "<<(nor*nor)<<endl;
  
        for (int im = 0, i = 0; im < dim; ++im)
        {
@@ -1082,6 +1103,8 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
              elvect(i) += tj*shape(idof);
           }
        }
+
+
     }
 
     //cout<<"elvect.l2Norm() is: "<<elvect.Norml2()<<endl;

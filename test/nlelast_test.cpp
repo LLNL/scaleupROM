@@ -534,7 +534,7 @@ TEST(TempNeoHookeanStiffnessMatrices, Test_NLElast)
    PWConstCoefficient lambda_c(lambda);
    Vector mu(mesh.attributes.Max());
    double _mu = 2.33;  
-   _mu = 0.0;    
+   //_mu = 0.0;    
    mu = _mu;       // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(mu);
 
@@ -609,7 +609,7 @@ TEST(TempNeoHookeanStiffnessMatrices, Test_NLElast)
     cout << "MFEM NeoHooke residual norm: " << y2.Norml2() << endl;
     cout << "Analytic NeoHooke residual norm: " << y3.Norml2() << endl;
 
-    y1 -= y3; // Already tested y1 ==y2
+    y1 -= y2; // Already tested y1 ==y2
     norm_diff = y1.Norml2();
     cout << "NeoHooke residual difference norm: " << norm_diff << endl;
 

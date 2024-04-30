@@ -322,7 +322,7 @@ void NLElastSolver::BuildDomainOperators()
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
-             new DGHyperelasticNLFIntegrator(model, alpha, kappa));
+             new DGHyperelasticNLFIntegrator(model, alpha, kappa)); 
       }
    }
 
@@ -389,7 +389,7 @@ bool NLElastSolver::Solve()
       cout<<"var_offsets(i) is: "<<var_offsets[i]<<endl;
    }
    cout<<"hw is: "<<hw<<endl; */
-   Vector _U(U->GetBlock(0));
+   /* Vector _U(U->GetBlock(0));
    Vector _U0(_U);
    Vector _RHS(RHS->GetBlock(0));
    Vector _res(_U);
@@ -400,7 +400,7 @@ bool NLElastSolver::Solve()
 
    oper.Mult(_U, _res);
 
-   cout<<"_res.Norml2() is: "<<_res.Norml2()<<endl;
+   cout<<"_res.Norml2() is: "<<_res.Norml2()<<endl; */
    
    /* for (size_t i = 0; i < _res.Size(); i++)
    {
@@ -419,26 +419,28 @@ bool NLElastSolver::Solve()
       
    } */
 
-   for (size_t i = 0; i < _U.Size(); i++)
+   /* for (size_t i = 0; i < _U.Size(); i++)
    {
       double _x1 = 0.5 * (sqrt(4.0 * _U0(i) + 1.0) - 1.0);
       _U0(i) = _x1;
-   }
-   
-
+   } */
+   /* 
+   cout<<"_res.Size()/2 is: "<<_res.Size()/2<<endl;
+   //for (size_t i = 0; i < _res.Size()/2; i++)
    for (size_t i = 0; i < _res.Size()/2; i++)
    {
-      if ((abs(_res(i) - _RHS(i)) <= 0.0000001) && abs(_res(i + _res.Size()/2) - _RHS(i + _res.Size()/2) <= 0.0000001))
+      //if ((abs(_res(i) - _RHS(i)) <= 0.0000001) && abs(_res(i + _res.Size()/2) - _RHS(i + _res.Size()/2) <= 0.0000001))
       {
          cout<<"_resx is: "<<_res(i)<<endl;
          cout<<"_resy is: "<<_res(i + _res.Size()/2)<<endl;
          cout<<"_RHSx is: "<<_RHS(i)<<endl;
          cout<<"_RHSy is: "<<_RHS(i + _res.Size()/2)<<endl;
-         cout<<"_U0x is: "<<_U0(i)<<endl;
-         cout<<"_U0y is: "<<_U0(i + _res.Size()/2)<<endl;
+         cout<<"_Ux is: "<<_U(i)<<endl;
+         cout<<"_Uy is: "<<_U(i + _res.Size()/2)<<endl;
         cout<<endl;
 
       }
+ */
       
       
       /* {
@@ -453,12 +455,13 @@ bool NLElastSolver::Solve()
         cout<<endl;
       } */
       
-   }
+   //}
    
-   _res -= _RHS;
    
-   cout<<"(_res - RHS).Norml2() is: "<<_res.Norml2()<<endl;
-   MFEM_ABORT("test");
+   //_res -= _RHS;
+   
+   //cout<<"(_res - RHS).Norml2() is: "<<_res.Norml2()<<endl;
+   //MFEM_ABORT("test");
 
    cout<<"full_dg is: "<<full_dg<<endl;
    if (direct_solve)
