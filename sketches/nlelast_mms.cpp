@@ -28,6 +28,9 @@ protected:
 
    // Jacobian matrix objects
    mutable SparseMatrix *J = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+   HYPRE_BigInt sys_glob_size;
+   mutable HYPRE_BigInt sys_row_starts[2];
 
 public:
    SimpleNLElastOperator(const int hw, NonlinearForm &nlform_);
@@ -42,11 +45,16 @@ public:
 SimpleNLElastOperator::SimpleNLElastOperator(const int hw, NonlinearForm &nlform_)
    : Operator(hw, hw),nlform(nlform_)
 {
+   // TODO: this needs to be changed for parallel implementation.
+   sys_glob_size = hw;
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = hw;
 }
 
 SimpleNLElastOperator::~SimpleNLElastOperator()
 {
    //delete J;
+   delete jac_hypre;
    //delete nlform;
 }
 
@@ -58,7 +66,11 @@ void SimpleNLElastOperator::Mult(const Vector &x, Vector &y) const
 
 Operator& SimpleNLElastOperator::GetGradient(const Vector &x) const
 {
-   return nlform.GetGradient(x);
+
+   J = dynamic_cast<SparseMatrix *>(&(nlform.GetGradient(x)));
+   jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, J);
+   return *jac_hypre;
+   //return nlform.GetGradient(x);
 }
 
 // Define the analytical solution and forcing terms / boundary conditions
@@ -67,7 +79,8 @@ void ExactSolutionNeoHooke(const Vector &x, Vector &u);
 void SimpleExactSolutionNeoHooke(const Vector &x, Vector &u);
 void ExactSolutionLinear(const Vector &x, Vector &u);
 void ExactRHSLinear(const Vector &x, Vector &u);
-void CheckGradient(SimpleNLElastOperator &oper, FiniteElementSpace* fes);
+void CheckGradient(NonlinearForm oper, FiniteElementSpace *fes);
+
 
 
 double error(Operator &M, Vector &x, Vector &b)
@@ -155,12 +168,19 @@ int main(int argc, char *argv[])
    }
 
    // 5. Define a finite element space on the mesh. Here we use the
-   //    Raviart-Thomas finite elements of the specified order.
-   // FiniteElementCollection *hdiv_coll(new RT_FECollection(order, dim));
    FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
 
-
-   FiniteElementSpace *fes = new FiniteElementSpace(mesh, dg_coll, dim);
+   FiniteElementSpace *fes;
+   bool use_dg =false;
+   if (use_dg)
+   {
+      fes = new FiniteElementSpace(mesh, dg_coll, dim);
+   }
+   else
+   {
+      fes = new FiniteElementSpace(mesh, h1_coll, dim);
+   }
 
    // 7. Define the coefficients, analytical solution, and rhs of the PDE.
    VectorFunctionCoefficient exact_sol(dim, ExactSolutionNeoHooke);
@@ -177,37 +197,72 @@ int main(int argc, char *argv[])
    //    MemoryType mt = device.GetMemoryType();
     int fomsize = fes->GetTrueVSize();
 
-   Vector x(fomsize), rhs(fomsize);
+   Vector x(fomsize), rhs(fomsize), rhs2(fomsize);
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
-   GridFunction u(fes);
+   GridFunction u;
+   u.MakeRef(fes, x, 0);
 
    u = 0.0;
    u.ProjectCoefficient(exact_sol);
-   x = u.GetTrueVector();
    
-   double kappa = -1.0;
+   double kappa = (order+1)*(order+1);
 
    NeoHookeanHypModel model(mu, K);
    //LinElastMaterialModel model(mu, K);
 
+   Array<int> u_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   u_ess_attr = 1;
+
+   Array<int> u_ess_tdof;
+   fes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
+
    LinearForm *gform = new LinearForm(fes);
+   LinearForm *tempform = new LinearForm(fes);
    gform->Update(fes, rhs, 0);
    gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
-               exact_sol, &model, 0.0, kappa));
+               exact_sol, &model, 0.0, kappa), u_ess_attr);
    gform->Assemble();
    gform->SyncAliasMemory(rhs);
+
+   cout<<"u_ess_tdof.Size() is: "<<u_ess_tdof.Size()<<endl;
+   cout<<"fomsize is: "<<fomsize<<endl;
+
+   tempform->Update(fes, rhs2, 0);
+   tempform->AddDomainIntegrator(new VectorDomainLFIntegrator(exact_RHS));
+   tempform->Assemble();
+   gform->SyncAliasMemory(rhs2);
+
+
+   /* for (size_t i = 0; i < u_ess_tdof.Size(); i++)
+   {
+      rhs2[u_ess_tdof[i]] = 0.0;
+   } */
+
+   cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
+   rhs += rhs2;
+   cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
 
    // 9. Assemble the finite element matrices
    NonlinearForm *nlform(new NonlinearForm(fes));
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
-   nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(&model, 0.0, kappa));
+   nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(&model, 0.0, kappa), u_ess_attr);
+   //nlform->AddInteriorFaceIntegrator( new DGHyperelasticNLFIntegrator(&model, 0.0, kappa));
+   //nlform->SetEssentialTrueDofs(u_ess_tdof);
 
-   SimpleNLElastOperator oper(fomsize, *nlform);
+
+    SimpleNLElastOperator oper(fomsize, *nlform);
 
    if (check_grad)
    {
-   CheckGradient(oper, fes);
+   CheckGradient(*nlform, fes);
+   /* SparseMatrix *jac = dynamic_cast<SparseMatrix *>(&(nlform->GetGradient(x)));
+   DenseMatrix J(*(jac->ToDenseMatrix()));
+   Vector ev(J.Size());
+   cout<<"J.Det() is: "<<J.Det()<<endl; */
    }
 
    // Test applying nonlinear form
@@ -215,29 +270,29 @@ int main(int argc, char *argv[])
    Vector _y0(x);
    Vector _y1(x);
 
-   GridFunction x_ref(fes);
+   //GridFunction x_ref(fes);
    //mesh->GetNodes(x_ref);
-   x_ref.ProjectCoefficient(exact_sol);
-   _x = x_ref.GetTrueVector();
+   //x_ref.ProjectCoefficient(exact_sol);
+   //_x = x_ref.GetTrueVector();
 
    _y1 = 0.0;
    nlform->Mult(_x, _y1); //MFEM Neohookean
 
    double _y1_norm = _y1.Norml2();
 
-   for (size_t i = 0; i < _y1.Size(); i++)
+   /* for (size_t i = 0; i < _y1.Size(); i++)
    {
-      /* cout<<"LHS(i) is: "<<_y1(i)<<endl;
-      cout<<"RHS(i) is: "<<rhs(i)<<endl; */
+      cout<<"LHS(i) is: "<<_y1(i)<<endl;
+      cout<<"RHS(i) is: "<<rhs(i)<<endl;
       _y1(i) -= rhs(i);
-      /* cout<<"res(i) is: "<<_y1(i)<<endl;
-      cout<<endl; */
+      cout<<"res(i) is: "<<_y1(i)<<endl;
+      cout<<endl;
 
    }
    
    cout<<"(_y1 - rhs).Norml2() is: "<<_y1.Norml2()<<endl;
    cout<<"_y1_norm is: "<<_y1_norm<<endl;
-   cout<<"rel_err is: "<<_y1.Norml2()/_y1_norm<<endl;
+   cout<<"rel_err is: "<<_y1.Norml2()/_y1_norm<<endl; */
 
 if (solve)
 {
@@ -246,14 +301,17 @@ if (solve)
    double atol(1.e-10);
 
    // MINRESSolver J_solver;
-   GMRESSolver J_solver;
-   J_solver.SetAbsTol(atol);
+   MUMPSSolver J_solver(MPI_COMM_SELF);
+   J_solver.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+   J_solver.SetPrintLevel(-1);
+   //GMRESSolver J_solver;
+   /* J_solver.SetAbsTol(atol);
    J_solver.SetRelTol(rtol);
    J_solver.SetMaxIter(maxIter);
-   J_solver.SetPrintLevel(-1);
+   J_solver.SetPrintLevel(-1); */
 
    NewtonSolver newton_solver;
-   newton_solver.iterative_mode = false;
+   newton_solver.iterative_mode = true;
    newton_solver.SetSolver(J_solver);
    newton_solver.SetOperator(oper);
    newton_solver.SetPrintLevel(1); // print Newton iterations
@@ -261,12 +319,6 @@ if (solve)
    newton_solver.SetAbsTol(atol);
    newton_solver.SetMaxIter(10);
    newton_solver.Mult(rhs, x);
-  /*  for (size_t i = 0; i < x.Size(); i++)
-   {
-      cout<<"x(i) is: "<<x(i)<<endl;
-      cout<<"rhs(i) is: "<<rhs(i)<<endl;
-      cout<<endl;
-   } */
    
 }
 
@@ -274,11 +326,12 @@ if (solve)
    {
       cout<<"_x(i) is: "<<_x(i)<<endl;
       cout<<"x(i) is: "<<x(i)<<endl;
+      cout<<"u(i) is: "<<u(i)<<endl;
       _x(i) -= x(i);
       cout<<"res(i) is: "<<_x(i)<<endl;
       cout<<endl;
-   } */
-   
+   }
+    */
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
    for (int i=0; i < Geometry::NumGeom; ++i)
@@ -311,13 +364,12 @@ if (solve)
    return 0;
 }
 
-
 void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
       u(0) = 2 * K * pow(1.0 + 2.0 * x(1), 2.0);
       u(1) = 2 * K * pow(1.0 + 2.0 * x(0), 2.0); 
-      u *= -1.0;
+      //u *= -1.0;
    }
 
    void ExactSolutionNeoHooke(const Vector &x, Vector &u)
@@ -363,7 +415,7 @@ void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
    }
 
 
-void CheckGradient(SimpleNLElastOperator &oper, FiniteElementSpace *fes)
+void CheckGradient(NonlinearForm oper, FiniteElementSpace *fes)
 {   
    // if (!use_dg)
    //    fes->GetEssentialTrueDofs(ess_attr, ess_tdof);
