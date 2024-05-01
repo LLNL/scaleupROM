@@ -539,7 +539,19 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       double w1 = w / Trans.Elem1->Weight();
       wLM += model->EvalDGWeight(w1, *Trans.Elem1, eip1);
       P1 *= w1;
-      P1.Mult(nor, tau1);
+
+      // Transform Piola tensor to Cauchy
+      /* DenseMatrix _P1(dim);
+      DenseMatrix Jpt1t(Jpt1);
+      Jpt1t.Transpose();
+      Mult(P1,Jpt1t,_P1);
+      double Jdet = 1.0/Jpt1.Det();
+      //_P1 *= Jdet;
+      /* cout<<"nor(0) is: "<<nor(0)<<endl;
+      cout<<"nor(1) is: "<<nor(1)<<endl;
+      cout<<endl; 
+      _P1.Mult(nor, tau1); */
+      //assert(ndofs2 ==0);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 

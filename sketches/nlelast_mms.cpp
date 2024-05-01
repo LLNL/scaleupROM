@@ -255,6 +255,7 @@ int main(int argc, char *argv[])
 
    tempform->Update(fes, rhs2, 0);
    tempform->AddDomainIntegrator(new VectorDomainLFIntegrator(*exact_RHS));
+   tempform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(*exact_RHS));
    tempform->Assemble();
    gform->SyncAliasMemory(rhs2);
 
@@ -264,7 +265,8 @@ int main(int argc, char *argv[])
       rhs2[u_ess_tdof[i]] = 0.0;
    } */
 
-   rhs += rhs1;
+   //rhs += rhs1;
+   kappa = 0.0;
    cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
    rhs += rhs2;
    cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
@@ -354,7 +356,7 @@ int main(int argc, char *argv[])
 
    } */
 
-   /* for (size_t i = 0; i < u_ess_tdof.Size(); i++)
+   for (size_t i = 0; i < u_ess_tdof.Size(); i++)
    {
       //_y1[u_ess_tdof[i]] -= rhs[u_ess_tdof[i]];
       if (abs(_y1[u_ess_tdof[i]] - rhs[u_ess_tdof[i]]) > 0.001)
@@ -368,12 +370,12 @@ int main(int argc, char *argv[])
 
       }
       
-   } */
+   }
 
-    /* for (size_t i = 0; i < _y1.Size(); i++)
+    for (size_t i = 0; i < _y1.Size(); i++)
    {
       const double res = _y1(i) - rhs(i);
-      if (abs(res) > 0.001)
+      /* if (abs(res) > 0.001)
       {
       cout<<"LHS(i) is: "<<_y1(i)<<endl;
       cout<<"RHS(i) is: "<<rhs(i)<<endl;
@@ -381,9 +383,9 @@ int main(int argc, char *argv[])
       cout<<"i is: "<<i<<endl;
       cout<<"ui is: "<<u(i)<<endl;
       cout<<endl;
-      }
+      } */
       _y1(i) -= rhs(i);
-   }  */
+   } 
 
    cout<<"(_y1 - rhs).Norml2() is: "<<_y1.Norml2()<<endl;
    cout<<"_y1_norm is: "<<_y1_norm<<endl;
@@ -477,7 +479,7 @@ if (solve)
 
    return 0;
 }
-/* 
+
 void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
@@ -506,10 +508,10 @@ void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
          U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
       }
    }
- */
+ 
 
 
-void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
+/* void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
    {
       u = 0.0;
       u(0) = -0.9869604401089358*K*sin(pi*x(0))*(pow((1 + 0.3141592653589793*cos(pi* x(1))),2.0));
@@ -539,7 +541,7 @@ void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
          U(dof + i) = 0.1*sin(pi*X(dof + i)) + X(dof + i);
       }
    }
-
+ */
    void ExactSolutionLinear(const Vector &x, Vector &u)
    {
       int dim = 2;
