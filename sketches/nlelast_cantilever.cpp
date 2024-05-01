@@ -216,13 +216,26 @@ int main(int argc, char *argv[])
    u.MakeRef(fes, x, 0);
 
    u = 0.0;
+   if (nonlinear)
+   {
    u.ProjectCoefficient(*dir);
+   }
+   
    
    double kappa = (order+1)*(order+1);
 
    DGHyperelasticModel* model;
-      model = new NeoHookeanHypModel(mu, K);
-
+   
+   if (nonlinear)
+   {
+model = new NeoHookeanHypModel(mu, K);
+   }
+   else
+   {
+model = new LinElastMaterialModel(mu, K);
+   }
+   
+   
    Array<int> u_ess_attr(mesh->bdr_attributes.Max());
    // this array of integer essentially acts as the array of boolean:
    // If value is 0, then it is not Dirichlet.
@@ -269,7 +282,7 @@ int main(int argc, char *argv[])
       rhs2[u_ess_tdof[i]] = 0.0;
    }
 
-   rhs += rhs1;
+   //rhs += rhs1;
    cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
    rhs += rhs2;
    cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
@@ -280,7 +293,7 @@ int main(int argc, char *argv[])
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(model));
    nlform->AddBdrFaceIntegrator(new DGHyperelasticNLFIntegrator(model, 0.0, kappa), u_ess_attr);
    //nlform->AddInteriorFaceIntegrator( new DGHyperelasticNLFIntegrator(model, 0.0, kappa));
-   //nlform->SetEssentialTrueDofs(u_ess_tdof);
+   nlform->SetEssentialTrueDofs(u_ess_tdof);
 
    SimpleNLElastOperator oper(fomsize, *nlform);
 
