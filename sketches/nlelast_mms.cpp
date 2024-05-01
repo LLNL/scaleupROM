@@ -265,8 +265,8 @@ int main(int argc, char *argv[])
       rhs2[u_ess_tdof[i]] = 0.0;
    } */
 
-   //rhs += rhs1;
-   kappa = 0.0;
+   rhs += rhs1;
+   //kappa = 0.0;
    cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
    rhs += rhs2;
    cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
