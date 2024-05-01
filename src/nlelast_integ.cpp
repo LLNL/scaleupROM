@@ -552,6 +552,8 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       cout<<endl; 
       _P1.Mult(nor, tau1); */
       //assert(ndofs2 ==0);
+      
+      P1.Mult(nor, tau1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 

@@ -17,7 +17,7 @@ using namespace std;
 using namespace mfem;
 
 static double K = 1.0;
-static double mu = 0.000001;
+static double mu = 0.00001;
 static const double pi = 4.0 * atan(1.0);
 //static double mu = 1.0;
 
@@ -220,13 +220,11 @@ int main(int argc, char *argv[])
    u.ProjectCoefficient(*exact_sol);
    
    double kappa = (order+1)*(order+1);
-   //kappa = -1.0;
 
    DGHyperelasticModel* model;
    if (nonlinear)
    {
       model = new NeoHookeanHypModel(mu, K);
-
    }
    else
    {
@@ -255,9 +253,9 @@ int main(int argc, char *argv[])
 
    tempform->Update(fes, rhs2, 0);
    tempform->AddDomainIntegrator(new VectorDomainLFIntegrator(*exact_RHS));
-   tempform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(*exact_RHS));
+   //tempform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(*exact_RHS));
    tempform->Assemble();
-   gform->SyncAliasMemory(rhs2);
+   tempform->SyncAliasMemory(rhs2);
 
 
    /* for (size_t i = 0; i < u_ess_tdof.Size(); i++)
@@ -394,10 +392,8 @@ int main(int argc, char *argv[])
 if (solve)
 {
    int maxIter(10000);
-   //double rtol(1.e-10);
-   double rtol(1.e-1);
-   //double atol(1.e-10);
-   double atol(1.e-1);
+   double rtol(1.e-10);
+   double atol(1.e-10);
 
    // MINRESSolver J_solver;
    MUMPSSolver J_solver(MPI_COMM_SELF);
@@ -430,9 +426,6 @@ if (solve)
    newton_solver.SetAbsTol(atol);
    newton_solver.SetMaxIter(50);
    newton_solver.Mult(rhs, x);
-
-   
-   
 }
 
 /* for (size_t i = 0; i < _x.Size(); i++)
