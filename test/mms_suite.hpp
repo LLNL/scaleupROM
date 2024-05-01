@@ -97,7 +97,7 @@ namespace nlelast
 
 static const double pi = 4.0 * atan(1.0);
 //static const double mu = 3.14;
-static const double mu = 0.0;
+static const double mu = 1.0;
 //static double K = 2.33;
 static double K = 1.0;
 static double lambda = K;

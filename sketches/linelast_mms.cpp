@@ -17,7 +17,7 @@ using namespace std;
 using namespace mfem;
 
 static double K = 1.0;
-static double mu = 0.00001;
+static double mu = 1.0;
 
 // A proxy Operator used for FOM Newton Solver.
 // Similar to SteadyNSOperator.
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
    FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
 
    FiniteElementSpace *fes;
-   bool use_dg = false;
+   bool use_dg =true;
    if (use_dg)
    {
       fes = new FiniteElementSpace(mesh, dg_coll, dim);
@@ -252,7 +252,8 @@ int main(int argc, char *argv[])
    // 9. Assemble the finite element matrices
    NonlinearForm *nlform(new NonlinearForm(fes));
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model));
-   nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(&model, 0.0, kappa), u_ess_attr);
+   //nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(&model, 0.0, kappa), u_ess_attr);
+   //nlform->AddBdrFaceIntegrator( new DGElasticityIntegrator(&model, 0.0, kappa), u_ess_attr);
    //nlform->AddInteriorFaceIntegrator( new DGHyperelasticNLFIntegrator(&model, 0.0, kappa));
    //nlform->SetEssentialTrueDofs(u_ess_tdof);
 
@@ -263,9 +264,9 @@ int main(int argc, char *argv[])
    _mu = mu;      // Set mu = 1 for all element attributes.
    PWConstCoefficient mu_c(_mu);
 
-   double alpha = 0.0;
+   double alpha = -1.0;
 
-    /* LinearForm b(fes);
+    LinearForm b(fes);
    b.AddBdrFaceIntegrator(
       new DGElasticityDirichletLFIntegrator(
          exact_sol, lambda_c, mu_c, alpha, kappa), u_ess_attr);
@@ -284,8 +285,8 @@ int main(int argc, char *argv[])
 
    SparseMatrix A;
    Vector B, X;
-   Array<int> ess_tdof_list;  */
-   //a.FormLinearSystem(ess_tdof_list, x, b, A, X, B);
+   Array<int> ess_tdof_list; 
+   a.FormLinearSystem(ess_tdof_list, x, b, A, X, B);
 
    // 9. Solve the system using PCG with symmetric Gauss-Seidel preconditioner.
    //GSSmoother M(A);
@@ -384,9 +385,7 @@ if (solve)
    J_solver.SetRelTol(rtol);
    J_solver.SetMaxIter(maxIter);
    J_solver.SetPrintLevel(-1); */
-
-
-   /* HYPRE_BigInt sys_glob_size = fomsize;
+   HYPRE_BigInt sys_glob_size = fomsize;
    HYPRE_BigInt sys_row_starts[2];
    sys_row_starts[0] = 0;
    sys_row_starts[1] = fomsize;
@@ -395,7 +394,7 @@ if (solve)
    J_solver.Mult(B, X);
    
    a.RecoverFEMSolution(X, b, x);
-   u.MakeRef(fes, x, 0); */
+   u.MakeRef(fes, x, 0);
 
    NewtonSolver newton_solver;
    newton_solver.iterative_mode = true;
@@ -405,7 +404,7 @@ if (solve)
    newton_solver.SetRelTol(rtol);
    newton_solver.SetAbsTol(atol);
    newton_solver.SetMaxIter(10);
-   newton_solver.Mult(rhs, x);
+   //newton_solver.Mult(rhs, x);
 
    
    

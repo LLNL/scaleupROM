@@ -33,12 +33,12 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound)
 TEST(DDSerialTest, Test_convergence_DG)
 {
    config = InputParser("inputs/dd_mms.yml");
-   //config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
-   config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
-   config.dict_["solver"]["direct_solve"] = false;
+   //config.dict_["mesh"]["filename"] = "meshes/test.1x1.mesh";
+   config.dict_["mesh"]["filename"] = "../examples/linelast/meshes/beam-tri.mesh";
+   config.dict_["solver"]["direct_solve"] = true;
    config.dict_["discretization"]["full-discrete-galerkin"] = true;
    config.dict_["domain-decomposition"]["type"] = "none";
-   bool nonlinear = true;
+   bool nonlinear = false;
    CheckConvergence(nonlinear);
 
    return;

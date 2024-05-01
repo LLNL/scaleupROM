@@ -735,23 +735,21 @@ namespace nlelast
       }
       else
       {
-      /* test->AddBCFunction(ExactSolutionLinear, 1);
-      test->AddBCFunction(ExactSolutionLinear, 2);
+      test->AddBCFunction(ExactSolutionLinear);
+      /* test->AddBCFunction(ExactSolutionLinear, 2);
       test->AddBCFunction(ExactSolutionLinear, 3); */
-      //test->AddBCFunction(NullSolution, 1);
-      //test->AddBCFunction(cantileverf, 2);
-      //test->AddBCFunction(NullSolution, 3);
-      //test->AddRHSFunction(ExactRHSLinear);
+      test->AddRHSFunction(ExactRHSLinear);
+      test->SetupIC(ExactSolutionLinear);
       }
       //test->AddBCFunction(NullSolution, 1);
       //test->AddBCFunction(NullSolution, 2);
       //test->AddBCFunction(NullSolution, 3);
       //test->AddBCFunction(cantileverfu, 2);
       //test->AddBCFunction(NullSolution, 3);
-      //test->SetBdrType(BoundaryType::DIRICHLET);
+      test->SetBdrType(BoundaryType::DIRICHLET);
       //test->SetBdrType(BoundaryType::NEUMANN,1);
       //test->SetBdrType(BoundaryType::NEUMANN,2);
-      test->SetupIC(ExactSolutionNeoHooke);
+      //test->SetupIC(ExactSolutionNeoHooke);
       
       test->BuildOperators();
 
@@ -831,14 +829,14 @@ namespace nlelast
       Vector conv_rate(num_refine);
       conv_rate = 0.0;
       double error1 = 0.0;
-      // TEMP
       base_refine = 0;
-      num_refine = 2;
+      num_refine = 4;
       for (int r = base_refine; r < num_refine; r++)
       {
          NLElastSolver *test = SolveWithRefinement(r, nonlinear);
 
          int order = test->GetDiscretizationOrder();
+         cout<<"order is: "<<order<<endl;
          int order_quad = max(2, 2 * order + 1);
          const IntegrationRule *irs[Geometry::NumGeom];
          for (int i = 0; i < Geometry::NumGeom; ++i)

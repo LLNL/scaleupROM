@@ -315,9 +315,9 @@ TEST(TempLinStiffnessMatrices, Test_NLElast)
     Mesh mesh("meshes/test.2x1.mesh", 1, 1);
 
    int dim = mesh.Dimension();
-   int order = 1;
+   int order = 2;
    double alpha = 0.0; // IIPG
-   double kappa = -1.0; 
+   double kappa = (order+1)*(order+1); 
    DG_FECollection fec(order, dim, BasisType::GaussLobatto);
    FiniteElementSpace fespace(&mesh, &fec, dim);
 
