@@ -634,8 +634,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
          }
       }
 
-      
-   
       }
 
       
