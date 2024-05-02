@@ -260,7 +260,7 @@ void NeoHookeanHypModel::EvalP(const DenseMatrix &J, DenseMatrix &P) const
     double dJ = J.Det();
     double a  = mu*pow(dJ, -2.0/dim);
     double b  = K*(dJ/g - 1.0)/g - a*(J*J)/(dim*dJ);
- 
+    
     P = 0.0;
     P.Add(a, J);
     P.Add(b, Z);
@@ -540,19 +540,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       wLM += model->EvalDGWeight(w1, *Trans.Elem1, eip1);
       P1 *= w1;
 
-      // Transform Piola tensor to Cauchy
-      /* DenseMatrix _P1(dim);
-      DenseMatrix Jpt1t(Jpt1);
-      Jpt1t.Transpose();
-      Mult(P1,Jpt1t,_P1);
-      double Jdet = 1.0/Jpt1.Det();
-      //_P1 *= Jdet;
-      /* cout<<"nor(0) is: "<<nor(0)<<endl;
-      cout<<"nor(1) is: "<<nor(1)<<endl;
-      cout<<endl; 
-      _P1.Mult(nor, tau1); */
-      //assert(ndofs2 ==0);
-      
       P1.Mult(nor, tau1);
 
       const double jmatcoef = kappa * (nor*nor) * wLM;

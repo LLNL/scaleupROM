@@ -17,7 +17,7 @@ using namespace std;
 using namespace mfem;
 
 static double K = 1.0;
-static double mu = 0.00001;
+static double mu = 0.0;
 static const double pi = 4.0 * atan(1.0);
 //static double mu = 1.0;
 
@@ -196,6 +196,7 @@ int main(int argc, char *argv[])
    }
    else
    {
+      mu = 1.0;
      exact_sol = new VectorFunctionCoefficient(dim, ExactSolutionLinear);
       exact_RHS = new VectorFunctionCoefficient(dim, ExactRHSLinear); 
    }
@@ -276,46 +277,6 @@ int main(int argc, char *argv[])
    //nlform->AddInteriorFaceIntegrator( new DGHyperelasticNLFIntegrator(model, 0.0, kappa));
    //nlform->SetEssentialTrueDofs(u_ess_tdof);
 
-   Vector lambda(mesh->attributes.Max());
-   lambda = K;      // Set lambda = 1 for all element attributes.
-   PWConstCoefficient lambda_c(lambda);
-   Vector _mu(mesh->attributes.Max());
-   _mu = mu;      // Set mu = 1 for all element attributes.
-   PWConstCoefficient mu_c(_mu);
-
-   double alpha = 0.0;
-
-    /* LinearForm b(fes);
-   b.AddBdrFaceIntegrator(
-      new DGElasticityDirichletLFIntegrator(
-         exact_sol, lambda_c, mu_c, alpha, kappa), u_ess_attr);
-   b.AddDomainIntegrator(new VectorDomainLFIntegrator(exact_RHS));
-   b.Assemble();
-
-   BilinearForm a(fes);
-   a.AddDomainIntegrator(new ElasticityIntegrator(lambda_c, mu_c));
-   a.AddBdrFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa), u_ess_attr);
-   a.AddInteriorFaceIntegrator(
-      new DGElasticityIntegrator(lambda_c, mu_c, alpha, kappa));
-
-   // 10. Assemble the bilinear form and the corresponding linear system.
-   a.Assemble();
-
-   SparseMatrix A;
-   Vector B, X;
-   Array<int> ess_tdof_list;  */
-   //a.FormLinearSystem(ess_tdof_list, x, b, A, X, B);
-
-   // 9. Solve the system using PCG with symmetric Gauss-Seidel preconditioner.
-   //GSSmoother M(A);
-   //const double rtol = 1e-6;
-   //GMRES(A, M, B, X, 3, 5000, 1000, rtol*rtol, rtol*rtol);
-
-   // 10. Recover the solution x as a grid function and save to file. The output
-   //     can be viewed using GLVis as follows: "glvis -m mesh.mesh -g sol.gf"
-   
-
    SimpleNLElastOperator oper(fomsize, *nlform);
 
    if (check_grad)
@@ -354,7 +315,7 @@ int main(int argc, char *argv[])
 
    } */
 
-   for (size_t i = 0; i < u_ess_tdof.Size(); i++)
+   /* for (size_t i = 0; i < u_ess_tdof.Size(); i++)
    {
       //_y1[u_ess_tdof[i]] -= rhs[u_ess_tdof[i]];
       if (abs(_y1[u_ess_tdof[i]] - rhs[u_ess_tdof[i]]) > 0.001)
@@ -369,7 +330,7 @@ int main(int argc, char *argv[])
       }
       
    }
-
+ */
     for (size_t i = 0; i < _y1.Size(); i++)
    {
       const double res = _y1(i) - rhs(i);
@@ -385,10 +346,10 @@ int main(int argc, char *argv[])
       _y1(i) -= rhs(i);
    } 
 
-   cout<<"(_y1 - rhs).Norml2() is: "<<_y1.Norml2()<<endl;
+   /* cout<<"(_y1 - rhs).Norml2() is: "<<_y1.Norml2()<<endl;
    cout<<"_y1_norm is: "<<_y1_norm<<endl;
    cout<<"rel_err is: "<<_y1.Norml2()/_y1_norm<<endl;
-
+ */
 if (solve)
 {
    int maxIter(10000);
@@ -404,18 +365,6 @@ if (solve)
    J_solver.SetRelTol(rtol);
    J_solver.SetMaxIter(maxIter);
    J_solver.SetPrintLevel(-1); */
-
-
-   /* HYPRE_BigInt sys_glob_size = fomsize;
-   HYPRE_BigInt sys_row_starts[2];
-   sys_row_starts[0] = 0;
-   sys_row_starts[1] = fomsize;
-   HypreParMatrix Jax(MPI_COMM_SELF, sys_glob_size, sys_row_starts, &(A));
-   J_solver.SetOperator(Jax);
-   J_solver.Mult(B, X);
-   
-   a.RecoverFEMSolution(X, b, x);
-   u.MakeRef(fes, x, 0); */
 
    NewtonSolver newton_solver;
    newton_solver.iterative_mode = true;
