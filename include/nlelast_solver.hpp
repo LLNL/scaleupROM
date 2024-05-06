@@ -2,20 +2,60 @@
 //
 // SPDX-License-Identifier: MIT
 
-#ifndef SCALEUPROM_LINELAST_SOLVER_HPP
-#define SCALEUPROM_LINELAST_SOLVER_HPP
+#ifndef SCALEUPROM_NLELAST_SOLVER_HPP
+#define SCALEUPROM_NLELAST_SOLVER_HPP
 
 #include "multiblock_solver.hpp"
 #include "interfaceinteg.hpp"
 #include "mfem.hpp"
+#include "nlelast_integ.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
 
-class LinElastSolver : public MultiBlockSolver
+
+// A proxy Operator used for FOM Newton Solver.
+// Similar to SteadyNSOperator.
+class NLElastOperator : public Operator
+{
+protected:
+   bool direct_solve;
+
+   mutable Vector x_u, y_u;
+
+   Array<int> u_offsets, vblock_offsets;
+   InterfaceForm *nl_itf = NULL;
+   Array<NonlinearForm *> hs;
+   BlockOperator *Hop = NULL;
+
+   BlockMatrix *linearOp = NULL;
+   SparseMatrix *M = NULL, *B = NULL, *Bt = NULL;
+
+   // Jacobian matrix objects
+   mutable BlockMatrix *system_jac = NULL;
+   mutable Array2D<SparseMatrix *> hs_mats;
+   mutable BlockMatrix *hs_jac = NULL;
+   mutable SparseMatrix *uu_mono = NULL;
+   mutable SparseMatrix *mono_jac = NULL;
+   mutable HypreParMatrix *jac_hypre = NULL;
+
+   HYPRE_BigInt sys_glob_size;
+   mutable HYPRE_BigInt sys_row_starts[2];
+public:
+   NLElastOperator(const int height_, const int width_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+                    Array<int> &u_offsets_, const bool direct_solve_=true);
+
+   virtual ~NLElastOperator();
+
+   virtual void Mult(const Vector &x, Vector &y) const;
+   virtual Operator &GetGradient(const Vector &x) const;
+};
+
+class NLElastSolver : public MultiBlockSolver
 {
 
    friend class ParameterizedProblem;
+   friend class NLElastOperator;
 
 protected:
    // interface integrator
@@ -35,12 +75,20 @@ protected:
    HypreParMatrix *globalMat_hypre = NULL;
    MUMPSSolver *mumps = NULL;
 
+   // Temporary for nonlinear solve implementation
+   Array<int> u_offsets, p_offsets, vblock_offsets;
+   BlockMatrix *systemOp = NULL;
+   Array<NonlinearForm *> hs;
+   InterfaceForm *nl_itf = NULL;
+   Solver *J_solver = NULL;
+   GMRESSolver *J_gmres = NULL;
+   NewtonSolver *newton_solver = NULL;
+
    // operators
    Array<LinearForm *> bs;
-   Array<BilinearForm *> as;
+   Array<NonlinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
-   double lambda, mu;
    Array<ConstantCoefficient *> lambda_c;
    Array<ConstantCoefficient *> mu_c;
    Array<VectorFunctionCoefficient *> bdr_coeffs;
@@ -50,13 +98,15 @@ protected:
    double alpha = -1.0;
    double kappa = -1.0;
 
+   DGHyperelasticModel* model;
+
    // Initial positions
    VectorFunctionCoefficient *init_x = NULL;
 
 public:
-   LinElastSolver(const double lambda_ = 1.0, const double mu_ = 1.0);
+   NLElastSolver(DGHyperelasticModel* _model = NULL);
 
-   virtual ~LinElastSolver();
+   virtual ~NLElastSolver();
 
    static const std::vector<std::string> GetVariableNames()
    {

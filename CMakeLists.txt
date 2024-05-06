@@ -179,6 +179,9 @@ set(scaleupROMObj_SOURCES
   include/dg_linear.hpp
   src/dg_linear.cpp
 
+  include/nlelast_integ.hpp
+  src/nlelast_integ.cpp
+
   include/nonlinear_integ.hpp
   src/nonlinear_integ.cpp
 
@@ -202,6 +205,9 @@ set(scaleupROMObj_SOURCES
 
   include/linelast_solver.hpp
   src/linelast_solver.cpp
+
+  include/nlelast_solver.hpp
+  src/nlelast_solver.cpp
 
   include/stokes_solver.hpp
   src/stokes_solver.cpp

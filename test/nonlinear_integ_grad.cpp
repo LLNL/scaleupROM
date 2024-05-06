@@ -5,6 +5,7 @@
 #include<gtest/gtest.h>
 #include "nonlinear_integ.hpp"
 #include "hyperreduction_integ.hpp"
+#include "nlelast_integ.hpp"
 #include "input_parser.hpp"
 #include "etc.hpp"
 
@@ -121,7 +122,8 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
    printf("%10s\t%10s\t%10s\t%10s\t%10s\n", "amp", "J0", "J1", "dJdx", "error");
    for (int k = 0; k < 40; k++)
    {
-      double amp = pow(10.0, -0.25 * k);
+      //double amp = pow(10.0, -0.25 * k);
+      double amp = pow(10.0, -5.0-0.25 * k);
       double dx = amp;
       if (gg > 1.0e-14) dx /= sqrt(gg);
 
@@ -258,6 +260,57 @@ TEST(TemamTrilinearFormIntegrator, Test_grad)
    return;
 }
 
+TEST(HyperelasticNLFIntegratorHR, Test_grad)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+
+   double mu = 2.33;
+   double K = 3.14;
+   NeoHookeanHypModel model(mu, K);
+   //LinElastMaterialModel model(mu, K);
+
+   auto *nlc_nlfi = new HyperelasticNLFIntegratorHR(&model);
+    
+   CheckGradient(nlc_nlfi, IntegratorType::DOMAIN, false);
+
+   return;
+}
+
+TEST(DGHyperelasticNLFIntegrator, Test_grad_bdr)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+
+   double mu = 2.33;
+   double K = 3.14;
+   NeoHookeanHypModel model(mu, K);
+   //LinElastMaterialModel model(mu, K);
+
+   auto *nlc_nlfi = new DGHyperelasticNLFIntegrator(&model, 0.0, -1.0);
+    
+   CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+
+   return;
+}
+
+TEST(DGHyperelasticNLFIntegrator, Test_grad_int)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+
+   double mu = 2.33;
+   double K = 3.14;
+   NeoHookeanHypModel model(mu, K);
+   //LinElastMaterialModel model(mu, K);
+
+   auto *nlc_nlfi = new DGHyperelasticNLFIntegrator(&model, 0.0, -1.0);
+    
+   CheckGradient(nlc_nlfi, IntegratorType::INTERIOR, true);
+
+   return;
+}
+   
 int main(int argc, char* argv[])
 {
    MPI_Init(&argc, &argv);

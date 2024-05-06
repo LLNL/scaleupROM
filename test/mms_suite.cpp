@@ -597,6 +597,480 @@ namespace linelast
 
 } // namespace linelast
 
+namespace nlelast
+{
+   void ExactSolutionLinear(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = pow(x(i), 3.0);
+      }
+   }
+
+   void ExactRHSLinear(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      for (size_t i = 0; i < dim; i++)
+      {
+         u(i) = 6.0 * x(i) * (lambda + 2.0 * mu);
+      }
+      u *= -1.0;
+   }
+
+   void ExactSolutionNeoHooke(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      //assert(dim == 2);
+      assert(x.Size() == 2);
+      u(0) = pow(x(0), 2.0) + x(0);
+      u(1) = pow(x(1), 2.0) + x(1);
+   }
+
+   void ExactSolutionNeoHookeBC(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      //assert(dim == 2);
+      assert(x.Size() == 2);
+      u(0) = pow(x(0), 2.0);
+      u(1) = pow(x(1), 2.0);
+   }
+
+   void SimpleExactSolutionNeoHooke(const Vector &X, Vector &U)
+   {
+      int dim = 2;
+      int dof = U.Size()/dim;
+      U = 0.0;
+      for (size_t i = 0; i < U.Size()/dim; i++)
+      {
+         U(i) = pow(X(i), 2.0) + X(i);
+         U(dof + i) = pow(X(dof + i), 2.0) + X(dof + i);
+      }
+   }
+
+   /* void ExactRHSNeoHooke(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      assert(dim == 2);
+
+      const double x_1 = x(0);
+      const double x_2 = x(1);
+
+      u(0) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 128.0*mu*x_1 + 384.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 128.0*mu*(pow(x_1,2)) + 384.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1), 4))*(pow((1 + 2*x_2),2)));
+
+      u(1) = (128.0*K + 128.0*mu + 1024.0*K*x_1 + 1024.0*K*x_2 + 384.0*mu*x_1 + 128.0*mu*x_2 + 3072.0*K*(pow(x_1,2)) + 8192.0*K*x_1*x_2 + 3072.0*K*(pow(x_2,2)) + 384.0*mu*(pow(x_1,2)) + 128.0*mu*(pow(x_2,2)) + 4096.0*K*(pow(x_1,3)) + 24576.0*K*(pow(x_1,2))*x_2 + 24576.0*K*x_1*(pow(x_2,2)) + 4096.0*K*(pow(x_2,3)) + 2048.0*K*(pow(x_1,4)) + 32768.0*K*(pow(x_1,3))*x_2 + 73728.0*K*(pow(x_1,2))*(pow(x_2,2)) + 32768.0*K*x_1*(pow(x_2,3)) + 2048.0*K*(pow(x_2,4)) + 16384.0*K*(pow(x_1,4))*x_2 + 98304.0*K*(pow(x_1,3))*(pow(x_2,2)) + 98304.0*K*(pow(x_1,2))*(pow(x_2,3)) + 16384.0*K*x_1*(pow(x_2,4)) + 49152.0*K*(pow(x_1,4))*(pow(x_2,2)) + 131072.0*K*(pow(x_1,3))*(pow(x_2,3)) + 49152.0*K*(pow(x_1,2))*(pow(x_2,4)) + 65536.0*K*(pow(x_1,4))*(pow(x_2,3)) + 65536.0*K*(pow(x_1,3))*(pow(x_2,4)) + 32768.0*K*(pow(x_1,4))*(pow(x_2,4))) / (64.0 * (pow((1 + 2*x_1),2))*(pow((1 + 2*x_2),4)));
+      //u *= -1.0;
+   } */
+
+   void SimpleExactRHSNeoHooke(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      assert(dim == 2);
+      assert(mu == 0.0);
+      u(0) = 2 * K * pow(1.0 + 2.0 * x(1), 2.0);
+      u(1) = 2 * K * pow(1.0 + 2.0 * x(0), 2.0); 
+      u *= -1.0;
+   }
+
+    void NullSolution(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      //u -= x;
+   }
+
+   void NullDefSolution(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u = x;
+      //u = 1.0;
+   }
+
+    void cantileverf(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u(0) = -0.10;
+   }
+
+   void cantileverfu(const Vector &x, Vector &u)
+   {
+      u = 0.0;
+      u(0) = 0.10;
+   }
+
+   NLElastSolver *SolveWithRefinement(const int num_refinement, const bool nonlinear)
+   {
+      config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+      DGHyperelasticModel *model = NULL;
+
+      if (nonlinear)
+      {
+         model = new NeoHookeanHypModel(mu, K);
+
+      }
+      else
+      {
+         model = new LinElastMaterialModel(mu, lambda);
+      }
+
+      NLElastSolver *test = new NLElastSolver(model);
+
+      
+      dim = test->GetDim();
+
+      test->InitVariables();
+      test->InitVisualization();
+      if (nonlinear)
+      {
+      test->AddBCFunction(ExactSolutionNeoHooke);
+      //test->AddBCFunction(ExactSolutionNeoHookeBC, 1);
+      //test->AddBCFunction(ExactSolutionNeoHookeBC, 2);
+      //test->AddBCFunction(ExactSolutionNeoHookeBC, 3);
+      //test->AddBCFunction(cantileverf, 1);
+      //test->AddBCFunction(cantileverfu, 2);
+      //test->AddBCFunction(NullSolution, 3);
+      test->AddRHSFunction(SimpleExactRHSNeoHooke);
+      //test->SetupIC(NullDefSolution);
+      test->SetBdrType(BoundaryType::DIRICHLET);
+
+      }
+      else
+      {
+      test->AddBCFunction(ExactSolutionLinear);
+      /* test->AddBCFunction(ExactSolutionLinear, 2);
+      test->AddBCFunction(ExactSolutionLinear, 3); */
+      test->AddRHSFunction(ExactRHSLinear);
+      test->SetupIC(ExactSolutionLinear);
+      }
+      //test->AddBCFunction(NullSolution, 1);
+      //test->AddBCFunction(NullSolution, 2);
+      //test->AddBCFunction(NullSolution, 3);
+      //test->AddBCFunction(cantileverfu, 2);
+      //test->AddBCFunction(NullSolution, 3);
+      test->SetBdrType(BoundaryType::DIRICHLET);
+      //test->SetBdrType(BoundaryType::NEUMANN,1);
+      //test->SetBdrType(BoundaryType::NEUMANN,2);
+      //test->SetupIC(ExactSolutionNeoHooke);
+      
+      test->BuildOperators();
+
+      test->SetupBCOperators();
+
+      test->Assemble();
+
+      test->Solve();
+ 
+      return test;
+   }
+
+
+   void CompareLinMat()
+   {
+      int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+      int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+      // Compare with exact solution
+      config.dict_["mesh"]["uniform_refinement"] = 0;
+      LinElastMaterialModel* model = new LinElastMaterialModel(mu, lambda);
+      NLElastSolver *test1 = new NLElastSolver(model);
+
+      LinElastSolver *test2 = new LinElastSolver(mu, lambda);
+      dim = test2->GetDim();
+      assert(dim == 2);
+      test2->InitVariables();
+      test2->InitVisualization();
+      test2->AddBCFunction(ExactSolutionLinear, 1);
+      test2->AddBCFunction(ExactSolutionLinear, 2);
+      test2->AddBCFunction(ExactSolutionLinear, 3);
+      test2->SetBdrType(BoundaryType::DIRICHLET);
+      test2->AddRHSFunction(ExactRHSLinear);
+      test2->BuildOperators();
+      test2->SetupBCOperators();
+      test2->Assemble();
+      test2->Solve();
+      
+      dim = test1->GetDim();
+      assert(dim == 2);
+      test1->InitVariables();
+      test1->InitVisualization();
+      test1->AddBCFunction(ExactSolutionLinear, 1);
+      test1->AddBCFunction(ExactSolutionLinear, 2);
+      test1->AddBCFunction(ExactSolutionLinear, 3);
+      test1->SetBdrType(BoundaryType::DIRICHLET);
+      test1->AddRHSFunction(ExactRHSLinear);
+      test1->BuildOperators();
+      test1->SetupBCOperators();
+      test1->Assemble();
+      test1->Solve();
+
+      return;
+   }
+
+   void CheckConvergence(const bool nonlinear)
+   {
+      int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+      int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+      // Compare with exact solution
+      int dim = 2; // only check two dimensions
+      //const double mu = 0.0;
+      //const double K = 1.0;
+      VectorFunctionCoefficient* exact_sol;
+      if (nonlinear)
+      {
+      exact_sol = new VectorFunctionCoefficient(dim, ExactSolutionNeoHooke);
+      }
+      else
+      {
+      exact_sol = new VectorFunctionCoefficient(dim, ExactSolutionLinear);
+      }
+      
+      printf("Num. Elem.\tRelative Error\tConvergence Rate\tNorm\n");
+
+      Vector conv_rate(num_refine);
+      conv_rate = 0.0;
+      double error1 = 0.0;
+      base_refine = 0;
+      num_refine = 4;
+      for (int r = base_refine; r < num_refine; r++)
+      {
+         NLElastSolver *test = SolveWithRefinement(r, nonlinear);
+
+         int order = test->GetDiscretizationOrder();
+         cout<<"order is: "<<order<<endl;
+         int order_quad = max(2, 2 * order + 1);
+         const IntegrationRule *irs[Geometry::NumGeom];
+         for (int i = 0; i < Geometry::NumGeom; ++i)
+         {
+            irs[i] = &(IntRules.Get(i, order_quad));
+         }
+
+         int numEl = 0;
+         double norm = 0.0;
+         for (int k = 0; k < test->GetNumSubdomains(); k++)
+         {
+            Mesh *mk = test->GetMesh(k);
+            norm += pow(ComputeLpNorm(2.0, *exact_sol, *mk, irs), 2);
+            numEl += mk->GetNE();
+         }
+         norm = sqrt(norm);
+         double error = 0.0;
+         for (int k = 0; k < test->GetNumSubdomains(); k++)
+         {
+            GridFunction *uk = test->GetGridFunction(k);
+            error += pow(uk->ComputeLpError(2, *exact_sol), 2);
+         }
+         error = sqrt(error);
+         error /= norm;
+
+         if (r > base_refine)
+         {
+            conv_rate(r) = error1 / error;
+         }
+
+         printf("%d\t%.15E\t%.15E\t%.15E\n", numEl, error, conv_rate(r), norm);
+
+         // reported convergence rate
+         if (r > base_refine)
+            //EXPECT_TRUE(conv_rate(r) > pow(2.0, order + 1) - 0.5);
+            EXPECT_TRUE(conv_rate(r) > pow(2.0, order + 1) - 0.8);
+
+         error1 = error;
+      }
+
+      return;
+   }
+
+   void test_fn(const Vector &x, Vector &u)
+{
+   double xi(x(0));
+   double yi(x(1));
+
+   assert(x.Size() == 2);
+
+   u(0) = sin(pi * x(0));
+   u(1) = sin(pi * x(1));
+   return;
+}
+
+   double EvalWithRefinement(const int num_refinement, int &order_out)
+{  
+   // 1. Parse command-line options.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+   bool use_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   int order = config.GetOption<int>("discretization/order", 1);
+   order_out = order;
+
+   Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
+   int dim = mesh->Dimension();
+   //cout<<"dim is: "<<dim<<endl;
+
+   for (int l = 0; l < num_refinement; l++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+
+   FiniteElementSpace *fes;
+   //FiniteElementSpace fespace(mesh, &fe_coll, dim);
+   if (use_dg)
+   {
+      fes = new FiniteElementSpace(mesh, dg_coll, dim);
+   }
+   else
+   {
+      fes = new FiniteElementSpace(mesh, h1_coll, dim);
+   }
+
+   // 12. Create the grid functions u and p. Compute the L2 error norms.
+   //cout<<"pre error1"<<endl;
+   VectorFunctionCoefficient v(dim, test_fn);
+   GridFunction p(fes);
+   p.ProjectCoefficient(v);
+   
+   string test_integ = "domain";
+   Vector x, y0, y1;
+
+   double product = 0.0;
+   NeoHookeanHypModel model2(mu, K);
+    int ndofs = fes->GetTrueVSize();
+   if (test_integ == "domain")
+   {
+   assert(use_dg == true);
+
+   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   p_ess_attr = 1;
+   double kappa = -1.0;
+   //kappa = 0.0;
+   LinearForm *gform = new LinearForm(fes);
+   VectorFunctionCoefficient ud(dim, ExactSolutionNeoHooke);
+   
+   gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
+               ud, &model2, 0.0, kappa), p_ess_attr);
+   gform->Assemble();
+
+   NonlinearForm *nlform = new NonlinearForm(fes);
+   nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(&model2));
+   nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(&model2, 0.0, kappa),p_ess_attr);
+
+    GridFunction x_ref(fes);
+    mesh->GetNodes(x_ref);
+    x.SetSize(ndofs);
+    x = x_ref.GetTrueVector();
+
+    y0.SetSize(ndofs);
+    y0 = 0.0;
+    SimpleExactSolutionNeoHooke(x, y0);
+
+    y1.SetSize(ndofs);
+    y1 = 0.0;
+   nlform->Mult(y0, y1); //MFEM Neohookean
+
+   for (size_t i = 0; i < y1.Size(); i++)
+   {
+      y1(i) -= gform->Elem(i);
+   }
+   
+   product = p * y1;
+   delete nlform;
+   delete gform;
+   }
+   else if (test_integ == "bc")
+   {
+   assert(use_dg == true);
+   Array<int> p_ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   p_ess_attr = 1;
+   //p_ess_attr[1] = 1;
+   LinearForm *gform = new LinearForm(fes);
+   VectorFunctionCoefficient ud(dim, ExactSolutionNeoHooke);
+   
+   gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
+               ud, &model2, 0.0, -1.0), p_ess_attr);
+   gform->Assemble();
+
+   NonlinearForm *nlform = new NonlinearForm(fes);
+   nlform->AddBdrFaceIntegrator(new DGHyperelasticNLFIntegrator(&model2, 0.0, -1.0), p_ess_attr);
+   y0.SetSize(ndofs);
+    y0 = 0.0;
+    SimpleExactSolutionNeoHooke(x, y0);
+
+    y1.SetSize(ndofs);
+    y1 = 0.0;
+   nlform->Mult(y0, y1); //MFEM Neohookean
+
+   //y1 -= gform;
+   product = y1.Norml2();
+   delete gform;
+
+   }
+   
+   // 17. Free the used memory.
+   delete fes;
+   delete dg_coll;
+   delete h1_coll;
+   delete mesh;
+
+   return product;
+}
+
+void CheckConvergenceIntegratorwise()
+{
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 5);
+   num_refine = 8;
+   //double product_ex = 26.0 * K / 3.0 * 1.5384588; // TODO: replace
+   string test_integ = "domain";
+   double product_ex =0.0;
+   if (test_integ == "bc")
+   {
+      double wlm = K;
+      //product_ex = 4.0 * kappa * wlm * (pow(pi,2.0) - 4.0)/pow(pi,3.0);
+      //product_ex = 1.0;
+      product_ex = 4.0 * -1.0 * (pow(pi,2.0) - 4.0)/pow(pi,3.0);
+
+   }
+   else if (test_integ == "domain")
+   {
+   product_ex =  -(104.0 * K)/(3.0 * pi); // TODO: replace
+   }
+   
+   
+   printf("(p, n dot u_d)_ex = %.5E\n", product_ex);
+
+   printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
+
+   Vector conv_rate(num_refine);
+   conv_rate = 0.0;
+   double error1 = 0.0;
+   for (int r = 0; r < num_refine; r++)
+   {
+      int order = -1;
+      double product = EvalWithRefinement(r, order);
+
+      double error = abs(product - product_ex) / abs(product_ex);
+      
+      if (r > 0)
+         conv_rate(r) = error1 / error;
+      printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\n", r, error, conv_rate(r), product, product_ex);
+
+      // reported convergence rate
+      if (r > 0)
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
+
+      error1 = error;
+   }
+
+   return;
+}
+
+} // namespace nlelast
+
 namespace advdiff
 {
 

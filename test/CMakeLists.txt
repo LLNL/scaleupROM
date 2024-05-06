@@ -14,8 +14,10 @@ add_executable(poisson_dd_mms poisson_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>
 add_executable(stokes_dd_mms stokes_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(steady_ns_dd_mms steady_ns_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(linelast_dd_mms linelast_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
+add_executable(nlelast_dd_mms nlelast_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(advdiff_dd_mms advdiff_dd_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 add_executable(dg_integ_mms dg_integ_mms.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
+add_executable(neohookean_test neohookean_test.cpp $<TARGET_OBJECTS:scaleupROMObj> $<TARGET_OBJECTS:mmsSuiteObj>)
 file(COPY inputs/dd_mms.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
 file(COPY meshes/dd_mms.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/meshes)
 file(COPY inputs/dd_mms.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/inputs)
@@ -70,6 +72,9 @@ add_executable(test_linalg_utils test_linalg_utils.cpp $<TARGET_OBJECTS:scaleupR
 add_executable(test_rom_nonlinearform test_rom_nonlinearform.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
 add_executable(test_ns_parallel test_ns_parallel.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
+add_executable(nlelast_test nlelast_test.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+
 
 function(add_test_dir TEST_DIR)
     # helper function that adds all executables in a given directory as tests for ctest

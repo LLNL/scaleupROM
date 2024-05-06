@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#include "linelast_solver.hpp"
+#include "nlelast_solver.hpp"
 #include "input_parser.hpp"
 #include "linalg_utils.hpp"
 #include "etc.hpp"
@@ -10,18 +10,115 @@
 using namespace std;
 using namespace mfem;
 
-LinElastSolver::LinElastSolver(const double  mu_, const double lambda_)
+
+/* NLElastOperator */
+
+NLElastOperator::NLElastOperator(const int height_, const int width_, Array<NonlinearForm *> &hs_, InterfaceForm *nl_itf_,
+   Array<int> &u_offsets_, const bool direct_solve_)
+   : Operator(height_, width_), hs(hs_), nl_itf(nl_itf_),
+     u_offsets(u_offsets_), direct_solve(direct_solve_)
+{
+
+   // TODO: this needs to be changed for parallel implementation.
+   sys_glob_size = height;
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = height;
+
+   Hop = new BlockOperator(u_offsets);
+   for (int m = 0; m < hs_.Size(); m++)
+   {
+      assert(hs_[m]);
+      Hop->SetDiagonalBlock(m, hs_[m]);
+   }
+
+   hs_mats.SetSize(hs.Size(), hs.Size());
+   hs_mats = NULL;
+}
+
+NLElastOperator::~NLElastOperator()
+{
+   delete Hop;
+   delete system_jac;
+   delete hs_jac;
+   delete uu_mono;
+   delete mono_jac;
+   delete jac_hypre;
+}
+
+void NLElastOperator::Mult(const Vector &x, Vector &y) const
+{
+   y = 0.0;
+   //cout<<"in mult"<<endl;
+   Hop->Mult(x, y);
+   //cout<<"out mult"<<endl;
+   //if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u); // TODO: Add this when interface integrator is there
+}
+
+Operator& NLElastOperator::GetGradient(const Vector &x) const
+{
+   //cout<<"in grad"<<endl;
+
+   delete hs_jac;
+   delete jac_hypre;
+
+   hs_jac = new BlockMatrix(u_offsets);
+   for (int i = 0; i < hs.Size(); i++)
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         if (i == j)
+         {
+            x_u.MakeRef(const_cast<Vector &>(x), u_offsets[i], u_offsets[i+1] - u_offsets[i]);
+         //cout<<"before getgrad"<<endl;
+
+            hs_mats(i, j) = dynamic_cast<SparseMatrix *>(&hs[i]->GetGradient(x_u));
+         //cout<<"after getgrad"<<endl;
+
+         }
+         else
+         {
+            delete hs_mats(i, j);
+            hs_mats(i, j) = new SparseMatrix(u_offsets[i+1] - u_offsets[i], u_offsets[j+1] - u_offsets[j]);
+         }
+      }
+
+   x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
+   //if (nl_itf) nl_itf->InterfaceGetGradient(x_u, hs_mats); // TODO: Enable when we have interface integrator
+
+   for (int i = 0; i < hs.Size(); i++)
+      for (int j = 0; j < hs.Size(); j++)
+      {
+         hs_mats(i, j)->Finalize();
+         hs_jac->SetBlock(i, j, hs_mats(i, j));
+      }
+
+   mono_jac = hs_jac->CreateMonolithic();
+   //cout<<"out grad"<<endl;
+
+   if (direct_solve)
+   {
+      jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
+   //cout<<"out grad1"<<endl;
+      return *jac_hypre;
+
+   }  
+   else
+   //cout<<"out gra2"<<endl;
+
+      return *mono_jac;
+}
+
+/* NLElastSolver */
+
+NLElastSolver::NLElastSolver(DGHyperelasticModel* _model)
     : MultiBlockSolver()
 {
-   alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
-   alpha = 0.0; // TEMP
+   alpha = 0.0; // Only allow IIPG
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
-   mu = mu_;
-   lambda = lambda_;
-
 
    var_names = GetVariableNames();
    num_var = var_names.size();
+
+   model = _model;
 
    // solution dimension is determined by initialization.
    udim = dim;
@@ -46,7 +143,7 @@ LinElastSolver::LinElastSolver(const double  mu_, const double lambda_)
    }
 }
 
-LinElastSolver::~LinElastSolver()
+NLElastSolver::~NLElastSolver()
 {
    delete a_itf;
 
@@ -63,26 +160,44 @@ LinElastSolver::~LinElastSolver()
    
 }
 
-void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
+void NLElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
 {
    init_x = new VectorFunctionCoefficient(dim, F);
    for (int m = 0; m < numSub; m++)
    {
       assert(us[m]);
       us[m]->ProjectCoefficient(*init_x);
+
+      /* for (size_t i = 0; i < us[m]->Size(); i++)
+       {
+         cout<<"us[m]->Elem(i) is: "<<us[m]->Elem(i)<<endl;
+       }
+
+       cout<<endl<<endl; */
    }
+   //MFEM_ABORT("test")
 }
 
-void LinElastSolver::SetupBCVariables()
+void NLElastSolver::SetupBCVariables()
 {
    MultiBlockSolver::SetupBCVariables();
    bdr_coeffs.SetSize(numBdr);
    bdr_coeffs = NULL;
 
-   
+   lambda_c.SetSize(numSub);
+   lambda_c = NULL;
+
+   mu_c.SetSize(numSub);
+   mu_c = NULL;
+
+   for (size_t i = 0; i < numSub; i++)
+   {
+      lambda_c[i] = new ConstantCoefficient(1.0);
+      mu_c[i] = new ConstantCoefficient(1.0);
+   }
 }
 
-void LinElastSolver::InitVariables()
+void NLElastSolver::InitVariables()
 {
    // number of blocks = solution dimension * number of subdomain;
    block_offsets.SetSize(udim * numSub + 1);
@@ -102,18 +217,6 @@ void LinElastSolver::InitVariables()
    block_offsets.PartialSum();
    var_offsets.PartialSum();
    domain_offsets = var_offsets;
-
-   lambda_c.SetSize(numSub);
-   lambda_c = NULL;
-
-   mu_c.SetSize(numSub);
-   mu_c = NULL;
-
-   for (size_t i = 0; i < numSub; i++)
-   {
-      lambda_c[i] = new ConstantCoefficient(lambda);
-      mu_c[i] = new ConstantCoefficient(mu);
-   }
 
    SetupBCVariables();
 
@@ -136,26 +239,28 @@ void LinElastSolver::InitVariables()
 
       // BC's are weakly constrained and there is no essential dofs.
       // Does this make any difference?
+      meshes[m]->GetNodes(*us[m]);
       us[m]->SetTrueVector();
+      //PrintVector(U->GetBlock(m), "ub.txt");
    }
    if (use_rom)
      MultiBlockSolver::InitROMHandler();
 }
 
-void LinElastSolver::BuildOperators()
+void NLElastSolver::BuildOperators()
 {
    BuildRHSOperators();
    BuildDomainOperators();
 }
 
-bool LinElastSolver::BCExistsOnBdr(const int &global_battr_idx)
+bool NLElastSolver::BCExistsOnBdr(const int &global_battr_idx)
 {
    assert((global_battr_idx >= 0) && (global_battr_idx < global_bdr_attributes.Size()));
    assert(bdr_coeffs.Size() == global_bdr_attributes.Size());
    return (bdr_coeffs[global_battr_idx]);
 }
 
-void LinElastSolver::BuildRHSOperators()
+void NLElastSolver::BuildRHSOperators()
 {
    bs.SetSize(numSub);
    for (int m = 0; m < numSub; m++)
@@ -168,7 +273,7 @@ void LinElastSolver::BuildRHSOperators()
    }
 }
 
-void LinElastSolver::SetupRHSBCOperators()
+void NLElastSolver::SetupRHSBCOperators()
 {
    assert(bs.Size() == numSub);
    for (int m = 0; m < numSub; m++)
@@ -185,15 +290,17 @@ void LinElastSolver::SetupRHSBCOperators()
 
          switch (bdr_type[b])
          {
-            case BoundaryType::DIRICHLET:
-               bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
-                  *bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+               case BoundaryType::DIRICHLET:
+               //bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
+                  //*bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
+               bs[m]->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
+               *bdr_coeffs[b], model, alpha, kappa), *bdr_markers[b]);
                break;
             case BoundaryType::NEUMANN:
                bs[m]->AddBdrFaceIntegrator(new VectorBoundaryLFIntegrator(*bdr_coeffs[b]), *bdr_markers[b]);
                break;
             default:
-               printf("LinElastSolver::SetupRHSBCOperators - ");
+               printf("NLElastSolver::SetupRHSBCOperators - ");
                printf("boundary attribute %d has a non-zero function, but does not have boundary type. will not be enforced.",
                       global_bdr_attributes[b]);
                break;
@@ -202,34 +309,34 @@ void LinElastSolver::SetupRHSBCOperators()
    }
 }
 
-void LinElastSolver::BuildDomainOperators()
+void NLElastSolver::BuildDomainOperators()
 {
    // SanityCheckOnCoeffs();
    as.SetSize(numSub);
 
    for (int m = 0; m < numSub; m++)
    {
-      as[m] = new BilinearForm(fes[m]);
-      as[m]->AddDomainIntegrator(new ElasticityIntegrator(*(lambda_c[m]), *(mu_c[m])));
+      as[m] = new NonlinearForm(fes[m]);
+      as[m]->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(model));
 
       if (full_dg)
       {
          as[m]->AddInteriorFaceIntegrator(
-             new DGElasticityIntegrator(*(lambda_c[m]), *(mu_c[m]), alpha, kappa));
+             new DGHyperelasticNLFIntegrator(model, alpha, kappa)); 
       }
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
+   //a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
 }
 
-void LinElastSolver::Assemble()
+void NLElastSolver::Assemble()
 {
    AssembleRHS();
-   AssembleOperator();
+   //AssembleOperator();
 }
 
-void LinElastSolver::AssembleRHS()
+void NLElastSolver::AssembleRHS()
 {
    // SanityCheckOnCoeffs();
    MFEM_ASSERT(bs.Size() == numSub, "LinearForm bs != numSub.\n");
@@ -244,169 +351,159 @@ void LinElastSolver::AssembleRHS()
       bs[m]->SyncAliasMemory(*RHS); // Synchronize with block vector RHS. What is different from SyncMemory?
 }
 
-void LinElastSolver::AssembleOperator()
+void NLElastSolver::AssembleOperator()
 {
-   // SanityCheckOnCoeffs();
-   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
-   for (int m = 0; m < numSub; m++)
-   {
-      MFEM_ASSERT(as[m], "LinearForm or BilinearForm pointer of a subdomain is not associated!\n");
-      as[m]->Assemble();
-   }
-   mats.SetSize(numSub, numSub);
-   for (int i = 0; i < numSub; i++)
-   {
-      for (int j = 0; j < numSub; j++)
-      {
-         if (i == j)
-         {
-            mats(i, i) = &(as[i]->SpMat());
-         }
-         else
-         {
-            mats(i, j) = new SparseMatrix(fes[i]->GetTrueVSize(), fes[j]->GetTrueVSize());
-         }
-      }
-   }
-   AssembleInterfaceMatrices();
-   for (int m = 0; m < numSub; m++)
-      as[m]->Finalize();
-
-   // globalMat = new BlockOperator(block_offsets);
-   // NOTE: currently, domain-decomposed system will have a significantly different sparsity pattern.
-   // This is especially true for vector solution, where ordering of component is changed.
-   // This is quite inevitable, but is it desirable?
-   globalMat = new BlockMatrix(var_offsets);
-   for (int i = 0; i < numSub; i++)
-   {
-      for (int j = 0; j < numSub; j++)
-      {
-         if (i != j)
-            mats(i, j)->Finalize();
-
-         globalMat->SetBlock(i, j, mats(i, j));
-      }
-   }
-
-   if (use_amg || direct_solve)
-   {
-      globalMat_mono = globalMat->CreateMonolithic();
-
-      // TODO: need to change when the actual parallelization is implemented.
-      sys_glob_size = globalMat_mono->NumRows();
-      sys_row_starts[0] = 0;
-      sys_row_starts[1] = globalMat_mono->NumRows();
-      globalMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, sys_glob_size, sys_row_starts, globalMat_mono);
-
-      mumps = new MUMPSSolver(MPI_COMM_SELF);
-      if (alpha != -1.0)
-      {
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
-      }
-      else
-      {
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_POSITIVE_DEFINITE);
-      }
-      
-      mumps->SetOperator(*globalMat_hypre);
-   }
+   "AssembleOperator is not needed for NLElastSolver!\n";
 }
 
-void LinElastSolver::AssembleInterfaceMatrices()
+void NLElastSolver::AssembleInterfaceMatrices()
 {
    assert(a_itf);
    a_itf->AssembleInterfaceMatrices(mats);
 }
 
-bool LinElastSolver::Solve()
+bool NLElastSolver::Solve()
 {
-   // If using direct solver, returns always true.
-   bool converged = true;
-
-   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
+   int maxIter = config.GetOption<int>("solver/max_iter", 100);
+   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
+   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
-   // TODO: need to change when the actual parallelization is implemented.
-   if (direct_solve)
+   int jac_maxIter = config.GetOption<int>("solver/jacobian/max_iter", 10000);
+   double jac_rtol = config.GetOption<double>("solver/jacobian/relative_tolerance", 1.e-10);
+   double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
+   int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
+
+   bool lbfgs = config.GetOption<bool>("solver/use_lbfgs", false);
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file;
+   if (use_restart)
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+
+   const int hw = U->Size();
+   NLElastOperator oper(hw, hw, as, a_itf, var_offsets, direct_solve);
+
+   // Test mult
+   /* for (int i = 0; i < var_offsets.Size(); i++)
    {
-      assert(mumps);
-      if (alpha!=-1.0)
+      cout<<"var_offsets(i) is: "<<var_offsets[i]<<endl;
+   }
+   cout<<"hw is: "<<hw<<endl; */
+   /* Vector _U(U->GetBlock(0));
+   Vector _U0(_U);
+   Vector _RHS(RHS->GetBlock(0));
+   Vector _res(_U);
+   _res = 0.0;
+   cout<<"_U.Norml2() is: "<<_U.Norml2()<<endl;
+
+   cout<<"_RHS.Norml2() is: "<<_RHS.Norml2()<<endl;
+
+   oper.Mult(_U, _res);
+
+   cout<<"_res.Norml2() is: "<<_res.Norml2()<<endl; */
+   
+   /* for (size_t i = 0; i < _res.Size(); i++)
+   {
+      
       {
-      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+        cout<<"_res(i) is: "<<_res(i)<<endl;
+        cout<<"i is: "<<i<<endl;
+        cout<<"_U(i) is: "<<_U(i)<<endl;
+        cout<<"_RHS(i) is: "<<_RHS(i)<<endl;
+        if (abs(_res(i) - _RHS(i)) > 0.0000001)
+        {
+         cout<<"ohnon "<< abs(_res(i) - _RHS(i))<<endl;
+        }
+        cout<<endl;
       }
       
-      mumps->SetPrintLevel(print_level);
-      mumps->Mult(*RHS, *U);
-   }
-   else
+   } */
+
+   /* for (size_t i = 0; i < _U.Size(); i++)
    {
-      CGSolver *solver = NULL;
-      HypreBoomerAMG *M = NULL;
-      BlockDiagonalPreconditioner *globalPrec = NULL;
-
-      // HypreBoomerAMG makes a meaningful difference in computation time.
-      if (use_amg)
+      double _x1 = 0.5 * (sqrt(4.0 * _U0(i) + 1.0) - 1.0);
+      _U0(i) = _x1;
+   } */
+   /* 
+   cout<<"_res.Size()/2 is: "<<_res.Size()/2<<endl;
+   //for (size_t i = 0; i < _res.Size()/2; i++)
+   for (size_t i = 0; i < _res.Size()/2; i++)
+   {
+      //if ((abs(_res(i) - _RHS(i)) <= 0.0000001) && abs(_res(i + _res.Size()/2) - _RHS(i + _res.Size()/2) <= 0.0000001))
       {
-         // Initializating HypreParMatrix needs the monolithic sparse matrix.
-         assert(globalMat_mono != NULL);
+         cout<<"_resx is: "<<_res(i)<<endl;
+         cout<<"_resy is: "<<_res(i + _res.Size()/2)<<endl;
+         cout<<"_RHSx is: "<<_RHS(i)<<endl;
+         cout<<"_RHSy is: "<<_RHS(i + _res.Size()/2)<<endl;
+         cout<<"_Ux is: "<<_U(i)<<endl;
+         cout<<"_Uy is: "<<_U(i + _res.Size()/2)<<endl;
+        cout<<endl;
 
-         solver = new CGSolver(MPI_COMM_WORLD);
-
-         M = new HypreBoomerAMG(*globalMat_hypre);
-         M->SetPrintLevel(print_level);
-
-         solver->SetPreconditioner(*M);
-         solver->SetOperator(*globalMat_hypre);
       }
-      else
-      {
-         solver = new CGSolver();
+ */
+      
+      
+      /* {
+        cout<<"_res(i) is: "<<_res(i)<<endl;
+        cout<<"i is: "<<i<<endl;
+        cout<<"_U(i) is: "<<_U(i)<<endl;
+        cout<<"_RHS(i) is: "<<_RHS(i)<<endl;
+        if (abs(_res(i) - _RHS(i)) > 0.0000001)
+        {
+         cout<<"ohnon "<< abs(_res(i) - _RHS(i))<<endl;
+        }
+        cout<<endl;
+      } */
+      
+   //}
+   
+   
+   //_res -= _RHS;
+   
+   //cout<<"(_res - RHS).Norml2() is: "<<_res.Norml2()<<endl;
+   //MFEM_ABORT("test");
 
-         if (config.GetOption<bool>("solver/block_diagonal_preconditioner", true))
-         {
-            globalPrec = new BlockDiagonalPreconditioner(var_offsets);
-            solver->SetPreconditioner(*globalPrec);
-         }
-         solver->SetOperator(*globalMat);
-      }
-      solver->SetAbsTol(atol);
-      solver->SetRelTol(rtol);
-      solver->SetMaxIter(maxIter);
-      solver->SetPrintLevel(print_level);
-
-      *U = 0.0;
-      // The time for the setup above is much smaller than this Mult().
-      // StopWatch test;
-      // test.Start();
-      solver->Mult(*RHS, *U);
-      // test.Stop();
-      // printf("test: %f seconds.\n", test.RealTime());
-      converged = solver->GetConverged();
-
-      // delete the created objects.
-      if (use_amg)
-      {
-         delete M;
-      }
-      else
-      {
-         if (globalPrec != NULL)
-            delete globalPrec;
-      }
-      delete solver;
+   cout<<"full_dg is: "<<full_dg<<endl;
+   if (direct_solve)
+   {
+      mumps = new MUMPSSolver(MPI_COMM_SELF);
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      mumps->SetPrintLevel(jac_print_level);
+      J_solver = mumps;
    }
+   else 
+   {
+      J_gmres = new GMRESSolver;
+      J_gmres->SetAbsTol(jac_atol);
+      J_gmres->SetRelTol(jac_rtol);
+      J_gmres->SetMaxIter(jac_maxIter);
+      J_gmres->SetPrintLevel(jac_print_level);
+      J_solver = J_gmres;
+   }
+   //cout<<"2 "<<endl;
 
-      PrintMatrix(*(globalMat->CreateMonolithic()->ToDenseMatrix()), "test_KLin.txt");
-      PrintVector(*RHS, "RhsLin.txt");
-      PrintVector(*U, "ULin2.txt");
+   if (lbfgs)
+      newton_solver = new LBFGSSolver;
+   else
+      newton_solver = new NewtonSolver;
+   newton_solver->SetSolver(*J_solver);
+   newton_solver->SetOperator(oper);
+   newton_solver->SetPrintLevel(print_level); // print Newton iterations
+   newton_solver->SetRelTol(rtol);
+   newton_solver->SetAbsTol(atol);
+   newton_solver->SetMaxIter(maxIter);
+  cout<<"4 "<<endl;
 
+   newton_solver->Mult(*RHS, *U);
+   //cout<<"5 "<<endl;
+
+   bool converged = newton_solver->GetConverged();
+   //cout<<"6 "<<endl;
 
    return converged;
 }
 
-void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
+void NLElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
 {
    assert(bdr_coeffs.Size() > 0);
 
@@ -426,20 +523,20 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
          bdr_coeffs[k] = new VectorFunctionCoefficient(dim, F);
 }
 
-void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
+void NLElastSolver::AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
 {
    rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
 }
 
-void LinElastSolver::SetupBCOperators()
+void NLElastSolver::SetupBCOperators()
 {
    SetupRHSBCOperators();
    SetupDomainBCOperators();
 }
 
-void LinElastSolver::SetupDomainBCOperators()
+void NLElastSolver::SetupDomainBCOperators()
 {
-   MFEM_ASSERT(as.Size() == numSub, "BilinearForm bs != numSub.\n");
+   MFEM_ASSERT(as.Size() == numSub, "NonlinearForm bs != numSub.\n");
    if (full_dg)
    {
       for (int m = 0; m < numSub; m++)
@@ -453,14 +550,18 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
 
             if (bdr_type[b] == BoundaryType::DIRICHLET)
-               as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
-                  *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+               //as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
+                 // *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+               //cout<<"*lambda_c[m] is: "<<model->lambda<<endl;
+               //cout<<"*mu_c[m] is: "<<model->mu<<endl;
+               as[m]->AddBdrFaceIntegrator(
+                  new DGHyperelasticNLFIntegrator(model, alpha, kappa), *(bdr_markers[b]));
          }
       }
-   }
+   } 
 }
 
-void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+void NLElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
@@ -507,7 +608,7 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    }
 }
 
-void LinElastSolver::ProjectOperatorOnReducedBasis()
+void NLElastSolver::ProjectOperatorOnReducedBasis()
 { 
    Array2D<Operator *> tmp(mats.NumRows(), mats.NumCols());
    for (int i = 0; i < tmp.NumRows(); i++)
@@ -518,7 +619,7 @@ void LinElastSolver::ProjectOperatorOnReducedBasis()
 }
 
 // Component-wise assembly
-void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
+void NLElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -544,7 +645,7 @@ void LinElastSolver::BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
+void NLElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
@@ -576,7 +677,7 @@ void LinElastSolver::BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
+void NLElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -611,4 +712,4 @@ void LinElastSolver::BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_c
          for (int j = 0; j < 2; j++) delete spmats(i, j);
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
-void LinElastSolver::SanityCheckOnCoeffs() { "LinElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
+//void NLElastSolver::SanityCheckOnCoeffs() { "NLElastSolver::SanityCheckOnCoeffs is not implemented yet!\n"; }
