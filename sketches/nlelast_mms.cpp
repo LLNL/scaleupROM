@@ -19,7 +19,6 @@ using namespace mfem;
 static double K = 1.0;
 static double mu = 0.0;
 static const double pi = 4.0 * atan(1.0);
-//static double mu = 1.0;
 
 // A proxy Operator used for FOM Newton Solver.
 // Similar to SteadyNSOperator.
@@ -129,10 +128,12 @@ int main(int argc, char *argv[])
    int refine = 0;
    bool pa = false;
    const char *device_config = "cpu";
-   bool visualization = 1;
-   bool solve = false;
+   bool visualization = false;
+   bool solve = true;
    bool check_grad = false;
    bool nonlinear = true;
+   bool verbose = false;
+   bool weak_constraints = true;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -147,6 +148,16 @@ int main(int argc, char *argv[])
                   "Check gradients.");
    args.AddOption(&nonlinear, "-nl", "--nonlinear","-lin", "--linear",
                   "toggle linear/nonlinear elasticity.");
+   args.AddOption(&mu, "-mu", "--mu",
+                  "Value of material parameter mu.");
+   args.AddOption(&K, "-K", "--K",
+                  "Value of material parameter K.");
+   args.AddOption(&verbose, "-v", "--verbose","-nv", "--notverbose",
+                  "Toggle verbose output.");
+   args.AddOption(&weak_constraints, "-wc", "--weakconstraints","-sc", "--strongconstraints",
+                  "Toggle weak or strong constraint enforcement.");
+   args.AddOption(&visualization, "-vis", "--visualization","-nvis", "--novisualization",
+                  "Toggle visualization.");
    args.Parse();
    if (!args.Good())
    {
@@ -201,7 +212,6 @@ int main(int argc, char *argv[])
       exact_RHS = new VectorFunctionCoefficient(dim, ExactRHSLinear); 
    }
 
-
    // 8. Allocate memory (x, rhs) for the analytical solution and the right hand
    //    side.  Define the GridFunction u,p for the finite element solution and
    //    linear forms fform and gform for the right hand side.  The data
@@ -233,138 +243,110 @@ int main(int argc, char *argv[])
    }
 
    Array<int> u_ess_attr(mesh->bdr_attributes.Max());
-   // this array of integer essentially acts as the array of boolean:
-   // If value is 0, then it is not Dirichlet.
-   // If value is 1, then it is Dirichlet.
+   Array<int> u_ess_tdof;
    u_ess_attr = 1;
 
-   Array<int> u_ess_tdof;
-   fes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
-
+   // Initialize the two RHS components
    LinearForm *gform = new LinearForm(fes);
    LinearForm *tempform = new LinearForm(fes);
+
+   if (weak_constraints == false)
+   {
+   fes->GetEssentialTrueDofs(u_ess_attr, u_ess_tdof);
+   }
+   else
+   {
    gform->Update(fes, rhs1, 0);
    gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
                *exact_sol, model, 0.0, kappa), u_ess_attr);
    gform->Assemble();
    gform->SyncAliasMemory(rhs1);
-
-   cout<<"u_ess_tdof.Size() is: "<<u_ess_tdof.Size()<<endl;
-   cout<<"fomsize is: "<<fomsize<<endl;
-
+   rhs += rhs1;
+   if (verbose)
+   cout<<"rhs.Norml2() after added Dirichlet BCs is: "<<rhs.Norml2()<<endl;
+   }
+   
    tempform->Update(fes, rhs2, 0);
    tempform->AddDomainIntegrator(new VectorDomainLFIntegrator(*exact_RHS));
-   //tempform->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(*exact_RHS));
    tempform->Assemble();
    tempform->SyncAliasMemory(rhs2);
 
-
-   /* for (size_t i = 0; i < u_ess_tdof.Size(); i++)
+   if (weak_constraints == false)
+   {
+   for (size_t i = 0; i < u_ess_tdof.Size(); i++)
    {
       rhs2[u_ess_tdof[i]] = 0.0;
-   } */
-
-   rhs += rhs1;
-   //kappa = 0.0;
-   cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
+   }
+   kappa = 0.0;
+   }
+   
    rhs += rhs2;
-   cout<<"rhs.Norml2() is: "<<rhs.Norml2()<<endl;
+   if (verbose)
+   cout<<"rhs.Norml2() after added forcing term is: "<<rhs.Norml2()<<endl;
 
    // 9. Assemble the finite element matrices
    NonlinearForm *nlform(new NonlinearForm(fes));
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(model));
    nlform->AddBdrFaceIntegrator( new DGHyperelasticNLFIntegrator(model, 0.0, kappa), u_ess_attr);
-   //nlform->AddInteriorFaceIntegrator( new DGHyperelasticNLFIntegrator(model, 0.0, kappa));
-   //nlform->SetEssentialTrueDofs(u_ess_tdof);
+
+   if (weak_constraints == false)
+   {
+   nlform->SetEssentialTrueDofs(u_ess_tdof);
+   }
 
    SimpleNLElastOperator oper(fomsize, *nlform);
 
    if (check_grad)
    {
    CheckGradient(*nlform, fes);
-   /* SparseMatrix *jac = dynamic_cast<SparseMatrix *>(&(nlform->GetGradient(x)));
-   DenseMatrix J(*(jac->ToDenseMatrix()));
-   Vector ev(J.Size());
-   cout<<"J.Det() is: "<<J.Det()<<endl; */
    }
 
-   // Test applying nonlinear form
    Vector _x(x);
+
+   // Test applying nonlinear form
+   if (verbose)
+   {
    Vector _y0(x);
    Vector _y1(x);
 
-   //GridFunction x_ref(fes);
-   //mesh->GetNodes(x_ref);
-   //x_ref.ProjectCoefficient(exact_sol);
-   //_x = x_ref.GetTrueVector();
-
    _y1 = 0.0;
-   oper.Mult(_x, _y1); //MFEM Neohookean
+   oper.Mult(_x, _y1);
 
    double _y1_norm = _y1.Norml2();
+   cout<<"--- RESIDUAL CHECK ---"<<endl;
 
-   
-
-   /* for (size_t i = 0; i < _y1.Size(); i++)
-   {
-      cout<<"LHS(i) is: "<<_y1(i)<<endl;
-      cout<<"RHS(i) is: "<<rhs(i)<<endl;
-      _y1(i) -= rhs(i);
-      cout<<"res(i) is: "<<_y1(i)<<endl;
-      cout<<endl;
-
-   } */
-
-   /* for (size_t i = 0; i < u_ess_tdof.Size(); i++)
-   {
-      //_y1[u_ess_tdof[i]] -= rhs[u_ess_tdof[i]];
-      if (abs(_y1[u_ess_tdof[i]] - rhs[u_ess_tdof[i]]) > 0.001)
-      {
-      cout<<"LHS(i) is: "<<_y1[u_ess_tdof[i]]<<endl;
-      cout<<"RHS(i) is: "<<rhs[u_ess_tdof[i]]<<endl;
-      cout<<"res(i) is: "<<_y1[u_ess_tdof[i]] - rhs[u_ess_tdof[i]]<<endl;
-      cout<<"i is: "<<u_ess_tdof[i]<<endl;
-      cout<<"ui is: "<<u(u_ess_tdof[i])<<endl;
-      cout<<endl;
-
-      }
-      
-   }
- */
     for (size_t i = 0; i < _y1.Size(); i++)
    {
       const double res = _y1(i) - rhs(i);
-      /* if (abs(res) > 0.001)
+      if (abs(res) > 0.1)
       {
+      cout<<"High residual, res(i), is: "<<res<<endl;
+      cout<<"Index, i is: "<<i<<endl;
+      cout<<"u(i) is: "<<u(i)<<endl;
       cout<<"LHS(i) is: "<<_y1(i)<<endl;
       cout<<"RHS(i) is: "<<rhs(i)<<endl;
-      cout<<"res(i) is: "<<res<<endl;
-      cout<<"i is: "<<i<<endl;
-      cout<<"ui is: "<<u(i)<<endl;
       cout<<endl;
-      } */
+      }
       _y1(i) -= rhs(i);
    } 
 
-   /* cout<<"(_y1 - rhs).Norml2() is: "<<_y1.Norml2()<<endl;
-   cout<<"_y1_norm is: "<<_y1_norm<<endl;
-   cout<<"rel_err is: "<<_y1.Norml2()/_y1_norm<<endl;
- */
+   cout<<"||LHS - RHS|| is: "<<_y1.Norml2()<<endl;
+   cout<<"RHS norm is: "<<_y1_norm<<endl;
+   cout<<"Relative error is: "<<_y1.Norml2()/_y1_norm<<endl;
+   cout<<endl;
+   cout<<endl;
+
+   }
+
 if (solve)
 {
    int maxIter(10000);
    double rtol(1.e-10);
    double atol(1.e-10);
 
-   // MINRESSolver J_solver;
    MUMPSSolver J_solver(MPI_COMM_SELF);
    J_solver.SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
    J_solver.SetPrintLevel(-1);
-   //GMRESSolver J_solver;
-   /* J_solver.SetAbsTol(atol);
-   J_solver.SetRelTol(rtol);
-   J_solver.SetMaxIter(maxIter);
-   J_solver.SetPrintLevel(-1); */
 
    NewtonSolver newton_solver;
    newton_solver.iterative_mode = true;
@@ -377,16 +359,6 @@ if (solve)
    newton_solver.Mult(rhs, x);
 }
 
-/* for (size_t i = 0; i < _x.Size(); i++)
-   {
-      cout<<"_x(i) is: "<<_x(i)<<endl;
-      cout<<"x(i) is: "<<x(i)<<endl;
-      cout<<"u(i) is: "<<u(i)<<endl;
-      _x(i) -= x(i);
-      cout<<"res(i) is: "<<_x(i)<<endl;
-      cout<<endl;
-   }
-    */
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
    for (int i=0; i < Geometry::NumGeom; ++i)
@@ -402,13 +374,15 @@ if (solve)
 
    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
 
-/* 
+
    // 15. Save data in the ParaView format
+   if (visualization)
+   {
    ParaViewDataCollection paraview_dc("nlelast_mms_paraview", mesh);
    paraview_dc.SetLevelsOfDetail(order);
-   paraview_dc.RegisterField("velocity",&u);
-   paraview_dc.RegisterField("pressure",&p);
-   paraview_dc.Save(); */
+   paraview_dc.RegisterField("u",&u);
+   paraview_dc.Save();
+   }
 
    // 17. Free the used memory.
    delete gform;
