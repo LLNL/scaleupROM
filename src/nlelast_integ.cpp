@@ -7,134 +7,6 @@
 using namespace std;
 namespace mfem
 {
-/* 
-double StVenantKirchhoffModel::EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip)
-{const double wL = w * c_lambda->Eval(Ttr, ip);
-const double wM = w * c_mu->Eval(Ttr, ip);
-return wL + 2.0*wM;
-};
-
-void StVenantKirchhoffModel::EvalP(const DenseMatrix &F, const double lambda, const double mu, DenseMatrix &P)
-{ 
-   const int dim = F.NumCols();
-
-   // Get Green-Lagrange strain tensor 1/2 (F'F - I)
-   E.SetSize(dim);
-   E = 0.0;
-   MultAtB(F, F, E);
-   for (size_t i = 0; i < dim; i++)
-   E(i,i) -= 1.0;
-   E*=0.5;
-
-   // Assemble Second Piola Stress tensor
-   S.SetSize(dim);
-   S = 0.0;
-   double temp = 0.0;
-   for (size_t i = 0; i < dim; i++)
-   temp += E(i,i);
-
-   for (size_t i = 0; i < dim; i++)
-   S(i,i) += temp * lambda;
-   S.Add(2*mu, E);
-
-   // Compute First Piola Stress tensor.
-   P = 0.0;
-   Mult(F, S, P);
-};
-
-StVenantKirchhoffModel::EvalDfmat(DS)
-{
-   // This is just a simple one
-   // \frac{\partial \mathbf{F}_{i j}}{\partial \mathbf{w}_{m n}}=\delta_{i n}(\mathrm{DS})_{m j}
-};
-
-StVenantKirchhoffModel::EvalDamat(Dfmat)
-{
-   // 
-};
-
-void StVenantKirchhoffModel::EvalDmat(const DenseMatrix &w, DenseMatrix &DS, DenseMatrix &Dmat){
-const int dim = F.NumCols();
-
-   // Get Green-Lagrange strain tensor 1/2 (F'F - I)
-   E.SetSize(dim);
-   E = 0.0;
-   MultAtB(F, F, E);
-   for (size_t i = 0; i < dim; i++)
-   E(i,i) -= 1.0;
-   E*=0.5;
-
-   // Assemble Second Piola Stress tensor
-   S.SetSize(dim);
-   S = 0.0;
-   double temp = 0.0;
-   for (size_t i = 0; i < dim; i++)
-   temp += E(i,i);
-
-   for (size_t i = 0; i < dim; i++)
-   S(i,i) += temp * lambda;
-   S.Add(2*mu, E);
-
-   // Call this function to get the partials of F wrt w
-   EvalDfmat();
-
-   // Call this function to get the partials of S wrt w
-   EvalDamat(Dfmat);
-
-   for (size_t i = 0; i < dim; i++) 
-      {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int P_ij = j * dim + i;
-
-            for (size_t m = 0; m < dof; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to w
-            {
-               const int w_mn = n * dof + m;
-
-               for (size_t k = 0; k < count; k++) // Sum over k
-               {
-                  // Get fik index
-                  Dmat(P_ij, w_mn) += Dfmat(f_ik, w_mn) * S(k, j) + F(i, k) * Damat(a_kj, w_mn)
-               }
-               
-            }
-         }
-      }
-}
-
-   
-};
-
-void StVenantKirchhoffModel::AssembleH(const DenseMatrix &Dmat, const DenseMatrix &DS, const double w, DenseMatrix &elmat)
-{
-      const int dof = DS.NumRows();
-      const int dim = DS.NumCols();
-
-      //Assemble elmat, can be refactored out
-      for (size_t i = 0; i < dof; i++) 
-      {
-         for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
-         {
-            const int ij = j * dof + i;
-
-            for (size_t m = 0; m < dof; m++) 
-            for (size_t n = 0; n < dim; n++) // Looping over derivatives with respect to w
-            {
-               const int mn = n * dof + m;
-               double temp = 0.0;
-               for (size_t k = 0; k < dim; k++)
-               {
-                  const int S_jk = k * dim + j;
-                  temp += Dmat(S_jk, mn) * w * DS(i,k);
-               }
-               elmat(ij, mn) += temp;
-               
-            }
-         }
-      }
-       }; 
- */
 double LinElastMaterialModel::EvalW(const DenseMatrix &J) const
 {MFEM_ABORT("TODO")};
 
@@ -274,11 +146,6 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     double bc = a*(J*J)/dim;
     double b  = bc - K*sJ*(sJ - 1.0);
     double c  = 2.0*bc/dim + K*sJ*(2.0*sJ - 1.0);
-    //cout<<"Jnorm = "<<J.FNorm()<<endl;
-    //cout<<"-2.0/dim = "<<-2.0/dim<<endl;
-    //cout<<"mu = "<<mu<<endl;
-    //cout<<"a = "<<a<<endl;
-    //cout<<"dJ is: "<<dJ<<endl;
 
     Z.SetSize(dim);
      G.SetSize(dof, dim);
@@ -290,31 +157,7 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
     MultABt(DS, J, C); // C = DS J^t
     MultABt(DS, Z, G); // G = DS J^{-1}
  
-    /* a *= weight;
-    b *= weight;
-    c *= weight; */
     const double a2 = a * (-2.0/dim);
-
-
-        /*  if (isnan(a))
-         {
-            cout<<"Nan a"<<endl;
-         }
-
-         if (isnan(a2))
-         {
-            cout<<"Nan a2"<<endl;
-         }
- */
-         /* if (isnan(b))
-         {
-            cout<<"Nan b"<<endl;
-         }
-
-         if (isnan(c))
-         {
-            cout<<"Nan c"<<endl;
-         } */
 
    for (size_t i = 0; i < dim; i++) 
    for (size_t j = 0; j < dim; j++) // Looping over each entry in residual
@@ -329,18 +172,12 @@ void NeoHookeanHypModel::EvalDmat(const int dim, const int dof, const DenseMatri
          const double s1 = (i==n) ?  a * DS(m,j) : 0.0;
          const double s2 = a2 * (J(i,j)*G(m,n) + Z(i,j)*C(m,n))
                + b*Z(n,j)*G(m,i) + c*Z(i,j)*G(m,n);
-         //double s2 = 0.0;
 
-/* cout<<"Dmat.Width() is: "<<Dmat.Width()<<endl;        
-cout<<"Dmat.Height() is: "<<Dmat.Height()<<endl;        
- cout<<"S_ij is: "<<S_ij<<endl;
-         cout<<"U_mn is: "<<U_mn<<endl; */
          Dmat(S_ij, U_mn) = s1 + s2;       
       }
    }
 
 }
-
 
 void _PrintMatrix(const DenseMatrix &mat,
                  const std::string &filename)
@@ -381,7 +218,6 @@ void DGHyperelasticNLFIntegrator::AssembleJmat(
        for (int jdof = 0, j = jo; jdof < col_ndofs; ++jdof, ++j)
        {
           const double sj = jmatcoef * col_shape(jdof); 
-          //const double sj = jmatcoef;
           for (int i = max(io,j), idof = i - io; idof < row_ndofs; ++idof, ++i)
           {
              jmat(i, j) += row_shape(idof) * sj;
@@ -402,34 +238,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
-   //cout<<"ndofs2 is: "<<ndofs2<<endl;
-   /* if (ndofs2)
-   {
-   MFEM_ABORT("testst");
-   } */
-   
-   // TODO: Assert ndofs1 == ndofs2
-
    Vector elfun_copy(elfun); // FIXME: How to avoid this?
-   Vector el0(elfun);// The initial deformation FIXME: This is only for the analytical solution in MMS
-   /* for (size_t i = 0; i < nvdofs; i++)
-   {
-      double _x1 = 0.5 * (sqrt(4.0 * elfun(i) + 1.0) - 1.0);
-      double _x2 = 0.5 * (-sqrt(4.0 * elfun(i) + 1.0) - 1.0);
-      el0(i) = _x1;
-      /* cout<<"_x1  is: "<<_x1 <<endl;
-      cout<<"_x2 is: "<<_x2<<endl;
-      if (elfun(i) != _x1 + pow(_x1, 2.0))
-      {
-         cout<< "oh no!"<<endl;
-      }
-       
-      cout<<"el0(i) is: "<<el0(i)<<endl;
-      cout<<"elfun(i) is: "<<elfun(i)<<endl;
-      //cout<<endl;
-   } */
-
-   //MFEM_ABORT("te");
 
     nor.SetSize(dim);
     Jrt.SetSize(dim);
@@ -452,7 +261,9 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
     DSh1.SetSize(ndofs1, dim);
     DS1.SetSize(ndofs1, dim);
     Jpt1.SetSize(dim);
+    adjJ1.SetSize(dim);
     P1.SetSize(dim);
+    tau1.SetSize(dim);
 
     if (ndofs2)
     {
@@ -462,8 +273,10 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       PMatI2.UseExternalData(elfun2.GetData(), ndofs2, dim);
       DSh2.SetSize(ndofs2, dim);
       DS2.SetSize(ndofs2, dim);
+      adjJ2.SetSize(dim);
       Jpt2.SetSize(dim);
       P2.SetSize(dim);
+   tau2.SetSize(dim);
     }
     
    const IntegrationRule *ir = IntRule;
@@ -473,14 +286,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
       ir = &IntRules.Get(Trans.GetGeometryType(), intorder);
    }
 
-   // TODO: Add to class
-   Vector tau1(dim);
-   Vector tau2(dim);
-
-   Vector big_row1(dim*ndofs1);
-   Vector big_row2(dim*ndofs2);
-
-   //for (int i = 0; i < 1; i++)
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
@@ -511,14 +316,12 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
-      DenseMatrix adjJ2(dim);
       CalcAdjugate(Trans.Elem2->Jacobian(), adjJ2);
       Mult(DSh2, adjJ2, DS2);
       MultAtB(PMatI2, DS2, Jpt2);
       model->SetMatParam(Trans, eip2);
 
       model->EvalP(Jpt2, P2);
-
 
       double w2 = w / Trans.Elem2->Weight();
       wLM = model->EvalDGWeight(w2, *Trans.Elem2, eip2);
@@ -528,7 +331,6 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
-      DenseMatrix adjJ1(dim);
       CalcAdjugate(Trans.Elem1->Jacobian(), adjJ1);
       Mult(DSh1, adjJ1, DS1);
       MultAtB(PMatI1, DS1, Jpt1);
@@ -587,26 +389,13 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
        {
             for (size_t j = 0; j < nvdofs; j++)
          {
-            //elvect(i) -= jmat(i,j) * (elfun(j) - el0(j));
             elvect(i) -= jmat(i,j) * (elfun(j));
-            
-            //cout<<"elfun(j) - el0(j) is: "<<elfun(j) - el0(j)<<endl;
-         }
+                     }
        }
-
-       /* for (int im = 0, i = 0; im < dim; ++im)
-      {
-         for (int idof = 0; idof < ndofs1; ++idof, ++i)
-         {
-         elvect(i) -= jmatcoef* elfun(i) *shape1(idof);
-         }
-      } 
- */
        
     }
 
       if (ndofs2 == 0) {continue;}
-       
 
       // (1,2) block
       for (int im = 0, i = 0; im < dim; ++im)
@@ -637,9 +426,7 @@ void DGHyperelasticNLFIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       }
 
-      
    elvect *= -1.0;
-
 }
 
 void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
@@ -647,31 +434,20 @@ void DGHyperelasticNLFIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                               FaceElementTransformations &Tr,
                               const Vector &elfun, DenseMatrix &elmat){
 
-                                 //cout<<"in face grad"<<endl;
 const int dim = el1.GetDim();
    const int ndofs1 = el1.GetDof();
    const int ndofs2 = (Tr.Elem2No >= 0) ? el2.GetDof() : 0;
-                                 //cout<<"1"<<endl;
-
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
    Vector elfun_copy(elfun); // FIXME: How to avoid this
     nor.SetSize(dim);
     Jrt.SetSize(dim);
-   //cout<<"2"<<endl;
-   //cout<<"nvdofs: "<<nvdofs<<endl;
-   //cout<<"elmat(0): "<<elmat(0,0)<<endl;
-   //cout<<"elmat.Size: "<<elmat.Size()<<endl;
-   //cout<<"&elmat: "<< &elmat<<endl;
 
    elmat.SetSize(nvdofs);
-   //cout<<"postsetsize"<<&nvdofs<<endl;
 
    elmat = 0.0;
-   //cout<<"pretrans"<<endl;
    model->SetTransformation(Tr);
-   //cout<<"posttrans"<<endl;
 
    const bool kappa_is_nonzero = (kappa != 0.0);
     if (kappa_is_nonzero)
@@ -687,6 +463,11 @@ const int dim = el1.GetDim();
     DS1.SetSize(ndofs1, dim);
     Jpt1.SetSize(dim);
     P1.SetSize(dim);
+    tau1.SetSize(dim);
+    wnor1.SetSize(dim);
+    adjJ1.SetSize(dim);
+    Dmat1.SetSize(dim * dim, dim*ndofs1);
+    Dmat1 = 0.0;
 
     if (ndofs2)
     {
@@ -697,38 +478,19 @@ const int dim = el1.GetDim();
       DS2.SetSize(ndofs2, dim);
       Jpt2.SetSize(dim);
       P2.SetSize(dim);
+      tau2.SetSize(dim);
+      wnor2.SetSize(dim);
+      adjJ2.SetSize(dim);
+      Dmat2.SetSize(dim * dim, dim*ndofs2);
+      Dmat2 = 0.0;
     }
     
-
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
       int intorder = 2*el1.GetOrder();
       ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
    }
-
-   // TODO: Add to class
-   Vector tau1(dim);
-   Vector tau2(dim);
-
-   Vector wnor1(dim);
-   Vector wnor2(dim);
-
-   Vector big_row1(dim*ndofs1);
-   Vector big_row2(dim*ndofs2);
-
-   DenseMatrix Dmat1(dim * dim,dim*ndofs1);
-   DenseMatrix Dmat2(dim * dim,dim*ndofs2);
-
-   Dmat1 = 0.0;
-   Dmat2 = 0.0;
-
-   DenseMatrix adjJ2(dim);
-   
-   DenseMatrix dshape1_ps(ndofs1, dim);
-   DenseMatrix dshape2_ps(ndofs2, dim);
-
-   //cout<<"pre loop"<<endl;
 
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
@@ -759,19 +521,15 @@ const int dim = el1.GetDim();
       w /= 2.0;
       el2.CalcShape(eip2, shape2);
       el2.CalcDShape(eip2, DSh2);
-      //Mult(DSh2, Jrt, DS2);
 
       CalcAdjugate(Tr.Elem2->Jacobian(), adjJ2);
       Mult(DSh2, adjJ2, DS2);
 
-      //model->EvalDmat(dim, ndofs1, eip2, Tr, DS2, Dmat2);
       model->SetMatParam(Tr,eip2);
 
-      //model->EvalDmat(dim, ndofs2, dshape2_ps, Dmat2);
       MultAtB(PMatI2, DS2, Jpt2);
 
       model->EvalDmat(dim, ndofs2, DS2, Jpt2, Dmat2);
-      //model->EvalDmat(dim, ndofs2, eip2, Tr, dshape2_ps, Dmat2);
       double w2 = w / Tr.Elem2->Weight();
       wLM = model->EvalDGWeight(w2, *Tr.Elem2, eip2);
       wnor2.Set(w2,nor);
@@ -779,22 +537,16 @@ const int dim = el1.GetDim();
 
       el1.CalcShape(eip1, shape1);
       el1.CalcDShape(eip1, DSh1);
-      //Mult(DSh1, Jrt, DS1);
 
       double w1 = w / Tr.Elem1->Weight();
       wLM += model->EvalDGWeight(w1, *Tr.Elem1, eip1);
 
-      // Temporary stuff
-      DenseMatrix adjJ1(dim);
       CalcAdjugate(Tr.Elem1->Jacobian(), adjJ1);
       Mult(DSh1, adjJ1, DS1);
 
-      //model->EvalDmat(dim, ndofs1, eip1, Tr, dshape1_ps, Dmat1);
       model->SetMatParam(Tr,eip1);
       MultAtB(PMatI1, DS1, Jpt1);
-      //cout<<"preDmat"<<endl;
       model->EvalDmat(dim, ndofs1, DS1, Jpt1, Dmat1);
-      //cout<<"postDmat"<<endl;
 
       const double jmatcoef = kappa * (nor*nor) * wLM;
 
@@ -813,8 +565,6 @@ const int dim = el1.GetDim();
 
        // (2,2) block
       AssembleBlock(dim, ndofs2, ndofs2, dim*ndofs1, dim*ndofs1, shape2, shape2,jmatcoef,wnor2, Dmat2, elmat,jmat);
-      //cout<<"Block assemblies"<<endl;
-
    }
 
    // elmat := -elmat + jmat
@@ -832,7 +582,6 @@ const int dim = el1.GetDim();
           elmat(i,i) += jmat(i,i);
        } 
     }
-      //cout<<"jmatt"<<endl;
          
    };
 
@@ -956,10 +705,7 @@ void HyperelasticNLFIntegratorHR::AssembleElementGrad(const FiniteElement &el,
        model->SetMatParam(Ttr,ip);
 
        model->EvalDmat(dim, dof, DS, Jpt, Dmat);
-       //cout<<"before asshemble"<<endl;
        AssembleH(dim, dof, ip.weight * Ttr.Weight(), DS, elmat);
-       //cout<<"after asshemble"<<endl;
-
     }
                                     };
 
@@ -982,18 +728,8 @@ void HyperelasticNLFIntegratorHR::AssembleH(const int dim, const int dof, const 
                {
                   const int S_jk = k * dim + j;
                   temp += Dmat(S_jk, mn) * w * J(i,k);
-                  /* if (isnan(Dmat(S_jk, mn)))
-               {
-                  cout<<"Not good"<<endl;
-               } */
                }
                elmat(ij, mn) += temp;
-               /* if (isnan(elmat(ij, mn)))
-               {
-                  cout<<"Oh no!"<<endl;
-               } */
-               
-               
             }
          }
       }
@@ -1012,17 +748,6 @@ void DGHyperelasticDirichletLFIntegrator::AssembleRHSElementVect(const FiniteEle
                                         FaceElementTransformations &Tr,
                                         Vector &elvect){
 MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
- 
- #ifdef MFEM_THREAD_SAFE
-    Vector shape;
-    DenseMatrix dshape;
-    DenseMatrix adjJ;
-    DenseMatrix dshape_ps;
-    Vector nor;
-    Vector dshape_dn;
-    Vector dshape_du;
-    Vector u_dir;
- #endif
  
     const int dim = el.GetDim();
     const int ndofs = el.GetDof();
@@ -1054,26 +779,6 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
  
        // Evaluate the Dirichlet b.c. using the face transformation.
        uD.Eval(u_dir, Tr, ip);
-       double _x[3];
-         Vector _transip(_x, 3);
- 
-      Tr.Transform(ip, _transip);
-
-      /* for (size_t i = 0; i < _transip.Size(); i++)
-       {
-         cout<<"_transip[i] is: "<<_transip[i]<<endl;
-       }
-
-       for (size_t i = 0; i < u_dir.Size(); i++)
-       {
-         cout<<"u_dir[i] is: "<<u_dir[i]<<endl;
-       }
-
-       cout<<endl<<endl; */
-       
-
-       //MFEM_ABORT("test");
- 
        el.CalcShape(eip, shape);
  
        if (dim == 1)
@@ -1091,8 +796,6 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
       const double w = ip.weight / Tr.Elem1->Weight();
       wLM = model->EvalDGWeight(w, *Tr.Elem1, eip);
       jcoef = kappa * wLM * (nor*nor);
-      //jcoef = -1.0 * w * (nor*nor); //Temp
-      //cout<<"(nor*nor) is: "<<(nor*nor)<<endl;
  
        for (int im = 0, i = 0; im < dim; ++im)
        {
@@ -1103,10 +806,8 @@ MFEM_ASSERT(Tr.Elem2No < 0, "interior boundary is not supported");
           }
        }
 
-
     }
 
-    //cout<<"elvect.l2Norm() is: "<<elvect.Norml2()<<endl;
 };
 
 } // namespace mfem

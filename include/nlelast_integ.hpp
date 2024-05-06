@@ -58,30 +58,6 @@ namespace mfem
 
    };
 
-   class StVenantKirchhoffModel //: public DGHyperelasticModel
-   {
-   protected:
-      mutable double mu, lambda;
-      Coefficient *c_mu, *c_lambda;
-      ElementTransformation *Ttr;
-      DenseMatrix E, S;
-
-   public:
-      StVenantKirchhoffModel(double mu_, double lambda_)
-          : mu(mu_), lambda(lambda_) { c_mu = new ConstantCoefficient(mu), c_lambda = new ConstantCoefficient(lambda); }
-
-      void SetTransformation(ElementTransformation &Ttr_) { Ttr = &Ttr_; }
-      double EvalW(const DenseMatrix &J);
-
-      double EvalDGWeight(const double w, ElementTransformation &Ttr, const IntegrationPoint &ip);
-
-      void EvalP(const DenseMatrix &Jpt, const double lambda, const double mu, DenseMatrix &P);
-
-      void EvalDmat(const DenseMatrix &w, DenseMatrix &DS, DenseMatrix &Dmat);
-
-      void AssembleH(const DenseMatrix &Dmat, const DenseMatrix &DS, const double w, DenseMatrix &elmat);
-   };
-
    class NeoHookeanHypModel : public DGHyperelasticModel
    {
    protected:
@@ -130,30 +106,18 @@ namespace mfem
       DGHyperelasticModel *model;
       Coefficient *lambda, *mu;
       double alpha, kappa; // vector) at the integration point in the reference space
-#ifndef MFEM_THREAD_SAFE
       Vector elvect1, elvect2;
       Vector elfun1, elfun2;
 
       DenseMatrix Jrt;
-      DenseMatrix PMatI1, PMatO1, NorMat1, DSh1, DS1, Jpt1, P1;
-      DenseMatrix PMatI2, PMatO2, NorMat2, DSh2, DS2, Jpt2, P2;
-      Vector shape1, shape2;
-      // values of derivatives of all scalar basis functions for one component
-      // of u (which is a vector) at the integration point in the reference space
-      DenseMatrix dshape1, dshape2;
-      // Adjugate of the Jacobian of the transformation: adjJ = det(J) J^{-1}
-      DenseMatrix adjJ;
-      // gradient of shape functions in the real (physical, not reference)
-      // coordinates, scaled by det(J):
-      //    dshape_ps(jdof,jm) = sum_{t} adjJ(t,jm)*dshape(jdof,t)
-      DenseMatrix dshape1_ps, dshape2_ps;
+      DenseMatrix PMatI1, PMatO1, DSh1, DS1, Jpt1, adjJ1, P1, Dmat1;
+      DenseMatrix PMatI2, PMatO2, DSh2, DS2, Jpt2, adjJ2, P2, Dmat2;
+      Vector shape1, tau1,wnor1;
+      Vector shape2, tau2,wnor2;
+      
       Vector nor;                      // nor = |weight(J_face)| n
-      Vector nL1, nL2;                 // nL1 = (lambda1 * ip.weight / detJ1) nor
-      Vector nM1, nM2;                 // nM1 = (mu1     * ip.weight / detJ1) nor
-      Vector dshape1_dnM, dshape2_dnM; // dshape1_dnM = dshape1_ps . nM1
       // 'jmat' corresponds to the term: kappa <h^{-1} {lambda + 2 mu} [u], [v]>
       DenseMatrix jmat;
-#endif
 
       static void AssembleBlock(
           const int dim, const int row_ndofs, const int col_ndofs,
@@ -213,17 +177,7 @@ namespace mfem
       DGHyperelasticModel *model;
       Coefficient *lambda, *mu;
       double alpha, kappa;
-
-#ifndef MFEM_THREAD_SAFE
-      Vector shape;
-      DenseMatrix dshape;
-      DenseMatrix adjJ;
-      DenseMatrix dshape_ps;
-      Vector nor;
-      Vector dshape_dn;
-      Vector dshape_du;
-      Vector u_dir;
-#endif
+      Vector shape, nor, u_dir;
 
    public:
       DGHyperelasticDirichletLFIntegrator(VectorCoefficient &uD_,
