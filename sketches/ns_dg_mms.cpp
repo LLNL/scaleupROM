@@ -17,7 +17,7 @@
 using namespace std;
 using namespace mfem;
 
-static double nu = 1.0;
+static double nu = 0.1;
 static double zeta = 1.0;
 static bool direct_solve = true;
 
@@ -367,15 +367,16 @@ int main(int argc, char *argv[])
    // nVarf->AddDomainIntegrator(nlc_nlfi1);
    // nVarf->AddDomainIntegrator(nlc_nlfi2);
    // auto *nlc_nlfi1 = new TemamTrilinearFormIntegrator(zeta_coeff);
-   auto *nlc_nlfi1 = new IncompressibleInviscidFluxNLFIntegrator(minus_zeta);
+
+   auto *nlc_nlfi1 = new VectorConvectionTrilinearFormIntegrator(zeta_coeff);
    nlc_nlfi1->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi1);
-   if (use_dg)
-      nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff));
+   // if (use_dg)
+   //    nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff));
       // nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
    // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
-   nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff), u_ess_attr);
-   nVarf->AddBdrFaceIntegrator(new DGTraceIntegrator(ucoeff, 0.0, zeta), u_ess_attr);
+   // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff), u_ess_attr);
+   // nVarf->AddBdrFaceIntegrator(new DGTraceIntegrator(ucoeff, 0.0, zeta), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
 
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
