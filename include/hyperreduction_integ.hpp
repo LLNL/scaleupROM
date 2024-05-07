@@ -158,6 +158,71 @@ public:
                                      const Vector &x, DenseMatrix &jac) override;
 };
 
+/*
+   < \nabla v, uu > domain integrator
+*/
+class IncompressibleInviscidFluxNLFIntegrator :
+   public HyperReductionIntegrator
+{
+private:
+   int dim;
+   Coefficient *Q{};
+   DenseMatrix dshape, dshapex, EF, uu, ELV, elmat_comp;
+   Vector shape;
+
+public:
+   IncompressibleInviscidFluxNLFIntegrator(Coefficient &q)
+      : HyperReductionIntegrator(true), Q(&q) { }
+
+   IncompressibleInviscidFluxNLFIntegrator() = default;
+
+   static const IntegrationRule &GetRule(const FiniteElement &fe,
+                                         ElementTransformation &T);
+
+   void AssembleElementVector(const FiniteElement &el,
+                              ElementTransformation &trans,
+                              const Vector &elfun,
+                              Vector &elvect) override;
+
+   void AssembleElementGrad(const FiniteElement &el,
+                           ElementTransformation &trans,
+                           const Vector &elfun,
+                           DenseMatrix &elmat) override;
+};
+
+/*
+   Interior face, interface integrator
+   < [v], {uu \dot n} + \Lambda * [u] >
+   \Lambda = max( | u- \dot n |, | u+ \dot n | )
+*/
+class DGLaxFriedrichsFluxIntegrator : public HyperReductionIntegrator
+{
+private:
+   int dim, ndofs1, ndofs2, nvdofs;
+   double w, un1, un2, un;
+   Coefficient *Q{};
+
+   Vector nor, flux, shape1, shape2, u1, u2;
+   DenseMatrix udof1, udof2, elv1, elv2;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
+public:
+   DGLaxFriedrichsFluxIntegrator(Coefficient &q)
+      : HyperReductionIntegrator(true), Q(&q) {}
+
+   void AssembleFaceVector(const FiniteElement &el1,
+                           const FiniteElement &el2,
+                           FaceElementTransformations &Tr,
+                           const Vector &elfun, Vector &elvect) override;
+
+   /// @brief Assemble the local action of the gradient of the
+   /// NonlinearFormIntegrator resulting from a face integral term.
+    void AssembleFaceGrad(const FiniteElement &el1,
+                           const FiniteElement &el2,
+                           FaceElementTransformations &Tr,
+                           const Vector &elfun, DenseMatrix &elmat) override;
+
+};
+
 } // namespace mfem
 
 #endif

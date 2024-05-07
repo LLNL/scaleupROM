@@ -11,7 +11,7 @@
 namespace mfem
 {
 
-   class InterfaceNonlinearFormIntegrator : virtual public HyperReductionIntegrator
+class InterfaceNonlinearFormIntegrator : virtual public HyperReductionIntegrator
 {
 protected:
   InterfaceNonlinearFormIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)

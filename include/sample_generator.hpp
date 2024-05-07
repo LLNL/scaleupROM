@@ -96,11 +96,18 @@ public:
 
    void ReportStatus(const int &sample_idx);
 
-   // Perform SVD over snapshot for basis_tag. Calculate the coverage for ref_num_basis (optional).
-   void FormReducedBasis(const std::string &basis_prefix,
+   /*
+      Collect snapshot matrices from the file list to the specified basis tag.
+   */
+   void CollectSnapshots(const std::string &basis_prefix,
                          const std::string &basis_tag,
-                         const std::vector<std::string> &file_list,
-                         const int &ref_num_basis = -1);
+                         const std::vector<std::string> &file_list);
+   /*
+      Perform SVD over snapshot for basis_tag.
+      Calculate the energy fraction for num_basis.
+      CollectSnapshots must be executed before this.
+   */
+   void FormReducedBasis(const std::string &basis_prefix);
 
 private:
    const int GetDimFromSnapshots(const std::string &filename);

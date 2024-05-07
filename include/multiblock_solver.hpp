@@ -183,36 +183,36 @@ public:
    virtual void AssembleInterfaceMatrices() = 0;
 
    // Global ROM operator Loading.
-   virtual void SaveROMOperator(const std::string input_prefix="")
-   { rom_handler->SaveOperator(input_prefix); }
-   virtual void LoadROMOperatorFromFile(const std::string input_prefix="")
-   { rom_handler->LoadOperatorFromFile(input_prefix); }
+   virtual void SaveROMOperator(const std::string filename)
+   { rom_handler->SaveOperator(filename); }
+   virtual void LoadROMOperatorFromFile(const std::string filename)
+   { rom_handler->LoadOperatorFromFile(filename); }
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
-   void AllocateROMElements();
+   virtual void AllocateROMLinElems();
 
-   void BuildROMElements();
-   virtual void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
-   virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   void BuildROMLinElems();
+   virtual void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
    // TODO(kevin): part of this can be transferred to InterfaceForm.
-   virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
 
-   void SaveROMElements(const std::string &filename);
+   void SaveROMLinElems(const std::string &filename);
    // Save ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void SaveCompBdrROMElement(hid_t &file_id);
-   void SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   void SaveInterfaceROMElement(hid_t &file_id);
+   virtual void SaveCompBdrROMLinElems(hid_t &file_id);
+   void SaveBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx);
+   void SaveItfaceROMLinElems(hid_t &file_id);
 
-   void LoadROMElements(const std::string &filename);
+   void LoadROMLinElems(const std::string &filename);
    // Load ROM Elements in a hdf5-format file specified with file_id.
    // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void LoadCompBdrROMElement(hid_t &file_id);
-   void LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx);
-   void LoadInterfaceROMElement(hid_t &file_id);
+   virtual void LoadCompBdrROMLinElems(hid_t &file_id);
+   void LoadBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx);
+   void LoadItfaceROMLinElems(hid_t &file_id);
 
-   void AssembleROM();
+   void AssembleROMMat();
 
    virtual bool Solve() = 0;
 
@@ -225,12 +225,31 @@ public:
    void LoadSolution(const std::string &filename);
    void CopySolution(BlockVector *input_sol);
 
-   virtual void TrainEQP(SampleGenerator *sample_generator)
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
-   virtual void SaveEQP()
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
-   virtual void LoadEQP()
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQP!\n"); }
+   virtual void AllocateROMTensorElems()
+   { mfem_error("Abstract method MultiBlockSolver::AllocateROMTensorElems!\n"); }
+   virtual void BuildROMTensorElems()
+   { mfem_error("Abstract method MultiBlockSolver::BuildROMTensorElems!\n"); }
+   virtual void SaveROMTensorElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::SaveROMTensorElems!\n"); }
+   virtual void LoadROMTensorElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::LoadROMTensorElems!\n"); }
+   virtual void AssembleROMTensorOper()
+   { mfem_error("Abstract method MultiBlockSolver::AssembleROMTensorOper!\n"); }
+
+   virtual void AllocateROMEQPElems()
+   { mfem_error("Abstract method MultiBlockSolver::AllocateROMEQPElems!\n"); }
+   virtual void TrainEQPElems(SampleGenerator *sample_generator)
+   { mfem_error("Abstract method MultiBlockSolver::TrainEQPElems!\n"); }
+   virtual void SaveEQPElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::SaveEQP!\n"); }
+   virtual void LoadEQPElems(const std::string &filename)
+   { mfem_error("Abstract method MultiBlockSolver::LoadEQP!\n"); }
+   virtual void AssembleROMEQPOper()
+   { mfem_error("Abstract method MultiBlockSolver::AssembleROMEQPOper!\n"); }
+
+   void AllocateROMNlinElems();
+   void LoadROMNlinElems(const std::string &input_prefix);
+   void AssembleROMNlinOper();
 
    void InitROMHandler();
    void GetBasisTags(std::vector<std::string> &basis_tags);

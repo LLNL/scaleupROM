@@ -186,8 +186,8 @@ public:
    virtual void Solve(BlockVector* U) = 0;
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
 
-   virtual void SaveOperator(const std::string input_prefix="") = 0;
-   virtual void LoadOperatorFromFile(const std::string input_prefix="") = 0;
+   virtual void SaveOperator(const std::string filename) = 0;
+   virtual void LoadOperatorFromFile(const std::string filename) = 0;
    virtual void SetRomMat(BlockMatrix *input_mat) = 0;
    virtual void SaveRomSystem(const std::string &input_prefix, const std::string type="mm") = 0;
 

@@ -264,7 +264,7 @@ void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fe
    }
 }
 
-void MultiBlockSolver::AllocateROMElements()
+void MultiBlockSolver::AllocateROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -290,7 +290,7 @@ void MultiBlockSolver::AllocateROMElements()
       port_mats[p] = new MatrixBlocks(2 * block_size, 2 * block_size);
 }
 
-void MultiBlockSolver::BuildROMElements()
+void MultiBlockSolver::BuildROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -301,18 +301,18 @@ void MultiBlockSolver::BuildROMElements()
    Array<FiniteElementSpace *> fes_comp;
    GetComponentFESpaces(fes_comp);
 
-   BuildCompROMElement(fes_comp);
+   BuildCompROMLinElems(fes_comp);
 
    // Boundary penalty matrices
-   BuildBdrROMElement(fes_comp);
+   BuildBdrROMLinElems(fes_comp);
 
    // Port penalty matrices
-   BuildInterfaceROMElement(fes_comp);
+   BuildItfaceROMLinElems(fes_comp);
 
    for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
 }
 
-void MultiBlockSolver::SaveROMElements(const std::string &filename)
+void MultiBlockSolver::SaveROMLinElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -323,17 +323,17 @@ void MultiBlockSolver::SaveROMElements(const std::string &filename)
    assert(file_id >= 0);
 
    // components + boundary
-   SaveCompBdrROMElement(file_id);
+   SaveCompBdrROMLinElems(file_id);
 
    // (reference) ports
-   SaveInterfaceROMElement(file_id);
+   SaveItfaceROMLinElems(file_id);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
    return;
 }
 
-void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
+void MultiBlockSolver::SaveCompBdrROMLinElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    hid_t grp_id;
@@ -360,7 +360,7 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
       hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp_mats[c]);
 
       // boundaries are saved for each component group.
-      SaveBdrROMElement(comp_grp_id, c);
+      SaveBdrROMLinElems(comp_grp_id, c);
 
       errf = H5Gclose(comp_grp_id);
       assert(errf >= 0);
@@ -371,7 +371,7 @@ void MultiBlockSolver::SaveCompBdrROMElement(hid_t &file_id)
    return;
 }
 
-void MultiBlockSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx)
+void MultiBlockSolver::SaveBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx)
 {
    assert(comp_grp_id >= 0);
    herr_t errf;
@@ -394,7 +394,7 @@ void MultiBlockSolver::SaveBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
    return;
 }
 
-void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
+void MultiBlockSolver::SaveItfaceROMLinElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    herr_t errf;
@@ -422,7 +422,7 @@ void MultiBlockSolver::SaveInterfaceROMElement(hid_t &file_id)
    return;
 }
 
-void MultiBlockSolver::LoadROMElements(const std::string &filename)
+void MultiBlockSolver::LoadROMLinElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -433,10 +433,10 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
    assert(file_id >= 0);
 
    // components
-   LoadCompBdrROMElement(file_id);
+   LoadCompBdrROMLinElems(file_id);
 
    // (reference) ports
-   LoadInterfaceROMElement(file_id);
+   LoadItfaceROMLinElems(file_id);
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
@@ -444,7 +444,7 @@ void MultiBlockSolver::LoadROMElements(const std::string &filename)
    return;
 }
 
-void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
+void MultiBlockSolver::LoadCompBdrROMLinElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    herr_t errf;
@@ -470,7 +470,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
       hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp_mats[c]);
 
       // boundary
-      LoadBdrROMElement(comp_grp_id, c);
+      LoadBdrROMLinElems(comp_grp_id, c);
 
       errf = H5Gclose(comp_grp_id);
       assert(errf >= 0);
@@ -480,7 +480,7 @@ void MultiBlockSolver::LoadCompBdrROMElement(hid_t &file_id)
    assert(errf >= 0);
 }
 
-void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx)
+void MultiBlockSolver::LoadBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx)
 {
    assert(comp_grp_id >= 0);
    herr_t errf;
@@ -504,7 +504,7 @@ void MultiBlockSolver::LoadBdrROMElement(hid_t &comp_grp_id, const int &comp_idx
    return;
 }
 
-void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
+void MultiBlockSolver::LoadItfaceROMLinElems(hid_t &file_id)
 {
    assert(file_id >= 0);
    herr_t errf;
@@ -531,7 +531,7 @@ void MultiBlockSolver::LoadInterfaceROMElement(hid_t &file_id)
    assert(errf >= 0);
 }
 
-void MultiBlockSolver::AssembleROM()
+void MultiBlockSolver::AssembleROMMat()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
@@ -832,24 +832,39 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
    *U = *input_sol;
 }
 
+void MultiBlockSolver::AllocateROMNlinElems()
+{
+   assert(nonlinear_mode);
+   assert(rom_handler);
+   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
+
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AllocateROMTensorElems();
+   else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
+}
+
+void MultiBlockSolver::LoadROMNlinElems(const std::string &input_prefix)
+{
+   assert(nonlinear_mode);
+   assert(rom_handler);
+   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
+
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    LoadROMTensorElems(input_prefix + ".h5");
+   else if (rom_nlin_mode == NonlinearHandling::EQP)  LoadEQPElems(input_prefix + ".eqp.h5");
+}
+
+void MultiBlockSolver::AssembleROMNlinOper()
+{
+   assert(nonlinear_mode);
+   assert(rom_handler);
+   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
+
+   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AssembleROMTensorOper();
+   else if (rom_nlin_mode == NonlinearHandling::EQP)  AssembleROMEQPOper();
+}
+
 void MultiBlockSolver::InitROMHandler()
 {
-   // std::string rom_handler_str = config.GetOption<std::string>("model_reduction/rom_handler_type", "base");
-
    rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-
-   // if (rom_handler_str == "base")
-   // {
-   //    rom_handler = new ROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-   // }
-   // else if (rom_handler_str == "mfem")
-   // {
-   //    rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
-   // }
-   // else
-   // {
-   //    mfem_error("Unknown ROM handler type!\n");
-   // }
 }
 
 void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)

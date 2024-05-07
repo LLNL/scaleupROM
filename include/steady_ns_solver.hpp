@@ -162,26 +162,26 @@ public:
    void SaveROMOperator(const std::string input_prefix="") override;
    void LoadROMOperatorFromFile(const std::string input_prefix="") override;
 
-   // Component-wise assembly
-   void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) override;
-   // virtual void BuildBdrROMElement(Array<FiniteElementSpace *> &fes_comp);
-   // virtual void BuildInterfaceROMElement(Array<FiniteElementSpace *> &fes_comp);
-   void SaveCompBdrROMElement(hid_t &file_id) override;
-   void LoadCompBdrROMElement(hid_t &file_id) override;
-
    bool Solve() override;
 
    void ProjectOperatorOnReducedBasis() override;
 
    void SolveROM() override;
 
-   void TrainEQP(SampleGenerator *sample_generator) override;
-   void SaveEQP() override;
-   void LoadEQP() override;
+   void AllocateROMTensorElems() override;
+   void BuildROMTensorElems() override;
+   void SaveROMTensorElems(const std::string &filename) override;
+   void LoadROMTensorElems(const std::string &filename) override;
+   void AssembleROMTensorOper() override;
+
+   void AllocateROMEQPElems() override;
+   void TrainEQPElems(SampleGenerator *sample_generator) override;
+   void SaveEQPElems(const std::string &filename) override;
+   void LoadEQPElems(const std::string &filename) override;
+   void AssembleROMEQPOper() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
-   void SetupEQPOperators();
 };
 
 #endif

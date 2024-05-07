@@ -46,7 +46,7 @@ public:
    void BuildDomainOperators() override;
 
    // Component-wise assembly
-   void BuildCompROMElement(Array<FiniteElementSpace *> &fes_comp) override;
+   void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp) override;
 
    bool Solve() override;
 
