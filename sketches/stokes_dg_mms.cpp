@@ -66,6 +66,11 @@ public:
 
 int main(int argc, char *argv[])
 {
+   int num_procs, rank;
+   MPI_Init(&argc, &argv);
+   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
    StopWatch chrono;
 
    // 1. Parse command-line options.
@@ -77,6 +82,7 @@ int main(int argc, char *argv[])
    bool visualization = 1;
    bool pres_dbc = false;
    bool use_dg = false;
+   bool direct_solve = true;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -88,6 +94,8 @@ int main(int argc, char *argv[])
    args.AddOption(&pres_dbc, "-pd", "--pdirichlet", "-no-pd", "--no-pdirichlet",
                   "Use pressure dirichlet condition.");
    args.AddOption(&use_dg, "-dg", "--use-dg", "-no-dg", "--no-use-dg",
+                  "Use discontinuous Galerkin scheme.");
+   args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
                   "Use discontinuous Galerkin scheme.");
    args.Parse();
    if (!args.Good())
@@ -263,100 +271,111 @@ int main(int argc, char *argv[])
    bVarf->Assemble();
    bVarf->Finalize();
 
-   Vector R1(ufes->GetVSize());
-   R1 = 0.0;
-   // SparseMatrix M;
-   // Vector F1(ufes->GetVSize());
-   // mVarf->FormLinearSystem(u_ess_tdof, u, *fform, M, R1, F1);
+   if (direct_solve)
+   {
+      Array<int> vblock_offsets(3); // number of variables + 1
+      vblock_offsets[0] = 0;
+      vblock_offsets[1] = ufes->GetVSize();
+      vblock_offsets[2] = pfes->GetVSize();
+      vblock_offsets.PartialSum();
 
-// {
-//    SparseMatrix &M(mVarf->SpMat());
-//    SparseMatrix &B(bVarf->SpMat());
-//    PrintMatrix(M, "sketch.M.txt");
-//    PrintMatrix(B, "sketch.B.txt");
-//    PrintVector(*fform, "sketch.urhs.txt");
-//    PrintVector(*gform, "sketch.prhs.txt");
-// }
+      SparseMatrix *up = Transpose(bVarf->SpMat());
 
-   printf("Setting up pressure RHS\n");
-   int maxIter(10000);
-   double rtol(1.e-10);
-   double atol(1.e-10);
-   // chrono.Clear();
-   // chrono.Start();
-   // MINRESSolver solver;
-   CGSolver solver;
-   solver.SetAbsTol(atol);
-   solver.SetRelTol(rtol);
-   solver.SetMaxIter(maxIter);
-   // solver.SetOperator(M);
-   solver.SetOperator(*mVarf);
-   // solver.SetPreconditioner(darcyPrec);
-   solver.SetPrintLevel(0);
-   // x = 0.0;
-   solver.Mult(*fform, R1);
-   // solver.Mult(*fform, u);
-   // mVarf->RecoverFEMSolution(R1, *fform, u);
-   // if (device.IsEnabled()) { x.HostRead(); }
-   // chrono.Stop();
-   printf("Set up pressure RHS\n");
+      BlockMatrix system_mat(vblock_offsets);
+      system_mat.SetBlock(0, 0, &(mVarf->SpMat()));
+      system_mat.SetBlock(0, 1, up);
+      system_mat.SetBlock(1, 0, &(bVarf->SpMat()));
 
-// {
-//    int order_quad = max(2, 2*(order+1)+1);
-//    const IntegrationRule *irs[Geometry::NumGeom];
-//    for (int i=0; i < Geometry::NumGeom; ++i)
-//    {
-//       irs[i] = &(IntRules.Get(i, order_quad));
-//    }
+      HYPRE_BigInt glob_size = vblock_offsets.Last();
+      HYPRE_BigInt row_starts[2];
+      row_starts[0] = 0;
+      row_starts[1] = vblock_offsets.Last();
 
-//    double err_u  = u.ComputeL2Error(ucoeff, irs);
-//    double norm_u = ComputeLpNorm(2., ucoeff, *mesh, irs);
+      SparseMatrix *mono_mat = system_mat.CreateMonolithic();
+      HypreParMatrix hypre_mat(MPI_COMM_WORLD, glob_size, row_starts, mono_mat);
 
-//    printf("|| u_h - u_ex || / || u_ex || = %.5E\n", err_u / norm_u);
-// }
+      MUMPSSolver J_mumps(MPI_COMM_WORLD);
+      J_mumps.SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
+      J_mumps.SetOperator(hypre_mat);
+      J_mumps.Mult(rhs, x);
 
-   // B * A^{-1} * F1 - G1
-   Vector R2(pfes->GetVSize());
-   bVarf->Mult(R1, R2);
-   R2 -= (*gform);
+      delete up;
+      delete mono_mat;
+   }
+   else
+   {
+      Vector R1(ufes->GetVSize());
+      R1 = 0.0;
 
-   SchurOperator schur(mVarf, bVarf);
-   CGSolver solver2;
-   solver2.SetOperator(schur);
-   solver2.SetPrintLevel(0);
-   solver2.SetAbsTol(rtol);
-   solver2.SetMaxIter(maxIter);
-   
-   OrthoSolver ortho;
+      printf("Setting up pressure RHS\n");
+      int maxIter(10000);
+      double rtol(1.e-10);
+      double atol(1.e-10);
+      // chrono.Clear();
+      // chrono.Start();
+      // MINRESSolver solver;
+      CGSolver solver;
+      solver.SetAbsTol(atol);
+      solver.SetRelTol(rtol);
+      solver.SetMaxIter(maxIter);
+      // solver.SetOperator(M);
+      solver.SetOperator(*mVarf);
+      // solver.SetPreconditioner(darcyPrec);
+      solver.SetPrintLevel(0);
+      // x = 0.0;
+      solver.Mult(*fform, R1);
+      // solver.Mult(*fform, u);
+      // mVarf->RecoverFEMSolution(R1, *fform, u);
+      // if (device.IsEnabled()) { x.HostRead(); }
+      // chrono.Stop();
+      printf("Set up pressure RHS\n");
+
+      // B * A^{-1} * F1 - G1
+      Vector R2(pfes->GetVSize());
+      bVarf->Mult(R1, R2);
+      R2 -= (*gform);
+
+      SchurOperator schur(mVarf, bVarf);
+      CGSolver solver2;
+      solver2.SetOperator(schur);
+      solver2.SetPrintLevel(0);
+      solver2.SetAbsTol(rtol);
+      solver2.SetMaxIter(maxIter);
+      
+      OrthoSolver ortho;
+      if (!pres_dbc)
+      {
+         printf("Setting up OrthoSolver\n");
+         ortho.SetSolver(solver2);
+         ortho.SetOperator(schur);
+         printf("OrthoSolver Set up.\n");
+      }
+      
+      printf("Solving for pressure\n");
+      // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
+      if (pres_dbc)
+         solver2.Mult(R2, p);
+      else
+         ortho.Mult(R2, p);
+      printf("Pressure is solved.\n");
+
+      // AU = F - B^T * P;
+      Vector F3(ufes->GetVSize());
+      F3 = 0.0;
+      bVarf->MultTranspose(p, F3);
+      F3 *= -1.0;
+      F3 += (*fform);
+
+      printf("Solving for velocity\n");
+      solver.Mult(F3, u);
+      printf("Velocity is solved.\n");
+   }
+
    if (!pres_dbc)
    {
-      printf("Setting up OrthoSolver\n");
-      ortho.SetSolver(solver2);
-      ortho.SetOperator(schur);
-      printf("OrthoSolver Set up.\n");
-   }
-   
-   printf("Solving for pressure\n");
-   // printf("%d ?= %d ?= %d\n", R2.Size(), p.Size(), ortho.Height());
-   if (pres_dbc)
-      solver2.Mult(R2, p);
-   else
-      ortho.Mult(R2, p);
-   printf("Pressure is solved.\n");
-
-   // AU = F - B^T * P;
-   Vector F3(ufes->GetVSize());
-   F3 = 0.0;
-   bVarf->MultTranspose(p, F3);
-   F3 *= -1.0;
-   F3 += (*fform);
-
-   printf("Solving for velocity\n");
-   solver.Mult(F3, u);
-   printf("Velocity is solved.\n");
-
-   if (!pres_dbc)
+      p -= p.Sum() / static_cast<double>(p.Size());
       p += p_const;
+   }
 
    int order_quad = max(2, 2*(order+1)+1);
    const IntegrationRule *irs[Geometry::NumGeom];
