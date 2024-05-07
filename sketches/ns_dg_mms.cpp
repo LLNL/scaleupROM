@@ -21,6 +21,13 @@ static double nu = 0.1;
 static double zeta = 1.0;
 static bool direct_solve = true;
 
+enum class Scheme
+{
+   DOMAIN,
+   LF,
+   TEMAM
+};
+
 // Define the analytical solution and forcing terms / boundary conditions
 void uFun_ex(const Vector & x, Vector & u);
 double pFun_ex(const Vector & x);
@@ -169,6 +176,8 @@ int main(int argc, char *argv[])
    const char *device_config = "cpu";
    bool visualization = 1;
    bool use_dg = false;
+   const char *scheme_str = "domain";
+   Scheme scheme = Scheme::DOMAIN;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -186,6 +195,8 @@ int main(int argc, char *argv[])
                   "Use discontinuous Galerkin scheme.");
    args.AddOption(&zeta, "-z", "--zeta",
                   "Constant coefficient for nonlinear convection.");
+   args.AddOption(&scheme_str, "-s", "--scheme",
+                  "Discretization scheme for nonlinear convection.");
    args.Parse();
    if (!args.Good())
    {
@@ -193,6 +204,21 @@ int main(int argc, char *argv[])
       return 1;
    }
    args.PrintOptions(cout);
+
+   if (strcmp(scheme_str, "domain") == 0)
+   {
+      printf("Domain nonlinear scheme\n");
+      scheme = Scheme::DOMAIN;
+   }
+   else if (strcmp(scheme_str, "lf") == 0)
+   {
+      printf("Lax-Friedrichs nonlinear scheme\n");
+      scheme = Scheme::LF;
+   }
+   else if (strcmp(scheme_str, "temam") == 0)
+      mfem_error("TEMAM scheme is not implemented yet!\n");
+   else
+      mfem_error("Unknown discretization scheme!\n");
 
    // assert(!pres_dbc);
 
@@ -321,15 +347,10 @@ int main(int argc, char *argv[])
    else
       fform->AddBoundaryIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
 
-   fform->Assemble();
-   fform->SyncAliasMemory(rhs);
-
    LinearForm *gform(new LinearForm);
    gform->Update(pfes, rhs.GetBlock(1), 0);
    gform->AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
    gform->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(ucoeff), u_ess_attr);
-   gform->Assemble();
-   gform->SyncAliasMemory(rhs);
 
    // 9. Assemble the finite element matrices for the Darcy operator
    //
@@ -360,24 +381,47 @@ int main(int argc, char *argv[])
 
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
-   // auto *nlc_nlfi1 = new VectorConvectionNLFIntegrator(half_zeta);
-   // auto *nlc_nlfi2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
-   // nlc_nlfi1->SetIntRule(&gll_ir_nl);
-   // nlc_nlfi2->SetIntRule(&gll_ir_nl);
-   // nVarf->AddDomainIntegrator(nlc_nlfi1);
-   // nVarf->AddDomainIntegrator(nlc_nlfi2);
-   // auto *nlc_nlfi1 = new TemamTrilinearFormIntegrator(zeta_coeff);
 
-   auto *nlc_nlfi1 = new VectorConvectionTrilinearFormIntegrator(zeta_coeff);
-   nlc_nlfi1->SetIntRule(&gll_ir_nl);
-   nVarf->AddDomainIntegrator(nlc_nlfi1);
-   // if (use_dg)
-   //    nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff));
-      // nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
-   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
-   // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff), u_ess_attr);
-   // nVarf->AddBdrFaceIntegrator(new DGTraceIntegrator(ucoeff, 0.0, zeta), u_ess_attr);
-   // nVarf->SetEssentialTrueDofs(u_ess_tdof);
+   auto *domain_integ1 = new VectorConvectionTrilinearFormIntegrator(zeta_coeff);
+   domain_integ1->SetIntRule(&gll_ir_nl);
+
+   auto *lf_integ1 = new IncompressibleInviscidFluxNLFIntegrator(minus_zeta);
+   auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(zeta_coeff);
+   auto *lf_bdr_integ1 = new DGLaxFriedrichsFluxIntegrator(zeta_coeff);
+   auto *lf_bdr_integ2 = new DGTraceIntegrator(ucoeff, 0.0, zeta);
+   auto *lf_bdr_integ3 = new DGBdrLaxFriedrichsLFIntegrator(ucoeff, &minus_zeta);
+   lf_integ1->SetIntRule(&gll_ir_nl);
+   lf_integ2->SetIntRule(&gll_ir_nl);
+   lf_bdr_integ1->SetIntRule(&gll_ir_nl);
+
+   switch (scheme)
+   {
+      case Scheme::DOMAIN:
+      {
+         nVarf->AddDomainIntegrator(domain_integ1);
+      }
+      break;
+      case Scheme::LF:
+      {
+         mfem_warning("Lax-Friedrichs scheme doesn't seem to work for steady case.\n");
+         nVarf->AddDomainIntegrator(lf_integ1);
+         if (use_dg)
+            nVarf->AddInteriorFaceIntegrator(lf_integ2);
+         nVarf->AddBdrFaceIntegrator(lf_bdr_integ1, u_ess_attr);
+         nVarf->AddBdrFaceIntegrator(lf_bdr_integ2, u_ess_attr);
+         
+         fform->AddBdrFaceIntegrator(lf_bdr_integ3, u_ess_attr);
+      }
+      break;
+      case Scheme::TEMAM:
+         mfem_error("TEMEM scheme not implemented yet!\n");
+      break;
+   }
+
+   fform->Assemble();
+   fform->SyncAliasMemory(rhs);
+   gform->Assemble();
+   gform->SyncAliasMemory(rhs);   
 
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
 {

@@ -80,10 +80,13 @@ private:
    Vector shape;
    VectorCoefficient &Q;
    DenseMatrix ELV;
+   Coefficient *Z = NULL;
+
+   double w;
 public:
    /// Constructs a boundary integrator with a given Coefficient QG
-   DGBdrLaxFriedrichsLFIntegrator(VectorCoefficient &QG)
-      : Q(QG) { }
+   DGBdrLaxFriedrichsLFIntegrator(VectorCoefficient &QG, Coefficient *ZG = NULL)
+      : Q(QG), Z(ZG) { }
 
    virtual bool SupportsDevice() { return false; }
 
