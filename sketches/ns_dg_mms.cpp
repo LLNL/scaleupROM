@@ -9,6 +9,7 @@
 #include "etc.hpp"
 #include "linalg_utils.hpp"
 #include "nonlinear_integ.hpp"
+#include "interfaceinteg.hpp"
 #include "dg_mixed_bilin.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
@@ -16,7 +17,7 @@
 using namespace std;
 using namespace mfem;
 
-static double nu = 0.1;
+static double nu = 1.0;
 static double zeta = 1.0;
 static bool direct_solve = true;
 
@@ -183,6 +184,8 @@ int main(int argc, char *argv[])
                   "Use discontinuous Galerkin scheme.");
    args.AddOption(&direct_solve, "-ds", "--direct-solve", "-no-ds", "--no-direct-solve",
                   "Use discontinuous Galerkin scheme.");
+   args.AddOption(&zeta, "-z", "--zeta",
+                  "Constant coefficient for nonlinear convection.");
    args.Parse();
    if (!args.Good())
    {
@@ -311,7 +314,7 @@ int main(int argc, char *argv[])
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
-   fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
+   // fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
 
    if (use_dg)
       fform->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
@@ -363,44 +366,17 @@ int main(int argc, char *argv[])
    // nlc_nlfi2->SetIntRule(&gll_ir_nl);
    // nVarf->AddDomainIntegrator(nlc_nlfi1);
    // nVarf->AddDomainIntegrator(nlc_nlfi2);
-   auto *nlc_nlfi1 = new TemamTrilinearFormIntegrator(zeta_coeff);
+   // auto *nlc_nlfi1 = new TemamTrilinearFormIntegrator(zeta_coeff);
+   auto *nlc_nlfi1 = new IncompressibleInviscidFluxNLFIntegrator(minus_zeta);
    nlc_nlfi1->SetIntRule(&gll_ir_nl);
    nVarf->AddDomainIntegrator(nlc_nlfi1);
    if (use_dg)
-      // nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-      nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
-   nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
-   // nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
+      nVarf->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff));
+      // nVarf->AddInteriorFaceIntegrator(new DGTemamFluxIntegrator(minus_zeta));
+   // nVarf->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(zeta_coeff), p_ess_attr);
+   nVarf->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(zeta_coeff), u_ess_attr);
+   nVarf->AddBdrFaceIntegrator(new DGTraceIntegrator(ucoeff, 0.0, zeta), u_ess_attr);
    // nVarf->SetEssentialTrueDofs(u_ess_tdof);
-
-// {
-//    NonlinearForm *ntemp(new NonlinearForm(ufes));
-//    // ntemp->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one), u_ess_attr);
-//    // ntemp->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(one));
-//    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(one);
-//    nlc_nlfi->SetIntRule(&gll_ir_nl);
-//    ntemp->AddDomainIntegrator(nlc_nlfi);
-
-//    // LinearForm *ftemp(new LinearForm(ufes));
-//    // ftemp->AddBdrFaceIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
-//    // // ftemp->AddBoundaryIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff), u_ess_attr);
-//    // ftemp->Assemble();
-
-//    Vector rhs_temp(u_ex.Size());
-//    ntemp->Mult(u_ex, rhs_temp);
-//    for (int k = 0; k < rhs_temp.Size(); k++)
-//    {
-//       printf("%.3E\t%.3E\n", u_ex(k), rhs_temp(k));
-//    }
-   
-//    // for (int k = 0; k < ftemp->Size(); k++)
-//    // {
-//    //    printf("%.3E\n", (*ftemp)[k]);
-//    // }
-   
-
-//    delete ntemp;
-// }
 
    SteadyNavierStokes oper(mVarf, bVarf, nVarf);
 {
@@ -448,7 +424,7 @@ int main(int argc, char *argv[])
 
    if (!pres_dbc)
    {
-      p -= p.Sum() / p.Size();
+      p -= p.Sum() / static_cast<double>(p.Size());
       p += p_const;
    }
 
