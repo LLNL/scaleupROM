@@ -64,7 +64,13 @@ public:
                                        const Vector &eltest,
                                        DenseMatrix &quadmat);
 
-   virtual void AppendPrecomputeCoefficients(const FiniteElementSpace *fes,
+   virtual void AppendPrecomputeDomainCoeffs(const FiniteElementSpace *fes,
+                                             DenseMatrix &basis,
+                                             const SampleInfo &sample);
+   virtual void AppendPrecomputeInteriorFaceCoeffs(const FiniteElementSpace *fes,
+                                                   DenseMatrix &basis,
+                                                   const SampleInfo &sample);
+   virtual void AppendPrecomputeBdrFaceCoeffs(const FiniteElementSpace *fes,
                                              DenseMatrix &basis,
                                              const SampleInfo &sample);
 
@@ -146,7 +152,7 @@ public:
                                        const Vector &elfun,
                                        DenseMatrix &elmat) override;
 
-   virtual void AppendPrecomputeCoefficients(const FiniteElementSpace *fes,
+   virtual void AppendPrecomputeDomainCoeffs(const FiniteElementSpace *fes,
                                              DenseMatrix &basis,
                                              const SampleInfo &sample) override;
 
@@ -170,6 +176,9 @@ private:
    DenseMatrix dshape, dshapex, EF, uu, ELV, elmat_comp;
    Vector shape;
 
+   // precomputed basis value at the sample point.
+   Array<DenseMatrix *> shapes;
+   Array<Array<DenseMatrix *> *> dshapes;
 public:
    IncompressibleInviscidFluxNLFIntegrator(Coefficient &q)
       : HyperReductionIntegrator(true), Q(&q) { }
@@ -188,6 +197,31 @@ public:
                            ElementTransformation &trans,
                            const Vector &elfun,
                            DenseMatrix &elmat) override;
+
+   void AssembleQuadratureVector(const FiniteElement &el,
+                                 ElementTransformation &T,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest,
+                                 Vector &elquad) override;
+
+   void AssembleQuadratureGrad(const FiniteElement &el,
+                              ElementTransformation &trans,
+                              const IntegrationPoint &ip,
+                              const double &iw,
+                              const Vector &elfun,
+                              DenseMatrix &elmat);
+
+   void AppendPrecomputeDomainCoeffs(const FiniteElementSpace *fes,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample) override;
+
+   void AddAssembleVector_Fast(const int s, const double qw,
+                                 ElementTransformation &T, const IntegrationPoint &ip,
+                                 const Vector &x, Vector &y) override;
+   void AddAssembleGrad_Fast(const int s, const double qw,
+                              ElementTransformation &T, const IntegrationPoint &ip,
+                              const Vector &x, DenseMatrix &jac) override;
 };
 
 /*
@@ -202,9 +236,12 @@ private:
    double w, un1, un2, un;
    Coefficient *Q{};
 
-   Vector nor, flux, shape1, shape2, u1, u2;
+   Vector nor, flux, shape1, shape2, u1, u2, tmp_vec;
    DenseMatrix udof1, udof2, elv1, elv2;
-   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22, tmp;
+
+   // precomputed basis value at the sample point.
+   Array<DenseMatrix *> shapes1, shapes2;
 public:
    DGLaxFriedrichsFluxIntegrator(Coefficient &q)
       : HyperReductionIntegrator(true), Q(&q) {}
@@ -220,6 +257,42 @@ public:
                            const FiniteElement &el2,
                            FaceElementTransformations &Tr,
                            const Vector &elfun, DenseMatrix &elmat) override;
+
+   void AssembleQuadratureVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &T,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest,
+                                 Vector &elquad) override;
+
+   void AssembleQuadratureGrad(const FiniteElement &el1,
+                              const FiniteElement &el2,
+                              FaceElementTransformations &T,
+                              const IntegrationPoint &ip,
+                              const double &iw,
+                              const Vector &eltest,
+                              DenseMatrix &quadmat) override;
+
+   void AppendPrecomputeInteriorFaceCoeffs(const FiniteElementSpace *fes,
+                                       DenseMatrix &basis,
+                                       const SampleInfo &sample) override;
+   void AppendPrecomputeBdrFaceCoeffs(const FiniteElementSpace *fes,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample) override;
+
+   void AddAssembleVector_Fast(const int s, const double qw,
+                              FaceElementTransformations &T, const IntegrationPoint &ip,
+                              const Vector &x, Vector &y) override;
+   void AddAssembleGrad_Fast(const int s, const double qw,
+                           FaceElementTransformations &T, const IntegrationPoint &ip,
+                           const Vector &x, DenseMatrix &jac) override;
+
+private:
+   void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
+                                    FaceElementTransformations *T,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample);
 
 };
 
