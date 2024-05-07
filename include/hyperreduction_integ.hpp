@@ -11,12 +11,15 @@ namespace mfem
 {
 
 struct SampleInfo {
+   // TODO(kevin): all integrators could use the same integer variable, reducing the memory size of this struct.
    int el;         // element index (used for DomainIntegrator)
    int face;       // face index (used for InteriorFaceIntegrator)
    int be;         // boundary element index (used for BdrFaceIntegrator)
+   int itf;        // interface info index (used for InterfaceIntegrator)
+   // can add dofs for other hyper reductions.
+
    int qp;         // quadrature point
    double qw;      // quadrature weight
-   // can add dofs for other hyper reductions.
 };
 
 class HyperReductionIntegrator : virtual public NonlinearFormIntegrator
@@ -222,78 +225,6 @@ public:
    void AddAssembleGrad_Fast(const int s, const double qw,
                               ElementTransformation &T, const IntegrationPoint &ip,
                               const Vector &x, DenseMatrix &jac) override;
-};
-
-/*
-   Interior face, interface integrator
-   < [v], {uu \dot n} + \Lambda * [u] >
-   \Lambda = max( | u- \dot n |, | u+ \dot n | )
-*/
-class DGLaxFriedrichsFluxIntegrator : public HyperReductionIntegrator
-{
-private:
-   int dim, ndofs1, ndofs2, nvdofs;
-   double w, un1, un2, un;
-   Coefficient *Q{};
-
-   Vector nor, flux, shape1, shape2, u1, u2, tmp_vec;
-   DenseMatrix udof1, udof2, elv1, elv2;
-   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22, tmp;
-
-   // precomputed basis value at the sample point.
-   Array<DenseMatrix *> shapes1, shapes2;
-public:
-   DGLaxFriedrichsFluxIntegrator(Coefficient &q)
-      : HyperReductionIntegrator(true), Q(&q) {}
-
-   void AssembleFaceVector(const FiniteElement &el1,
-                           const FiniteElement &el2,
-                           FaceElementTransformations &Tr,
-                           const Vector &elfun, Vector &elvect) override;
-
-   /// @brief Assemble the local action of the gradient of the
-   /// NonlinearFormIntegrator resulting from a face integral term.
-    void AssembleFaceGrad(const FiniteElement &el1,
-                           const FiniteElement &el2,
-                           FaceElementTransformations &Tr,
-                           const Vector &elfun, DenseMatrix &elmat) override;
-
-   void AssembleQuadratureVector(const FiniteElement &el1,
-                                 const FiniteElement &el2,
-                                 FaceElementTransformations &T,
-                                 const IntegrationPoint &ip,
-                                 const double &iw,
-                                 const Vector &eltest,
-                                 Vector &elquad) override;
-
-   void AssembleQuadratureGrad(const FiniteElement &el1,
-                              const FiniteElement &el2,
-                              FaceElementTransformations &T,
-                              const IntegrationPoint &ip,
-                              const double &iw,
-                              const Vector &eltest,
-                              DenseMatrix &quadmat) override;
-
-   void AppendPrecomputeInteriorFaceCoeffs(const FiniteElementSpace *fes,
-                                       DenseMatrix &basis,
-                                       const SampleInfo &sample) override;
-   void AppendPrecomputeBdrFaceCoeffs(const FiniteElementSpace *fes,
-                                    DenseMatrix &basis,
-                                    const SampleInfo &sample) override;
-
-   void AddAssembleVector_Fast(const int s, const double qw,
-                              FaceElementTransformations &T, const IntegrationPoint &ip,
-                              const Vector &x, Vector &y) override;
-   void AddAssembleGrad_Fast(const int s, const double qw,
-                           FaceElementTransformations &T, const IntegrationPoint &ip,
-                           const Vector &x, DenseMatrix &jac) override;
-
-private:
-   void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
-                                    FaceElementTransformations *T,
-                                    DenseMatrix &basis,
-                                    const SampleInfo &sample);
-
 };
 
 } // namespace mfem

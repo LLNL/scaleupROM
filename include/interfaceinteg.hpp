@@ -52,6 +52,24 @@ public:
                                        FaceElementTransformations &Trans2,
                                        Array2D<DenseMatrix*> &elmats)
    { mfem_error("Abstract method InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix!\n"); }
+
+   virtual void AssembleQuadratureVector(const FiniteElement &el1,
+                                          const FiniteElement &el2,
+                                          FaceElementTransformations &Tr1,
+                                          FaceElementTransformations &Tr2,
+                                          const IntegrationPoint &ip,
+                                          const double &iw,
+                                          const Vector &eltest1, const Vector &eltest2,
+                                          Vector &elquad1, Vector &elquad2);
+
+   virtual void AssembleQuadratureGrad(const FiniteElement &el1,
+                                          const FiniteElement &el2,
+                                          FaceElementTransformations &Tr1,
+                                          FaceElementTransformations &Tr2,
+                                          const IntegrationPoint &ip,
+                                          const double &iw,
+                                          const Vector &eltest1, const Vector &eltest2,
+                                          Array2D<DenseMatrix*> &quadmats);
 };
 
 class InterfaceDGDiffusionIntegrator : public InterfaceNonlinearFormIntegrator
@@ -238,6 +256,110 @@ public:
                                              Array2D<DenseMatrix *> &elmats);
 
    using InterfaceNonlinearFormIntegrator::AssembleInterfaceMatrix;
+};
+
+/*
+   Interior face, interface integrator
+   < [v], {uu \dot n} + \Lambda * [u] >
+   \Lambda = max( | u- \dot n |, | u+ \dot n | )
+*/
+class DGLaxFriedrichsFluxIntegrator : public InterfaceNonlinearFormIntegrator
+{
+private:
+   int dim, ndofs1, ndofs2, nvdofs;
+   double w, un1, un2, un;
+   Coefficient *Q{};
+
+   Vector nor, flux, shape1, shape2, u1, u2, tmp_vec;
+   DenseMatrix udof1, udof2, elv1, elv2;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22, tmp;
+
+   // precomputed basis value at the sample point.
+   Array<DenseMatrix *> shapes1, shapes2;
+public:
+   DGLaxFriedrichsFluxIntegrator(Coefficient &q, const IntegrationRule *ir = NULL)
+      : InterfaceNonlinearFormIntegrator(true, ir), Q(&q) {}
+
+   void AssembleFaceVector(const FiniteElement &el1,
+                           const FiniteElement &el2,
+                           FaceElementTransformations &Tr,
+                           const Vector &elfun, Vector &elvect) override;
+
+   /// @brief Assemble the local action of the gradient of the
+   /// NonlinearFormIntegrator resulting from a face integral term.
+    void AssembleFaceGrad(const FiniteElement &el1,
+                           const FiniteElement &el2,
+                           FaceElementTransformations &Tr,
+                           const Vector &elfun, DenseMatrix &elmat) override;
+
+   void AssembleQuadratureVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &T,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest,
+                                 Vector &elquad) override;
+
+   void AssembleQuadratureGrad(const FiniteElement &el1,
+                              const FiniteElement &el2,
+                              FaceElementTransformations &T,
+                              const IntegrationPoint &ip,
+                              const double &iw,
+                              const Vector &eltest,
+                              DenseMatrix &quadmat) override;
+
+   void AppendPrecomputeInteriorFaceCoeffs(const FiniteElementSpace *fes,
+                                       DenseMatrix &basis,
+                                       const SampleInfo &sample) override;
+   void AppendPrecomputeBdrFaceCoeffs(const FiniteElementSpace *fes,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample) override;
+
+   void AddAssembleVector_Fast(const int s, const double qw,
+                              FaceElementTransformations &T, const IntegrationPoint &ip,
+                              const Vector &x, Vector &y) override;
+   void AddAssembleGrad_Fast(const int s, const double qw,
+                           FaceElementTransformations &T, const IntegrationPoint &ip,
+                           const Vector &x, DenseMatrix &jac) override;
+
+   void AssembleInterfaceVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr1,
+                                 FaceElementTransformations &Tr2,
+                                 const Vector &elfun1, const Vector &elfun2,
+                                 Vector &elvect1, Vector &elvect2) override;
+
+   void AssembleInterfaceGrad(const FiniteElement &el1,
+                              const FiniteElement &el2,
+                              FaceElementTransformations &Tr1,
+                              FaceElementTransformations &Tr2,
+                              const Vector &elfun1, const Vector &elfun2,
+                              Array2D<DenseMatrix *> &elmats) override;
+
+   void AssembleQuadratureVector(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr1,
+                                 FaceElementTransformations &Tr2,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest1, const Vector &eltest2,
+                                 Vector &elquad1, Vector &elquad2) override;
+
+   void AssembleQuadratureGrad(const FiniteElement &el1,
+                                 const FiniteElement &el2,
+                                 FaceElementTransformations &Tr1,
+                                 FaceElementTransformations &Tr2,
+                                 const IntegrationPoint &ip,
+                                 const double &iw,
+                                 const Vector &eltest1, const Vector &eltest2,
+                                 Array2D<DenseMatrix*> &quadmats) override;
+
+private:
+   void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
+                                    FaceElementTransformations *T,
+                                    DenseMatrix &basis,
+                                    const SampleInfo &sample);
+
 };
 
 } // namespace mfem

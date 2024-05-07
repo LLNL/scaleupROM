@@ -161,6 +161,10 @@ void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
                       const DenseMatrix& A,
                       const DenseMatrix& P, const Array<int> &Prows,
                       DenseMatrix& RAP);
+void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
+                      const DenseMatrix& A,
+                      const DenseMatrix& P, const Array<int> &Prows,
+                      SparseMatrix& RAP);
 
 // DenseTensor is column major and i is the fastest index. 
 // y_k = T_{ijk} * x_i * x_j

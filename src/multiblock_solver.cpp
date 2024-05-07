@@ -888,7 +888,7 @@ void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<s
 {
    // View vector for U.
    if (separate_variable_basis)
-      U_snapshots = new BlockVector(U->GetData(), var_offsets); 
+      U_snapshots = new BlockVector(U->GetData(), var_offsets);
    else
       U_snapshots = new BlockVector(U->GetData(), domain_offsets);
 

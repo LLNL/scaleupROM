@@ -214,7 +214,7 @@ void LinElastSolver::BuildDomainOperators()
    }
 
    a_itf = new InterfaceForm(meshes, fes, topol_handler); // TODO: Is this reasonable?
-   a_itf->AddIntefaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
+   a_itf->AddInterfaceIntegrator(new InterfaceDGElasticityIntegrator(lambda_c[0], mu_c[0], alpha, kappa));
 }
 
 void LinElastSolver::Assemble()
