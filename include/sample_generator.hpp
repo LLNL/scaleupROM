@@ -9,6 +9,7 @@
 #include "parameter.hpp"
 #include "linalg/BasisGenerator.h"
 #include "linalg_utils.hpp"
+#include "rom_handler.hpp"
 
 using namespace mfem;
 
@@ -18,6 +19,16 @@ enum SampleGeneratorType
    RANDOM,
    NUM_SAMPLE_GEN_TYPE
 };
+
+struct PortTag
+{
+   std::string Mesh1;
+   std::string Mesh2;
+   int Attr1;
+   int Attr2;
+};
+
+bool operator<(const PortTag &tag1, const PortTag &tag2);
 
 class SampleGenerator
 {
@@ -52,6 +63,11 @@ protected:
    // each snapshot will be sorted out by its basis tag.
    std::vector<std::string> basis_tags;
    std::map<std::string, int> basis_tag2idx;
+
+   /* snapshot pairs per interface port, for nonlinear EQP */
+   std::vector<PortTag> port_tags;
+   std::map<PortTag, int> port_tag2idx;
+   Array<Array<int> *> port_colidxs;
 
 public:
    SampleGenerator(MPI_Comm comm);
@@ -89,9 +105,16 @@ public:
 
    const std::string GetSamplePath(const int& idx, const std::string &prefix = "");
 
-   void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags);
+   /*
+      Save each block of U_snapshots according to snapshot_basis_tags.
+      Number of blocks in U_snapshots must be equal to the size of snapshot_basis_tags.
+      The appended column indices of each basis tag are stored in col_idxs.
+   */
+   void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags, Array<int> &col_idxs);
+   void SaveSnapshotPorts(TopologyHandler *topol_handler, const TrainMode &train_mode, const Array<int> &col_idxs);
    void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag);
    void WriteSnapshots();
+   void WriteSnapshotPorts();
    const CAROM::Matrix* LookUpSnapshot(const std::string &basis_tag);
 
    void ReportStatus(const int &sample_idx);
