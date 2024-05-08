@@ -440,7 +440,7 @@ const int dim = el1.GetDim();
 
    const int nvdofs = dim*(ndofs1 + ndofs2);
 
-   Vector elfun_copy(elfun); // FIXME: How to avoid this
+   Vector elfun_copy(elfun); // FIXME: How to avoid this?
     nor.SetSize(dim);
     Jrt.SetSize(dim);
 

@@ -30,6 +30,7 @@ add_executable(ns_rom ns_rom.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(nlelast_mms nlelast_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(nlelast_cantilever nlelast_cantilever.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 add_executable(linelast_mms linelast_mms.cpp $<TARGET_OBJECTS:scaleupROMObj>)
+add_executable(linelast_cantilever linelast_cantilever.cpp $<TARGET_OBJECTS:scaleupROMObj>)
 
 file(COPY inputs/gen_interface.yml DESTINATION ${CMAKE_BINARY_DIR}/sketches/inputs)
 file(COPY meshes/2x2.mesh DESTINATION ${CMAKE_BINARY_DIR}/sketches/meshes)

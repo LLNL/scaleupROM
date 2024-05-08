@@ -235,6 +235,7 @@ model = new NeoHookeanHypModel(mu, K);
 model = new LinElastMaterialModel(mu, K);
    }
    
+   double alpha = -0.0;
    
    Array<int> u_ess_attr(mesh->bdr_attributes.Max());
    // this array of integer essentially acts as the array of boolean:
@@ -262,7 +263,7 @@ model = new LinElastMaterialModel(mu, K);
    LinearForm *tempform = new LinearForm(fes);
    gform->Update(fes, rhs1, 0);
    gform->AddBdrFaceIntegrator(new DGHyperelasticDirichletLFIntegrator(
-               *dir, model, 0.0, kappa), u_ess_attr);
+               *dir, model, alpha, kappa), u_ess_attr);
    gform->Assemble();
    gform->SyncAliasMemory(rhs1);
 
@@ -291,7 +292,7 @@ model = new LinElastMaterialModel(mu, K);
    
    NonlinearForm *nlform(new NonlinearForm(fes));
    nlform->AddDomainIntegrator(new HyperelasticNLFIntegratorHR(model));
-   nlform->AddBdrFaceIntegrator(new DGHyperelasticNLFIntegrator(model, 0.0, kappa), u_ess_attr);
+   nlform->AddBdrFaceIntegrator(new DGHyperelasticNLFIntegrator(model, alpha, kappa), u_ess_attr);
    //nlform->AddInteriorFaceIntegrator( new DGHyperelasticNLFIntegrator(model, 0.0, kappa));
    nlform->SetEssentialTrueDofs(u_ess_tdof);
 
