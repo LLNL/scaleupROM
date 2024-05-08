@@ -46,6 +46,7 @@ private:
    HYPRE_BigInt glob_size;
    HYPRE_BigInt row_starts[2];
    MUMPSSolver *mumps = NULL;
+   BlockVector rhs;
 
    /* velocity and its convection at previous time step */
    Vector u1;
@@ -243,6 +244,33 @@ public:
       mumps = new MUMPSSolver(MPI_COMM_WORLD);
       mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
       mumps->SetOperator(*hypre_mat);
+
+      Cu1.SetSize(u->Size());
+      rhs.Update(vblock_offsets);
+   }
+
+   void Step(double &time, int step)
+   {
+      /* copy velocity */
+      u1 = (*u);
+
+      /* evaluate nonlinear advection at previous time step */
+      conv->Mult(*u, Cu1);
+
+      /* Base right-hand side for boundary conditions and forcing */
+      rhs = (*rhs0);
+
+      /* Add nonlinear convection */
+      rhs.GetBlock(0).Add(-ab1, Cu1);
+
+      /* Add time derivative term */
+      // TODO: extend for high order bdf schemes
+      mass->AddMult(u1, rhs.GetBlock(0), -bd1 / dt);
+
+      /* Solve for the next step */
+      mumps->Mult(rhs, *x);
+
+      time += dt;
    }
 };
 
@@ -338,6 +366,9 @@ int main(int argc, char *argv[])
    navier.AssembleOperators();
 
    navier.InitializeTimeIntegration(dt);
+   double time = 0.0;
+   int step = 0;
+   navier.Step(time, step);
 
    // 17. Free the used memory.
    DeletePointers(u_coeffs);
