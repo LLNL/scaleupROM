@@ -37,6 +37,20 @@ private:
    double ab2 = 0.0;
    double ab3 = 0.0;
 
+   /* For coupled solution approach */
+   BlockMatrix *system_mat = NULL;
+   SparseMatrix *uu = NULL;
+   SparseMatrix *up = NULL;
+   SparseMatrix *mono_mat = NULL;
+   HypreParMatrix *hypre_mat = NULL;
+   HYPRE_BigInt glob_size;
+   HYPRE_BigInt row_starts[2];
+   MUMPSSolver *mumps = NULL;
+
+   /* velocity and its convection at previous time step */
+   Vector u1;
+   Vector Cu1;
+
 protected:
 
    int dim = -1;
@@ -48,12 +62,13 @@ protected:
    int order = -1;
    const double sigma = -1.0;
    double kappa = -1.0;
+   double dt = -1.0;
 
    Array<int> block_offsets;
    Array<int> vblock_offsets;
 
    BlockVector *x = NULL;     // owned
-   BlockVector *rhs = NULL;   // owned
+   BlockVector *rhs0 = NULL;   // owned
 
    GridFunction *u = NULL;    // owned
    GridFunction *p = NULL;    // owned
@@ -96,7 +111,7 @@ public:
 
       /* solution/rhs vectors */
       x = new BlockVector(vblock_offsets);
-      rhs = new BlockVector(vblock_offsets);
+      rhs0 = new BlockVector(vblock_offsets);
 
       /* grid functions that represent blocks of solution vector */
       u = new GridFunction;
@@ -107,8 +122,8 @@ public:
       /* linear forms that represent blocks of rhs vector */
       fform = new LinearForm;
       gform = new LinearForm;
-      fform->Update(ufes, rhs->GetBlock(0), 0);
-      gform->Update(pfes, rhs->GetBlock(1), 0);
+      fform->Update(ufes, rhs0->GetBlock(0), 0);
+      gform->Update(pfes, rhs0->GetBlock(1), 0);
 
       /* operators that are applied to grid functions */
       mass = new BilinearForm(ufes);
@@ -119,6 +134,34 @@ public:
       nu_coeff = new ConstantCoefficient(nu);
       zeta_coeff = new ConstantCoefficient(zeta);
       kappa = (order + 2) * (order + 2);
+   }
+
+   virtual ~NavierSolver()
+   {
+      delete x;
+      delete rhs0;
+
+      delete u;
+      delete p;
+
+      delete fform;
+      delete gform;
+
+      delete mass;
+      delete visc;
+      delete conv;
+      delete div;
+
+      delete nu_coeff;
+      delete zeta_coeff;
+      delete minus_one;
+
+      delete system_mat;
+      delete uu;
+      delete up;
+
+      delete mono_mat;
+      delete hypre_mat;
    }
 
    void SetupOperators(Array<Array<int> *> &u_ess_attr, Array<VectorCoefficient *> &u_coeff)
@@ -172,29 +215,34 @@ public:
       fform->Assemble();
       gform->Assemble();
 
-      fform->SyncAliasMemory(*rhs);
-      gform->SyncAliasMemory(*rhs);   
+      fform->SyncAliasMemory(*rhs0);
+      gform->SyncAliasMemory(*rhs0);   
    }
 
-   virtual ~NavierSolver()
+   void InitializeTimeIntegration(const double &dt_)
    {
-      delete x;
-      delete rhs;
+      assert(dt_ > 0.0);
+      dt = dt_;
 
-      delete u;
-      delete p;
+      uu = new SparseMatrix(mass->SpMat());
+      (*uu) *= bd0 / dt;
+      (*uu) += visc->SpMat();
+      up = Transpose(div->SpMat());
 
-      delete fform;
-      delete gform;
+      system_mat = new BlockMatrix(vblock_offsets);
+      system_mat->SetBlock(0, 0, uu);
+      system_mat->SetBlock(0, 1, up);
+      system_mat->SetBlock(1, 0, &(div->SpMat()));
 
-      delete mass;
-      delete visc;
-      delete conv;
-      delete div;
+      mono_mat = system_mat->CreateMonolithic();
+      glob_size = vblock_offsets.Last();
+      row_starts[0] = 0;
+      row_starts[1] = vblock_offsets.Last();
+      hypre_mat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, mono_mat);
 
-      delete nu_coeff;
-      delete zeta_coeff;
-      delete minus_one;
+      mumps = new MUMPSSolver(MPI_COMM_WORLD);
+      mumps->SetMatrixSymType(MUMPSSolver::MatType::UNSYMMETRIC);
+      mumps->SetOperator(*hypre_mat);
    }
 };
 
@@ -211,6 +259,7 @@ int main(int argc, char *argv[])
    const char *mesh_file = "../data/star.mesh";
    int order = 1;
    int refine = 0;
+   double dt = 1e-2;
    bool pres_dbc = false;
    const char *device_config = "cpu";
    bool visualization = 1;
@@ -227,6 +276,8 @@ int main(int argc, char *argv[])
                   "Use pressure Dirichlet condition.");
    args.AddOption(&zeta, "-z", "--zeta",
                   "constant factor for nonlinear convection.");
+   args.AddOption(&dt, "-dt", "--dt",
+                  "time step size for time integration.");
    args.Parse();
    if (!args.Good())
    {
@@ -285,6 +336,8 @@ int main(int argc, char *argv[])
 
    navier.SetupOperators(u_attrs, u_coeffs);
    navier.AssembleOperators();
+
+   navier.InitializeTimeIntegration(dt);
 
    // 17. Free the used memory.
    DeletePointers(u_coeffs);
