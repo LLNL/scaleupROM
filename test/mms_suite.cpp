@@ -936,9 +936,19 @@ void EvalWithRefinement(const int num_refinement, int &order_out, double &produc
       fes = new FiniteElementSpace(mesh, h1_coll, dim);
    }
 
+   Array<int> ess_attr(mesh->bdr_attributes.Max());
+   // this array of integer essentially acts as the array of boolean:
+   // If value is 0, then it is not Dirichlet.
+   // If value is 1, then it is Dirichlet.
+   ess_attr = 0;
+   ess_attr[1] = 1;
+
    VectorFunctionCoefficient ucoeff(dim, uFun_ex);
    VectorFunctionCoefficient uscoeff(dim, usFun_ex);
    ConstantCoefficient one(1.0), minus_one(-1.0), half(0.5), minus_half(-0.5);
+   Vector test(dim);
+   test(0) = 1.0; test(1) = 1.0;
+   VectorConstantCoefficient test_coeff(test);
 
    // 12. Create the grid functions u and p. Compute the L2 error norms.
    GridFunction u(fes), us(fes);
@@ -947,6 +957,7 @@ void EvalWithRefinement(const int num_refinement, int &order_out, double &produc
    u.ProjectCoefficient(ucoeff);
    us.ProjectCoefficient(uscoeff);
 
+   /* this integration rule can be used only for domain integrator. */
    IntegrationRule gll_ir_nl = IntRules.Get(fes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
 
@@ -959,22 +970,22 @@ void EvalWithRefinement(const int num_refinement, int &order_out, double &produc
    nform1.Mult(u, Nu);
    product1 = (us * Nu);
 
-   auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_one);
-   auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff, &one);
-   // auto *temam_integ1 = new VectorConvectionTrilinearFormIntegrator(half);
-   // auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
-   // auto *temam_integ3 = new DGTemamFluxIntegrator(minus_half);
-   // auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff, &minus_half);
-   // temam_integ1->SetIntRule(&gll_ir_nl);
+   // auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_one);
+   // auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff);
+   // temam_integ2->SetIntRule(&gll_ir_nl);
+
+   auto *temam_integ1 = new VectorConvectionTrilinearFormIntegrator(half);
+   auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
+   auto *temam_integ3 = new DGTemamFluxIntegrator(minus_half);
+   auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff, &minus_half);
+   temam_integ1->SetIntRule(&gll_ir_nl);
    temam_integ2->SetIntRule(&gll_ir_nl);
-   // temam_integ3->SetIntRule(&gll_ir_nl);
-   temam_bdr_integ1->SetIntRule(&gll_ir_nl);
 
    NonlinearForm nform2(fes);
-   // nform2.AddDomainIntegrator(temam_integ1);
+   nform2.AddDomainIntegrator(temam_integ1);
    nform2.AddDomainIntegrator(temam_integ2);
-   // if (use_dg)
-   //    nform2.AddInteriorFaceIntegrator(temam_integ3);
+   if (use_dg)
+      nform2.AddInteriorFaceIntegrator(temam_integ3);
 
    LinearForm gform(fes);
    gform.AddBdrFaceIntegrator(temam_bdr_integ1);
@@ -982,7 +993,7 @@ void EvalWithRefinement(const int num_refinement, int &order_out, double &produc
    gform.Assemble();
 
    nform2.Mult(u, Nu);
-   product2 = (us * Nu) + (us * gform);
+   product2 = (us * Nu) - (us * gform);
 
    // 17. Free the used memory.
    delete fes;

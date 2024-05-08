@@ -216,7 +216,10 @@ int main(int argc, char *argv[])
       scheme = Scheme::LF;
    }
    else if (strcmp(scheme_str, "temam") == 0)
-      mfem_error("TEMAM scheme is not implemented yet!\n");
+   {
+      printf("Temam nonlinear scheme\n");
+      scheme = Scheme::TEMAM;
+   }
    else
       mfem_error("Unknown discretization scheme!\n");
 
@@ -340,7 +343,6 @@ int main(int argc, char *argv[])
    fform->Update(ufes, rhs.GetBlock(0), 0);
    fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
    fform->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(ucoeff, k, sigma, kappa), u_ess_attr);
-   // fform->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta), u_ess_attr);
 
    if (use_dg)
       fform->AddBdrFaceIntegrator(new BoundaryNormalStressLFIntegrator(fvecnatcoeff), p_ess_attr);
@@ -379,6 +381,7 @@ int main(int argc, char *argv[])
    bVarf->Assemble();
    bVarf->Finalize();
 
+   /* this integration rule can be used only for domain integrator. */
    IntegrationRule gll_ir_nl = IntRules.Get(ufes->GetFE(0)->GetGeomType(),
                                              (int)(ceil(1.5 * (2 * ufes->GetMaxElementOrder() - 1))));
 
@@ -391,8 +394,13 @@ int main(int argc, char *argv[])
    auto *lf_bdr_integ2 = new DGTraceIntegrator(ucoeff, 0.0, zeta);
    auto *lf_bdr_integ3 = new DGBdrLaxFriedrichsLFIntegrator(ucoeff, &minus_zeta);
    lf_integ1->SetIntRule(&gll_ir_nl);
-   lf_integ2->SetIntRule(&gll_ir_nl);
-   lf_bdr_integ1->SetIntRule(&gll_ir_nl);
+
+   auto *temam_integ1 = new VectorConvectionTrilinearFormIntegrator(half_zeta);
+   auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half_zeta);
+   auto *temam_integ3 = new DGTemamFluxIntegrator(minus_half_zeta);
+   auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff, &minus_half_zeta);
+   temam_integ1->SetIntRule(&gll_ir_nl);
+   temam_integ2->SetIntRule(&gll_ir_nl);
 
    switch (scheme)
    {
@@ -414,7 +422,14 @@ int main(int argc, char *argv[])
       }
       break;
       case Scheme::TEMAM:
-         mfem_error("TEMEM scheme not implemented yet!\n");
+      {
+         nVarf->AddDomainIntegrator(temam_integ1);
+         nVarf->AddDomainIntegrator(temam_integ2);
+         if (use_dg)
+            nVarf->AddInteriorFaceIntegrator(temam_integ3);
+
+         fform->AddBdrFaceIntegrator(temam_bdr_integ1, u_ess_attr);
+      }
       break;
    }
 
