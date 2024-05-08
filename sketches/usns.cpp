@@ -19,6 +19,8 @@ using namespace mfem;
 static double nu = 0.1;
 static double zeta = 1.0;
 
+void uFun_ex(const Vector & x, Vector & u);
+
 class NavierSolver
 {
 private:
@@ -165,6 +167,9 @@ public:
       delete hypre_mat;
    }
 
+   GridFunction* GetVelGridFunction() { return u; }
+   GridFunction* GetPresGridFunction() { return p; }
+
    void SetupOperators(Array<Array<int> *> &u_ess_attr, Array<VectorCoefficient *> &u_coeff)
    {
       assert(u_ess_attr.Size() == u_coeff.Size());
@@ -209,7 +214,7 @@ public:
       visc->Assemble();
       div->Assemble();
 
-      mass->Finalize();
+      /* mass will be finalized later, to build other sparse matrices. */
       visc->Finalize();
       div->Finalize();
 
@@ -228,6 +233,8 @@ public:
       uu = new SparseMatrix(mass->SpMat());
       (*uu) *= bd0 / dt;
       (*uu) += visc->SpMat();
+      uu->Finalize();
+      mass->Finalize();
       up = Transpose(div->SpMat());
 
       system_mat = new BlockMatrix(vblock_offsets);
@@ -288,9 +295,11 @@ int main(int argc, char *argv[])
    int order = 1;
    int refine = 0;
    double dt = 1e-2;
+   int Nt = 1;
    bool pres_dbc = false;
    const char *device_config = "cpu";
    bool visualization = 1;
+   int vis_interval = 10;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -304,8 +313,14 @@ int main(int argc, char *argv[])
                   "Use pressure Dirichlet condition.");
    args.AddOption(&zeta, "-z", "--zeta",
                   "constant factor for nonlinear convection.");
+   args.AddOption(&nu, "-nu", "--nu",
+                  "nondimensional viscosity. inverse of Reynolds number.");
    args.AddOption(&dt, "-dt", "--dt",
                   "time step size for time integration.");
+   args.AddOption(&Nt, "-nt", "--nt",
+                  "number of time steps for time integration.");
+   args.AddOption(&vis_interval, "-vi", "--visual-interval",
+                  "time step interval for visualization.");
    args.Parse();
    if (!args.Good())
    {
@@ -320,25 +335,20 @@ int main(int argc, char *argv[])
    Mesh *mesh = new Mesh(mesh_file, 1, 1);
    int dim = mesh->Dimension();
 
-   // 4. Refine the mesh to increase the resolution. In this example we do
-   //    'ref_levels' of uniform refinement. We choose 'ref_levels' to be the
-   //    largest number that gives a final mesh with no more than 10,000
-   //    elements.
    for (int l = 0; l < refine; l++)
    {
       mesh->UniformRefinement();
    }
 
-   // 5. Define a finite element space on the mesh. Here we use the
-   //    Raviart-Thomas finite elements of the specified order.
-   // FiniteElementCollection *hdiv_coll(new RT_FECollection(order, dim));
+   FiniteElementCollection *dg_coll(new DG_FECollection(order+1, dim));
+   FiniteElementCollection *pdg_coll(new DG_FECollection(order, dim));
    FiniteElementCollection *l2_coll(new L2_FECollection(order, dim));
    FiniteElementCollection *h1_coll(new H1_FECollection(order+1, dim));
    FiniteElementCollection *ph1_coll(new H1_FECollection(order, dim));
 
-   FiniteElementSpace *fes = new FiniteElementSpace(mesh, h1_coll);
-   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, h1_coll, dim);
-   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, ph1_coll);
+   FiniteElementSpace *fes = new FiniteElementSpace(mesh, dg_coll);
+   FiniteElementSpace *ufes = new FiniteElementSpace(mesh, dg_coll, dim);
+   FiniteElementSpace *pfes = new FiniteElementSpace(mesh, pdg_coll);
 
    assert(mesh->bdr_attributes.Max() >= 4);
    Array<int> inlet_attr(mesh->bdr_attributes.Max());
@@ -350,13 +360,17 @@ int main(int argc, char *argv[])
    inlet_attr = 0;
    noslip_attr = 0;
    inlet_attr[3] = 1;
+   // noslip_attr[0] = 1;
+   // noslip_attr[2] = 1;
    if (mesh->bdr_attributes.Max() > 4)
       noslip_attr[4] = 1;
 
    Vector u_inlet(dim), u_zero(dim);
    u_zero = 0.0;
-   u_inlet = 1.0;
+   u_inlet = 0.0;
+   u_inlet(0) = 1.0;
    Array<VectorCoefficient *> u_coeffs(2);
+   // u_coeffs[0] = new VectorFunctionCoefficient(dim, uFun_ex);
    u_coeffs[0] = new VectorConstantCoefficient(u_inlet);
    u_coeffs[1] = new VectorConstantCoefficient(u_zero);
 
@@ -365,10 +379,32 @@ int main(int argc, char *argv[])
    navier.SetupOperators(u_attrs, u_coeffs);
    navier.AssembleOperators();
 
+   GridFunction *u = navier.GetVelGridFunction();
+   GridFunction *p = navier.GetPresGridFunction();
+
+   u->ProjectCoefficient(*u_coeffs[0]);
+   (*p) = 0.0;
+
+   ParaViewDataCollection pd("NavierStokes", mesh);
+   pd.SetPrefixPath("NavierStokes_ParaView");
+   pd.RegisterField("vel", u);
+   pd.RegisterField("pres", p);
+   pd.SetLevelsOfDetail(order);
+
    navier.InitializeTimeIntegration(dt);
    double time = 0.0;
-   int step = 0;
-   navier.Step(time, step);
+   for (int step = 0; step < Nt; step++)
+   {
+      if (step % vis_interval == 0)
+      {
+         printf("time step: %d\n", step);
+         pd.SetCycle(step);
+         pd.SetTime(time);
+         pd.Save();
+      }
+
+      navier.Step(time, step);
+   }
 
    // 17. Free the used memory.
    DeletePointers(u_coeffs);
@@ -381,4 +417,13 @@ int main(int argc, char *argv[])
    delete mesh;
 
    return 0;
+}
+
+void uFun_ex(const Vector & x, Vector & u)
+{
+   double yi(x(1));
+
+   u.SetSize(x.Size());
+   u = 0.0;
+   u(0) = 1.0 - 4.0 * (yi - 0.5) * (yi - 0.5);
 }
