@@ -12,6 +12,7 @@ using namespace mfem;
 // void pts(int iphi, int t, double x[]);
 // void trans(const Vector &x, Vector &p);
 static int    order_ = 3;
+static bool    force_nc_ = false;
 
 int main(int argc, char *argv[])
 {
@@ -23,6 +24,8 @@ int main(int argc, char *argv[])
                   "File name for the output mesh.");
    args.AddOption(&order_, "-o", "--mesh-order",
                   "Order (polynomial degree) of the mesh elements.");
+   args.AddOption(&force_nc_, "-fnc", "--force-non-conforming", "-nfnc", "--noforce-non-conforming",
+                  "Sets whether to force the output mesh to be nonconforming. Default behavior is no enforcing.");
 
    args.Parse();
    if (!args.Good())
@@ -35,9 +38,22 @@ int main(int argc, char *argv[])
    Mesh mesh(meshFileString);
 
    // Promote to high order mesh
-   if (order_ > 1)
+   if (order_ >1)
       mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
-
+   
+   // Force mesh to be nonconforming
+   if (force_nc_)
+   {
+      if (mesh.GetNodalFESpace())
+      {
+         mesh.SetCurvature(mesh.GetNodalFESpace()->GetMaxElementOrder(), true, 2, Ordering::byVDIM);
+      }
+      else
+      {
+         mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
+      }
+   }
+   
    std::string outputFile(meshFileString);
    outputFile += ".mfem";
    ofstream ofs(outputFile.c_str());

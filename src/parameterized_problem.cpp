@@ -200,6 +200,33 @@ void tip_force(const Vector &x, Vector &f)
 
 }  // namespace linelast_force
 
+namespace linelast_frame_wind
+{
+
+double qwind_f;
+double density;
+double g;
+
+void gravity_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(f.Size()-1) = -density * g;
+}
+
+void wind_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(0) = qwind_f;
+}
+
+void dirichlet(const Vector &x, Vector &u)
+{
+   u = 0.0;
+}
+
+}  // namespace linelast_frame_wind
+
+
 namespace advdiff_problem
 {
 
@@ -228,40 +255,53 @@ double qbdr(const Vector &x)
 
 namespace linelast_cwtrain
 {
+   // Probabilities
+   double lx;
+   double ly;
+   double rx;
+   double ry;
+   double dx;
+   double dy;
+   double ux;
+   double uy;
+   double bx;
+   double by;
 
-double l_ux;
-double l_uy;
-double r_fx;
-double r_fy;
-double u_fx;
-double u_fy;
-double d_fx;
-double d_fy;
+   // Constant force
+   double l_ux;
+   double l_uy;
+   double r_fx;
+   double r_fy;
+   double u_fx;
+   double u_fy;
+   double d_fx;
+   double d_fy;
+   double b_fx;
+   double b_fy;
 
-double xu_amp;
-double xu_freq;
-double xu_offset;
+   // Amplitudes
+   double xu_amp;
+   double xf_amp;
+   double yu_amp;
+   double yf_amp;
+   double bxf_amp;
+   double byf_amp;
 
-double xf_amp;
-double xf_freq;
-double xf_offset;
+   // Frequencies
+   double xu_freq;
+   double xf_freq;
+   double yu_freq;
+   double yf_freq;
+   double bxf_freq;
+   double byf_freq;
 
-double yu_amp;
-double yu_freq;
-double yu_offset;
-
-double yf_amp;
-double yf_freq;
-double yf_offset;
-
-double lx;
-double ly;
-double rx;
-double ry;
-double dx;
-double dy;
-double ux;
-double uy;
+   // Sine offsets
+   double xu_offset;
+   double xf_offset;
+   double yu_offset;
+   double yf_offset;
+   double bxf_offset;
+   double byf_offset;
 
 double perturb_func(const double x, const double amp, const double freq, const double offset)
 {
@@ -298,6 +338,14 @@ void down_disp(const Vector &x, Vector &u)
       u(0) = d_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
    if (dy >= 0.5)
       u(1) = d_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+}
+
+void body_force(const Vector &x, Vector &u)
+{
+   if (bx >= 0.5)
+      u(0) = b_fx + perturb_func(x(0), bxf_amp, bxf_freq, bxf_offset);
+   if (by >= 0.5)
+      u(1) = b_fy + perturb_func(x(1), byf_amp, byf_freq, byf_offset);
 }
 
 }  // namespace linelast_cwtrain
@@ -408,6 +456,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "linelast_cwtrain")
    {
       problem = new LinElastComponentWiseTrain();
+   }
+   else if (problem_name == "linelast_frame_wind")
+   {
+      problem = new LinElastFrameWind();
    }
    else if (problem_name == "advdiff_flow_past_array")
    {
@@ -787,20 +839,34 @@ LinElastDispLattice::LinElastDispLattice()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(3);
-   battr.SetSize(3);
-   vector_bdr_ptr.SetSize(3);
-  for (size_t i = 0; i < 2; i++)
-      {
-      battr[i] = i+1;
-      bdr_type[i] = BoundaryType::DIRICHLET;
-      vector_bdr_ptr[i] = &(function_factory::linelast_disp::init_disp);
-   }
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
 
-   /* homogeneous Neumann bc */
+   // Down
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = NULL;
+
+   // Right
+   battr[1] = 2;
+   bdr_type[1] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[1] = &(function_factory::linelast_disp::init_disp);
+
+   // Up
    battr[2] = 3;
    bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
+
+   // Left
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_disp::init_disp);
+
+   // None
+   battr[4] = 5;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
 
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -830,24 +896,34 @@ LinElastForceCantilever::LinElastForceCantilever()
     : LinElastProblem()
 {
    // pointer to static function.
-   bdr_type.SetSize(3);
-   battr.SetSize(3);
-   vector_bdr_ptr.SetSize(3);
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
 
-   // Fixed end of cantilever
+   // Down
    battr[0] = 1;
-   bdr_type[0] = BoundaryType::DIRICHLET;
-   vector_bdr_ptr[0] = &(function_factory::linelast_disp::init_disp);
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = NULL;
 
-   // Free end of cantilever
+   // Right
    battr[1] = 2;
    bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_force::tip_force);
 
-   /* homogeneous Neumann bc */
+   // Up
    battr[2] = 3;
    bdr_type[2] = BoundaryType::NEUMANN;
    vector_bdr_ptr[2] = NULL;
+
+   // Left
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_disp::init_disp);
+
+   // None
+   battr[4] = 5;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
    
    // Set materials
    general_scalar_ptr.SetSize(2);
@@ -870,6 +946,70 @@ LinElastForceCantilever::LinElastForceCantilever()
 
    general_vector_ptr.SetSize(1);
    general_vector_ptr[0] = NULL;
+}
+
+LinElastFrameWind::LinElastFrameWind()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
+
+   // battr 1: Wind load
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = &(function_factory::linelast_frame_wind::wind_load);
+
+   // battr 2: Line load (to be implemented)
+   battr[1] = 2;
+   bdr_type[1] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[1] = NULL;
+
+   // battr 3: Other load (To be implemented)
+   battr[2] = 3;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[2] = NULL;
+
+   // battr 4: Dirichlet BCs
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_frame_wind::dirichlet);
+
+   // battr 5: Unloaded
+   battr[4] = 3;
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
+
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+   // Default values.
+   function_factory::linelast_problem::_lambda = 3846153846.0;
+   function_factory::linelast_problem::_mu = 769230769.0;
+   function_factory::linelast_frame_wind::qwind_f = 500.0; // [N]
+   function_factory::linelast_frame_wind::density = 78.5; //[kg/m2]
+   function_factory::linelast_frame_wind::g = 9.81; 
+
+   param_map["lambda"] = 0;
+   param_map["mu"] = 1;
+   param_map["qwind_f"] = 2;
+   param_map["density"] = 3;
+   param_map["g"] = 4;
+
+   param_ptr.SetSize(5);
+   param_ptr[0] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[1] = &(function_factory::linelast_problem::_mu);
+   param_ptr[2] = &(function_factory::linelast_frame_wind::qwind_f);
+   param_ptr[3] = &(function_factory::linelast_frame_wind::density);
+   param_ptr[4] = &(function_factory::linelast_frame_wind::g);
+
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
+
+   vector_rhs_ptr = &(function_factory::linelast_frame_wind::gravity_load);
 }
 
 /*
@@ -928,46 +1068,37 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    battr.SetSize(5);
    vector_bdr_ptr.SetSize(5);
 
-   // Left
+   // Down
    battr[0] = 1;
-   bdr_type[0] = BoundaryType::DIRICHLET;
-   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::left_disp);
+   bdr_type[0] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[0] = &(function_factory::linelast_cwtrain::down_disp);
 
    // Right
    battr[1] = 2;
    bdr_type[1] = BoundaryType::NEUMANN;
    vector_bdr_ptr[1] = &(function_factory::linelast_cwtrain::right_disp);
 
-   // None
-   battr[2] = 5;
-   bdr_type[2] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[2] = NULL;
-
    // Up
+   battr[2] = 3;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[2] = &(function_factory::linelast_cwtrain::up_disp);
+
+   // Left
    battr[3] = 4;
-   bdr_type[3] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::up_disp);
+   bdr_type[3] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[3] = &(function_factory::linelast_cwtrain::left_disp);
 
-   // Down
-   battr[4] = 3;
+   // None
+   battr[4] = 5;
    bdr_type[4] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[4] = &(function_factory::linelast_cwtrain::down_disp);
-
+   vector_bdr_ptr[4] = NULL;
 
    // Set materials
    general_scalar_ptr.SetSize(2);
    general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
    general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
-   // Default values.
-   function_factory::linelast_cwtrain::l_ux= 0.0;
-   function_factory::linelast_cwtrain::l_uy = 0.0;
-   function_factory::linelast_cwtrain::r_fx = 0.0;
-   function_factory::linelast_cwtrain::r_fy = 0.0;
-   function_factory::linelast_cwtrain::u_fx = 0.0;
-   function_factory::linelast_cwtrain::u_fy = 0.0;
-   function_factory::linelast_cwtrain::d_fx = 0.0;
-   function_factory::linelast_cwtrain::d_fy = 0.0;
+   // Probabilities default values
    function_factory::linelast_cwtrain::lx = 0.0;
    function_factory::linelast_cwtrain::ly = 0.0;
    function_factory::linelast_cwtrain::rx = 0.0;
@@ -976,21 +1107,50 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    function_factory::linelast_cwtrain::dy = 0.0;
    function_factory::linelast_cwtrain::ux = 0.0;
    function_factory::linelast_cwtrain::uy = 0.0;
+   function_factory::linelast_cwtrain::bx = 0.0;
+   function_factory::linelast_cwtrain::by = 0.0;
+
+   // Constant force default values
+   function_factory::linelast_cwtrain::l_ux= 0.0;
+   function_factory::linelast_cwtrain::l_uy = 0.0;
+   function_factory::linelast_cwtrain::r_fx = 0.0;
+   function_factory::linelast_cwtrain::r_fy = 0.0;
+   function_factory::linelast_cwtrain::u_fx = 0.0;
+   function_factory::linelast_cwtrain::u_fy = 0.0;
+   function_factory::linelast_cwtrain::d_fx = 0.0;
+   function_factory::linelast_cwtrain::d_fy = 0.0;
+   function_factory::linelast_cwtrain::b_fx = 0.0;
+   function_factory::linelast_cwtrain::b_fy = 0.0;
+
+   // Amplitudes default values
+   function_factory::linelast_cwtrain::xu_amp = 1.0;
+   function_factory::linelast_cwtrain::yu_amp = 1.0;
+   function_factory::linelast_cwtrain::xf_amp = 1.0;
+   function_factory::linelast_cwtrain::yf_amp = 1.0;
+   function_factory::linelast_cwtrain::bxf_amp = 1.0;
+   function_factory::linelast_cwtrain::byf_amp = 1.0;
+
+   // Frequencies default values
+   function_factory::linelast_cwtrain::xu_freq = 1.0;
+   function_factory::linelast_cwtrain::yu_freq = 1.0;
+   function_factory::linelast_cwtrain::xf_freq = 1.0;
+   function_factory::linelast_cwtrain::yf_freq = 1.0;
+   function_factory::linelast_cwtrain::bxf_freq = 1.0;
+   function_factory::linelast_cwtrain::byf_freq = 1.0;
+
+   // Sine offsets default values
+   function_factory::linelast_cwtrain::yu_offset = 0.0;
+   function_factory::linelast_cwtrain::xu_offset = 0.0;
+   function_factory::linelast_cwtrain::xf_offset = 0.0;
+   function_factory::linelast_cwtrain::yf_offset = 0.0;
+   function_factory::linelast_cwtrain::bxf_offset = 0.0;
+   function_factory::linelast_cwtrain::byf_offset = 0.0;
+   
+   // Material parameters default values
    function_factory::linelast_problem::_lambda = 1.0;
    function_factory::linelast_problem::_mu = 1.0;
-   function_factory::linelast_cwtrain::xu_amp = 1.0;
-   function_factory::linelast_cwtrain::xu_freq = 1.0;
-   function_factory::linelast_cwtrain::xu_offset = 0.0;
-   function_factory::linelast_cwtrain::xf_amp = 1.0;
-   function_factory::linelast_cwtrain::xf_freq = 1.0;
-   function_factory::linelast_cwtrain::xf_offset = 0.0;
-   function_factory::linelast_cwtrain::yu_amp = 1.0;
-   function_factory::linelast_cwtrain::yu_freq = 1.0;
-   function_factory::linelast_cwtrain::yu_offset = 0.0;
-   function_factory::linelast_cwtrain::yf_amp = 1.0;
-   function_factory::linelast_cwtrain::yf_freq = 1.0;
-   function_factory::linelast_cwtrain::yf_offset = 0.0;
 
+   // Parameter map
    param_map["l_ux"] = 0;
    param_map["l_uy"] = 1;
    param_map["r_fx"] = 2;
@@ -1021,8 +1181,18 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_map["yf_amp"] = 27;
    param_map["yf_freq"] = 28;
    param_map["yf_offset"] = 29;
+   param_map["b_fx"] = 30;
+   param_map["b_fy"] = 31;
+   param_map["bxf_amp"] = 32;
+   param_map["bxf_freq"] = 33;
+   param_map["bxf_offset"] = 34;
+   param_map["byf_amp"] = 35;
+   param_map["byf_freq"] = 36;
+   param_map["byf_offset"] = 37;
+   param_map["bx"] = 38;
+   param_map["by"] = 39;
 
-   param_ptr.SetSize(30);
+   param_ptr.SetSize(40);
    param_ptr[0] = &(function_factory::linelast_cwtrain::l_ux);
    param_ptr[1] = &(function_factory::linelast_cwtrain::l_uy);
    param_ptr[2] = &(function_factory::linelast_cwtrain::r_fx);
@@ -1054,6 +1224,17 @@ LinElastComponentWiseTrain::LinElastComponentWiseTrain()
    param_ptr[28] = &(function_factory::linelast_cwtrain::yf_freq);
    param_ptr[29] = &(function_factory::linelast_cwtrain::yf_offset);
 
+   param_ptr[30] = &(function_factory::linelast_cwtrain::b_fx);
+   param_ptr[31] = &(function_factory::linelast_cwtrain::b_fy);
+   param_ptr[32] = &(function_factory::linelast_cwtrain::bxf_amp);
+   param_ptr[33] = &(function_factory::linelast_cwtrain::bxf_freq);
+   param_ptr[34] = &(function_factory::linelast_cwtrain::bxf_offset);
+   param_ptr[35] = &(function_factory::linelast_cwtrain::byf_amp);
+   param_ptr[36] = &(function_factory::linelast_cwtrain::byf_freq);
+   param_ptr[37] = &(function_factory::linelast_cwtrain::byf_offset);
+   param_ptr[38] = &(function_factory::linelast_cwtrain::bx);
+   param_ptr[39] = &(function_factory::linelast_cwtrain::by);
+
    general_vector_ptr.SetSize(1);
-   general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
+   general_vector_ptr[0] = &(function_factory::linelast_cwtrain::body_force); 
 }

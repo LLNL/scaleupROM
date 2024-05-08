@@ -49,6 +49,10 @@ protected:
    double alpha = -1.0;
    double kappa = -1.0;
 
+   // Initial Lame parameters if not set by parameterized problem
+   double lambda = 1.0;
+   double mu = 1.0;
+
    // Initial positions
    VectorFunctionCoefficient *init_x = NULL;
 

@@ -11,8 +11,12 @@ from paraview.simple import *
 #### disable automatic camera reset on 'Show'
 paraview.simple._DisableFirstRenderCameraReset()
 
-Nk = 4
-filenames = ['paraview_output_%d' % k for k in range(Nk)]
+import os
+
+prefix = "paraview_output"
+os.chdir(root_dir)
+filenames = [f for f in os.listdir('.') if os.path.isdir(f) and '_'.join(f.split('_')[0:-1]) == prefix]
+Nk = len(filenames)
 
 paraview_output_pvd = []
 paraview_output_pvdDisplay = []
