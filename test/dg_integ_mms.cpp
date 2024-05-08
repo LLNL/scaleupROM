@@ -35,6 +35,27 @@ TEST(DG_BDR_NORMAL_LF_Test, Test_Tri)
    return;
 }
 
+TEST(DG_TEMAM_Test, Test_Quad)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+   config.dict_["discretization"]["full-discrete-galerkin"] = false;
+   mms::fem::dg_temam::CheckConvergence();
+
+   return;
+}
+
+TEST(DG_TEMAM_Test, Test_Tri)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+   config.dict_["discretization"]["full-discrete-galerkin"] = false;
+   config.dict_["mesh"]["filename"] = "meshes/square.tri.mesh";
+   mms::fem::dg_temam::CheckConvergence();
+
+   return;
+}
+
 void _PrintMatrix(string filename, DenseMatrix &mat)
 {
    std::ofstream outfile(filename);

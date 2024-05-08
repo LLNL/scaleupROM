@@ -5,6 +5,9 @@
 #include "mms_suite.hpp"
 #include<gtest/gtest.h>
 #include "dg_linear.hpp"
+#include "nonlinear_integ.hpp"
+#include "hyperreduction_integ.hpp"
+#include "interfaceinteg.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -880,6 +883,155 @@ void CheckConvergence()
 }
 
 }  // namespace dg_bdr_normal_lf
+
+namespace dg_temam
+{
+
+void uFun_ex(const Vector & x, Vector & u)
+{
+   double xi(x(0));
+   double yi(x(1));
+   assert(x.Size() == 2);
+
+   u(0) = cos(xi) * sin(yi);
+   u(1) = - sin(xi) * cos(yi);
+}
+
+void usFun_ex(const Vector & x, Vector & us)
+{
+   double xi(x(0));
+   double yi(x(1));
+   assert(x.Size() == 2);
+
+   us(0) = cos(xi) + sin(yi);
+   us(1) = - sin(xi) + cos(yi);
+}
+
+void EvalWithRefinement(const int num_refinement, int &order_out, double &product1, double &product2)
+{  
+   // 1. Parse command-line options.
+   std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
+   bool use_dg = config.GetOption<bool>("discretization/full-discrete-galerkin", false);
+   int order = config.GetOption<int>("discretization/order", 1);
+   order_out = order;
+
+   Mesh *mesh = new Mesh(mesh_file.c_str(), 1, 1);
+   int dim = mesh->Dimension();
+
+   for (int l = 0; l < num_refinement; l++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   FiniteElementCollection *h1_coll(new H1_FECollection(order, dim));
+
+   FiniteElementSpace *fes;
+   if (use_dg)
+   {
+      fes = new FiniteElementSpace(mesh, dg_coll, dim);
+   }
+   else
+   {
+      fes = new FiniteElementSpace(mesh, h1_coll, dim);
+   }
+
+   VectorFunctionCoefficient ucoeff(dim, uFun_ex);
+   VectorFunctionCoefficient uscoeff(dim, usFun_ex);
+   ConstantCoefficient one(1.0), minus_one(-1.0), half(0.5), minus_half(-0.5);
+
+   // 12. Create the grid functions u and p. Compute the L2 error norms.
+   GridFunction u(fes), us(fes);
+   Vector Nu(u);
+
+   u.ProjectCoefficient(ucoeff);
+   us.ProjectCoefficient(uscoeff);
+
+   IntegrationRule gll_ir_nl = IntRules.Get(fes->GetFE(0)->GetGeomType(),
+                                             (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
+
+   auto *domain_integ1 = new VectorConvectionTrilinearFormIntegrator(one);
+   domain_integ1->SetIntRule(&gll_ir_nl);
+
+   NonlinearForm nform1(fes);
+   nform1.AddDomainIntegrator(domain_integ1);
+
+   nform1.Mult(u, Nu);
+   product1 = (us * Nu);
+
+   auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_one);
+   auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff, &one);
+   // auto *temam_integ1 = new VectorConvectionTrilinearFormIntegrator(half);
+   // auto *temam_integ2 = new IncompressibleInviscidFluxNLFIntegrator(minus_half);
+   // auto *temam_integ3 = new DGTemamFluxIntegrator(minus_half);
+   // auto *temam_bdr_integ1 = new DGBdrTemamLFIntegrator(ucoeff, &minus_half);
+   // temam_integ1->SetIntRule(&gll_ir_nl);
+   temam_integ2->SetIntRule(&gll_ir_nl);
+   // temam_integ3->SetIntRule(&gll_ir_nl);
+   temam_bdr_integ1->SetIntRule(&gll_ir_nl);
+
+   NonlinearForm nform2(fes);
+   // nform2.AddDomainIntegrator(temam_integ1);
+   nform2.AddDomainIntegrator(temam_integ2);
+   // if (use_dg)
+   //    nform2.AddInteriorFaceIntegrator(temam_integ3);
+
+   LinearForm gform(fes);
+   gform.AddBdrFaceIntegrator(temam_bdr_integ1);
+   // gform.AddBoundaryIntegrator(temam_bdr_integ1);
+   gform.Assemble();
+
+   nform2.Mult(u, Nu);
+   product2 = (us * Nu) + (us * gform);
+
+   // 17. Free the used memory.
+   delete fes;
+   delete dg_coll;
+   delete h1_coll;
+   delete mesh;
+
+   return;
+}
+
+void CheckConvergence()
+{
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+
+   double Lx = 1.0, Ly = 1.0;
+   /* < us, u dot grad u >_D */
+   double product_ex = -0.561514263166004384178127162067055248532791;
+   /* - < grad us, u kron u >_D */
+   double product_ex2 = 0.153111262927311;
+   printf("(us, u_d dot grad u_d)_ex = %.15E\n", product_ex);
+
+   printf("Num. Refine.\tRel. Error\tConv Rate\tProduct\tProduct_ex\n");
+
+   Vector conv_rate(num_refine);
+   conv_rate = 0.0;
+   double error1 = 0.0;
+   for (int r = 0; r < num_refine; r++)
+   {
+      int order = -1;
+      double product1, product2;
+      EvalWithRefinement(r, order, product1, product2);
+
+      double error = abs(product2 - product_ex) / abs(product_ex);
+      
+      if (r > 0)
+         conv_rate(r) = error1 / error;
+      printf("%d\t%.5E\t%.5E\t%.5E\t%.5E\n", r, error, conv_rate(r), product2, product_ex);
+
+      // reported convergence rate
+      if (r > 0)
+         EXPECT_TRUE(conv_rate(r) > pow(2.0, order+1) - 0.1);
+
+      error1 = error;
+   }
+
+   return;
+}
+
+}  // namespace dg_temam
 
 }  // namespace fem
 

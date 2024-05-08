@@ -368,6 +368,7 @@ void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
       {
          CalcOrtho(Tr.Jacobian(), nor);
       }
+      // Q.Eval(Qvec, *(Tr.Face), ip);
       Q.Eval(Qvec, *(Tr.Face), ip);
 
       el.CalcShape(eip, shape);
@@ -475,7 +476,7 @@ void DGBdrTemamLFIntegrator::AssembleRHSElementVect(
       w = ip.weight;
       if (Z) w *= Z->Eval(*(Tr.Face), eip);
 
-      Q.Eval(Qvec, *(Tr.Face), eip);
+      Q.Eval(Qvec, *Tr.Elem1, eip);
 
       el.CalcShape(eip, shape);
 
