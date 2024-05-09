@@ -13,6 +13,7 @@ file(COPY linelast.opt_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/l
 file(COPY linelast.opt_comp_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY config/linelast.optfom.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY config/linelast.simpleL3D.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY linelast.simpleL3D.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
