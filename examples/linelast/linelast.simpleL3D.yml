@@ -5,6 +5,7 @@ main:
 
 mesh:
   type: component-wise
+  uniform_refinement: 1
   component-wise:
     global_config: "config/linelast.simpleL3D.h5"
     components:
@@ -44,8 +45,8 @@ sample_generation:
     - key: single_run/linelast_disp/rdisp_f
       type: double
       sample_size: 6
-      minimum: 10.0
-      maximum: 10.0
+      minimum: 0.5
+      maximum: 0.5
 
 basis:
   prefix: "linelast_Lbeam"
