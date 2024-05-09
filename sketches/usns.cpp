@@ -9,6 +9,7 @@
 #include "linalg_utils.hpp"
 #include "nonlinear_integ.hpp"
 #include "hyperreduction_integ.hpp"
+#include "interfaceinteg.hpp"
 #include "dg_mixed_bilin.hpp"
 #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
@@ -70,6 +71,8 @@ protected:
    Array<int> block_offsets;
    Array<int> vblock_offsets;
 
+   Array<int> neumann_attr;
+
    BlockVector *x = NULL;     // owned
    BlockVector *rhs0 = NULL;   // owned
 
@@ -86,6 +89,7 @@ protected:
 
    ConstantCoefficient *nu_coeff = NULL;  // owned
    ConstantCoefficient *zeta_coeff = NULL;  // owned
+   ConstantCoefficient *minus_zeta = NULL;  // owned
    ConstantCoefficient *minus_one = NULL; // owned
 
 public:
@@ -136,6 +140,7 @@ public:
 
       nu_coeff = new ConstantCoefficient(nu);
       zeta_coeff = new ConstantCoefficient(zeta);
+      minus_zeta = new ConstantCoefficient(-zeta);
       kappa = (order + 2) * (order + 2);
    }
 
@@ -157,6 +162,7 @@ public:
 
       delete nu_coeff;
       delete zeta_coeff;
+      delete minus_zeta;
       delete minus_one;
 
       delete system_mat;
@@ -191,7 +197,24 @@ public:
          div->AddBdrFaceIntegrator(new DGNormalFluxIntegrator, *u_ess_attr[k]);
       }
 
-      conv->AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(*zeta_coeff));
+      /* domain integrator */
+      // conv->AddDomainIntegrator(new VectorConvectionTrilinearFormIntegrator(*zeta_coeff));
+      // /* Lax-Friedrichs integrator */
+      conv->AddDomainIntegrator(new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta));
+      conv->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
+      for (int k = 0; k < u_ess_attr.Size(); k++)
+      {
+         conv->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta, u_coeff[k]), *u_ess_attr[k]);
+      }
+      /* Lax-Friedrichs solver needs neumann boundary integrator as well */
+      neumann_attr.SetSize(mesh->bdr_attributes.Max());
+      neumann_attr = 1;
+      for (int k = 0; k < u_ess_attr.Size(); k++)
+         for (int b = 0; b < mesh->bdr_attributes.Max(); b++)
+         {
+            neumann_attr[b] = (neumann_attr[b] && !((*u_ess_attr[k])[b]));
+         }
+      conv->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta), neumann_attr);
 
       // fform->AddDomainIntegrator(new VectorDomainLFIntegrator(fcoeff));
       for (int k = 0; k < u_ess_attr.Size(); k++)
@@ -284,6 +307,79 @@ public:
    {
       assert(!isnan(u->Min()) && !isnan(u->Max()));
       assert(!isnan(p->Min()) && !isnan(p->Max()));
+   }
+
+   double ComputeCFL(double dt)
+   {
+      int vdim = ufes->GetVDim();
+
+      Vector ux, uy, uz;
+      Vector ur, us, ut;
+      double cflx = 0.0;
+      double cfly = 0.0;
+      double cflz = 0.0;
+      double cflm = 0.0;
+      double cflmax = 0.0;
+
+      for (int e = 0; e < ufes->GetNE(); ++e)
+      {
+         const FiniteElement *fe = ufes->GetFE(e);
+         const IntegrationRule &ir = IntRules.Get(fe->GetGeomType(),
+                                                fe->GetOrder());
+         ElementTransformation *tr = ufes->GetElementTransformation(e);
+
+         u->GetValues(e, ir, ux, 1);
+         ur.SetSize(ux.Size());
+         u->GetValues(e, ir, uy, 2);
+         us.SetSize(uy.Size());
+         if (vdim == 3)
+         {
+            u->GetValues(e, ir, uz, 3);
+            ut.SetSize(uz.Size());
+         }
+
+         double hmin = mesh->GetElementSize(e, 1) /
+                     (double) ufes->GetElementOrder(0);
+
+         for (int i = 0; i < ir.GetNPoints(); ++i)
+         {
+            const IntegrationPoint &ip = ir.IntPoint(i);
+            tr->SetIntPoint(&ip);
+            const DenseMatrix &invJ = tr->InverseJacobian();
+            const double detJinv = 1.0 / tr->Jacobian().Det();
+
+            if (vdim == 2)
+            {
+               ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)) * detJinv;
+               us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)) * detJinv;
+            }
+            else if (vdim == 3)
+            {
+               ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)
+                        + uz(i) * invJ(2, 0))
+                     * detJinv;
+               us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)
+                        + uz(i) * invJ(2, 1))
+                     * detJinv;
+               ut(i) = (ux(i) * invJ(0, 2) + uy(i) * invJ(1, 2)
+                        + uz(i) * invJ(2, 2))
+                     * detJinv;
+            }
+
+            cflx = fabs(dt * ux(i) / hmin);
+            cfly = fabs(dt * uy(i) / hmin);
+            if (vdim == 3)
+            {
+               cflz = fabs(dt * uz(i) / hmin);
+            }
+            cflm = cflx + cfly + cflz;
+            cflmax = fmax(cflmax, cflm);
+         }
+      }
+
+      double cflmax_global = cflmax;
+
+      return cflmax_global;
    }
 };
 
@@ -403,7 +499,8 @@ int main(int argc, char *argv[])
    {
       if (step % vis_interval == 0)
       {
-         printf("time step: %d\n", step);
+         double cfl = navier.ComputeCFL(dt);
+         printf("time step: %d, CFL: %.3e\n", step, cfl);
          pd.SetCycle(step);
          pd.SetTime(time);
          pd.Save();

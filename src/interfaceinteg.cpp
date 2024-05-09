@@ -1315,6 +1315,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
       u2.SetSize(dim);
    }
 
+   bool eval2 = (ndofs2 || UD);
+
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
@@ -1353,30 +1355,34 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
          el2.CalcShape(eip2, shape2);
          udof2.MultTranspose(shape2, u2);
       }
-
-      w = ip.weight * Tr.Weight();
-      if (Q) { w *= Q->Eval(Tr, ip); }
-
-      nor *= w;
+      else if (UD)
+         UD->Eval(u2, *Tr.Elem1, eip1);
 
       un1 = nor * u1;
-      un2 = (ndofs2) ? nor * u2 : 0.0;
+      un2 = (eval2) ? nor * u2 : 0.0;
 
       flux.Set(un1, u1);
-      if (ndofs2)
+      if (eval2)
       {
          flux *= 0.5;
          flux.Add(0.5 * un2, u2);
       }
 
-      un = max(abs(un1), abs(un2));
-      flux.Add(un, u1);
-      if (ndofs2)
+      if (eval2)
+      {
+         // un = max(abs(un1), abs(un2));
+         un = std::max(std::sqrt(u1 * u1), std::sqrt(u2 * u2));
+         un *= std::sqrt(nor * nor);
+         flux.Add(un, u1);
          flux.Add(-un, u2);
+      }
 
-      AddMultVWt(shape1, flux, elv1);
+      w = ip.weight;
+      if (Q) { w *= Q->Eval(Tr, ip); }
+
+      AddMult_a_VWt(-w, shape1, flux, elv1);
       if (ndofs2)
-         AddMult_a_VWt(-1.0, shape2, flux, elv2);
+         AddMult_a_VWt(w, shape2, flux, elv2);
    }
 }
 
@@ -1449,13 +1455,13 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
          udof2.MultTranspose(shape2, u2);
       }
 
-      w = ip.weight * Tr.Weight();
+      w = ip.weight * Tr.Face->Weight();
       if (Q) { w *= Q->Eval(Tr, ip); }
 
-      nor *= w;
-      // Just for the average operator gradient.
-      if (ndofs2)
-         nor *= 0.5;
+      nor *= 0.5 * w;
+      // // Just for the average operator gradient.
+      // if (ndofs2)
+      //    nor *= 0.5;
 
       un1 = nor * u1;
       un2 = (ndofs2) ? nor * u2 : 0.0;
@@ -1491,9 +1497,10 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
          }
       }
 
-      // Recover 1/2 factor on normal vector.
-      if (ndofs2)
-         nor *= 2.0;
+      if (!ndofs2) continue;
+      // // Recover 1/2 factor on normal vector.
+      // if (ndofs2)
+      nor *= 2.0;
 
       // un1 as maximum absolute eigenvalue, un2 as the sign.
       un = max( abs(un1), abs(un2) );

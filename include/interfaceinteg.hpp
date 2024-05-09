@@ -260,8 +260,14 @@ public:
 
 /*
    Interior face, interface integrator
-   < [v], {uu \dot n} + \Lambda * [u] >
-   \Lambda = max( | u- \dot n |, | u+ \dot n | )
+   < [v], {uu \dot n} + \Lambda / 2 * [u] >
+   \Lambda = max( 2 * | u- \dot n |, 2 * | u+ \dot n | )
+
+   For boundary face,
+   (i) Neumann condition (UD == NULL)
+   < v-, (u-)(u-) \dot n >
+   (ii) Dirichlet condition (UD != NULL)
+   Same formulation, u+ = UD
 */
 class DGLaxFriedrichsFluxIntegrator : public InterfaceNonlinearFormIntegrator
 {
@@ -269,6 +275,7 @@ private:
    int dim, ndofs1, ndofs2, nvdofs;
    double w, un1, un2, un;
    Coefficient *Q{};
+   VectorCoefficient *UD = NULL;
 
    Vector nor, flux, shape1, shape2, u1, u2, tmp_vec;
    DenseMatrix udof1, udof2, elv1, elv2;
@@ -277,8 +284,8 @@ private:
    // precomputed basis value at the sample point.
    Array<DenseMatrix *> shapes1, shapes2;
 public:
-   DGLaxFriedrichsFluxIntegrator(Coefficient &q, const IntegrationRule *ir = NULL)
-      : InterfaceNonlinearFormIntegrator(true, ir), Q(&q) {}
+   DGLaxFriedrichsFluxIntegrator(Coefficient &q, VectorCoefficient *ud = NULL, const IntegrationRule *ir = NULL)
+      : InterfaceNonlinearFormIntegrator(true, ir), Q(&q), UD(ud) {}
 
    void AssembleFaceVector(const FiniteElement &el1,
                            const FiniteElement &el2,
