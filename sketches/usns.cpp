@@ -279,6 +279,12 @@ public:
 
       time += dt;
    }
+
+   void SanityCheck()
+   {
+      assert(!isnan(u->Min()) && !isnan(u->Max()));
+      assert(!isnan(p->Min()) && !isnan(p->Max()));
+   }
 };
 
 int main(int argc, char *argv[])
@@ -404,6 +410,7 @@ int main(int argc, char *argv[])
       }
 
       navier.Step(time, step);
+      navier.SanityCheck();
    }
 
    // 17. Free the used memory.
