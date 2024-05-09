@@ -21,3 +21,6 @@ file(COPY meshes/rod2D_V.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/
 file(COPY meshes/optjoint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/optbeam.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/optcol.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/3d_joint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/3d_beam.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/3d_col.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
