@@ -1386,6 +1386,65 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
    }
 }
 
+void DGLaxFriedrichsFluxIntegrator::ComputeGradFluxDotN(
+   const Vector &u1, const Vector &u2, const Vector &nor,
+   const bool &eval2, const bool &ndofs2,
+   DenseMatrix &gradu1, DenseMatrix &gradu2) const
+{
+   const int dim_ = u1.Size();
+   gradu1 = 0.0; gradu2 = 0.0;
+
+   double u1mag = std::sqrt(u1 * u1);
+   double u2mag = std::sqrt(u2 * u2);
+   double normag = std::sqrt(nor * nor);
+   bool u1_lg_u2 = (u1mag >= u2mag);
+
+   double un = std::max(u1mag, u2mag);
+   un *= normag;
+   Vector nor_(nor);
+   if (eval2) nor_ *= 0.5;
+
+   double un1 = nor_ * u1;
+   double un2 = (eval2) ? nor_ * u2 : 0.0;
+
+   for (int di = 0; di < dim_; di++)
+      gradu1(di, di) += un1;
+   
+   AddMultVWt(u1, nor_, gradu1);
+
+   /* Done if Neumann condition */
+   if (!eval2)
+      return;
+
+   for (int di = 0; di < dim_; di++)
+   {
+      /* un1 is already added for gradu1 */
+      gradu1(di, di) += un;
+
+      /* added only for interior face */
+      if (ndofs2)
+         gradu2(di, di) += un2 - un;
+   }
+
+   if (ndofs2)
+      AddMultVWt(u2, nor_, gradu2);
+
+   /* if Dirichlet condition and u2 is larger, then done here */
+   if (!ndofs2 && !u1_lg_u2)
+      return;
+
+   // [ u ] = u1 - u2
+   Vector du(u1);
+   du.Add(-1.0, u2);
+
+   if (u1_lg_u2)
+      AddMult_a_VWt(normag / u1mag, du, u1, gradu1);
+   else
+      AddMult_a_VWt(normag / u2mag, du, u2, gradu2);
+
+   return;
+}
+
 void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                                                       const FiniteElement &el2,
                                                       FaceElementTransformations &Tr,
@@ -1415,6 +1474,9 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
       elmat_comp21.SetSize(ndofs2, ndofs1);
       elmat_comp22.SetSize(ndofs2);
    }
+
+   bool eval2 = (ndofs2 || UD);
+   DenseMatrix gradu1(dim), gradu2(dim);
 
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
@@ -1454,17 +1516,10 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
          el2.CalcShape(eip2, shape2);
          udof2.MultTranspose(shape2, u2);
       }
+      else if (UD)
+         UD->Eval(u2, *Tr.Elem1, eip1);
 
-      w = ip.weight * Tr.Face->Weight();
-      if (Q) { w *= Q->Eval(Tr, ip); }
-
-      nor *= 0.5 * w;
-      // // Just for the average operator gradient.
-      // if (ndofs2)
-      //    nor *= 0.5;
-
-      un1 = nor * u1;
-      un2 = (ndofs2) ? nor * u2 : 0.0;
+      ComputeGradFluxDotN(u1, u2, nor, eval2, ndofs2, gradu1, gradu2);
 
       MultVVt(shape1, elmat_comp11);
       if (ndofs2)
@@ -1475,80 +1530,23 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
          MultVVt(shape2, elmat_comp22);
       }
 
+      w = ip.weight;
+      if (Q) { w *= Q->Eval(Tr, ip); }
+
       for (int di = 0; di < dim; di++)
       {
-         elmat.AddMatrix(un1, elmat_comp11, di * ndofs1, di * ndofs1);
-         if (ndofs2)
-         {
-            elmat.AddMatrix(-un1, elmat_comp21, di * ndofs2 + dim * ndofs1, di * ndofs1);
-            elmat.AddMatrix(un2, elmat_comp12, di * ndofs1, di * ndofs2 + dim * ndofs1);
-            elmat.AddMatrix(-un2, elmat_comp22, di * ndofs2 + dim * ndofs1, di * ndofs2 + dim * ndofs1);
-         }
-
          for (int dj = 0; dj < dim; dj++)
          {
-            elmat.AddMatrix(u1(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
+            elmat.AddMatrix(-w * gradu1(di, dj), elmat_comp11, di * ndofs1, dj * ndofs1);
             if (ndofs2)
             {
-               elmat.AddMatrix(-u1(di) * nor(dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
-               elmat.AddMatrix(u2(di) * nor(dj), elmat_comp12, di * ndofs1, dj * ndofs2 + dim * ndofs1);
-               elmat.AddMatrix(-u2(di) * nor(dj), elmat_comp22, di * ndofs2 + dim * ndofs1, dj * ndofs2 + dim * ndofs1);
+               elmat.AddMatrix(-w * gradu2(di, dj), elmat_comp12, di * ndofs1, dj * ndofs2 + dim * ndofs1);
+               elmat.AddMatrix(w * gradu1(di, dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
+               elmat.AddMatrix(w * gradu2(di, dj), elmat_comp22, di * ndofs2 + dim * ndofs1, dj * ndofs2 + dim * ndofs1);
             }
          }
       }
-
-      if (!ndofs2) continue;
-      // // Recover 1/2 factor on normal vector.
-      // if (ndofs2)
-      nor *= 2.0;
-
-      // un1 as maximum absolute eigenvalue, un2 as the sign.
-      un = max( abs(un1), abs(un2) );
-      if (ndofs2) un *= 2.0;
-      
-      double sgn = 0.0;
-      bool u1_lg_u2 = (abs(un1) >= abs(un2));
-      if (u1_lg_u2)
-      {
-         sgn = (un1 >= 0.0) ? 1.0 : -1.0;
-      }
-      else
-      {
-         sgn = (un2 >= 0.0) ? 1.0 : -1.0;
-      }
-
-      // [ u ] = u1 - u2
-      if (ndofs2)
-         u1.Add(-1.0, u2);
-
-      for (int di = 0; di < dim; di++)
-      {
-         elmat.AddMatrix(un, elmat_comp11, di * ndofs1, di * ndofs1);
-         if (ndofs2)
-         {
-            elmat.AddMatrix(-un, elmat_comp21, di * ndofs2 + dim * ndofs1, di * ndofs1);
-            elmat.AddMatrix(-un, elmat_comp12, di * ndofs1, di * ndofs2 + dim * ndofs1);
-            elmat.AddMatrix(un, elmat_comp22, di * ndofs2 + dim * ndofs1, di * ndofs2 + dim * ndofs1);
-         }
-
-         // remember u1 in this loop is in fact [ u ] = u1 - u2.
-         for (int dj = 0; dj < dim; dj++)
-         {
-            if (u1_lg_u2)
-            {
-               elmat.AddMatrix(sgn * u1(di) * nor(dj), elmat_comp11, di * ndofs1, dj * ndofs1);
-               if (ndofs2)
-                  elmat.AddMatrix(-sgn * u1(di) * nor(dj), elmat_comp21, di * ndofs2 + dim * ndofs1, dj * ndofs1);
-            }
-            else
-            {
-               assert(ndofs2);
-               elmat.AddMatrix(sgn * u1(di) * nor(dj), elmat_comp12, di * ndofs1, dj * ndofs2 + dim * ndofs1);
-               elmat.AddMatrix(-sgn * u1(di) * nor(dj), elmat_comp22, di * ndofs2 + dim * ndofs1, dj * ndofs2 + dim * ndofs1);
-            }
-         }
-      }
-   }
+   }  // for (int pind = 0; pind < ir->GetNPoints(); ++pind)
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureVector(

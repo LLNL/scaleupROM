@@ -362,6 +362,10 @@ public:
                                  Array2D<DenseMatrix*> &quadmats) override;
 
 private:
+   void ComputeGradFluxDotN(const Vector &u1, const Vector &u2, const Vector &nor,
+                            const bool &eval2, const bool &ndofs2,
+                            DenseMatrix &gradu1, DenseMatrix &gradu2) const;
+
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
                                     FaceElementTransformations *T,
                                     DenseMatrix &basis,

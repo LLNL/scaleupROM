@@ -389,10 +389,8 @@ int main(int argc, char *argv[])
    domain_integ1->SetIntRule(&gll_ir_nl);
 
    auto *lf_integ1 = new IncompressibleInviscidFluxNLFIntegrator(minus_zeta);
-   auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(zeta_coeff);
-   auto *lf_bdr_integ1 = new DGLaxFriedrichsFluxIntegrator(zeta_coeff);
-   auto *lf_bdr_integ2 = new DGTraceIntegrator(ucoeff, 0.0, zeta);
-   auto *lf_bdr_integ3 = new DGBdrLaxFriedrichsLFIntegrator(ucoeff, &minus_zeta);
+   auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(minus_zeta);
+   auto *lf_bdr_integ1 = new DGLaxFriedrichsFluxIntegrator(minus_zeta, &ucoeff);
    lf_integ1->SetIntRule(&gll_ir_nl);
 
    auto *temam_integ1 = new VectorConvectionTrilinearFormIntegrator(half_zeta);
@@ -416,9 +414,6 @@ int main(int argc, char *argv[])
          if (use_dg)
             nVarf->AddInteriorFaceIntegrator(lf_integ2);
          nVarf->AddBdrFaceIntegrator(lf_bdr_integ1, u_ess_attr);
-         nVarf->AddBdrFaceIntegrator(lf_bdr_integ2, u_ess_attr);
-         
-         fform->AddBdrFaceIntegrator(lf_bdr_integ3, u_ess_attr);
       }
       break;
       case Scheme::TEMAM:
