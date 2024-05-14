@@ -14,6 +14,9 @@ file(COPY linelast.opt_comp_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/lin
 file(COPY config/linelast.optfom.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY config/linelast.simpleL3D.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY linelast.simpleL3D.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
+file(COPY config/linelast.3dcwfom.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY linelast.3dcw_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
+
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
@@ -26,3 +29,6 @@ file(COPY meshes/optcol.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/m
 file(COPY meshes/3d_joint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/3d_beam.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/3d_col.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/3dcw_joint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/3dcw_beamH.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/3dcw_beamV.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
