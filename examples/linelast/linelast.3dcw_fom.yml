@@ -6,13 +6,13 @@ main:
 mesh:
   type: component-wise
   component-wise:
-    global_config: "config/linelast.optfom.h5"
+    global_config: "config/linelast.3dcwfom.h5"
     components:
-      - name: "optjoint"
+      - name: "3dcw_joint"
         file: "meshes/3dcw_joint.mesh"
-      - name: "optbeam"
+      - name: "3dcw_beamH"
         file: "meshes/3dcw_beamH.mesh"
-      - name: "optcol"
+      - name: "3dcw_beamV"
         file: "meshes/3dcw_beamV.mesh"
   uniform_refinement: 0
 

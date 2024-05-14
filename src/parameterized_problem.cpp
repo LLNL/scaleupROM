@@ -977,7 +977,7 @@ LinElastFrameWind::LinElastFrameWind()
    vector_bdr_ptr[3] = &(function_factory::linelast_frame_wind::dirichlet);
 
    // battr 5: Unloaded
-   battr[4] = 3;
+   battr[4] = 5; // maybe change back to 3?
    bdr_type[4] = BoundaryType::NEUMANN;
    vector_bdr_ptr[4] = NULL;
 
@@ -1010,6 +1010,8 @@ LinElastFrameWind::LinElastFrameWind()
    general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
 
    vector_rhs_ptr = &(function_factory::linelast_frame_wind::gravity_load);
+   cout<<" here is: "<<endl;
+
 }
 
 /*
