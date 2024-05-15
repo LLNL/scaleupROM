@@ -126,50 +126,69 @@ namespace linelast_cwtrain
    // Probabilities
    extern double lx;
    extern double ly;
+   extern double lz;
    extern double rx;
    extern double ry;
+   extern double rz;
    extern double dx;
    extern double dy;
+   extern double dz;
    extern double ux;
    extern double uy;
+   extern double uz;
    extern double bx;
    extern double by;
+   extern double bz;
 
    // Constant force
    extern double l_ux;
    extern double l_uy;
+   extern double l_uz;
    extern double r_fx;
    extern double r_fy;
+   extern double r_fz;
    extern double u_fx;
    extern double u_fy;
+   extern double u_fz;
    extern double d_fx;
    extern double d_fy;
+   extern double d_fz;
    extern double b_fx;
    extern double b_fy;
+   extern double b_fz;
 
 // Amplitudes
 extern double xu_amp;
-extern double xf_amp;
 extern double yu_amp;
+extern double zu_amp;
+extern double xf_amp;
 extern double yf_amp;
+extern double zf_amp;
 extern double bxf_amp;
 extern double byf_amp;
+extern double bzf_amp;
 
 // Frequencies
 extern double xu_freq;
-extern double xf_freq;
 extern double yu_freq;
+extern double zu_freq;
+extern double xf_freq;
 extern double yf_freq;
+extern double zf_freq;
 extern double bxf_freq;
 extern double byf_freq;
+extern double bzf_freq;
 
 // Sine offsets
 extern double xu_offset;
-extern double xf_offset;
 extern double yu_offset;
+extern double zu_offset;
+extern double xf_offset;
 extern double yf_offset;
+extern double zf_offset;
 extern double bxf_offset;
 extern double byf_offset;
+extern double bzf_offset;
 
 double perturb_func(const double x, const double amp, const double freq, const double offset);
 void left_disp(const Vector &x, double t, Vector &u);
@@ -447,6 +466,12 @@ class LinElastComponentWiseTrain : public LinElastProblem
 {
 public:
    LinElastComponentWiseTrain();
+};
+
+class LinElastComponentWiseTrain3D : public LinElastComponentWiseTrain
+{
+public:
+   LinElastComponentWiseTrain3D();
 };
 
 ParameterizedProblem* InitParameterizedProblem();

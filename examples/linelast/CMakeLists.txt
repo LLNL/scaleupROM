@@ -15,7 +15,12 @@ file(COPY config/linelast.optfom.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/lin
 file(COPY config/linelast.simpleL3D.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY linelast.simpleL3D.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY config/linelast.3dcwfom.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.3dcw_train0.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.3dcw_train1.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.3dcw_train2.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.3dcw_train3.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY linelast.3dcw_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
+file(COPY linelast.3dcw_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
