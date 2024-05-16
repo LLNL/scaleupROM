@@ -298,6 +298,38 @@ void dirichlet(const Vector &x, double t, Vector &u)
 
 }  // namespace linelast_frame_wind
 
+namespace linelast_lattice_roof
+{
+double qsnow_f;
+double qpoint_f;
+double density;
+double g;
+
+void gravity_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(f.Size()-1) = -density * g;
+}
+
+void snow_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(f.Size()-1) = qsnow_f;
+}
+
+void point_load(const Vector &x, Vector &f)
+{
+   f = 0.0;
+   f(f.Size()-1) = qpoint_f;
+}
+
+void dirichlet(const Vector &x, Vector &u)
+{
+   u = 0.0;
+}
+
+} //namespace linelast_lattice_roof
+
 
 namespace advdiff_problem
 {
@@ -584,6 +616,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "linelast_frame_wind")
    {
       problem = new LinElastFrameWind();
+   }
+   else if (problem_name == "linelast_lattice_roof")
+   {
+      problem = new LinElastLatticeRoof();
    }
    else if (problem_name == "advdiff_flow_past_array")
    {
@@ -1307,6 +1343,73 @@ LinElastFrameWind::LinElastFrameWind()
 
    vector_rhs_ptr = &(function_factory::linelast_frame_wind::gravity_load);
 
+}
+
+LinElastLatticeRoof::LinElastLatticeRoof()
+    : LinElastProblem()
+{
+   // pointer to static function.
+   bdr_type.SetSize(5);
+   battr.SetSize(5);
+   vector_bdr_ptr.SetSize(5);
+
+   // battr 1: Dirichlet BCs
+   battr[0] = 1;
+   bdr_type[0] = BoundaryType::DIRICHLET;
+   vector_bdr_ptr[0] = &(function_factory::linelast_lattice_roof::dirichlet);
+
+   // battr 2: Point load
+   battr[1] = 2;
+   bdr_type[1] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[1] = &(function_factory::linelast_lattice_roof::point_load);
+
+   // battr 3: Snow load
+   battr[2] = 3;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[2] = &(function_factory::linelast_lattice_roof::point_load);
+
+   // battr 4: Unloaded
+   battr[3] = 4;
+   bdr_type[3] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[3] = NULL;
+
+   // battr 5: Unloaded
+   battr[4] = 5; // maybe change back to 3?
+   bdr_type[4] = BoundaryType::NEUMANN;
+   vector_bdr_ptr[4] = NULL;
+
+   // Set materials
+   general_scalar_ptr.SetSize(2);
+   general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+   general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+   // Default values.
+   function_factory::linelast_problem::_lambda = 384615384615.3846;
+   function_factory::linelast_problem::_mu = 76923076923.07692;
+   function_factory::linelast_lattice_roof::qsnow_f = 2000.0; // [N/m2]
+   function_factory::linelast_lattice_roof::qpoint_f = 100000.0; // [N/m2]
+   function_factory::linelast_lattice_roof::density = 78.0; //[kg/m2]
+   function_factory::linelast_lattice_roof::g = 9.81; 
+
+   param_map["lambda"] = 0;
+   param_map["mu"] = 1;
+   param_map["qsnow_f"] = 2;
+   param_map["qpoint_f"] = 3;
+   param_map["density"] = 4;
+   param_map["g"] = 5;
+
+   param_ptr.SetSize(6);
+   param_ptr[0] = &(function_factory::linelast_problem::_lambda);
+   param_ptr[1] = &(function_factory::linelast_problem::_mu);
+   param_ptr[2] = &(function_factory::linelast_lattice_roof::qsnow_f);
+   param_ptr[3] = &(function_factory::linelast_lattice_roof::qpoint_f);
+   param_ptr[4] = &(function_factory::linelast_lattice_roof::density);
+   param_ptr[5] = &(function_factory::linelast_lattice_roof::g);
+
+   general_vector_ptr.SetSize(1);
+   general_vector_ptr[0] = NULL; // for now, change if current params doesn't work well enough.
+
+   vector_rhs_ptr = &(function_factory::linelast_lattice_roof::gravity_load);
 }
 
 /*

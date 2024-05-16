@@ -33,12 +33,39 @@ visualization:
     prefix: paraview_output
 
 parameterized_problem:
-  name: linelast_frame_wind
+  name: linelast_lattice_roof
 
 single_run:
-  linelast_frame_wind:
-    qwind_f : 500.0
+  linelast_lattice_roof:
+    qsnow_f : 2000.0
    
+basis:
+  prefix: "linelast_cwtrain"
+  number_of_basis: 16
+  tags:
+    - name: "3dcw_joint"
+      number_of_basis: 16
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_3dcw_joint_snapshot%01d"
+    - name: "3dcw_beamH"
+      number_of_basis: 64
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_3dcw_beamH_snapshot%01d"
+    - name: "3dcw_beamV"
+      number_of_basis: 64
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_3dcw_beamV_snapshot%01d"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
 
 model_reduction:
   rom_handler_type: mfem

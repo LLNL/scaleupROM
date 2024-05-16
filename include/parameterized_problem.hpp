@@ -212,6 +212,23 @@ void dirichlet(const Vector &x, double t, Vector &u);
 
 }
 
+namespace linelast_lattice_roof
+{
+extern double qsnow_f;
+extern double qpoint_f;
+extern double density;
+extern double g;
+
+void snow_load(const Vector &x, Vector &f);
+
+void gravity_load(const Vector &x, Vector &f);
+
+void point_load(const Vector &x, Vector &f);
+
+void dirichlet(const Vector &x, Vector &u);
+
+}
+
 namespace advdiff_problem
 {
 
@@ -423,6 +440,12 @@ class LinElastFrameWind : public LinElastProblem
 {
 public:
    LinElastFrameWind();
+};
+
+class LinElastLatticeRoof : public LinElastProblem
+{
+public:
+   LinElastLatticeRoof();
 };
 
 namespace function_factory
