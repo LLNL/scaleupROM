@@ -4,6 +4,7 @@
 
 #include "interfaceinteg.hpp"
 #include "etc.hpp"
+#include "linalg_utils.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -1881,29 +1882,12 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    if (Q) 
       w *= Q->Eval(T, ip);
 
-   tmp.SetSize(dim, nbasis);
-   Vector jac_col;
-
-   Mult(gradu1, *shapes1[s], tmp);
-   for (int k = 0; k < nbasis; k++)
-   {
-      jac.GetColumnReference(k, jac_col);
-      tmp.GetColumnReference(k, tmp_vec);
-      shapes1[s]->AddMultTranspose_a(-w, tmp_vec, jac_col);
-      if (el2)
-         shapes2[s]->AddMultTranspose_a(w, tmp_vec, jac_col);
-   }
-
+   AddwRtAP(*shapes1[s], gradu1, *shapes1[s], jac, -w);
    if (el2)
    {
-      Mult(gradu2, *shapes2[s], tmp);
-      for (int k = 0; k < nbasis; k++)
-      {
-         jac.GetColumnReference(k, jac_col);
-         tmp.GetColumnReference(k, tmp_vec);
-         shapes1[s]->AddMultTranspose_a(-w, tmp_vec, jac_col);
-         shapes2[s]->AddMultTranspose_a(w, tmp_vec, jac_col);
-      }
+      AddwRtAP(*shapes2[s], gradu1, *shapes1[s], jac, w);
+      AddwRtAP(*shapes1[s], gradu2, *shapes2[s], jac, -w);
+      AddwRtAP(*shapes2[s], gradu2, *shapes2[s], jac, w);
    }
 }
 

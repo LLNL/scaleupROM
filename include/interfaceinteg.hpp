@@ -282,9 +282,9 @@ private:
    Coefficient *Q{};
    VectorCoefficient *UD = NULL;
 
-   Vector shape1, shape2, tmp_vec;
+   Vector shape1, shape2;
    DenseMatrix udof1, udof2, elv1, elv2;
-   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22, tmp;
+   DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
 
    // precomputed basis value at the sample point.
    Array<DenseMatrix *> shapes1, shapes2;
