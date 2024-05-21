@@ -374,6 +374,14 @@ private:
                             const bool &eval2, const bool &ndofs2,
                             DenseMatrix &gradu1, DenseMatrix &gradu2);
 
+   void AssembleQuadVectorBase(const FiniteElement &el1,
+                               const FiniteElement &el2,
+                               FaceElementTransformations *Tr1,
+                               FaceElementTransformations *Tr2,
+                               const IntegrationPoint &ip, const double &iw, const int &ndofs2,
+                               const DenseMatrix &elfun1, const DenseMatrix &elfun2,
+                               DenseMatrix &elvect1, DenseMatrix &elvect2);
+
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
                                     FaceElementTransformations *T,
                                     DenseMatrix &basis,

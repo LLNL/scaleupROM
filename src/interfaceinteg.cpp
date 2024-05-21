@@ -1315,8 +1315,6 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
       u2.SetSize(dim);
    }
 
-   bool eval2 = (ndofs2 || UD);
-
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
@@ -1330,42 +1328,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
    {
       const IntegrationPoint &ip = ir->IntPoint(pind);
 
-      // Set the integration point in the face and the neighboring elements
-      Tr.SetAllIntPoints(&ip);
-
-      // Access the neighboring elements' integration points
-      // Note: eip2 will only contain valid data if Elem2 exists
-      const IntegrationPoint &eip1 = Tr.GetElement1IntPoint();
-      const IntegrationPoint &eip2 = Tr.GetElement2IntPoint();
-
-      el1.CalcShape(eip1, shape1);
-      udof1.MultTranspose(shape1, u1);
-
-      if (dim == 1)
-      {
-         nor(0) = 2*eip1.x - 1.0;
-      }
-      else
-      {
-         CalcOrtho(Tr.Jacobian(), nor);
-      }
-
-      if (ndofs2)
-      {
-         el2.CalcShape(eip2, shape2);
-         udof2.MultTranspose(shape2, u2);
-      }
-      else if (UD)
-         UD->Eval(u2, *Tr.Elem1, eip1);
-
-      ComputeFluxDotN(u1, u2, nor, eval2, flux);
-
-      w = ip.weight;
-      if (Q) { w *= Q->Eval(Tr, ip); }
-
-      AddMult_a_VWt(-w, shape1, flux, elv1);
-      if (ndofs2)
-         AddMult_a_VWt(w, shape2, flux, elv2);
+      AssembleQuadVectorBase(el1, el2, &Tr, NULL, ip, ip.weight, ndofs2, udof1, udof2, elv1, elv2);
    }
 }
 
@@ -1450,6 +1413,72 @@ void DGLaxFriedrichsFluxIntegrator::ComputeGradFluxDotN(
       AddMult_a_VWt(normag / u2mag, du, u2, gradu2);
 
    return;
+}
+
+void DGLaxFriedrichsFluxIntegrator::AssembleQuadVectorBase(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations *Tr1, FaceElementTransformations *Tr2,
+   const IntegrationPoint &ip, const double &iw, const int &ndofs2,
+   const DenseMatrix &elfun1, const DenseMatrix &elfun2,
+   DenseMatrix &elvect1, DenseMatrix &elvect2)
+{
+   assert(Tr1);
+   assert(elfun1.NumRows() == shape1.Size());
+   assert(elfun1.NumCols() == u1.Size());
+   if (ndofs2)
+   {
+      assert(elfun2.NumRows() == shape2.Size());
+      assert(elfun2.NumCols() == u2.Size());
+   }
+   assert(nor.Size() == dim);
+
+   bool eval2 = (ndofs2 || UD);
+
+   // Set the integration point in the face and the neighboring elements
+   Tr1->SetAllIntPoints(&ip);
+   if (Tr2) Tr2->SetAllIntPoints(&ip);
+
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = Tr1->GetElement1IntPoint();
+   const IntegrationPoint *eip2 = NULL;
+   if (Tr2)
+      eip2 = &(Tr2->GetElement1IntPoint());
+   else
+      eip2 = &(Tr1->GetElement2IntPoint());
+
+   /* evaluate solution at element 1 integration point */
+   el1.CalcShape(eip1, shape1);
+   elfun1.MultTranspose(shape1, u1);
+
+   /* evaluate normal vector */
+   if (dim == 1)
+   {
+      nor(0) = 2*eip1.x - 1.0;
+   }
+   else
+   {
+      CalcOrtho(Tr1->Jacobian(), nor);
+   }
+
+   /* evaluate solution at element 1 integration point */
+   if (ndofs2)
+   {
+      el2.CalcShape(*eip2, shape2);
+      elfun2.MultTranspose(shape2, u2);
+   }
+   /* if Dirichlet bc, then evaluate boundary condition */
+   else if (UD)
+      UD->Eval(u2, *(Tr1->Elem1), eip1);
+
+   ComputeFluxDotN(u1, u2, nor, eval2, flux);
+
+   w = iw;
+   if (Q) { w *= Q->Eval(*Tr1, ip); }
+
+   AddMult_a_VWt(-w, shape1, flux, elvect1);
+   if (ndofs2)
+      AddMult_a_VWt(w, shape2, flux, elvect2);
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
