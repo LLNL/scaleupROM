@@ -1481,6 +1481,73 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadVectorBase(
       AddMult_a_VWt(w, shape2, flux, elvect2);
 }
 
+void DGLaxFriedrichsFluxIntegrator::AssembleQuadGradBase(
+   const FiniteElement &el1, const FiniteElement &el2,
+   FaceElementTransformations *Tr1, FaceElementTransformations *Tr2,
+   const IntegrationPoint &ip, const double &iw, const int &ndofs2,
+   const DenseMatrix &elfun1, const DenseMatrix &elfun2,
+   double &w, DenseMatrix &gradu1, DenseMatrix &gradu2,
+   DenseMatrix &elmat11, DenseMatrix &elmat12, DenseMatrix &elmat21, DenseMatrix &elmat22)
+{
+   assert(Tr1);
+   assert(elfun1.NumRows() == shape1.Size());
+   assert(elfun1.NumCols() == u1.Size());
+   if (ndofs2)
+   {
+      assert(elfun2.NumRows() == shape2.Size());
+      assert(elfun2.NumCols() == u2.Size());
+   }
+   assert(nor.Size() == dim);
+
+   bool eval2 = (ndofs2 || UD);
+
+   // Set the integration point in the face and the neighboring elements
+   Tr1->SetAllIntPoints(&ip);
+   if (Tr2) Tr2->SetAllIntPoints(&ip);
+
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = Tr1->GetElement1IntPoint();
+   const IntegrationPoint *eip2 = NULL;
+   if (Tr2)
+      eip2 = &(Tr2->GetElement1IntPoint());
+   else
+      eip2 = &(Tr1->GetElement2IntPoint());
+
+   el1.CalcShape(eip1, shape1);
+   elfun1.MultTranspose(shape1, u1);
+
+   if (dim == 1)
+   {
+      nor(0) = 2*eip1.x - 1.0;
+   }
+   else
+   {
+      CalcOrtho(Tr1->Jacobian(), nor);
+   }
+
+   if (ndofs2)
+   {
+      el2.CalcShape(*eip2, shape2);
+      elfun2.MultTranspose(shape2, u2);
+   }
+   else if (UD)
+      UD->Eval(u2, *(Tr1->Elem1), eip1);
+
+   ComputeGradFluxDotN(u1, u2, nor, eval2, ndofs2, gradu1, gradu2);
+
+   MultVVt(shape1, elmat11);
+   if (ndofs2)
+   {
+      MultVWt(shape1, shape2, elmat12);
+      elmat21.Transpose(elmat12);
+      MultVVt(shape2, elmat22);
+   }
+
+   w = iw;
+   if (Q) { w *= Q->Eval(*Tr1, ip); }
+}
+
 void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
                                                       const FiniteElement &el2,
                                                       FaceElementTransformations &Tr,
@@ -1511,7 +1578,6 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
       elmat_comp22.SetSize(ndofs2);
    }
 
-   bool eval2 = (ndofs2 || UD);
    DenseMatrix gradu1(dim), gradu2(dim);
 
    const IntegrationRule *ir = IntRule;
@@ -1527,47 +1593,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(const FiniteElement &el1,
    {
       const IntegrationPoint &ip = ir->IntPoint(pind);
 
-      // Set the integration point in the face and the neighboring elements
-      Tr.SetAllIntPoints(&ip);
-
-      // Access the neighboring elements' integration points
-      // Note: eip2 will only contain valid data if Elem2 exists
-      const IntegrationPoint &eip1 = Tr.GetElement1IntPoint();
-      const IntegrationPoint &eip2 = Tr.GetElement2IntPoint();
-
-      el1.CalcShape(eip1, shape1);
-      udof1.MultTranspose(shape1, u1);
-
-      if (dim == 1)
-      {
-         nor(0) = 2*eip1.x - 1.0;
-      }
-      else
-      {
-         CalcOrtho(Tr.Jacobian(), nor);
-      }
-
-      if (ndofs2)
-      {
-         el2.CalcShape(eip2, shape2);
-         udof2.MultTranspose(shape2, u2);
-      }
-      else if (UD)
-         UD->Eval(u2, *Tr.Elem1, eip1);
-
-      ComputeGradFluxDotN(u1, u2, nor, eval2, ndofs2, gradu1, gradu2);
-
-      MultVVt(shape1, elmat_comp11);
-      if (ndofs2)
-      {
-         MultVWt(shape1, shape2, elmat_comp12);
-         elmat_comp21.Transpose(elmat_comp12);
-         // MultVWt(shape2, shape1, elmat_comp21);
-         MultVVt(shape2, elmat_comp22);
-      }
-
-      w = ip.weight;
-      if (Q) { w *= Q->Eval(Tr, ip); }
+      AssembleQuadGradBase(el1, el2, &Tr, NULL, ip, ip.weight, ndofs2, udof1, udof2,
+         w, gradu1, gradu2, elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22);
 
       for (int di = 0; di < dim; di++)
       {

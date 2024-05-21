@@ -382,6 +382,13 @@ private:
                                const DenseMatrix &elfun1, const DenseMatrix &elfun2,
                                DenseMatrix &elvect1, DenseMatrix &elvect2);
 
+   void AssembleQuadGradBase(const FiniteElement &el1, const FiniteElement &el2,
+                             FaceElementTransformations *Tr1, FaceElementTransformations *Tr2,
+                             const IntegrationPoint &ip, const double &iw, const int &ndofs2,
+                             const DenseMatrix &elfun1, const DenseMatrix &elfun2,
+                             double &w, DenseMatrix &gradu1, DenseMatrix &gradu2,
+                             DenseMatrix &elmat11, DenseMatrix &elmat12, DenseMatrix &elmat21, DenseMatrix &elmat22);
+
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
                                     FaceElementTransformations *T,
                                     DenseMatrix &basis,
