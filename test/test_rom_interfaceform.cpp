@@ -10,7 +10,7 @@
 using namespace std;
 using namespace mfem;
 
-static const double threshold = 1.0e-14;
+static const double threshold = 1.0e-13;
 static const double grad_thre = 1.0e-7;
 
 /**
