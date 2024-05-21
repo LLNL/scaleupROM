@@ -1804,11 +1804,6 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
 {
    const bool el2 = (T.Elem2No >= 0);
-   T.SetAllIntPoints(&ip);
-   // Access the neighboring elements' integration points
-   // Note: eip2 will only contain valid data if Elem2 exists
-   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
-   // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
    dim = shapes1[s]->NumRows();
    nor.SetSize(dim);
@@ -1816,9 +1811,19 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    u1.SetSize(dim);
    if (el2) u2.SetSize(dim);
 
-   double w = qw * T.Weight();
-   if (Q) 
-      w *= Q->Eval(T, ip);
+   bool eval2 = (el2 || UD);
+
+   T.SetAllIntPoints(&ip);
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
+   // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
+
+   shapes1[s]->Mult(x, u1);
+   if (el2)
+      shapes2[s]->Mult(x, u2);
+   else if (UD)
+      UD->Eval(u2, *(T.Elem1), eip1);
 
    if (dim == 1)
    {
@@ -1829,25 +1834,10 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
       CalcOrtho(T.Jacobian(), nor);
    }
 
-   nor *= w;
+   ComputeFluxDotN(u1, u2, nor, eval2, flux);
 
-   shapes1[s]->Mult(x, u1);
-   if (el2) shapes2[s]->Mult(x, u2);
-
-   un1 = nor * u1;
-   un2 = (el2) ? nor * u2 : 0.0;
-
-   flux.Set(un1, u1);
-   if (el2)
-   {
-      flux *= 0.5;
-      flux.Add(0.5 * un2, u2);
-   }
-
-   un = max(abs(un1), abs(un2));
-   flux.Add(un, u1);
-   if (el2)
-      flux.Add(-un, u2);
+   w = qw;
+   if (Q) { w *= Q->Eval(T, ip); }
 
    assert(y.Size() == x.Size());
    shapes1[s]->AddMultTranspose(flux, y, 1.0);
@@ -1858,11 +1848,6 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
 {
    const bool el2 = (T.Elem2No >= 0);
-   T.SetAllIntPoints(&ip);
-   // Access the neighboring elements' integration points
-   // Note: eip2 will only contain valid data if Elem2 exists
-   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
-   // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
    dim = shapes1[s]->NumRows();
    int nbasis = shapes1[s]->NumCols();
@@ -1871,7 +1856,6 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    u1.SetSize(dim);
    elmat_comp11.SetSize(dim);
    elmat_comp11 = 0.0;
-   tmp.SetSize(dim, nbasis);
 
    if (el2)
    {
@@ -1885,9 +1869,20 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
       elmat_comp22 = 0.0;
    }
 
-   double w = qw * T.Weight();
-   if (Q) 
-      w *= Q->Eval(T, ip);
+   DenseMatrix gradu1(dim), gradu2(dim);
+   bool eval2 = (el2 || UD);
+
+   T.SetAllIntPoints(&ip);
+   // Access the neighboring elements' integration points
+   // Note: eip2 will only contain valid data if Elem2 exists
+   const IntegrationPoint &eip1 = T.GetElement1IntPoint();
+   // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
+
+   shapes1[s]->Mult(x, u1);
+   if (el2)
+      shapes2[s]->Mult(x, u2);
+   else if (UD)
+      UD->Eval(u2, *(T.Elem1), eip1);
 
    if (dim == 1)
    {
@@ -1898,102 +1893,34 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
       CalcOrtho(T.Jacobian(), nor);
    }
 
-   nor *= w;
+   ComputeGradFluxDotN(u1, u2, nor, eval2, ndofs2, gradu1, gradu2);
 
-   shapes1[s]->Mult(x, u1);
-   if (el2) shapes2[s]->Mult(x, u2);
+   double w = qw;
+   if (Q) 
+      w *= Q->Eval(T, ip);
 
-   un1 = nor * u1;
-   un2 = (el2) ? nor * u2 : 0.0;
-
-   un = max( abs(un1), abs(un2) );
-   double sgn = 0.0;
-   bool u1_lg_u2 = (abs(un1) >= abs(un2));
-   if (u1_lg_u2)
-   {
-      sgn = (un1 >= 0.0) ? 1.0 : -1.0;
-   }
-   else
-   {
-      sgn = (un2 >= 0.0) ? 1.0 : -1.0;
-   }
-
-   double factor = 1.0;
-   if (el2)
-   {
-      un1 *= 0.5;
-      un2 *= 0.5;
-      factor = 0.5;
-   }
-
-   for (int di = 0; di < dim; di++)
-   {
-      elmat_comp11(di, di) += un1 + un;
-      if (el2)
-      {
-         elmat_comp21(di, di) += -un1 - un;
-         elmat_comp12(di, di) += un2 - un;
-         elmat_comp22(di, di) += -un2 + un;
-      }
-   }
-
-   AddMult_a_VWt(factor, u1, nor, elmat_comp11);
-   if (el2)
-   {
-      AddMult_a_VWt(-factor, u1, nor, elmat_comp21);
-      AddMult_a_VWt(factor, u2, nor, elmat_comp12);
-      AddMult_a_VWt(-factor, u2, nor, elmat_comp22);
-   }
-
-   // [ u ] = u1 - u2
-   if (ndofs2)
-      u1.Add(-1.0, u2);
-
-   if (u1_lg_u2)
-   {
-      AddMult_a_VWt(sgn, u1, nor, elmat_comp11);
-      if (el2)
-         AddMult_a_VWt(-sgn, u1, nor, elmat_comp21);
-   }
-   else
-   {
-      AddMult_a_VWt(sgn, u1, nor, elmat_comp12);
-      AddMult_a_VWt(-sgn, u1, nor, elmat_comp22);
-   }
-
-   Mult(elmat_comp11, *shapes1[s], tmp);
+   tmp.SetSize(dim, nbasis);
    Vector jac_col;
+
+   Mult(gradu1, *shapes1[s], tmp);
    for (int k = 0; k < nbasis; k++)
    {
       jac.GetColumnReference(k, jac_col);
       tmp.GetColumnReference(k, tmp_vec);
-      shapes1[s]->AddMultTranspose(tmp_vec, jac_col);
+      shapes1[s]->AddMultTranspose_a(-w, tmp_vec, jac_col);
+      if (el2)
+         shapes2[s]->AddMultTranspose_a(w, tmp_vec, jac_col);
    }
 
    if (el2)
    {
-      Mult(elmat_comp12, *shapes2[s], tmp);
+      Mult(gradu2, *shapes2[s], tmp);
       for (int k = 0; k < nbasis; k++)
       {
          jac.GetColumnReference(k, jac_col);
          tmp.GetColumnReference(k, tmp_vec);
-         shapes1[s]->AddMultTranspose(tmp_vec, jac_col);
-      }
-
-      Mult(elmat_comp21, *shapes1[s], tmp);
-      for (int k = 0; k < nbasis; k++)
-      {
-         jac.GetColumnReference(k, jac_col);
-         tmp.GetColumnReference(k, tmp_vec);
-         shapes2[s]->AddMultTranspose(tmp_vec, jac_col);
-      }
-
-      Mult(elmat_comp22, *shapes2[s], tmp);
-      for (int k = 0; k < nbasis; k++)
-      {
-         jac.GetColumnReference(k, jac_col);
-         tmp.GetColumnReference(k, tmp_vec);
-         shapes2[s]->AddMultTranspose(tmp_vec, jac_col);
+         shapes1[s]->AddMultTranspose_a(-w, tmp_vec, jac_col);
+         shapes2[s]->AddMultTranspose_a(w, tmp_vec, jac_col);
       }
    }
 }
