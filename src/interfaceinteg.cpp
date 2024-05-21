@@ -1358,24 +1358,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
       else if (UD)
          UD->Eval(u2, *Tr.Elem1, eip1);
 
-      un1 = nor * u1;
-      un2 = (eval2) ? nor * u2 : 0.0;
-
-      flux.Set(un1, u1);
-      if (eval2)
-      {
-         flux *= 0.5;
-         flux.Add(0.5 * un2, u2);
-      }
-
-      if (eval2)
-      {
-         // un = max(abs(un1), abs(un2));
-         un = std::max(std::sqrt(u1 * u1), std::sqrt(u2 * u2));
-         un *= std::sqrt(nor * nor);
-         flux.Add(un, u1);
-         flux.Add(-un, u2);
-      }
+      ComputeFluxDotN(u1, u2, nor, eval2, flux);
 
       w = ip.weight;
       if (Q) { w *= Q->Eval(Tr, ip); }
@@ -1386,28 +1369,52 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(const FiniteElement &el1,
    }
 }
 
+void DGLaxFriedrichsFluxIntegrator::ComputeFluxDotN(
+   const Vector &u1, const Vector &u2, const Vector &nor,
+   const bool &eval2, Vector &flux)
+{
+   un1 = nor * u1;
+   un2 = (eval2) ? nor * u2 : 0.0;
+
+   flux.Set(un1, u1);
+   if (eval2)
+   {
+      flux *= 0.5;
+      flux.Add(0.5 * un2, u2);
+   }
+
+   if (eval2)
+   {
+      // un = max(abs(un1), abs(un2));
+      un = std::max(std::sqrt(u1 * u1), std::sqrt(u2 * u2));
+      un *= std::sqrt(nor * nor);
+      flux.Add(un, u1);
+      flux.Add(-un, u2);
+   }
+}
+
 void DGLaxFriedrichsFluxIntegrator::ComputeGradFluxDotN(
    const Vector &u1, const Vector &u2, const Vector &nor,
    const bool &eval2, const bool &ndofs2,
-   DenseMatrix &gradu1, DenseMatrix &gradu2) const
+   DenseMatrix &gradu1, DenseMatrix &gradu2)
 {
-   const int dim_ = u1.Size();
+   assert(dim == u1.Size());
    gradu1 = 0.0; gradu2 = 0.0;
 
-   double u1mag = std::sqrt(u1 * u1);
-   double u2mag = std::sqrt(u2 * u2);
-   double normag = std::sqrt(nor * nor);
+   u1mag = std::sqrt(u1 * u1);
+   u2mag = std::sqrt(u2 * u2);
+   normag = std::sqrt(nor * nor);
    bool u1_lg_u2 = (u1mag >= u2mag);
 
-   double un = std::max(u1mag, u2mag);
+   un = std::max(u1mag, u2mag);
    un *= normag;
    Vector nor_(nor);
    if (eval2) nor_ *= 0.5;
 
-   double un1 = nor_ * u1;
-   double un2 = (eval2) ? nor_ * u2 : 0.0;
+   un1 = nor_ * u1;
+   un2 = (eval2) ? nor_ * u2 : 0.0;
 
-   for (int di = 0; di < dim_; di++)
+   for (int di = 0; di < dim; di++)
       gradu1(di, di) += un1;
    
    AddMultVWt(u1, nor_, gradu1);
@@ -1416,7 +1423,7 @@ void DGLaxFriedrichsFluxIntegrator::ComputeGradFluxDotN(
    if (!eval2)
       return;
 
-   for (int di = 0; di < dim_; di++)
+   for (int di = 0; di < dim; di++)
    {
       /* un1 is already added for gradu1 */
       gradu1(di, di) += un;

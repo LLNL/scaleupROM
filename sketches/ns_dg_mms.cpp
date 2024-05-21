@@ -409,7 +409,6 @@ int main(int argc, char *argv[])
       break;
       case Scheme::LF:
       {
-         mfem_warning("Lax-Friedrichs scheme doesn't seem to work for steady case.\n");
          nVarf->AddDomainIntegrator(lf_integ1);
          if (use_dg)
             nVarf->AddInteriorFaceIntegrator(lf_integ2);

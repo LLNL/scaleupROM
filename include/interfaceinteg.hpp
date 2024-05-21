@@ -272,12 +272,17 @@ public:
 class DGLaxFriedrichsFluxIntegrator : public InterfaceNonlinearFormIntegrator
 {
 private:
-   int dim, ndofs1, ndofs2, nvdofs;
-   double w, un1, un2, un;
+   int dim;
+   double un1, un2, un;
+   double u1mag, u2mag, normag;
+   Vector flux, u1, u2, nor;
+
+   int ndofs1, ndofs2, nvdofs;
+   double w;
    Coefficient *Q{};
    VectorCoefficient *UD = NULL;
 
-   Vector nor, flux, shape1, shape2, u1, u2, tmp_vec;
+   Vector shape1, shape2, tmp_vec;
    DenseMatrix udof1, udof2, elv1, elv2;
    DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22, tmp;
 
@@ -362,9 +367,12 @@ public:
                                  Array2D<DenseMatrix*> &quadmats) override;
 
 private:
+   void ComputeFluxDotN(const Vector &u1, const Vector &u2, const Vector &nor,
+                        const bool &eval2, Vector &flux);
+
    void ComputeGradFluxDotN(const Vector &u1, const Vector &u2, const Vector &nor,
                             const bool &eval2, const bool &ndofs2,
-                            DenseMatrix &gradu1, DenseMatrix &gradu2) const;
+                            DenseMatrix &gradu1, DenseMatrix &gradu2);
 
    void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
                                     FaceElementTransformations *T,
