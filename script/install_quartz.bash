@@ -10,10 +10,10 @@ check_result () {
   fi
 }
 
-#module load gcc/11.2.1
-#module load git/2.36.1
-#module load mvapich2
-#module load cmake/3.26.3
+module load gcc/11.2.1
+module load git/2.36.1
+module load mvapich2
+module load cmake/3.26.3
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 INSTALL_HELPER=$SCRIPT_DIR/../install-helper
