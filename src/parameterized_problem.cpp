@@ -1386,9 +1386,9 @@ LinElastLatticeRoof::LinElastLatticeRoof()
    // Default values.
    function_factory::linelast_problem::_lambda = 384615384615.3846;
    function_factory::linelast_problem::_mu = 76923076923.07692;
-   function_factory::linelast_lattice_roof::qsnow_f = 2000.0; // [N/m2]
-   function_factory::linelast_lattice_roof::qpoint_f = 100000.0; // [N/m2]
-   function_factory::linelast_lattice_roof::density = 78.0; //[kg/m2]
+   function_factory::linelast_lattice_roof::qsnow_f = -2000.0; // [N/m2]
+   function_factory::linelast_lattice_roof::qpoint_f = -100000.0; // [N/m2]
+   function_factory::linelast_lattice_roof::density = 7800.0; //[kg/m3]
    function_factory::linelast_lattice_roof::g = 9.81; 
 
    param_map["lambda"] = 0;
