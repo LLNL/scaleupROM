@@ -310,6 +310,9 @@ bool LinElastSolver::Solve()
    // If using direct solver, returns always true.
    bool converged = true;
 
+ cout<<"lambda is: "<<lambda_c[0]->constant<<endl;
+ cout<<"mu is: "<<mu_c[0]->constant<<endl;
+
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
@@ -455,10 +458,13 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    for (size_t i = 0; i < numSub; i++)
    {
       double lambda_i = (problem->general_scalar_ptr[0])(_x);
+      lambda = lambda_i;
       lambda_c[i] = new ConstantCoefficient(lambda_i);
 
       double mu_i = (problem->general_scalar_ptr[1])(_x);
+      mu = mu_i;
       mu_c[i] = new ConstantCoefficient(mu_i);
+ 
    }
 
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators

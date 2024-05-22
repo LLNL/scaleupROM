@@ -37,7 +37,7 @@ parameterized_problem:
 
 single_run:
   linelast_lattice_roof:
-    qsnow_f : 2000.0
+    qsnow_f : -2000.0
    
 basis:
   prefix: "linelast_cwtrain"
