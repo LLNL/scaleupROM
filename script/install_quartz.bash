@@ -108,7 +108,7 @@ if [ ! -d "mfem" ]; then
     cd mfem
     git checkout v4.6
     mkdir -p ./build && cd ./build
-    cmake .. -DBUILD_SHARED_LIBS=YES -DMFEM_USE_MPI=YES -DMFEM_USE_GSLIB=YES -DMFEM_USE_METIS=YES -DMFEM_USE_METIS_5=YES -DMFEM_USE_MUMPS=YES -DGSLIB_DIR="$LIB_DIR/gslib/build" -DMUMPS_DIR="$LIB_DIR/mumps/build/local" -DCMAKE_INCLUDE_PATH=$LIB_DIR/include -DCMAKE_LIBRARY_PATH=$LIB_DIR/lib
+    cmake .. -DBUILD_SHARED_LIBS=YES -DMFEM_USE_MPI=YES -DMFEM_USE_GSLIB=YES -DMFEM_USE_METIS=YES -DMFEM_USE_METIS_5=YES -DMFEM_USE_MUMPS=YES -DGSLIB_DIR="$LIB_DIR/gslib/build" -DMUMPS_DIR="$LIB_DIR/mumps/build/local" -DCMAKE_INCLUDE_PATH=$LIB_DIR/include -DCMAKE_LIBRARY_PATH=$LIB_DIR/lib -DScaLAPACK_DIR=$LIB_DIR/scalapack-2.2.0/build
     check_result $? mfem-config
 
     make -j 16
