@@ -155,7 +155,7 @@ fi
 
 cd $SCRIPT_DIR/../
 rm -rf build && mkdir build && cd build
-cmake .. -DLIB_DIR=$LIB_DIR -DCMAKE_LIBRARY_PATH=$LIB_DIR/lib -DCMAKE_INCLUDE_PATH=$LIB_DIR/include
+cmake .. -DLIB_DIR=$LIB_DIR -DYAML_DIR=$LIB_DIR/lib64/cmake/yaml-cpp -DCMAKE_LIBRARY_PATH=$LIB_DIR/lib -DCMAKE_INCLUDE_PATH=$LIB_DIR/include
 check_result $? scaleuprom-config
 make -j 16
 check_result $? scaleuprom-build
