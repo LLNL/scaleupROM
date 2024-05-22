@@ -128,6 +128,7 @@ public:
    const bool IsNonlinear() const { return nonlinear_mode; }
    const bool UseRom() const { return use_rom; }
    ROMHandlerBase* GetROMHandler() const { return rom_handler; }
+   TopologyHandler* GetTopologyHandler() const { return topol_handler; }
    const TrainMode GetTrainMode() { return train_mode; }
    const bool IsVisualizationSaved() const { return save_visual; }
    const std::string GetSolutionFilePrefix() const { return sol_prefix; }

@@ -596,7 +596,7 @@ void IncompressibleInviscidFluxNLFIntegrator::AssembleElementVector(
       EF.MultTranspose(shape, u1);
       MultVVt(u1, uu);
       
-      AddMult_a(w, dshape, uu, ELV);
+      AddMult_a_ABt(w, dshape, uu, ELV);
    }
 }
 

@@ -267,6 +267,60 @@ SparseMatrix* SparseRtAP(DenseMatrix& R,
    return RAP;
 }
 
+void AddwRtAP(DenseMatrix& R,
+               const Operator& A,
+               DenseMatrix& P,
+               DenseMatrix& RtAP,
+               const double w)
+{
+   assert(R.NumRows() == A.NumRows());
+   assert(A.NumCols() == P.NumRows());
+   
+   const int num_row = R.NumCols();
+   const int num_col = P.NumCols();
+   assert(RtAP.NumRows() == num_row);
+   assert(RtAP.NumCols() == num_col);
+   
+   Vector vec_i, vec_j;
+   Vector tmp(R.NumRows());
+   for (int i = 0; i < num_row; i++)
+      for (int j = 0; j < num_col; j++)
+      {
+         R.GetColumnReference(i, vec_i);
+         P.GetColumnReference(j, vec_j);
+         
+         A.Mult(vec_j, tmp);
+         RtAP(i, j) += w * (vec_i * tmp);
+      }
+}
+
+void AddwRtAP(DenseMatrix& R,
+               const Operator& A,
+               DenseMatrix& P,
+               SparseMatrix& RtAP,
+               const double w)
+{
+   assert(R.NumRows() == A.NumRows());
+   assert(A.NumCols() == P.NumRows());
+
+   const int num_row = R.NumCols();
+   const int num_col = P.NumCols();
+   assert(RtAP.NumRows() == num_row);
+   assert(RtAP.NumCols() == num_col);
+   
+   Vector vec_i, vec_j;
+   Vector tmp(R.NumRows());
+   for (int i = 0; i < num_row; i++)
+      for (int j = 0; j < num_col; j++)
+      {
+         R.GetColumnReference(i, vec_i);
+         P.GetColumnReference(j, vec_j);
+         
+         A.Mult(vec_j, tmp);
+         RtAP.Add(i, j, w * (vec_i * tmp));
+      }
+}
+
 template<typename T>
 void PrintMatrix(const T &mat,
                 const std::string &filename)

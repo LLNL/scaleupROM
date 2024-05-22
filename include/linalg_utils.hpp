@@ -136,6 +136,17 @@ SparseMatrix* SparseRtAP(DenseMatrix& R,
                         const Operator& A,
                         DenseMatrix& P);
 
+void AddwRtAP(DenseMatrix& R,
+            const Operator& A,
+            DenseMatrix& P,
+            DenseMatrix& RAP,
+            const double w=1.0);
+void AddwRtAP(DenseMatrix& R,
+            const Operator& A,
+            DenseMatrix& P,
+            SparseMatrix& RAP,
+            const double w=1.0);
+
 template<typename T>
 void PrintMatrix(const T &mat,
                 const std::string &filename);

@@ -129,6 +129,17 @@ void CheckConvergence();
 
 }   // namespace dg_bdr_normal_lf
 
+namespace dg_temam
+{
+
+void uFun_ex(const Vector & x, Vector & u);
+void usFun_ex(const Vector & x, Vector & us);
+
+void EvalWithRefinement(const int num_refinement, int &order_out, double &product1, double &product2);
+void CheckConvergence();
+
+}   // namespace dg_temam
+
 }   // namespace fem
 
 }  // namespace mms

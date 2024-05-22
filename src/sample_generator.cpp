@@ -10,6 +10,20 @@
 using namespace mfem;
 using namespace std;
 
+bool operator<(const PortTag &tag1, const PortTag &tag2)
+{
+   if (tag1.Mesh1 != tag2.Mesh1)
+      return (tag1.Mesh1 < tag2.Mesh1);
+   
+   if (tag1.Mesh2 != tag2.Mesh2)
+      return (tag1.Mesh2 < tag2.Mesh2);
+
+   if (tag1.Attr1 != tag2.Attr1)
+      return (tag1.Attr1 < tag2.Attr1);
+
+   return (tag1.Attr2 == tag2.Attr2) ? false : (tag1.Attr2 < tag2.Attr2);
+}
+
 SampleGenerator::SampleGenerator(MPI_Comm comm)
 {
    MPI_Comm_size(comm, &num_procs);
@@ -61,6 +75,7 @@ SampleGenerator::~SampleGenerator()
    DeletePointers(params);
    DeletePointers(snapshot_generators);
    DeletePointers(snapshot_options);
+   DeletePointers(port_colidxs);
 }
 
 void SampleGenerator::SetParamSpaceSizes()
@@ -162,9 +177,10 @@ const std::string SampleGenerator::GetSamplePath(const int &idx, const std::stri
    return full_path;
 }
 
-void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags)
+void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags, Array<int> &col_idxs)
 {
    assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
+   col_idxs.SetSize(U_snapshots->NumBlocks());
 
    for (int s = 0; s < snapshot_basis_tags.size(); s++)
    {
@@ -177,6 +193,53 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::st
       int index = basis_tag2idx[snapshot_basis_tags[s]];
       bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
       assert(addSample);
+
+      col_idxs[s] = snapshot_generators[index]->getNumSamples();
+   }
+}
+
+void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const TrainMode &train_mode, const Array<int> &col_idxs)
+{
+   assert(topol_handler);
+   const int numSub = topol_handler->GetNumSubdomains();
+   const int numPorts = topol_handler->GetNumPorts();
+
+   assert(col_idxs.Size() % numSub == 0);
+   const int num_var = col_idxs.Size() / numSub;
+
+   /*
+      We save the snapshot ports by dom%d (INDIVIDUAL) or component names (UNIVERSAL).
+      We does not consider basis separation at this point.
+      Though we use basis tags here, it is only for the sake of
+      getting consistent domain/component mesh names.
+   */
+   for (int p = 0; p < numPorts; p++)
+   {
+      const PortInfo *port = topol_handler->GetPortInfo(p);
+      std::string mesh1, mesh2;
+      mesh1 = GetBasisTag(port->Mesh1, train_mode, topol_handler);
+      mesh2 = GetBasisTag(port->Mesh2, train_mode, topol_handler); 
+
+      PortTag tag = {.Mesh1 = mesh1, .Mesh2 = mesh2, .Attr1 = port->Attr1, .Attr2 = port->Attr2};
+      if (!port_tag2idx.count(tag))
+      {
+         port_tag2idx[tag] = port_tags.size();
+         port_tags.push_back(tag);
+         port_colidxs.Append(new Array<int>(0));
+      }
+      const int index = port_tag2idx[tag];
+
+      int col1, col2;
+      col1 = col_idxs[num_var * (port->Mesh1)];
+      col2 = col_idxs[num_var * (port->Mesh2)];
+      for (int v = 0; v < num_var; v++)
+      {
+         assert(col1 == col_idxs[v + num_var * (port->Mesh1)]);
+         assert(col2 == col_idxs[v + num_var * (port->Mesh2)]);
+      }
+
+      port_colidxs[index]->Append(col1);
+      port_colidxs[index]->Append(col2);
    }
 }
 
@@ -205,6 +268,39 @@ void SampleGenerator::WriteSnapshots()
       assert(snapshot_generators[s]);
       snapshot_generators[s]->writeSnapshot();
    }
+}
+
+void SampleGenerator::WriteSnapshotPorts()
+{
+   const std::string filename = GetSamplePrefix() + ".port.h5";
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   hdf5_utils::WriteAttribute(file_id, "sample_prefix", GetSamplePrefix());
+   hdf5_utils::WriteAttribute(file_id, "number_of_ports", (int) port_tags.size());
+
+   for (int p = 0; p < port_tags.size(); p++)
+   {
+      hid_t grp_id;
+      grp_id = H5Gcreate(file_id, std::to_string(p).c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      hdf5_utils::WriteAttribute(grp_id, "Mesh1", port_tags[p].Mesh1);
+      hdf5_utils::WriteAttribute(grp_id, "Mesh2", port_tags[p].Mesh2);
+      hdf5_utils::WriteAttribute(grp_id, "Attr1", port_tags[p].Attr1);
+      hdf5_utils::WriteAttribute(grp_id, "Attr2", port_tags[p].Attr2);
+      hdf5_utils::WriteDataset(grp_id, "col_idxs", *(port_colidxs[p]));
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
 }
 
 const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_tag)

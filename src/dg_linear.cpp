@@ -368,22 +368,28 @@ void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
       {
          CalcOrtho(Tr.Jacobian(), nor);
       }
+      // Q.Eval(Qvec, *(Tr.Face), ip);
       Q.Eval(Qvec, *(Tr.Face), ip);
 
       el.CalcShape(eip, shape);
 
-      un = 0.5 * (Qvec * nor);
-      gn.Set(un, Qvec);
+      un = (Qvec * nor);
+      gn.Set(0.5 * un, Qvec);
+      gn.Add(- abs(un), Qvec);
+
+      w = ip.weight * Tr.Face->Weight();
+      if (Z)
+         w *= Z->Eval(*(Tr.Face), eip);
 
       // Need to check the signs.
-      AddMult_a_VWt(-ip.weight, shape, gn, ELV);
-      AddMult_a_VWt(ip.weight * abs(un), shape, Qvec, ELV);
+      AddMult_a_VWt(w, shape, gn, ELV);
    }
 }
 
 void DGBdrLaxFriedrichsLFIntegrator::AssembleRHSElementVect(
    const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
 {
+mfem_error("do not use this!\n");
    int dim = el.GetDim();
    int dof = el.GetDof();
    Vector nor(dim), Qvec, gn(dim);
@@ -470,7 +476,7 @@ void DGBdrTemamLFIntegrator::AssembleRHSElementVect(
       w = ip.weight;
       if (Z) w *= Z->Eval(*(Tr.Face), eip);
 
-      Q.Eval(Qvec, *(Tr.Face), eip);
+      Q.Eval(Qvec, *Tr.Elem1, eip);
 
       el.CalcShape(eip, shape);
 

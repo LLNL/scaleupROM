@@ -206,8 +206,10 @@ void GenerateSamples(MPI_Comm comm)
       BlockVector *U_snapshots = NULL;
       // Basis tags for each block of U_snapshots.
       std::vector<std::string> basis_tags;
+      Array<int> col_idxs;
       test->PrepareSnapshots(U_snapshots, basis_tags);
-      sample_generator->SaveSnapshot(U_snapshots, basis_tags);
+      sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
+      sample_generator->SaveSnapshotPorts(test->GetTopologyHandler(), test->GetTrainMode(), col_idxs);
 
       sample_generator->ReportStatus(s);
 
@@ -217,6 +219,7 @@ void GenerateSamples(MPI_Comm comm)
       s++;
    }
    sample_generator->WriteSnapshots();
+   sample_generator->WriteSnapshotPorts();
 
    delete sample_generator;
    delete problem;
