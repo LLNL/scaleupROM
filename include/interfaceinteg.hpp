@@ -70,6 +70,20 @@ public:
                                           const double &iw,
                                           const Vector &eltest1, const Vector &eltest2,
                                           Array2D<DenseMatrix*> &quadmats);
+
+   virtual void AddAssembleVector_Fast(const int s, const double qw,
+                                       FaceElementTransformations &Tr1,
+                                       FaceElementTransformations &Tr2,
+                                       const IntegrationPoint &ip,
+                                       const Vector &x1, const Vector &x2,
+                                       Vector &y1, Vector &y2);
+
+   virtual void AddAssembleGrad_Fast(const int s, const double qw,
+                                     FaceElementTransformations &Tr1,
+                                     FaceElementTransformations &Tr2,
+                                     const IntegrationPoint &ip,
+                                     const Vector &x1, const Vector &x2,
+                                     Array2D<SparseMatrix *> &jac);
 };
 
 class InterfaceDGDiffusionIntegrator : public InterfaceNonlinearFormIntegrator
@@ -365,6 +379,20 @@ public:
                                  const double &iw,
                                  const Vector &eltest1, const Vector &eltest2,
                                  Array2D<DenseMatrix*> &quadmats) override;
+
+   void AddAssembleVector_Fast(const int s, const double qw,
+                              FaceElementTransformations &Tr1,
+                              FaceElementTransformations &Tr2,
+                              const IntegrationPoint &ip,
+                              const Vector &x1, const Vector &x2,
+                              Vector &y1, Vector &y2) override;
+
+   void AddAssembleGrad_Fast(const int s, const double qw,
+                           FaceElementTransformations &Tr1,
+                           FaceElementTransformations &Tr2,
+                           const IntegrationPoint &ip,
+                           const Vector &x1, const Vector &x2,
+                           Array2D<SparseMatrix *> &jac) override;
 
 private:
    void ComputeFluxDotN(const Vector &u1, const Vector &u2, const Vector &nor,
