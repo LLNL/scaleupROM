@@ -150,23 +150,41 @@ def get_results(samples, prefix):
 
     return np.array(res)
 
-def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
-    fig, axs = plt.subplots(1,2, figsize=(15,5))
+def solve_time_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"):
+    plt.plot(samples, res[:,0], label='FOM')
+    plt.plot(samples, res[:,1], label='ROM')
+    plt.xlabel(scale_prefix)
+    plt.yscale('log')
+    plt.ylabel("Solve time [s]")
+    plt.legend()
 
-    axs[0].plot(samples, res[:,0], label='FOM solve time')
-    axs[0].plot(samples, res[:,1], label='ROM solve time')
-    axs[0].plot(samples, res[:,2], label='Relative error')
-    axs[0].set_xlabel(scale_prefix)
-    axs[0].set_yscale('log')
-    axs[0].legend()
-
-    axs[1].plot(samples, res[:,3], label='Speedup factor', )
-    axs[1].set_xlabel(scale_prefix)
-    axs[1].legend()
-
-    fig.suptitle(scale_prefix+'-scaling', fontsize = 24)
     plt.tight_layout()
-    plt.savefig(plt_name)
+    plt.savefig("solve_time_" + plt_name, dpi=300)
+    plt.clf()
+
+def relerr_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"):
+    plt.plot(samples, res[:,2], label='Relative error')
+    plt.xlabel(scale_prefix)
+    plt.yscale('log')
+    plt.ylabel("Relative error [-]")
+    
+    plt.tight_layout()
+    plt.savefig("relerr_" + plt_name, dpi=300)
+    plt.clf()
+
+def speedup_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"):
+    plt.plot(samples, res[:,3])
+    plt.xlabel(scale_prefix)
+    plt.ylabel("Speedup factor [-]")
+
+    plt.tight_layout()
+    plt.savefig("speedup_" + plt_name, dpi=300)
+    plt.clf()
+
+def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
+    solve_time_scaling_plot(samples, res, scale_prefix, plt_name)
+    relerr_scaling_plot(samples, res, scale_prefix, plt_name)
+    speedup_scaling_plot(samples, res, scale_prefix, plt_name)
 
 def get_nr(txt, split_txt = 'comparison'):
     return int(txt.split('.')[0].split(split_txt)[1])
@@ -190,20 +208,23 @@ def get_svs(filename):
         with open(filename, 'r') as file:
             return [float(line.strip()) for line in file]
 
-def sv_plot(jointname, h_name, v_name, plt_name = "sv_plot.png"):
+def sv_plot(jointname, h_name, v_name, legend_names, plt_name = "sv_plot.png"):
     svs_j = get_svs(jointname)
     svs_b = get_svs(h_name)
     svs_c = get_svs(v_name)
 
-    plt.plot(range(len(svs_j)), svs_j, label='Joint')
-    plt.plot(range(len(svs_b)), svs_b, label='Beam')
-    plt.plot(range(len(svs_c)), svs_c, label='Column')
+    plt.plot(range(len(svs_j)), svs_j, label=legend_names[0])
+    plt.plot(range(len(svs_b)), svs_b, label=legend_names[1])
+    plt.plot(range(len(svs_c)), svs_c, label=legend_names[2])
     plt.xscale('log')
+    plt.xlabel('$n$')
+    plt.ylabel('$\sigma$')
     plt.yscale('log')
-    plt.legend()
-    plt.title('Advanced component SV spectrum')
+    plt.legend(title="Component name")
+    #plt.title('Advanced component SV spectrum')
     plt.tight_layout()
-    plt.savefig(os.path.join(os.getcwd(), plt_name))
+    #plt.savefig(os.path.join(os.getcwd(), plt_name))
+    plt.savefig(os.path.join(os.getcwd(), plt_name), dpi=300)
 
 if __name__ == "__main__":
     import sys
@@ -224,10 +245,22 @@ if __name__ == "__main__":
             plot_path = sys.argv[3]
             basis_scaling_plot(prefix, plot_path)
         elif name == "svplot":
-            jointname = sys.argv[2]
-            h_name = sys.argv[3]
-            v_name = sys.argv[4]
-            sv_plot(jointname, h_name, v_name)        
+            prefix = sys.argv[2]
+            jointname = sys.argv[3]
+            h_name = sys.argv[4]
+            v_name = sys.argv[5]
+            legend_type = sys.argv[6]
+
+            if legend_type == 'A':
+                legend_names = ["Joint", "Beam", "Column"]
+            else:
+                legend_names = ["Joint", "Beam, X", "Beam, Y"]
+
+            jointname_file = prefix + "_" + jointname + "_sv.txt"
+            h_name_file = prefix + "_" + h_name + "_sv.txt"
+            v_name_file = prefix + "_" + v_name + "_sv.txt"
+
+            sv_plot(jointname_file, h_name_file, v_name_file, legend_names)        
         elif name == "cwtrain_mesh":
             prefix = sys.argv[2]
             create_training_meshes(prefix)
