@@ -39,7 +39,15 @@ scaleupROM is mainly built upon [MFEM](https://mfem.org/) and [libROM](https://w
   - [MUMPS](https://github.com/scivision/mumps)
 - [libROM](https://librom.net/)
 
-**TODO**: set up installation instruction
+## Instruction
+
+See the [wiki page](https://github.com/LLNL/scaleupROM/wiki/Installation) for the detailed instruction.
+
+For LC quartz, the installation script is provided. You can simply run:
+
+```
+./script/install_quartz.bash
+```
 
 # Using Docker container
 
@@ -63,3 +71,4 @@ LLNL-CODE-857975
 - Thomas Roy (LLNL)
 - Tiras Y. Lin (LLNL)
 - Sarah E. Baker (LLNL)
+- Axel Larsson (Princeton)
