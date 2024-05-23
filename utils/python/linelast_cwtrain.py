@@ -182,6 +182,7 @@ def speedup_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"):
     plt.clf()
 
 def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
+    plt.rc('axes', labelsize=14)
     solve_time_scaling_plot(samples, res, scale_prefix, plt_name)
     relerr_scaling_plot(samples, res, scale_prefix, plt_name)
     speedup_scaling_plot(samples, res, scale_prefix, plt_name)
@@ -213,6 +214,7 @@ def sv_plot(jointname, h_name, v_name, legend_names, plt_name = "sv_plot.png"):
     svs_b = get_svs(h_name)
     svs_c = get_svs(v_name)
 
+    plt.rc('axes', labelsize=18)
     plt.plot(range(len(svs_j)), svs_j, label=legend_names[0])
     plt.plot(range(len(svs_b)), svs_b, label=legend_names[1])
     plt.plot(range(len(svs_c)), svs_c, label=legend_names[2])
