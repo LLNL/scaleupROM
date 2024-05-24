@@ -117,7 +117,7 @@ friend class SteadyNSOperator;
 protected:
    enum OperType {
       BASE,
-      TEMAM,
+      LF,
       NUM_OPERTYPE
    } oper_type = BASE;
 

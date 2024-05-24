@@ -77,6 +77,24 @@ TEST(DDSerialTest, Test_full_dg)
    return;
 }
 
+TEST(DDSerialTest, Test_LF)
+{
+   config = InputParser("inputs/dd_mms.yml");
+   config.dict_["discretization"]["order"] = 1;
+   config.dict_["manufactured_solution"]["number_of_refinement"] = 1;
+   config.dict_["solver"]["jacobian"]["max_iter"] = 20000;
+   config.dict_["solver"]["print_level"] = 1;
+   config.dict_["solver"]["jacobian"]["print_level"] = 1;
+   // config.dict_["mesh"]["filename"] = "meshes/square.tri.mesh";
+   config.dict_["discretization"]["full-discrete-galerkin"] = true;
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["navier-stokes"]["operator-type"] = "lf";
+   config.dict_["domain-decomposition"]["type"] = "none";
+   CheckConvergence();
+
+   return;
+}
+
 // TODO: Devise 3d incompressible manufactured solution.
 // TEST(DDSerial_component_3D_hex_test, Test_convergence)
 // {

@@ -277,7 +277,7 @@ SteadyNSSolver::SteadyNSSolver()
 
    std::string oper_str = config.GetOption<std::string>("navier-stokes/operator-type", "base");
    if (oper_str == "base")       oper_type = OperType::BASE;
-   else if (oper_str == "temam") oper_type = OperType::TEMAM;
+   else if (oper_str == "lf")    oper_type = OperType::LF;
    else
       mfem_error("SteadyNSSolver: unknown operator type!\n");
 
@@ -347,17 +347,14 @@ void SteadyNSSolver::BuildDomainOperators()
             hs[m]->AddDomainIntegrator(nl_integ);
          }
          break;
-         case OperType::TEMAM:
+         case OperType::LF:
          {
-            auto nl_integ = new TemamTrilinearFormIntegrator(*zeta_coeff);
-            nl_integ->SetIntRule(ir_nl);
-            hs[m]->AddDomainIntegrator(nl_integ);
+            auto *lf_integ1 = new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta);
+            lf_integ1->SetIntRule(ir_nl);
+
+            hs[m]->AddDomainIntegrator(lf_integ1);
             if (full_dg)
-            {
-               auto nl_face = new DGTemamFluxIntegrator(*minus_zeta);
-               // nl_face->SetIntRule(ir_nl);
-               hs[m]->AddInteriorFaceIntegrator(nl_face);
-            }
+               hs[m]->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
          }
          break;
          default:
@@ -366,10 +363,10 @@ void SteadyNSSolver::BuildDomainOperators()
       }
    }
 
-   if (oper_type == OperType::TEMAM)
+   if (oper_type == OperType::LF)
    {
       nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
-      nl_itf->AddInterfaceIntegrator(new InterfaceDGTemamFluxIntegrator(*minus_zeta));
+      nl_itf->AddInterfaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
       // nl_interface->SetIntRule(ir_nl);
    }
 }
@@ -378,30 +375,30 @@ void SteadyNSSolver::SetupRHSBCOperators()
 {
    StokesSolver::SetupRHSBCOperators();
 
-   if (oper_type != OperType::TEMAM) return;
+   // if (oper_type != OperType::LF) return;
 
-   for (int m = 0; m < numSub; m++)
-   {
-      assert(fs[m] && gs[m]);
-      for (int b = 0; b < global_bdr_attributes.Size(); b++) 
-      {
-         int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-         if (idx < 0) continue;
-         if (!BCExistsOnBdr(b)) continue;
-         // TODO: Non-homogeneous Neumann stress bc
-         if (bdr_type[b] == BoundaryType::NEUMANN)
-            continue;
+   // for (int m = 0; m < numSub; m++)
+   // {
+   //    assert(fs[m] && gs[m]);
+   //    for (int b = 0; b < global_bdr_attributes.Size(); b++) 
+   //    {
+   //       int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
+   //       if (idx < 0) continue;
+   //       if (!BCExistsOnBdr(b)) continue;
+   //       // TODO: Non-homogeneous Neumann stress bc
+   //       if (bdr_type[b] == BoundaryType::NEUMANN)
+   //          continue;
 
-         fs[m]->AddBdrFaceIntegrator(new DGBdrTemamLFIntegrator(*ud_coeffs[b], minus_half_zeta), *bdr_markers[b]);
-      }
-   }
+   //       fs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]), *bdr_markers[b]);
+   //    }
+   // }
 }
 
 void SteadyNSSolver::SetupDomainBCOperators()
 {
    StokesSolver::SetupDomainBCOperators();
 
-   if (oper_type != OperType::TEMAM) return;
+   if (oper_type != OperType::LF) return;
 
    assert(hs.Size() == numSub);
    for (int m = 0; m < numSub; m++)
@@ -411,10 +408,12 @@ void SteadyNSSolver::SetupDomainBCOperators()
       {
          int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
          if (idx < 0) continue;
-         
-         // homogeneous Neumann boundary condition
-         if (!BCExistsOnBdr(b) && (bdr_type[b] == BoundaryType::NEUMANN))
-            hs[m]->AddBdrFaceIntegrator(new DGTemamFluxIntegrator(*zeta_coeff), *bdr_markers[b]);
+         if (!BCExistsOnBdr(b)) continue;
+         // TODO: Non-homogeneous Neumann stress bc
+         if (bdr_type[b] == BoundaryType::NEUMANN)
+            continue;
+
+         hs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]), *bdr_markers[b]);
       }
    }
    
@@ -537,7 +536,10 @@ bool SteadyNSSolver::Solve()
       SortByVariables(*U, sol_byvar);
    }
    else
-      sol_byvar = 0.0;
+   {
+      for (int k = 0; k < sol_byvar.Size(); k++)
+         sol_byvar(k) = UniformRandom();
+   }
 
    SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);
 
@@ -954,7 +956,7 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    const int num_basis = basis->NumCols();
    assert(basis->NumRows() >= nvdofs);
 
-   if (oper_type == OperType::TEMAM)
+   if (oper_type == OperType::LF)
       mfem_error("SteadyNSSolver: Temam Operator is not implemented for ROM yet!\n");
 
    DenseTensor *tensor = new DenseTensor(num_basis, num_basis, num_basis);
