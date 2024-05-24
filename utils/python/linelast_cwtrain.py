@@ -195,6 +195,7 @@ def export_opt_val(filename, opt_nb_a, opt_nb_i, opt_speedup):
     out_txt = "Optimal number of bases (interpolated) is: " + str(round(float(opt_nb_a), 4)) + " bases\nOptimal number of bases (rounded) is: " + str(opt_nb_i) + " bases\nSpeedup at rounded number of bases is: " + str(round(float(opt_speedup), 4)) + " x"
     f.write(out_txt)
     f.close()
+    print(out_txt)
 
 def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
     plt.rc('axes', labelsize=14)
