@@ -164,22 +164,27 @@ def solve_time_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"
     plt.savefig("solve_time_" + plt_name, dpi=300)
     plt.clf()
 
-def relerr_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"):
+def relerr_scaling_plot(samples, res, scale_prefix, opt_x, plt_name = "scaling.png"):
     plt.plot(samples, res[:,2], label='Relative error')
     plt.xscale('log')
     plt.xlabel(scale_prefix)
     plt.yscale('log')
     plt.ylabel("Relative error [-]")
+    plt.hlines([1.0e-2],[0.0],[opt_x], colors=['lightgray'], linestyles=['dashed'])
+    plt.scatter([opt_x], [1.0e-2], c = 'red',zorder=10)
+
     
     plt.tight_layout()
     plt.savefig("relerr_" + plt_name, dpi=300)
     plt.clf()
 
-def speedup_scaling_plot(samples, res, scale_prefix, plt_name = "scaling.png"):
+def speedup_scaling_plot(samples, res, scale_prefix, opt, plt_name = "scaling.png"):
     plt.plot(samples, res[:,3])
     plt.xscale('log')
     plt.xlabel(scale_prefix)
     plt.ylabel("Speedup factor [-]")
+    plt.hlines([opt[1]],[0.0],[opt[0]], colors=['lightgray'], linestyles=['dashed'])
+    plt.scatter([opt[0]], [opt[1]], c = 'red',zorder=10)
 
     plt.tight_layout()
     plt.savefig("speedup_" + plt_name, dpi=300)
@@ -193,17 +198,16 @@ def export_opt_val(filename, opt_nb_a, opt_nb_i, opt_speedup):
 
 def create_scaling_plot(samples, res, scale_prefix, plt_name = "plot.png"):
     plt.rc('axes', labelsize=14)
-    ferr = interp1d(samples, res[:,2]) # Rel err
     ferr_i = interp1d(res[:,2], samples) # Inverse correlation
     x_star_a = ferr_i(1e-2) # Analytical x_star
     x_star_i = np.ceil(x_star_a) # Next integer
 
     fspeed = interp1d(samples, res[:,3]) # speedup factor
-    opt_speedup = fspeed(x_star_i)
+    opt_speedup = fspeed(x_star_a)
 
     solve_time_scaling_plot(samples, res, scale_prefix, plt_name)
-    relerr_scaling_plot(samples, res, scale_prefix, plt_name)
-    speedup_scaling_plot(samples, res, scale_prefix, plt_name)
+    relerr_scaling_plot(samples, res, scale_prefix, x_star_a, plt_name)
+    speedup_scaling_plot(samples, res, scale_prefix, (x_star_a,opt_speedup), plt_name)
     export_opt_val("opt_vals.txt", x_star_a, x_star_i, opt_speedup)
 
 def get_nr(txt, split_txt = 'comparison'):
