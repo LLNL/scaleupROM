@@ -154,7 +154,6 @@ public:
 
    void BuildDomainOperators() override;
 
-   void SetupRHSBCOperators() override;
    void SetupDomainBCOperators() override;
 
    void AssembleOperator() override;

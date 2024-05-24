@@ -371,29 +371,6 @@ void SteadyNSSolver::BuildDomainOperators()
    }
 }
 
-void SteadyNSSolver::SetupRHSBCOperators()
-{
-   StokesSolver::SetupRHSBCOperators();
-
-   // if (oper_type != OperType::LF) return;
-
-   // for (int m = 0; m < numSub; m++)
-   // {
-   //    assert(fs[m] && gs[m]);
-   //    for (int b = 0; b < global_bdr_attributes.Size(); b++) 
-   //    {
-   //       int idx = meshes[m]->bdr_attributes.Find(global_bdr_attributes[b]);
-   //       if (idx < 0) continue;
-   //       if (!BCExistsOnBdr(b)) continue;
-   //       // TODO: Non-homogeneous Neumann stress bc
-   //       if (bdr_type[b] == BoundaryType::NEUMANN)
-   //          continue;
-
-   //       fs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]), *bdr_markers[b]);
-   //    }
-   // }
-}
-
 void SteadyNSSolver::SetupDomainBCOperators()
 {
    StokesSolver::SetupDomainBCOperators();
