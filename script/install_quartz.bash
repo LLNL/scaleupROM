@@ -14,6 +14,7 @@ module load gcc/11.2.1
 module load git/2.36.1
 module load mvapich2
 module load cmake/3.26.3
+module load hdf5-parallel/1.14.0
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 INSTALL_HELPER=$SCRIPT_DIR/../install-helper
@@ -147,7 +148,7 @@ cd $LIB_DIR/libROM
 if [ ! -f "build/lib/libROM.so" ]; then
     cp $INSTALL_HELPER/libROM/CMakeLists.txt ./lib/
     mkdir ./build && cd ./build
-    cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/simple.cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=OFF -DCMAKE_INCLUDE_PATH=$LIB_DIR/include -DCMAKE_LIBRARY_PATH=$LIB_DIR/lib
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/simple.cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=OFF -DCMAKE_INCLUDE_PATH=$LIB_DIR/include -DCMAKE_LIBRARY_PATH=$LIB_DIR/lib -DHDF5_IS_PARALLEL=On
     check_result $? librom-config
     make -j 16
     check_result $? librom-build
