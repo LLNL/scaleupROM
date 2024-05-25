@@ -96,11 +96,13 @@ void UnsteadyNSSolver::InitializeTimeIntegration()
 {
    assert(dt > 0.0);
 
-   uu = massMat->CreateMonolithic();
+   uu = new SparseMatrix(vblock_offsets[1]);
+   SparseMatrix *tmp = massMat->CreateMonolithic();
+   (*uu) += *tmp;
    (*uu) *= bd0 / dt;
    (*uu) += (*M); // add viscous flux operator
    uu->Finalize();
-   // mass->Finalize();
+   delete tmp;
 
    // This should be run after AssembleOperator
    assert(systemOp);
@@ -152,6 +154,14 @@ void UnsteadyNSSolver::Step(double &time, int step)
 
    /* Solve for the next step */
    mumps->Mult(*RHS_step, *U_step);
+
+   /* remove pressure scalar if all dirichlet bc */
+   if (!pres_dbc)
+   {
+      double p_const = U_stepview->GetBlock(1).Sum() / U_stepview->GetBlock(1).Size();
+
+      U_stepview->GetBlock(1) -= p_const;
+   }
 
    time += dt;
 }

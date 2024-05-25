@@ -488,6 +488,150 @@ void CheckConvergence(const double &threshold)
 
 } // namespace steady_ns
 
+namespace unsteady_ns
+{
+
+UnsteadyNSSolver *SolveWithRefinement(const int num_refinement)
+{
+   config.dict_["mesh"]["uniform_refinement"] = num_refinement;
+   UnsteadyNSSolver *test = new UnsteadyNSSolver();
+
+   test->InitVariables();
+   test->InitVisualization();
+
+   test->AddBCFunction(mms::steady_ns::uFun_ex);
+   test->SetBdrType(BoundaryType::DIRICHLET);
+   test->AddRHSFunction(mms::steady_ns::fFun);
+   
+   const int dim = test->GetDim();
+   VectorFunctionCoefficient ucoeff(dim, mms::steady_ns::uFun_ex);
+   FunctionCoefficient pcoeff(mms::steady_ns::pFun_ex);
+   for (int m = 0; m < test->GetNumSubdomains(); m++)
+   {
+      test->GetVelGridFunction(m)->ProjectCoefficient(ucoeff);
+      test->GetPresGridFunction(m)->ProjectCoefficient(pcoeff);
+   }
+
+   test->BuildOperators();
+
+   test->SetupBCOperators();
+
+   test->Assemble();
+
+   test->Solve();
+
+   test->SaveVisualization();
+
+   return test;
+}
+
+void CheckConvergence(const double &threshold)
+{
+   mms::steady_ns::nu = config.GetOption<double>("stokes/nu", 1.0);
+   mms::steady_ns::zeta = config.GetOption<double>("navier-stokes/zeta", 1.0);
+
+   int num_refine = config.GetOption<int>("manufactured_solution/number_of_refinement", 3);
+   int base_refine = config.GetOption<int>("manufactured_solution/baseline_refinement", 0);
+
+   //printf("Num. Elem.\tRel. v err.\tConv Rate\tNorm\tRel. p err.\tConv Rate\tNorm\n");
+   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
+          "Num. Elem.", "Rel v err", "Conv Rate", "Norm", "Rel p err", "Conv Rate", "Norm");
+
+   Vector uconv_rate(num_refine), pconv_rate(num_refine);
+   uconv_rate = 0.0;
+   pconv_rate = 0.0;
+   double uerror1 = 0.0, perror1 = 0.0;
+   for (int r = base_refine; r < num_refine; r++)
+   {
+      UnsteadyNSSolver *test = SolveWithRefinement(r);
+
+      // Compare with exact solution
+      int dim = test->GetDim();
+      VectorFunctionCoefficient exact_usol(dim, mms::steady_ns::uFun_ex);
+      FunctionCoefficient exact_psol(mms::steady_ns::pFun_ex);
+
+      // For all velocity dirichlet bc, pressure does not have the absolute value.
+      // specify the constant scalar for the reference value.
+      double p_const = 0.0;
+      int ps = 0;
+      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      {
+         GridFunction *pk = test->GetPresGridFunction(k);
+         GridFunction p_ex(*pk);
+         p_ex.ProjectCoefficient(exact_psol);
+         ps += p_ex.Size();
+         p_const += p_ex.Sum();
+         // If p_ex is the view vector of pk, then this will prevent false negative test result.
+         p_ex += 1.0;
+      }
+      p_const /= static_cast<double>(ps);
+
+      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      {
+         GridFunction *pk = test->GetPresGridFunction(k);
+         (*pk) += p_const;
+      }
+
+      int uorder = test->GetVelFEOrder();
+      int porder = test->GetPresFEOrder();
+      int order_quad = max(2, 2*uorder+1);
+      const IntegrationRule *irs[Geometry::NumGeom];
+      for (int i=0; i < Geometry::NumGeom; ++i)
+      {
+         irs[i] = &(IntRules.Get(i, order_quad));
+      }
+
+      int numEl = 0;
+      double unorm = 0.0, pnorm = 0.0;
+      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      {
+         Mesh *mk = test->GetMesh(k);
+         unorm += pow(ComputeLpNorm(2.0, exact_usol, *mk, irs), 2);
+         pnorm += pow(ComputeLpNorm(2.0, exact_psol, *mk, irs), 2);
+         numEl += mk->GetNE();
+      }
+      unorm = sqrt(unorm);
+      pnorm = sqrt(pnorm);
+
+      double uerror = 0.0, perror = 0.0;
+      for (int k = 0; k < test->GetNumSubdomains(); k++)
+      {
+         GridFunction *uk = test->GetVelGridFunction(k);
+         GridFunction *pk = test->GetPresGridFunction(k);
+         uerror += pow(uk->ComputeLpError(2, exact_usol), 2);
+         perror += pow(pk->ComputeLpError(2, exact_psol), 2);
+      }
+      uerror = sqrt(uerror);
+      perror = sqrt(perror);
+
+      uerror /= unorm;
+      perror /= pnorm;
+      
+      if (r > base_refine)
+      {
+         uconv_rate(r) = uerror1 / uerror;
+         pconv_rate(r) = perror1 / perror;
+      }
+      printf("%10d\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\t%10.5E\n", numEl, uerror, uconv_rate(r), unorm, perror, pconv_rate(r), pnorm);
+
+      // reported convergence rate
+      if (r > base_refine)
+      {
+         EXPECT_TRUE(uconv_rate(r) > pow(2.0, uorder+1) - threshold);
+         EXPECT_TRUE(pconv_rate(r) > pow(2.0, porder+1) - threshold);
+      }
+
+      uerror1 = uerror;
+      perror1 = perror;
+
+      delete test;
+   }
+
+   return;
+}
+
+}
+
 namespace linelast
 {
    void ExactSolution(const Vector &x, Vector &u)

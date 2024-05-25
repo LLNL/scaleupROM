@@ -9,6 +9,7 @@
 #include "poisson_solver.hpp"
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
+#include "unsteady_ns_solver.hpp"
 #include "linelast_solver.hpp"
 #include "advdiff_solver.hpp"
 #include <fstream>
@@ -73,6 +74,14 @@ void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 
 SteadyNSSolver *SolveWithRefinement(const int num_refinement);
+void CheckConvergence(const double &threshold = 1.0);
+
+}   // namespace steady_ns
+
+namespace unsteady_ns
+{
+
+UnsteadyNSSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence(const double &threshold = 1.0);
 
 }   // namespace steady_ns
