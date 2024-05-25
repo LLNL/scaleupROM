@@ -179,7 +179,8 @@ public:
    // For bilinear case.
    // system-specific.
    virtual void AssembleInterfaceMatrices();
-   virtual void SetupMUMPSSolver(bool set_oper);
+   virtual void SetupMUMPSSolver(bool set_oper,
+      const MUMPSSolver::MatType mat_type=MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
    virtual void SetupPressureMassMatrix();
 
    // Component-wise assembly

@@ -477,7 +477,7 @@ void StokesSolver::AssembleOperatorBase()
    systemOp->SetBlock(1,0, B);
 }
 
-void StokesSolver::SetupMUMPSSolver(bool set_oper)
+void StokesSolver::SetupMUMPSSolver(bool set_oper, const MUMPSSolver::MatType mat_type)
 {
    assert(systemOp);
    delete systemOp_mono;
@@ -493,7 +493,7 @@ void StokesSolver::SetupMUMPSSolver(bool set_oper)
    systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
    mumps = new MUMPSSolver(MPI_COMM_SELF);
-   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
+   mumps->SetMatrixSymType(mat_type);
    if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 

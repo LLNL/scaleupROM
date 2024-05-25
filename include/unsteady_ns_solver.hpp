@@ -18,6 +18,42 @@ friend class SteadyNSOperator;
 
 protected:
 
+   // number of timesteps
+   int nt = -1;
+   // timestep size
+   double dt = -1.0;
+   // BDF time integrator order
+   int time_order = -1;
+
+   // BDFk/EXTk coefficients.
+   /* use first order for now. */
+   double bd0 = 1.0;
+   double bd1 = -1.0;
+   double bd2 = 0.0;
+   double bd3 = 0.0;
+   double ab1 = 1.0;
+   double ab2 = 0.0;
+   double ab3 = 0.0;
+
+   /* velocity and its convection at previous time step */
+   Vector u1;
+   Vector Cu1;
+
+   /* mass matrix operator for time-derivative term */
+   Array<BilinearForm *> mass;
+   BlockMatrix *massMat = NULL;
+
+   /* For coupled solution approach */
+   SparseMatrix *uu = NULL;
+
+   /* proxy variables for time integration */
+   Array<int> offsets_byvar;
+   BlockVector *U_step = NULL;
+   BlockVector *RHS_step = NULL;
+   BlockVector *U_stepview = NULL;
+   BlockVector *RHS_stepview = NULL;
+
+   BlockOperator *Hop = NULL;
 
 public:
    UnsteadyNSSolver();
@@ -27,6 +63,8 @@ public:
    using SteadyNSSolver::GetVariableNames;
 
    void InitVariables() override;
+   void BuildDomainOperators() override;
+   void AssembleOperator() override;
 
    void SaveROMOperator(const std::string input_prefix="") override
    { mfem_error("UnsteadyNSSolver::SaveROMOperator is not implemented yet!\n"); }
@@ -63,6 +101,10 @@ public:
    { mfem_error("UnsteadyNSSolver::LoadROMTensorElems is not implemented yet!\n"); }
    void AssembleROMTensorOper() override
    { mfem_error("UnsteadyNSSolver::AssembleROMTensorOper is not implemented yet!\n"); }
+
+private:
+   void InitializeTimeIntegration();
+   void Step(double &time, int step);
 
 };
 
