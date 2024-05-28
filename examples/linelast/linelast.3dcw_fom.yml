@@ -1,0 +1,78 @@
+main:
+  mode: single_run
+  use_rom: false
+  solver: linelast
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "config/linelast.3dcwfom.h5"
+    components:
+      - name: "3dcw_joint"
+        file: "meshes/3dcw_joint.mesh"
+      - name: "3dcw_beamH"
+        file: "meshes/3dcw_beamH.mesh"
+      - name: "3dcw_beamV"
+        file: "meshes/3dcw_beamV.mesh"
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: paraview_output
+
+parameterized_problem:
+  name: linelast_lattice_roof
+
+single_run:
+  linelast_lattice_roof:
+    qsnow_f : -2000.0
+   
+basis:
+  prefix: "linelast_cwtrain"
+  number_of_basis: 16
+  tags:
+    - name: "3dcw_joint"
+      number_of_basis: 16
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_3dcw_joint_snapshot%01d"
+    - name: "3dcw_beamH"
+      number_of_basis: 64
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_3dcw_beamH_snapshot%01d"
+    - name: "3dcw_beamV"
+      number_of_basis: 64
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_3dcw_beamV_snapshot%01d"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  subdomain_training: universal
+  linear_solver_type: direct
+  save_operator:
+    level: component
+    prefix: "linelast_cw.rom_elem"
+  compare_solution:
+    enabled: true
