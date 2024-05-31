@@ -116,6 +116,8 @@ void MultiBlockSolver::ParseInputs()
 
       // visualization type for pointwise error.
       visual.save_error = config.GetOption<bool>("visualization/visualize_error", false);
+
+      visual.time_interval = config.GetOption<int>("visualization/time_interval", -1);
    }
 
    // rom inputs.

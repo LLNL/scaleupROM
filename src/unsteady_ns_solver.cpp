@@ -82,9 +82,14 @@ bool UnsteadyNSSolver::Solve()
    SortByVariables(*U, *U_step);
 
    double time = 0.0;
+   SaveVisualization(0, time);
+
    for (int step = 0; step < nt; step++)
    {
       Step(time, step);
+
+      if (((step+1) % visual.time_interval) == 0)
+         SaveVisualization(step+1, time);
    }
 
    SortBySubdomains(*U_step, *U);

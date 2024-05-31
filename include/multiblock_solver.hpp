@@ -89,6 +89,9 @@ protected:
       int domain_offset = -1;
       int domain_interval = -1;
 
+      /* time-dependent options */
+      int time_interval = -1;
+
       /* visualizing rom solution error */
       bool save_error = false;
    } visual;
