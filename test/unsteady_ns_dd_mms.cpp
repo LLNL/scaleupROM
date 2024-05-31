@@ -22,8 +22,8 @@ TEST(DDSerialTest, Test_convergence)
    config.dict_["navier-stokes"]["operator-type"] = "lf";
    config.dict_["discretization"]["order"] = 1;
    config.dict_["manufactured_solution"]["number_of_refinement"] = 3;
-   config.dict_["navier-stokes"]["timestep_size"] = 0.01;
-   config.dict_["navier-stokes"]["number_of_timesteps"] = 50;
+   config.dict_["time-integration"]["timestep_size"] = 0.01;
+   config.dict_["time-integration"]["number_of_timesteps"] = 100;
    CheckConvergence();
 
    return;

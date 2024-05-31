@@ -21,9 +21,9 @@ UnsteadyNSSolver::UnsteadyNSSolver()
    if (oper_type != OperType::LF)
       mfem_error("UnsteadyNSSolver only support Lax-Fridriechs flux integrator!\n");
 
-   nt = config.GetRequiredOption<int>("navier-stokes/number_of_timesteps");
-   dt = config.GetRequiredOption<double>("navier-stokes/timestep_size");
-   time_order = config.GetOption<int>("navier-stokes/bdf_order", 1);
+   nt = config.GetRequiredOption<int>("time-integration/number_of_timesteps");
+   dt = config.GetRequiredOption<double>("time-integration/timestep_size");
+   time_order = config.GetOption<int>("time-integration/bdf_order", 1);
 
    if (time_order != 1)
       mfem_error("UnsteadyNSSolver supports only first-order time integration for now!\n");
