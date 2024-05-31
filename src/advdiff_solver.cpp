@@ -178,7 +178,7 @@ void AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
 void AdvDiffSolver::SaveVisualization()
 {
-   if (!save_visual) return;
+   if (!visual.save) return;
 
    assert(paraviewColls.Size() > 0);
    for (int k = 0; k < paraviewColls.Size(); k++)
@@ -209,7 +209,7 @@ void AdvDiffSolver::SaveVisualization()
       }
    }
 
-   if (unified_paraview)
+   if (visual.unified_view)
    {
       assert(pmesh);
       global_flow_fes = new FiniteElementSpace(pmesh, fec[0], dim);
