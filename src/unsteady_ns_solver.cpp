@@ -84,9 +84,14 @@ bool UnsteadyNSSolver::Solve()
    double time = 0.0;
    SaveVisualization(0, time);
 
+   double cfl = 0.0;
    for (int step = 0; step < nt; step++)
    {
       Step(time, step);
+
+      cfl = ComputeCFL(dt);
+      printf("CFL: %.3e\n", cfl);
+      SanityCheck(step);
 
       if (((step+1) % visual.time_interval) == 0)
          SaveVisualization(step+1, time);
@@ -169,4 +174,89 @@ void UnsteadyNSSolver::Step(double &time, int step)
    }
 
    time += dt;
+}
+
+void UnsteadyNSSolver::SaveVisualization(const int step, const double time)
+{
+   /* copy to original solution variable */
+   SortBySubdomains(*U_step, *U);
+
+   MultiBlockSolver::SaveVisualization(step, time);
+}
+
+double UnsteadyNSSolver::ComputeCFL(const double dt_)
+{
+   Vector ux, uy, uz;
+   Vector ur, us, ut;
+   double cflx = 0.0;
+   double cfly = 0.0;
+   double cflz = 0.0;
+   double cflm = 0.0;
+   double cflmax = 0.0;
+
+   for (int m = 0; m < numSub; m++)
+   {
+      GridFunction vel;
+      vel.MakeRef(ufes[m], U_step->GetBlock(m * num_var), 0);
+
+      for (int e = 0; e < ufes[m]->GetNE(); ++e)
+      {
+         const FiniteElement *fe = ufes[m]->GetFE(e);
+         const IntegrationRule &ir = IntRules.Get(fe->GetGeomType(),
+                                                fe->GetOrder());
+         ElementTransformation *tr = ufes[m]->GetElementTransformation(e);
+
+         vel.GetValues(e, ir, ux, 1);
+         ur.SetSize(ux.Size());
+         vel.GetValues(e, ir, uy, 2);
+         us.SetSize(uy.Size());
+         if (vdim[0] == 3)
+         {
+            vel.GetValues(e, ir, uz, 3);
+            ut.SetSize(uz.Size());
+         }
+
+         double hmin = meshes[m]->GetElementSize(e, 1) /
+                     (double) ufes[m]->GetElementOrder(0);
+
+         for (int i = 0; i < ir.GetNPoints(); ++i)
+         {
+            const IntegrationPoint &ip = ir.IntPoint(i);
+            tr->SetIntPoint(&ip);
+            const DenseMatrix &invJ = tr->InverseJacobian();
+            const double detJinv = 1.0 / tr->Jacobian().Det();
+
+            if (vdim[0] == 2)
+            {
+               ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)) * detJinv;
+               us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)) * detJinv;
+            }
+            else if (vdim[0] == 3)
+            {
+               ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)
+                        + uz(i) * invJ(2, 0))
+                     * detJinv;
+               us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)
+                        + uz(i) * invJ(2, 1))
+                     * detJinv;
+               ut(i) = (ux(i) * invJ(0, 2) + uy(i) * invJ(1, 2)
+                        + uz(i) * invJ(2, 2))
+                     * detJinv;
+            }
+
+            cflx = fabs(dt_ * ux(i) / hmin);
+            cfly = fabs(dt_ * uy(i) / hmin);
+            if (vdim[0] == 3)
+            {
+               cflz = fabs(dt_ * uz(i) / hmin);
+            }
+            cflm = cflx + cfly + cflz;
+            cflmax = fmax(cflmax, cflm);
+         }  // for (int i = 0; i < ir.GetNPoints(); ++i)
+      }  // for (int e = 0; e < ufes->GetNE(); ++e)
+   }  // for (int m = 0; m < numSub; m++)
+
+   double cflmax_global = cflmax;
+
+   return cflmax_global;
 }

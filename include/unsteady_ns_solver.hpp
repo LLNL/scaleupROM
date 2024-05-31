@@ -73,6 +73,9 @@ public:
 
    bool Solve() override;
 
+   using MultiBlockSolver::SaveVisualization;
+   void SaveVisualization(const int step, const double time) override;
+
    void ProjectOperatorOnReducedBasis() override
    { mfem_error("UnsteadyNSSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"); }
 
@@ -105,6 +108,16 @@ public:
 private:
    void InitializeTimeIntegration();
    void Step(double &time, int step);
+
+   void SanityCheck(const int step)
+   {
+      if (isnan(U_step->Min()) || isnan(U_step->Max()))
+      {
+         printf("Step : %d\n", step);
+         mfem_error("UnsteadyNSSolver: Solution blew up!!\n");
+      }
+   }
+   double ComputeCFL(const double dt);
 
 };
 
