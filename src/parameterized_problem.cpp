@@ -155,6 +155,23 @@ void ubdr(const Vector &x, Vector &y)
 
 }  // namespace component_flow
 
+namespace backward_facing_step
+{
+
+double u0, y0, y1;
+
+void ubdr(const Vector &x, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   y = 0.0;
+
+   double ygap = (y1 - y0);
+   y(0) = - u0 * 4.0 / ygap / ygap * (y0 - x(1)) * (y1 - x(1));
+}
+
+}  // namespace backward_facing_step
+
 } // namespace flow_problem
 
 namespace linelast_problem
@@ -433,9 +450,13 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new ComponentFlow();
    }
-   else if (problem_name == "stokes_flow_past_array")
+   else if (problem_name == "flow_past_array")
    {
       problem = new FlowPastArray();
+   }
+   else if (problem_name == "backward_facing_step")
+   {
+      problem = new BackwardFacingStep();
    }
    else if (problem_name == "linelast_disp")
    {
@@ -610,17 +631,16 @@ PoissonSpiral::PoissonSpiral()
 ChannelFlow::ChannelFlow()
    : FlowProblem()
 {
-   battr.SetSize(4);
-   battr[0] = 1;
-   battr[1] = 3;
-   battr[2] = 4;
-   battr[3] = 5;
+   battr.SetSize(5);
+   for (int b = 0; b < 5; b++)
+      battr[b] = b+1;
    bdr_type.SetSize(4);
    bdr_type = BoundaryType::ZERO;
-   bdr_type[2] = BoundaryType::DIRICHLET;
+   bdr_type[1] = BoundaryType::NEUMANN;
+   bdr_type[3] = BoundaryType::DIRICHLET;
 
    // pointer to static function.
-   vector_bdr_ptr.SetSize(4);
+   vector_bdr_ptr.SetSize(5);
    vector_rhs_ptr = NULL;
    vector_bdr_ptr = &(function_factory::flow_problem::channel_flow::ubdr);
 
@@ -745,6 +765,54 @@ void FlowPastArray::SetBattr()
       bdr_type[2] = BoundaryType::DIRICHLET;
       bdr_type[0] = BoundaryType::NEUMANN;
    }
+}
+
+/*
+   BackwardFacingStep
+*/
+
+BackwardFacingStep::BackwardFacingStep()
+   : FlowProblem()
+{
+   /* Assume there are only three boundary attributes: 1, 2, 3 */
+   battr.SetSize(3);
+   for (int b = 0; b < 3; b++)
+      battr[b] = b+1;
+   
+   /*
+      1: dirichlet inflow
+      2: dirichlet no-slip wall
+      3: neumann outflow
+   */
+   bdr_type.SetSize(3);
+   bdr_type[0] = BoundaryType::DIRICHLET;
+   bdr_type[1] = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
+
+   // pointer to static function.
+   vector_bdr_ptr.SetSize(3);
+   vector_rhs_ptr = NULL;
+   /* technically only vector_bdr_ptr[0] will be used. */
+   vector_bdr_ptr = &(function_factory::flow_problem::backward_facing_step::ubdr);
+
+   param_num = 4;
+
+   // Default values.
+   function_factory::flow_problem::nu = 1.0;
+   function_factory::flow_problem::backward_facing_step::y0 = 0.0;
+   function_factory::flow_problem::backward_facing_step::y1 = 1.0;
+   function_factory::flow_problem::backward_facing_step::u0 = 1.0;
+
+   param_map["nu"] = 0;
+   param_map["y0"] = 1;
+   param_map["y1"] = 2;
+   param_map["u0"] = 3;
+
+   param_ptr.SetSize(param_num);
+   param_ptr[0] = &(function_factory::flow_problem::nu);
+   param_ptr[1] = &(function_factory::flow_problem::backward_facing_step::y0);
+   param_ptr[2] = &(function_factory::flow_problem::backward_facing_step::y1);
+   param_ptr[3] = &(function_factory::flow_problem::backward_facing_step::u0);
 }
 
 /*

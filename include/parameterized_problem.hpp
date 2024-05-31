@@ -66,6 +66,14 @@ namespace component_flow
    extern DenseMatrix k;
    void ubdr(const Vector &x, Vector &y);
 }
+
+namespace backward_facing_step
+{
+   extern double u0, y0, y1;
+   // TODO(kevin): time-dependent inflow boundary
+   void ubdr(const Vector &x, Vector &y);
+}
+
 }
 
 namespace linelast_problem
@@ -304,6 +312,13 @@ public:
 protected:
    Vector *u0;
    virtual void SetBattr();
+};
+
+class BackwardFacingStep : public FlowProblem
+{
+public:
+   BackwardFacingStep();
+   virtual ~BackwardFacingStep() {};
 };
 
 class LinElastProblem : public ParameterizedProblem
