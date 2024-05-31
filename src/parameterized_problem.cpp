@@ -87,7 +87,7 @@ double rhs(const Vector &x)
 
 }  // namespace poisson_spiral
 
-namespace stokes_problem
+namespace flow_problem
 {
 
 double nu;
@@ -110,7 +110,7 @@ void flux(const Vector &x, Vector &y)
    y *= del_u;
 }
 
-namespace stokes_channel
+namespace channel_flow
 {
 
 double L, U, x0;
@@ -125,9 +125,9 @@ void ubdr(const Vector &x, Vector &y)
    y(0) = U * (1.0 - 4.0 * yc * yc);
 }
 
-}  // namespace stokes_channel
+}  // namespace channel_flow
 
-namespace stokes_component
+namespace component_flow
 {
 
 Vector u0, du, offsets;
@@ -149,13 +149,13 @@ void ubdr(const Vector &x, Vector &y)
 
    // ensure incompressibility.
    Vector del_u(dim);
-   stokes_problem::flux(x, del_u);
+   flow_problem::flux(x, del_u);
    y -= del_u;
 }
 
-}  // namespace stokes_component
+}  // namespace component_flow
 
-} // namespace stokes_problem
+} // namespace flow_problem
 
 namespace linelast_problem
 {
@@ -231,7 +231,7 @@ namespace advdiff_problem
 {
 
 bool analytic_flow;
-StokesProblem *flow_problem;
+FlowProblem *flow_problem;
 
 namespace advdiff_flow_past_array
 {
@@ -425,17 +425,17 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new PoissonSpiral();
    }
-   else if (problem_name == "stokes_channel")
+   else if (problem_name == "channel_flow")
    {
-      problem = new StokesChannel();
+      problem = new ChannelFlow();
    }
-   else if (problem_name == "stokes_component")
+   else if (problem_name == "component_flow")
    {
-      problem = new StokesComponent();
+      problem = new ComponentFlow();
    }
    else if (problem_name == "stokes_flow_past_array")
    {
-      problem = new StokesFlowPastArray();
+      problem = new FlowPastArray();
    }
    else if (problem_name == "linelast_disp")
    {
@@ -604,11 +604,11 @@ PoissonSpiral::PoissonSpiral()
 }
 
 /*
-   StokesChannel
+   ChannelFlow
 */
 
-StokesChannel::StokesChannel()
-   : StokesProblem()
+ChannelFlow::ChannelFlow()
+   : FlowProblem()
 {
    battr.SetSize(4);
    battr[0] = 1;
@@ -622,15 +622,15 @@ StokesChannel::StokesChannel()
    // pointer to static function.
    vector_bdr_ptr.SetSize(4);
    vector_rhs_ptr = NULL;
-   vector_bdr_ptr = &(function_factory::stokes_problem::stokes_channel::ubdr);
+   vector_bdr_ptr = &(function_factory::flow_problem::channel_flow::ubdr);
 
    param_num = 4;
 
    // Default values.
-   function_factory::stokes_problem::nu = 1.0;
-   function_factory::stokes_problem::stokes_channel::L = 1.0;
-   function_factory::stokes_problem::stokes_channel::U = 1.0;
-   function_factory::stokes_problem::stokes_channel::x0 = 0.5;
+   function_factory::flow_problem::nu = 1.0;
+   function_factory::flow_problem::channel_flow::L = 1.0;
+   function_factory::flow_problem::channel_flow::U = 1.0;
+   function_factory::flow_problem::channel_flow::x0 = 0.5;
 
    param_map["nu"] = 0;
    param_map["L"] = 1;
@@ -638,14 +638,14 @@ StokesChannel::StokesChannel()
    param_map["x0"] = 3;
 
    param_ptr.SetSize(param_num);
-   param_ptr[0] = &(function_factory::stokes_problem::nu);
-   param_ptr[1] = &(function_factory::stokes_problem::stokes_channel::L);
-   param_ptr[2] = &(function_factory::stokes_problem::stokes_channel::U);
-   param_ptr[3] = &(function_factory::stokes_problem::stokes_channel::x0);
+   param_ptr[0] = &(function_factory::flow_problem::nu);
+   param_ptr[1] = &(function_factory::flow_problem::channel_flow::L);
+   param_ptr[2] = &(function_factory::flow_problem::channel_flow::U);
+   param_ptr[3] = &(function_factory::flow_problem::channel_flow::x0);
 }
 
-StokesComponent::StokesComponent()
-   : StokesProblem()
+ComponentFlow::ComponentFlow()
+   : FlowProblem()
 {
    battr.SetSize(5);
    for (int b = 0; b < 5; b++)
@@ -657,20 +657,20 @@ StokesComponent::StokesComponent()
    // pointer to static function.
    vector_bdr_ptr.SetSize(5);
    vector_rhs_ptr = NULL;
-   vector_bdr_ptr = &(function_factory::stokes_problem::stokes_component::ubdr);
+   vector_bdr_ptr = &(function_factory::flow_problem::component_flow::ubdr);
 
    param_num = 1 + 3 * 3 + 3 * 3;
-   function_factory::stokes_problem::stokes_component::u0.SetSize(3);
-   function_factory::stokes_problem::stokes_component::du.SetSize(3);
-   function_factory::stokes_problem::stokes_component::offsets.SetSize(3);
-   function_factory::stokes_problem::stokes_component::k.SetSize(3);
+   function_factory::flow_problem::component_flow::u0.SetSize(3);
+   function_factory::flow_problem::component_flow::du.SetSize(3);
+   function_factory::flow_problem::component_flow::offsets.SetSize(3);
+   function_factory::flow_problem::component_flow::k.SetSize(3);
 
    // Default values.
-   function_factory::stokes_problem::nu = 1.0;
-   function_factory::stokes_problem::stokes_component::u0 = 0.0;
-   function_factory::stokes_problem::stokes_component::du = 1.0;
-   function_factory::stokes_problem::stokes_component::offsets = 0.0;
-   function_factory::stokes_problem::stokes_component::k = 1.0;
+   function_factory::flow_problem::nu = 1.0;
+   function_factory::flow_problem::component_flow::u0 = 0.0;
+   function_factory::flow_problem::component_flow::du = 1.0;
+   function_factory::flow_problem::component_flow::offsets = 0.0;
+   function_factory::flow_problem::component_flow::k = 1.0;
 
    std::vector<std::string> xc(3), uc(3);
    xc[0] = "_x";
@@ -691,38 +691,38 @@ StokesComponent::StokesComponent()
    }
 
    param_ptr.SetSize(param_num);
-   param_ptr[0] = &(function_factory::stokes_problem::nu);
+   param_ptr[0] = &(function_factory::flow_problem::nu);
    for (int i = 0; i < 3; i++)
    {
-      param_ptr[1+i] = &(function_factory::stokes_problem::stokes_component::u0[i]);
-      param_ptr[4+i] = &(function_factory::stokes_problem::stokes_component::du[i]);
-      param_ptr[7+i] = &(function_factory::stokes_problem::stokes_component::offsets[i]);
+      param_ptr[1+i] = &(function_factory::flow_problem::component_flow::u0[i]);
+      param_ptr[4+i] = &(function_factory::flow_problem::component_flow::du[i]);
+      param_ptr[7+i] = &(function_factory::flow_problem::component_flow::offsets[i]);
       for (int j = 0; j < 3; j++)
-         param_ptr[10 + 3*i + j] = &(function_factory::stokes_problem::stokes_component::k(j,i));
+         param_ptr[10 + 3*i + j] = &(function_factory::flow_problem::component_flow::k(j,i));
    }
 }
 
 /*
-   StokesFlowPastArray
+   FlowPastArray
 */
 
-StokesFlowPastArray::StokesFlowPastArray()
-   : StokesComponent(), u0(&function_factory::stokes_problem::stokes_component::u0)
+FlowPastArray::FlowPastArray()
+   : ComponentFlow(), u0(&function_factory::flow_problem::component_flow::u0)
 {}
 
-void StokesFlowPastArray::SetParams(const std::string &key, const double &value)
+void FlowPastArray::SetParams(const std::string &key, const double &value)
 {
    ParameterizedProblem::SetParams(key, value);
    SetBattr();
 }
 
-void StokesFlowPastArray::SetParams(const Array<int> &indexes, const Vector &values)
+void FlowPastArray::SetParams(const Array<int> &indexes, const Vector &values)
 {
    ParameterizedProblem::SetParams(indexes, values);
    SetBattr();
 }
 
-void StokesFlowPastArray::SetBattr()
+void FlowPastArray::SetBattr()
 {
    if ((*u0)[0] > 0.0)
    {
@@ -1017,7 +1017,7 @@ LinElastFrameWind::LinElastFrameWind()
 */
 
 AdvDiffFlowPastArray::AdvDiffFlowPastArray()
-   : StokesFlowPastArray(), flow_problem(new StokesFlowPastArray)
+   : FlowPastArray(), flow_problem(new FlowPastArray)
 {
    function_factory::advdiff_problem::analytic_flow = false;
    function_factory::advdiff_problem::flow_problem = flow_problem;

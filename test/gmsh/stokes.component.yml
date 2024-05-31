@@ -51,10 +51,10 @@ visualization:
   output_dir: dd_mms_output
 
 parameterized_problem:
-  name: stokes_channel
+  name: channel_flow
 
 single_run:
-  stokes_channel:
+  channel_flow:
     U: 2.5
 
 sample_generation:
@@ -63,7 +63,7 @@ sample_generation:
   file_path:
     prefix: "stokes"
   parameters:
-    - key: single_run/stokes_channel/U
+    - key: single_run/channel_flow/U
       type: double
       sample_size: 2
       minimum: 2.0

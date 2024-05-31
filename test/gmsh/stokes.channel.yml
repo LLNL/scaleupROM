@@ -69,13 +69,13 @@ visualization:
   enabled: true
   unified_paraview: false
   file_path:
-    prefix: stokes_channel_output
+    prefix: channel_flow_output
 
 parameterized_problem:
-  name: stokes_channel
+  name: channel_flow
 
 single_run:
-  stokes_channel:
+  channel_flow:
     L: 2.0
     U: 1.0
 

@@ -5,7 +5,7 @@
 import numpy as np
 import h5py
 
-def ConfigStokesChannel():
+def ConfigChannelFlow():
     n_mesh = 4
     mesh_type = [0, 1, 2, 3]
     # n_mesh = 2
@@ -322,7 +322,7 @@ def Config3D():
 
 
 if __name__ == "__main__":
-    ConfigStokesChannel()
+    ConfigChannelFlow()
     #ConfigScaleUp(128)
     # ConfigTestMultiComponent()
     #for ncomp in [4,8,16,32,64]:

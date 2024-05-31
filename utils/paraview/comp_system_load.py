@@ -16,7 +16,7 @@ paraview.simple._DisableFirstRenderCameraReset()
 ncomp = 128
 offset = 128
 rootDir = 'C:\\Users\\chung28\\Desktop\\slides\\stokes_array\\stokes_array_32x32_rom'
-prefix = 'stokes_channel_output'
+prefix = 'channel_flow_output'
 filenames = ['%s_%d' % (prefix, n + offset) for n in range(ncomp)]
 paths = ['%s/%s/%s.pvd' % (rootDir, filename, filename) for filename in filenames]
 
