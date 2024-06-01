@@ -184,6 +184,21 @@ void UnsteadyNSSolver::SaveVisualization(const int step, const double time)
    MultiBlockSolver::SaveVisualization(step, time);
 }
 
+void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+{
+   SteadyNSSolver::SetParameterizedProblem(problem);
+
+   /* set up initial condition */
+   VectorFunctionCoefficient u_ic(vdim[0], problem->ic_ptr[0]);
+   VectorFunctionCoefficient p_ic(1, problem->ic_ptr[1]);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      vels[m]->ProjectCoefficient(u_ic);
+      ps[m]->ProjectCoefficient(p_ic);
+   }
+}
+
 double UnsteadyNSSolver::ComputeCFL(const double dt_)
 {
    Vector ux, uy, uz;

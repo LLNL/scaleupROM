@@ -76,6 +76,8 @@ public:
    using MultiBlockSolver::SaveVisualization;
    void SaveVisualization(const int step, const double time) override;
 
+   void SetParameterizedProblem(ParameterizedProblem *problem) override;
+
    void ProjectOperatorOnReducedBasis() override
    { mfem_error("UnsteadyNSSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"); }
 

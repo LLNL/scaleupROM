@@ -233,6 +233,10 @@ public:
    Array<int> battr;
    Array<BoundaryType> bdr_type; // abstract boundary type
 
+   /* initial condition for time-dependent problem */
+   /* size with number of variables */
+   Array<function_factory::GeneralVectorFunction *> ic_ptr;
+
    Array<function_factory::GeneralScalarFunction *> general_scalar_ptr;
    Array<function_factory::GeneralVectorFunction *> general_vector_ptr;
 

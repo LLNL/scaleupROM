@@ -170,6 +170,22 @@ void ubdr(const Vector &x, Vector &y)
    y(0) = - u0 * 4.0 / ygap / ygap * (y0 - x(1)) * (y1 - x(1));
 }
 
+void uic(const Vector &x, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   y = 0.0;
+
+   double ygap = (y1 - y0);
+   y(0) = (x(1) < y0) ? 0.0 : - u0 * 4.0 / ygap / ygap * (y0 - x(1)) * (y1 - x(1));
+}
+
+void pic(const Vector &x, Vector &y)
+{
+   y.SetSize(1);
+   y = 0.0;
+}
+
 }  // namespace backward_facing_step
 
 } // namespace flow_problem
@@ -794,6 +810,11 @@ BackwardFacingStep::BackwardFacingStep()
    vector_rhs_ptr = NULL;
    /* technically only vector_bdr_ptr[0] will be used. */
    vector_bdr_ptr = &(function_factory::flow_problem::backward_facing_step::ubdr);
+
+   /* pointer to initial condition */
+   ic_ptr.SetSize(2);
+   ic_ptr[0] = &(function_factory::flow_problem::backward_facing_step::uic);
+   ic_ptr[1] = &(function_factory::flow_problem::backward_facing_step::pic);
 
    param_num = 4;
 
