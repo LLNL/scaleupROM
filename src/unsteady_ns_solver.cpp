@@ -145,6 +145,9 @@ void UnsteadyNSSolver::InitializeTimeIntegration()
 
 void UnsteadyNSSolver::Step(double &time, int step)
 {
+   /* set time for forcing/boundary. At this point, time remains at the previous timestep. */
+   SetTime(time);
+
    /* copy velocity */
    u1 = U_stepview->GetBlock(0);
 
@@ -274,4 +277,17 @@ double UnsteadyNSSolver::ComputeCFL(const double dt_)
    double cflmax_global = cflmax;
 
    return cflmax_global;
+}
+
+void UnsteadyNSSolver::SetTime(const double time)
+{
+   /* set time for forcing coefficients */
+   for (int k = 0; k < f_coeffs.Size(); k++)
+      if (f_coeffs[k]) f_coeffs[k]->SetTime(time);
+
+   /* set time for boundary conditions */
+   for (int k = 0; k < ud_coeffs.Size(); k++)
+      if (ud_coeffs[k]) ud_coeffs[k]->SetTime(time);
+   for (int k = 0; k < sn_coeffs.Size(); k++)
+      if (sn_coeffs[k]) sn_coeffs[k]->SetTime(time);
 }

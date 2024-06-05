@@ -120,6 +120,7 @@ private:
       }
    }
    double ComputeCFL(const double dt);
+   void SetTime(const double time);
 
 };
 
