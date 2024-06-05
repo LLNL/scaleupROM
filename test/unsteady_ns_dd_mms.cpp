@@ -24,6 +24,7 @@ TEST(DDSerialTest, Test_convergence)
    config.dict_["manufactured_solution"]["number_of_refinement"] = 3;
    config.dict_["time-integration"]["timestep_size"] = 0.01;
    config.dict_["time-integration"]["number_of_timesteps"] = 100;
+   config.dict_["time-integration"]["report_interval"] = 10;
    CheckConvergence();
 
    return;

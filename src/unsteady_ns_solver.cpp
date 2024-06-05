@@ -24,6 +24,7 @@ UnsteadyNSSolver::UnsteadyNSSolver()
    nt = config.GetRequiredOption<int>("time-integration/number_of_timesteps");
    dt = config.GetRequiredOption<double>("time-integration/timestep_size");
    time_order = config.GetOption<int>("time-integration/bdf_order", 1);
+   report_interval = config.GetOption<int>("time-integration/report_interval", 0);
 
    if (time_order != 1)
       mfem_error("UnsteadyNSSolver supports only first-order time integration for now!\n");
@@ -90,8 +91,9 @@ bool UnsteadyNSSolver::Solve()
       Step(time, step);
 
       cfl = ComputeCFL(dt);
-      printf("CFL: %.3e\n", cfl);
       SanityCheck(step);
+      if (((step+1) % report_interval) == 0)
+         printf("Time step: %05d, CFL: %.3e\n", step+1, cfl);
 
       if (((step+1) % visual.time_interval) == 0)
          SaveVisualization(step+1, time);
@@ -205,7 +207,6 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 double UnsteadyNSSolver::ComputeCFL(const double dt_)
 {
    Vector ux, uy, uz;
-   Vector ur, us, ut;
    double cflx = 0.0;
    double cfly = 0.0;
    double cflz = 0.0;
@@ -215,7 +216,7 @@ double UnsteadyNSSolver::ComputeCFL(const double dt_)
    for (int m = 0; m < numSub; m++)
    {
       GridFunction vel;
-      vel.MakeRef(ufes[m], U_step->GetBlock(m * num_var), 0);
+      vel.MakeRef(ufes[m], U_step->GetBlock(m), 0);
 
       for (int e = 0; e < ufes[m]->GetNE(); ++e)
       {
@@ -225,14 +226,9 @@ double UnsteadyNSSolver::ComputeCFL(const double dt_)
          ElementTransformation *tr = ufes[m]->GetElementTransformation(e);
 
          vel.GetValues(e, ir, ux, 1);
-         ur.SetSize(ux.Size());
          vel.GetValues(e, ir, uy, 2);
-         us.SetSize(uy.Size());
          if (vdim[0] == 3)
-         {
             vel.GetValues(e, ir, uz, 3);
-            ut.SetSize(uz.Size());
-         }
 
          double hmin = meshes[m]->GetElementSize(e, 1) /
                      (double) ufes[m]->GetElementOrder(0);
@@ -244,30 +240,11 @@ double UnsteadyNSSolver::ComputeCFL(const double dt_)
             const DenseMatrix &invJ = tr->InverseJacobian();
             const double detJinv = 1.0 / tr->Jacobian().Det();
 
-            if (vdim[0] == 2)
-            {
-               ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)) * detJinv;
-               us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)) * detJinv;
-            }
-            else if (vdim[0] == 3)
-            {
-               ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)
-                        + uz(i) * invJ(2, 0))
-                     * detJinv;
-               us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)
-                        + uz(i) * invJ(2, 1))
-                     * detJinv;
-               ut(i) = (ux(i) * invJ(0, 2) + uy(i) * invJ(1, 2)
-                        + uz(i) * invJ(2, 2))
-                     * detJinv;
-            }
-
             cflx = fabs(dt_ * ux(i) / hmin);
             cfly = fabs(dt_ * uy(i) / hmin);
             if (vdim[0] == 3)
-            {
                cflz = fabs(dt_ * uz(i) / hmin);
-            }
+
             cflm = cflx + cfly + cflz;
             cflmax = fmax(cflmax, cflm);
          }  // for (int i = 0; i < ir.GetNPoints(); ++i)

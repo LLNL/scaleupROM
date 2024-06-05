@@ -24,6 +24,8 @@ protected:
    double dt = -1.0;
    // BDF time integrator order
    int time_order = -1;
+   // report interval for time integration
+   int report_interval = 0;
 
    // BDFk/EXTk coefficients.
    /* use first order for now. */

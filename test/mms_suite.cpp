@@ -503,14 +503,9 @@ UnsteadyNSSolver *SolveWithRefinement(const int num_refinement)
    test->SetBdrType(BoundaryType::DIRICHLET);
    test->AddRHSFunction(mms::steady_ns::fFun);
    
-   const int dim = test->GetDim();
-   VectorFunctionCoefficient ucoeff(dim, mms::steady_ns::uFun_ex);
-   FunctionCoefficient pcoeff(mms::steady_ns::pFun_ex);
-   for (int m = 0; m < test->GetNumSubdomains(); m++)
-   {
-      test->GetVelGridFunction(m)->ProjectCoefficient(ucoeff);
-      test->GetPresGridFunction(m)->ProjectCoefficient(pcoeff);
-   }
+   BlockVector *U = test->GetSolution();
+   for (int k = 0; k < U->Size(); k++)
+      (*U)(k) = 1e-2 * (2. * UniformRandom() - 1.);
 
    test->BuildOperators();
 
