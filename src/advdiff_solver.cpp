@@ -154,7 +154,7 @@ bool AdvDiffSolver::Solve()
    return converged;
 }
 
-void AdvDiffSolver::SetFlowAtSubdomain(std::function<void(const Vector &, Vector &)> F, const int m)
+void AdvDiffSolver::SetFlowAtSubdomain(std::function<void(const Vector &, double, Vector &)> F, const int m)
 {
    assert(flow_coeffs.Size() == numSub);
    assert((m == -1) || ((m >= 0) && (m < numSub)));

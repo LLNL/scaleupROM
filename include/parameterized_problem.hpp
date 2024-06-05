@@ -13,8 +13,14 @@ using namespace mfem;
 namespace function_factory
 {
 
-typedef double GeneralScalarFunction(const Vector &);
-typedef void GeneralVectorFunction(const Vector &, Vector &);
+/*
+   These take the spatial location and time.
+   Time-constant functions won't use the time input in calculation.
+   For time-varying systems, corresponding FunctionCoefficient
+   must execuate SetTime to reflect the time.
+*/
+typedef double GeneralScalarFunction(const Vector &, double);
+typedef void GeneralVectorFunction(const Vector &, double, Vector &);
 
 static const double pi = 4.0 * atan(1.0);
 
@@ -23,8 +29,7 @@ namespace poisson0
    extern double k;
    extern double offset;
 
-   // TODO: function template?
-   double rhs(const Vector &x);
+   double rhs(const Vector &x, double t);
 }
 
 namespace poisson_component
@@ -33,15 +38,15 @@ namespace poisson_component
    extern double offset, bdr_offset;
    extern double bdr_idx;
 
-   double bdr(const Vector &x);
-   double rhs(const Vector &x);
+   double bdr(const Vector &x, double t);
+   double rhs(const Vector &x, double t);
 }
 
 namespace poisson_spiral
 {
    static const int N = 2;
    extern double L, Lw, k, s;
-   double rhs(const Vector &x);
+   double rhs(const Vector &x, double t);
 }
 
 namespace flow_problem
@@ -57,21 +62,24 @@ void flux(const Vector &x, Vector &y);
 namespace channel_flow
 {
    extern double L, U, x0;
-   void ubdr(const Vector &x, Vector &y);
+   void ubdr(const Vector &x, double t, Vector &y);
 }
 
 namespace component_flow
 {
    extern Vector u0, du, offsets;
    extern DenseMatrix k;
-   void ubdr(const Vector &x, Vector &y);
+   void ubdr(const Vector &x, double t, Vector &y);
 }
 
 namespace backward_facing_step
 {
    extern double u0, y0, y1;
-   // TODO(kevin): time-dependent inflow boundary
-   void ubdr(const Vector &x, Vector &y);
+   extern Vector amp, ky, freq, t_offset;
+   
+   void ubdr(const Vector &x, double t, Vector &y);
+   void uic(const Vector &x, double t, Vector &y);
+   void pic(const Vector &x, double t, Vector &y);
 }
 
 }
@@ -81,8 +89,8 @@ namespace linelast_problem
 extern double _lambda;
 extern double _mu;
 
-double lambda(const Vector &x);
-double mu(const Vector &x);
+double lambda(const Vector &x, double t);
+double mu(const Vector &x, double t);
 
 }
 
@@ -90,14 +98,14 @@ namespace linelast_disp
 {
 extern double rdisp_f;
 
-void init_disp(const Vector &x, Vector &u);
+void init_disp(const Vector &x, double t, Vector &u);
 }
 
 namespace linelast_force
 {
 extern double rforce_f;
 
-void tip_force(const Vector &x, Vector &u);
+void tip_force(const Vector &x, double t, Vector &u);
 }
 
 namespace linelast_cwtrain
@@ -151,11 +159,11 @@ extern double bxf_offset;
 extern double byf_offset;
 
 double perturb_func(const double x, const double amp, const double freq, const double offset);
-void left_disp(const Vector &x, Vector &u);
-void up_disp(const Vector &x, Vector &u);
-void down_disp(const Vector &x, Vector &u);
-void right_disp(const Vector &x, Vector &u);
-void body_force(const Vector &x, Vector &u);
+void left_disp(const Vector &x, double t, Vector &u);
+void up_disp(const Vector &x, double t, Vector &u);
+void down_disp(const Vector &x, double t, Vector &u);
+void right_disp(const Vector &x, double t, Vector &u);
+void body_force(const Vector &x, double t, Vector &u);
 }
 
 namespace linelast_frame_wind
@@ -164,11 +172,11 @@ extern double qwind_f;
 extern double density;
 extern double g;
 
-void wind_load(const Vector &x, Vector &f);
+void wind_load(const Vector &x, double t, Vector &f);
 
-void gravity_load(const Vector &x, Vector &f);
+void gravity_load(const Vector &x, double t, Vector &f);
 
-void dirichlet(const Vector &x, Vector &u);
+void dirichlet(const Vector &x, double t, Vector &u);
 
 }
 
@@ -182,7 +190,7 @@ namespace advdiff_flow_past_array
    extern double q0, dq, qoffset;
    extern Vector qk;
 
-   double qbdr(const Vector &x);
+   double qbdr(const Vector &x, double t);
 }  //  namespace advdiff_flow_past_array
 
 }  // namespace advdiff_problem

@@ -17,7 +17,7 @@ namespace poisson0
 
 double k, offset;
 
-double rhs(const Vector &x)
+double rhs(const Vector &x, double t)
 {
    double tmp = 0.0;
    for (int d = 0; d < x.Size(); d++)
@@ -36,7 +36,7 @@ Vector k(3), bdr_k(3);
 double offset, bdr_offset;
 double bdr_idx;
 
-double bdr(const Vector &x)
+double bdr(const Vector &x, double t)
 {
    assert(bdr_k.Size() >= x.Size());
    double tmp = 0.0;
@@ -46,7 +46,7 @@ double bdr(const Vector &x)
    return sin(2.0 * pi * tmp);
 }
 
-double rhs(const Vector &x)
+double rhs(const Vector &x, double t)
 {
    assert(k.Size() >= x.Size());
    double tmp = 0.0;
@@ -63,7 +63,7 @@ namespace poisson_spiral
 
 double L, Lw, k, s;
 
-double rhs(const Vector &x)
+double rhs(const Vector &x, double t)
 {
    double r = 0.0;
    for (int d = 0; d < x.Size(); d++) r += (x(d) - 0.5 * L) * (x(d) - 0.5 * L);
@@ -115,7 +115,7 @@ namespace channel_flow
 
 double L, U, x0;
 
-void ubdr(const Vector &x, Vector &y)
+void ubdr(const Vector &x, double t, Vector &y)
 {
    const int dim = x.Size();
    y.SetSize(dim);
@@ -133,7 +133,7 @@ namespace component_flow
 Vector u0, du, offsets;
 DenseMatrix k;
 
-void ubdr(const Vector &x, Vector &y)
+void ubdr(const Vector &x, double t, Vector &y)
 {
    const int dim = x.Size();
    y.SetSize(dim);
@@ -159,8 +159,9 @@ namespace backward_facing_step
 {
 
 double u0, y0, y1;
+Vector amp, ky, freq, t_offset;
 
-void ubdr(const Vector &x, Vector &y)
+void ubdr(const Vector &x, double t, Vector &y)
 {
    const int dim = x.Size();
    y.SetSize(dim);
@@ -168,9 +169,17 @@ void ubdr(const Vector &x, Vector &y)
 
    double ygap = (y1 - y0);
    y(0) = - u0 * 4.0 / ygap / ygap * (y0 - x(1)) * (y1 - x(1));
+
+   for (int m = 0; m < amp.Size(); m++)
+   {
+      if (amp(m) == 0.0) continue;
+
+      y(1) += amp(m) * sin(pi * ky(m) * (x(1) - y0) / ygap)
+                     * sin(2. * pi * (freq(m) * t + t_offset(m)));
+   }
 }
 
-void uic(const Vector &x, Vector &y)
+void uic(const Vector &x, double t, Vector &y)
 {
    const int dim = x.Size();
    y.SetSize(dim);
@@ -180,7 +189,7 @@ void uic(const Vector &x, Vector &y)
    y(0) = (x(1) < y0) ? 0.0 : - u0 * 4.0 / ygap / ygap * (y0 - x(1)) * (y1 - x(1));
 }
 
-void pic(const Vector &x, Vector &y)
+void pic(const Vector &x, double t, Vector &y)
 {
    y.SetSize(1);
    y = 0.0;
@@ -196,8 +205,8 @@ namespace linelast_problem
 double _lambda;
 double _mu;
 
-double lambda(const Vector &x){return _lambda;};
-double mu(const Vector &x){return _mu;};
+double lambda(const Vector &x, double t){return _lambda;};
+double mu(const Vector &x, double t){return _mu;};
 
 }
 
@@ -206,13 +215,13 @@ namespace linelast_disp
 
 double rdisp_f;
 
-void init_disp(const Vector &x, Vector &u)
+void init_disp(const Vector &x, double t, Vector &u)
 {
    u = 0.0;
    u(u.Size()-1) = -0.2*x(0)*rdisp_f;
 }
 
-void init_disp_lcantilever(const Vector &x, Vector &u)
+void init_disp_lcantilever(const Vector &x, double t, Vector &u)
 {
    u = 0.0;
    u(u.Size()-1) = -0.2*(x(u.Size()-1) - 5.0)*rdisp_f;
@@ -225,7 +234,7 @@ namespace linelast_force
 
 double rforce_f;
 
-void tip_force(const Vector &x, Vector &f)
+void tip_force(const Vector &x, double t, Vector &f)
 {
    f = 0.0;
    f(f.Size()-1) = -1.0e-2* rforce_f;
@@ -240,19 +249,19 @@ double qwind_f;
 double density;
 double g;
 
-void gravity_load(const Vector &x, Vector &f)
+void gravity_load(const Vector &x, double t, Vector &f)
 {
    f = 0.0;
    f(f.Size()-1) = -density * g;
 }
 
-void wind_load(const Vector &x, Vector &f)
+void wind_load(const Vector &x, double t, Vector &f)
 {
    f = 0.0;
    f(0) = qwind_f;
 }
 
-void dirichlet(const Vector &x, Vector &u)
+void dirichlet(const Vector &x, double t, Vector &u)
 {
    u = 0.0;
 }
@@ -272,7 +281,7 @@ namespace advdiff_flow_past_array
 double q0, dq, qoffset;
 Vector qk;
 
-double qbdr(const Vector &x)
+double qbdr(const Vector &x, double t)
 {
    assert(qk.Size() >= x.Size());
    double tmp = 0.0;
@@ -341,7 +350,7 @@ double perturb_func(const double x, const double amp, const double freq, const d
    return amp * sin(pi * freq *( x / 3.0 + 2 * offset) );
 }
 
-void left_disp(const Vector &x, Vector &u)
+void left_disp(const Vector &x, double t, Vector &u)
 {
    if (lx >= 0.5)
       u(0) = l_ux + perturb_func(x(0), xu_amp, xu_freq, xu_offset);
@@ -349,7 +358,7 @@ void left_disp(const Vector &x, Vector &u)
       u(1) = l_uy + perturb_func(x(1), yu_amp, yu_freq, yu_offset);
 }
 
-void right_disp(const Vector &x, Vector &u)
+void right_disp(const Vector &x, double t, Vector &u)
 {
    if (rx >= 0.5)
       u(0) = r_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
@@ -357,7 +366,7 @@ void right_disp(const Vector &x, Vector &u)
       u(1) = r_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
-void up_disp(const Vector &x, Vector &u)
+void up_disp(const Vector &x, double t, Vector &u)
 {
    if (ux >= 0.5)
       u(0) = u_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
@@ -365,7 +374,7 @@ void up_disp(const Vector &x, Vector &u)
       u(1) = u_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
-void down_disp(const Vector &x, Vector &u)
+void down_disp(const Vector &x, double t, Vector &u)
 {
    if (dx >= 0.5)
       u(0) = d_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
@@ -373,7 +382,7 @@ void down_disp(const Vector &x, Vector &u)
       u(1) = d_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
 }
 
-void body_force(const Vector &x, Vector &u)
+void body_force(const Vector &x, double t, Vector &u)
 {
    if (bx >= 0.5)
       u(0) = b_fx + perturb_func(x(0), bxf_amp, bxf_freq, bxf_offset);
@@ -816,13 +825,22 @@ BackwardFacingStep::BackwardFacingStep()
    ic_ptr[0] = &(function_factory::flow_problem::backward_facing_step::uic);
    ic_ptr[1] = &(function_factory::flow_problem::backward_facing_step::pic);
 
-   param_num = 4;
+   param_num = 4 + 2 * 4;
 
    // Default values.
    function_factory::flow_problem::nu = 1.0;
    function_factory::flow_problem::backward_facing_step::y0 = 0.0;
    function_factory::flow_problem::backward_facing_step::y1 = 1.0;
    function_factory::flow_problem::backward_facing_step::u0 = 1.0;
+
+   function_factory::flow_problem::backward_facing_step::amp.SetSize(2);
+   function_factory::flow_problem::backward_facing_step::ky.SetSize(2);
+   function_factory::flow_problem::backward_facing_step::freq.SetSize(2);
+   function_factory::flow_problem::backward_facing_step::t_offset.SetSize(2);
+   function_factory::flow_problem::backward_facing_step::amp = 0.0;
+   function_factory::flow_problem::backward_facing_step::ky = 0.0;
+   function_factory::flow_problem::backward_facing_step::freq = 0.0;
+   function_factory::flow_problem::backward_facing_step::t_offset = 0.0;
 
    param_map["nu"] = 0;
    param_map["y0"] = 1;
@@ -834,6 +852,18 @@ BackwardFacingStep::BackwardFacingStep()
    param_ptr[1] = &(function_factory::flow_problem::backward_facing_step::y0);
    param_ptr[2] = &(function_factory::flow_problem::backward_facing_step::y1);
    param_ptr[3] = &(function_factory::flow_problem::backward_facing_step::u0);
+
+   for (int m = 0; m < 2; m++)
+   {
+      param_map["amp" + std::to_string(m)] = 4 + m * 4;
+      param_map["ky" + std::to_string(m)] = 5 + m * 4;
+      param_map["freq" + std::to_string(m)] = 6 + m * 4;
+      param_map["t_offset" + std::to_string(m)] = 7 + m * 4;
+      param_ptr[4 + m * 4] = &(function_factory::flow_problem::backward_facing_step::amp[m]);
+      param_ptr[5 + m * 4] = &(function_factory::flow_problem::backward_facing_step::ky[m]);
+      param_ptr[6 + m * 4] = &(function_factory::flow_problem::backward_facing_step::freq[m]);
+      param_ptr[7 + m * 4] = &(function_factory::flow_problem::backward_facing_step::t_offset[m]);
+   }
 }
 
 /*

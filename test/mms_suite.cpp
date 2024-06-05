@@ -18,7 +18,7 @@ namespace mms
 namespace poisson
 {
 
-double ExactSolution(const Vector &x)
+double ExactSolution(const Vector &x, double t)
 {
    double result = constant;
    for (int d = 0; d < x.Size(); d++)
@@ -26,7 +26,7 @@ double ExactSolution(const Vector &x)
    return result;
 }
 
-double ExactRHS(const Vector &x)
+double ExactRHS(const Vector &x, double t)
 {
    double result = 0.0;
    for (int d = 0; d < x.Size(); d++)
@@ -133,7 +133,7 @@ void CheckConvergence()
 namespace stokes
 {
 
-void uFun_ex(const Vector & x, Vector & u)
+void uFun_ex(const Vector & x, double t, Vector & u)
 {
    double xi(x(0));
    double yi(x(1));
@@ -144,7 +144,7 @@ void uFun_ex(const Vector & x, Vector & u)
 }
 
 // Change if needed
-double pFun_ex(const Vector & x)
+double pFun_ex(const Vector & x, double t)
 {
    double xi(x(0));
    double yi(x(1));
@@ -154,7 +154,7 @@ double pFun_ex(const Vector & x)
    return 2.0 * nu * sin(xi)*sin(yi);
 }
 
-void fFun(const Vector & x, Vector & f)
+void fFun(const Vector & x, double t, Vector & f)
 {
    assert(x.Size() == 2);
    f.SetSize(x.Size());
@@ -166,7 +166,7 @@ void fFun(const Vector & x, Vector & f)
    f(1) = 0.0;
 }
 
-double gFun(const Vector & x)
+double gFun(const Vector & x, double t)
 {
    assert(x.Size() == 2);
 
@@ -310,7 +310,7 @@ void CheckConvergence(const double &threshold)
 namespace steady_ns
 {
 
-void uFun_ex(const Vector & x, Vector & u)
+void uFun_ex(const Vector & x, double t, Vector & u)
 {
    double xi(x(0));
    double yi(x(1));
@@ -321,7 +321,7 @@ void uFun_ex(const Vector & x, Vector & u)
 }
 
 // Change if needed
-double pFun_ex(const Vector & x)
+double pFun_ex(const Vector & x, double t)
 {
    double xi(x(0));
    double yi(x(1));
@@ -331,7 +331,7 @@ double pFun_ex(const Vector & x)
    return 2.0 * nu * sin(xi)*sin(yi);
 }
 
-void fFun(const Vector & x, Vector & f)
+void fFun(const Vector & x, double t, Vector & f)
 {
    assert(x.Size() == 2);
    f.SetSize(x.Size());
@@ -346,7 +346,7 @@ void fFun(const Vector & x, Vector & f)
    f(1) += - zeta * sin(yi) * cos(yi);
 }
 
-double gFun(const Vector & x)
+double gFun(const Vector & x, double t)
 {
    assert(x.Size() == 2);
 
@@ -629,7 +629,7 @@ void CheckConvergence(const double &threshold)
 
 namespace linelast
 {
-   void ExactSolution(const Vector &x, Vector &u)
+   void ExactSolution(const Vector &x, double t, Vector &u)
    {
       u = 0.0;
       for (size_t i = 0; i < dim; i++)
@@ -638,7 +638,7 @@ namespace linelast
       }
    }
 
-   void ExactRHS(const Vector &x, Vector &u)
+   void ExactRHS(const Vector &x, double t, Vector &u)
    {
       u = 0.0;
       for (size_t i = 0; i < dim; i++)
@@ -742,7 +742,7 @@ namespace linelast
 namespace advdiff
 {
 
-double ExactSolution(const Vector &x)
+double ExactSolution(const Vector &x, double t)
 {
    double result = constant;
    for (int d = 0; d < x.Size(); d++)
@@ -750,7 +750,7 @@ double ExactSolution(const Vector &x)
    return result;
 }
 
-void ExactFlow(const Vector &x, Vector &y)
+void ExactFlow(const Vector &x, double t, Vector &y)
 {
    y.SetSize(x.Size());
    y = 0.0;
@@ -766,10 +766,10 @@ void ExactFlow(const Vector &x, Vector &y)
    return;
 }
 
-double ExactRHS(const Vector &x)
+double ExactRHS(const Vector &x, double t)
 {
    Vector flow;
-   ExactFlow(x, flow);
+   ExactFlow(x, t, flow);
 
    double result = 0.0;
    for (int d = 0; d < x.Size(); d++)

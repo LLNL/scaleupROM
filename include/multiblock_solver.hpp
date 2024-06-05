@@ -158,11 +158,11 @@ public:
    void SortByVariables(BlockVector &by_sub, BlockVector &by_var);
 
    virtual void SetupBCVariables();
-   virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1)
+   virtual void AddBCFunction(std::function<double(const Vector &, double)> F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
    virtual void AddBCFunction(const double &F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
-   virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1)
+   virtual void AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
    virtual void AddBCFunction(const Vector &F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }

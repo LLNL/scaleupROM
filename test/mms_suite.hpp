@@ -31,8 +31,8 @@ static double L[3];
 static double offset[3];
 static double constant;
 
-double ExactSolution(const Vector &);
-double ExactRHS(const Vector &);
+double ExactSolution(const Vector &, double);
+double ExactRHS(const Vector &, double);
 PoissonSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 
@@ -43,7 +43,7 @@ namespace stokes
 
 static double nu;
 
-void uFun_ex(const Vector & x, Vector & u);
+void uFun_ex(const Vector & x, double t, Vector & u);
 // void mlap_uFun_ex(const Vector & x, Vector & u)
 // {
 //    double xi(x(0));
@@ -53,9 +53,9 @@ void uFun_ex(const Vector & x, Vector & u);
 //    u(0) = 2.0 * nu * cos(xi)*sin(yi);
 //    u(1) = - 2.0 * nu * sin(xi)*cos(yi);
 // }
-double pFun_ex(const Vector & x);
-void fFun(const Vector & x, Vector & f);
-double gFun(const Vector & x);
+double pFun_ex(const Vector & x, double t);
+void fFun(const Vector & x, double t, Vector & f);
+double gFun(const Vector & x, double t);
 
 StokesSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence(const double &threshold = 0.1);
@@ -68,10 +68,10 @@ namespace steady_ns
 static double nu;
 static double zeta = 1.0;
 
-void uFun_ex(const Vector & x, Vector & u);
-double pFun_ex(const Vector & x);
-void fFun(const Vector & x, Vector & f);
-double gFun(const Vector & x);
+void uFun_ex(const Vector & x, double t, Vector & u);
+double pFun_ex(const Vector & x, double t);
+void fFun(const Vector & x, double t, Vector & f);
+double gFun(const Vector & x, double t);
 
 SteadyNSSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence(const double &threshold = 1.0);
@@ -93,8 +93,8 @@ static const double pi = 4.0 * atan(1.0);
 static const double mu = 1.0; //only test case when mu = 1.0 (homogenous material)
 static double lambda = 1.0;
 static int dim;
-static void ExactSolution(const Vector & x, Vector & u);
-static void ExactRHS(const Vector & x, Vector & u);
+static void ExactSolution(const Vector & x, double t, Vector & u);
+static void ExactRHS(const Vector & x, double t, Vector & u);
 LinElastSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 
@@ -116,9 +116,9 @@ static double wn;
 static double uoffset[3];
 static double u0, v0;
 
-double ExactSolution(const Vector &);
-void ExactFlow(const Vector &, Vector &);
-double ExactRHS(const Vector &);
+double ExactSolution(const Vector &, double t);
+void ExactFlow(const Vector &, double t, Vector &);
+double ExactRHS(const Vector &, double t);
 AdvDiffSolver *SolveWithRefinement(const int num_refinement);
 void CheckConvergence();
 

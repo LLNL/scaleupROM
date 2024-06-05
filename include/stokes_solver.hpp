@@ -152,7 +152,7 @@ public:
    const int GetPresFEOrder() const { return porder; }
 
    virtual void SetupBCVariables() override;
-   virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1);
+   virtual void AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr = -1);
    virtual void AddBCFunction(const Vector &F, const int battr = -1);
    virtual void InitVariables();
 
@@ -167,7 +167,7 @@ public:
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
 
-   virtual void AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
+   virtual void AddRHSFunction(std::function<void(const Vector &, double, Vector &)> F)
    { f_coeffs.Append(new VectorFunctionCoefficient(vdim[0], F)); }
    virtual void AddRHSFunction(const Vector &F)
    { f_coeffs.Append(new VectorConstantCoefficient(F)); }

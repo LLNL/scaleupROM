@@ -62,7 +62,7 @@ public:
    }
 
    virtual void SetupBCVariables() override;
-   virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1);
+   virtual void AddBCFunction(std::function<double(const Vector &, double)> F, const int battr = -1);
    virtual void AddBCFunction(const double &F, const int battr = -1);
    virtual void InitVariables();
 
@@ -75,7 +75,7 @@ public:
    virtual void SetupRHSBCOperators();
    virtual void SetupDomainBCOperators();
 
-   virtual void AddRHSFunction(std::function<double(const Vector &)> F)
+   virtual void AddRHSFunction(std::function<double(const Vector &, double)> F)
    { rhs_coeffs.Append(new FunctionCoefficient(F)); }
    virtual void AddRHSFunction(const double F)
    { rhs_coeffs.Append(new ConstantCoefficient(F)); }

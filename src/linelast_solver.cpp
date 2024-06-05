@@ -59,7 +59,7 @@ LinElastSolver::~LinElastSolver()
    
 }
 
-void LinElastSolver::SetupIC(std::function<void(const Vector &, Vector &)> F)
+void LinElastSolver::SetupIC(std::function<void(const Vector &, double, Vector &)> F)
 {
    init_x = new VectorFunctionCoefficient(dim, F);
    for (int m = 0; m < numSub; m++)
@@ -384,7 +384,7 @@ bool LinElastSolver::Solve()
    return converged;
 }
 
-void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
+void LinElastSolver::AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr)
 {
    assert(bdr_coeffs.Size() > 0);
 
@@ -404,7 +404,7 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, Vector &)>
          bdr_coeffs[k] = new VectorFunctionCoefficient(dim, F);
 }
 
-void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, Vector &)> F)
+void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, double, Vector &)> F)
 {
    rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
 }
@@ -454,11 +454,9 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
    for (size_t i = 0; i < numSub; i++)
    {
-      double lambda_i = (problem->general_scalar_ptr[0])(_x);
-      lambda_c[i] = new ConstantCoefficient(lambda_i);
+      lambda_c[i] = new FunctionCoefficient(problem->general_scalar_ptr[0]);
 
-      double mu_i = (problem->general_scalar_ptr[1])(_x);
-      mu_c[i] = new ConstantCoefficient(mu_i);
+      mu_c[i] = new FunctionCoefficient(problem->general_scalar_ptr[1]);
    }
 
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators

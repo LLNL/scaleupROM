@@ -97,7 +97,7 @@ void StokesSolver::SetupBCVariables()
    sn_coeffs = NULL;
 }
 
-void StokesSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
+void StokesSolver::AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr)
 {
    assert(ud_coeffs.Size() > 0);
 

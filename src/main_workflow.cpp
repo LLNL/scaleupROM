@@ -18,12 +18,12 @@
 using namespace std;
 using namespace mfem;
 
-double dbc2(const Vector &x)
+double dbc2(const Vector &x, double t)
 {
    return 0.1 - 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
 
-double dbc4(const Vector &x)
+double dbc4(const Vector &x, double t)
 {
    return -0.1 + 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
