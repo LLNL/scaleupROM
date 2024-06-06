@@ -26,6 +26,9 @@ UnsteadyNSSolver::UnsteadyNSSolver()
    time_order = config.GetOption<int>("time-integration/bdf_order", 1);
    report_interval = config.GetOption<int>("time-integration/report_interval", 0);
 
+   if (save_sol)
+      restart_interval = config.GetOption<int>("save_solution/restart_interval", 0);
+
    if (time_order != 1)
       mfem_error("UnsteadyNSSolver supports only first-order time integration for now!\n");
 }
@@ -77,16 +80,26 @@ void UnsteadyNSSolver::AssembleOperator()
 bool UnsteadyNSSolver::Solve()
 {
    bool converged = true;
+   int initial_step = 0;
+   double time = 0.0;
+
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file, file_fmt;
+   file_fmt = "%s/%s_%08d.h5";
+   if (use_restart)
+   {
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+      LoadSolutionWithTime(restart_file, initial_step, time);
+   }
 
    InitializeTimeIntegration();
 
    SortByVariables(*U, *U_step);
 
-   double time = 0.0;
    SaveVisualization(0, time);
 
    double cfl = 0.0;
-   for (int step = 0; step < nt; step++)
+   for (int step = initial_step; step < nt; step++)
    {
       Step(time, step);
 
@@ -97,6 +110,12 @@ bool UnsteadyNSSolver::Solve()
 
       if (((step+1) % visual.time_interval) == 0)
          SaveVisualization(step+1, time);
+
+      if ((save_sol) && (((step+1) % restart_interval) == 0))
+      {
+         restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), step+1);
+         SaveSolutionWithTime(restart_file, step+1, time);
+      }
    }
 
    SortBySubdomains(*U_step, *U);

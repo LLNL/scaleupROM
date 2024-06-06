@@ -237,7 +237,9 @@ public:
    virtual void SaveVisualization(const int step, const double time);
 
    void SaveSolution(std::string filename = "");
+   void SaveSolutionWithTime(const std::string filename, const int step, const double time);
    void LoadSolution(const std::string &filename);
+   void LoadSolutionWithTime(const std::string &filename, int &step, double &time);
    void CopySolution(BlockVector *input_sol);
 
    virtual void AllocateROMTensorElems()

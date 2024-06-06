@@ -807,6 +807,25 @@ void MultiBlockSolver::SaveSolution(std::string filename)
    printf("Done!\n");
 }
 
+void MultiBlockSolver::SaveSolutionWithTime(std::string filename, const int step, const double time)
+{
+   SaveSolution(filename);
+   printf("Saving time/time step ...");
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // TODO: currently we only need solution vector. But we can add more data as we need.
+   hdf5_utils::WriteAttribute(file_id, "timestep", step);
+   hdf5_utils::WriteAttribute(file_id, "time", time);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   printf("Done!\n");
+}
+
 void MultiBlockSolver::LoadSolution(const std::string &filename)
 {
    // solution vector U must be instantiated beforehand.
@@ -837,6 +856,25 @@ void MultiBlockSolver::LoadSolution(const std::string &filename)
       printf("Done!\n");
    else
       mfem_error("solution size does not match!\n");
+}
+
+void MultiBlockSolver::LoadSolutionWithTime(const std::string &filename, int &step, double &time)
+{
+   LoadSolution(filename);
+   printf("Loading time/time step ...");
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // TODO: currently we only need solution vector. But we can add more data as we need.
+   hdf5_utils::ReadAttribute(file_id, "timestep", step);
+   hdf5_utils::ReadAttribute(file_id, "time", time);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   printf("Done!\n");
 }
 
 void MultiBlockSolver::CopySolution(BlockVector *input_sol)

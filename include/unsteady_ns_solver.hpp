@@ -26,6 +26,8 @@ protected:
    int time_order = -1;
    // report interval for time integration
    int report_interval = 0;
+   // restart save interval
+   int restart_interval = 0;
 
    // BDFk/EXTk coefficients.
    /* use first order for now. */
