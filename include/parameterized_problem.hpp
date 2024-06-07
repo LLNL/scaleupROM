@@ -82,6 +82,12 @@ namespace backward_facing_step
    void pic(const Vector &x, double t, Vector &y);
 }
 
+namespace periodic_flow_past_array
+{
+   extern Vector f;
+   void force(const Vector &x, double t, Vector &y);
+}
+
 }
 
 namespace linelast_problem
@@ -331,6 +337,12 @@ class BackwardFacingStep : public FlowProblem
 public:
    BackwardFacingStep();
    virtual ~BackwardFacingStep() {};
+};
+
+class PeriodicFlowPastArray : public FlowProblem
+{
+public:
+   PeriodicFlowPastArray();
 };
 
 class LinElastProblem : public ParameterizedProblem

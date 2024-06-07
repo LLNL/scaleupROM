@@ -197,6 +197,20 @@ void pic(const Vector &x, double t, Vector &y)
 
 }  // namespace backward_facing_step
 
+namespace periodic_flow_past_array
+{
+
+Vector f;
+
+void force(const Vector &x, double t, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   y = f;
+}
+
+}  // namespace periodic_flow_past_array
+
 } // namespace flow_problem
 
 namespace linelast_problem
@@ -482,6 +496,10 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "backward_facing_step")
    {
       problem = new BackwardFacingStep();
+   }
+   else if (problem_name == "periodic_flow_past_array")
+   {
+      problem = new PeriodicFlowPastArray();
    }
    else if (problem_name == "linelast_disp")
    {
@@ -864,6 +882,42 @@ BackwardFacingStep::BackwardFacingStep()
       param_ptr[6 + m * 4] = &(function_factory::flow_problem::backward_facing_step::freq[m]);
       param_ptr[7 + m * 4] = &(function_factory::flow_problem::backward_facing_step::t_offset[m]);
    }
+}
+
+/*
+   PeriodicFlowPastArray
+*/
+
+PeriodicFlowPastArray::PeriodicFlowPastArray()
+   : FlowProblem()
+{
+   battr.SetSize(1);
+   battr = 5;
+   bdr_type.SetSize(1);
+   bdr_type = BoundaryType::ZERO;
+
+   // pointer to static function.
+   vector_bdr_ptr.SetSize(1);
+   vector_bdr_ptr = NULL;
+   vector_rhs_ptr = &(function_factory::flow_problem::periodic_flow_past_array::force);
+
+   param_num = 4;
+   function_factory::flow_problem::periodic_flow_past_array::f.SetSize(3);
+
+   // Default values.
+   function_factory::flow_problem::nu = 1.0;
+   function_factory::flow_problem::periodic_flow_past_array::f = 0.0;
+
+   param_map["nu"] = 0;
+   param_map["fx"] = 1;
+   param_map["fy"] = 2;
+   param_map["fz"] = 3;
+
+   param_ptr.SetSize(param_num);
+   param_ptr[0] = &(function_factory::flow_problem::nu);
+   for (int i = 0; i < 3; i++)
+      param_ptr[1+i] = &(function_factory::flow_problem::periodic_flow_past_array::f[i]);
+
 }
 
 /*

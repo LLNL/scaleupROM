@@ -212,15 +212,41 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    SteadyNSSolver::SetParameterizedProblem(problem);
 
+   /* initialize solution with zero first */
+   for (int m = 0; m < numSub; m++)
+   {
+      *vels[m] = 0.0;
+      *ps[m] = 0.0;
+   }
+
    /* set up initial condition */
-   VectorFunctionCoefficient u_ic(vdim[0], problem->ic_ptr[0]);
-   VectorFunctionCoefficient p_ic(1, problem->ic_ptr[1]);
+   bool ic_setup = (problem->ic_ptr.Size() >= 2);
+   if (!ic_setup)
+      return;
+
+   Vector zero_vel(dim), zero_pres(1);
+   zero_vel = 0.0; zero_pres = 0.0;
+
+   VectorCoefficient *u_ic, *p_ic;
+
+   if (problem->ic_ptr[0])
+      u_ic = new VectorFunctionCoefficient(vdim[0], problem->ic_ptr[0]);
+   else
+      u_ic = new VectorConstantCoefficient(zero_vel);
+
+   if (problem->ic_ptr[1])
+      p_ic = new VectorFunctionCoefficient(1, problem->ic_ptr[1]);
+   else
+      p_ic = new VectorConstantCoefficient(zero_pres);
 
    for (int m = 0; m < numSub; m++)
    {
-      vels[m]->ProjectCoefficient(u_ic);
-      ps[m]->ProjectCoefficient(p_ic);
+      vels[m]->ProjectCoefficient(*u_ic);
+      ps[m]->ProjectCoefficient(*p_ic);
    }
+
+   delete u_ic;
+   delete p_ic;
 }
 
 double UnsteadyNSSolver::ComputeCFL(const double dt_)
