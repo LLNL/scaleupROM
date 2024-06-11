@@ -77,7 +77,7 @@ void UnsteadyNSSolver::AssembleOperator()
       massMat->SetBlock(i, i, &(mass[i]->SpMat()));
 }
 
-bool UnsteadyNSSolver::Solve()
+bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
 {
    bool converged = true;
    int initial_step = 0;

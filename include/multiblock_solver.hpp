@@ -226,7 +226,7 @@ public:
 
    void AssembleROMMat();
 
-   virtual bool Solve() = 0;
+   virtual bool Solve(SampleGenerator *sample_generator = NULL) = 0;
 
    virtual void InitVisualization(const std::string& output_dir = "");
    virtual void InitUnifiedParaview(const std::string &file_prefix);

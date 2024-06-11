@@ -479,7 +479,7 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    }
 }
 
-bool SteadyNSSolver::Solve()
+bool SteadyNSSolver::Solve(SampleGenerator *sample_generator)
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);

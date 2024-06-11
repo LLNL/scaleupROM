@@ -161,7 +161,7 @@ public:
    void SaveROMOperator(const std::string input_prefix="") override;
    void LoadROMOperatorFromFile(const std::string input_prefix="") override;
 
-   bool Solve() override;
+   bool Solve(SampleGenerator *sample_generator = NULL) override;
 
    void ProjectOperatorOnReducedBasis() override;
 

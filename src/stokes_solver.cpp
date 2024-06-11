@@ -711,7 +711,7 @@ void StokesSolver::BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    }  // for (int p = 0; p < num_ref_ports; p++)
 }
 
-bool StokesSolver::Solve()
+bool StokesSolver::Solve(SampleGenerator *sample_generator)
 {
    // If using direct solver, returns always true.
    bool converged = true;

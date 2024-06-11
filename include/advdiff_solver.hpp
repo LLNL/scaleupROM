@@ -48,7 +48,7 @@ public:
    // Component-wise assembly
    void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp) override;
 
-   bool Solve() override;
+   bool Solve(SampleGenerator *sample_generator = NULL) override;
 
    void SetFlowAtSubdomain(std::function<void(const Vector &, double, Vector &)> F, const int m=-1);
 

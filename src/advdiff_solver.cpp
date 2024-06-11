@@ -77,7 +77,7 @@ void AdvDiffSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-bool AdvDiffSolver::Solve()
+bool AdvDiffSolver::Solve(SampleGenerator *sample_generator)
 {
    // If using direct solver, returns always true.
    bool converged = true;

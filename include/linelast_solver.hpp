@@ -81,7 +81,7 @@ public:
    // system-specific.
    virtual void AssembleInterfaceMatrices();
 
-   virtual bool Solve();
+   bool Solve(SampleGenerator *sample_generator = NULL) override;
 
    virtual void SetupBCVariables() override;
    virtual void SetupIC(std::function<void(const Vector &, double, Vector &)> F);

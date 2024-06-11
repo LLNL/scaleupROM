@@ -305,7 +305,7 @@ void LinElastSolver::AssembleInterfaceMatrices()
    a_itf->AssembleInterfaceMatrices(mats);
 }
 
-bool LinElastSolver::Solve()
+bool LinElastSolver::Solve(SampleGenerator *sample_generator)
 {
    // If using direct solver, returns always true.
    bool converged = true;

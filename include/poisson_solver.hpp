@@ -92,7 +92,7 @@ public:
    virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp);
    virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp);
 
-   virtual bool Solve();
+   virtual bool Solve(SampleGenerator *sample_generator = NULL);
 
    virtual void ProjectOperatorOnReducedBasis();
 
