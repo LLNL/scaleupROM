@@ -566,6 +566,10 @@ bool SteadyNSSolver::Solve(SampleGenerator *sample_generator)
 
    SortBySubdomains(sol_byvar, *U);
 
+   /* save solution if sample generator is provided */
+   if (converged && sample_generator)
+      SaveSnapshots(sample_generator);
+
    return converged;
 }
 

@@ -92,6 +92,9 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
       LoadSolutionWithTime(restart_file, initial_step, time);
    }
 
+   int sample_interval = config.GetOption<int>("sample_generation/time-integration/sample_interval", 0);
+   int bootstrap = config.GetOption<int>("sample_generation/time-integration/bootstrap", 0);
+
    InitializeTimeIntegration();
 
    SortByVariables(*U, *U_step);
@@ -116,6 +119,10 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
          restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), step+1);
          SaveSolutionWithTime(restart_file, step+1, time);
       }
+
+      /* save solution if sample generator is provided */
+      if (sample_generator && ((step+1) > bootstrap) && (((step+1) % sample_interval) == 0))
+         SaveSnapshots(sample_generator);
    }
 
    SortBySubdomains(*U_step, *U);

@@ -271,7 +271,9 @@ public:
    void InitROMHandler();
    void GetBasisTags(std::vector<std::string> &basis_tags);
 
-   virtual void PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags);
+   virtual BlockVector* PrepareSnapshots(std::vector<std::string> &basis_tags);
+   void SaveSnapshots(SampleGenerator *sample_generator);
+
    virtual void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
    virtual void ProjectOperatorOnReducedBasis() = 0;
    virtual void ProjectRHSOnReducedBasis();

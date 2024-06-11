@@ -182,18 +182,22 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::st
    assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
    col_idxs.SetSize(U_snapshots->NumBlocks());
 
+   /* add snapshots according to their tags */
    for (int s = 0; s < snapshot_basis_tags.size(); s++)
    {
+      /* if the tag was never seen before, create a new snapshot generator */
       if (!basis_tag2idx.count(snapshot_basis_tags[s]))
       {
          const int fom_vdofs = U_snapshots->BlockSize(s);
          AddSnapshotGenerator(fom_vdofs, GetSamplePrefix(), snapshot_basis_tags[s]);
       }
 
+      /* add the snapshot into the corresponding snapshot generator */
       int index = basis_tag2idx[snapshot_basis_tags[s]];
       bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
       assert(addSample);
 
+      /* save the column index in each snapshot matrix, for port data. */
       col_idxs[s] = snapshot_generators[index]->getNumSamples();
    }
 }
@@ -207,29 +211,42 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Tr
    assert(col_idxs.Size() % numSub == 0);
    const int num_var = col_idxs.Size() / numSub;
 
-   /*
-      We save the snapshot ports by dom%d (INDIVIDUAL) or component names (UNIVERSAL).
-      We does not consider basis separation at this point.
-      Though we use basis tags here, it is only for the sake of
-      getting consistent domain/component mesh names.
-   */
+   /* iterate every port */
    for (int p = 0; p < numPorts; p++)
    {
       const PortInfo *port = topol_handler->GetPortInfo(p);
+
+      /*
+         We save the snapshot ports by dom%d (INDIVIDUAL) or component names (UNIVERSAL).
+         Variable separation does not matter at this point.
+         Though we use basis tags here, it is only for the sake of
+         getting consistent domain/component mesh names.
+      */
       std::string mesh1, mesh2;
       mesh1 = GetBasisTag(port->Mesh1, train_mode, topol_handler);
       mesh2 = GetBasisTag(port->Mesh2, train_mode, topol_handler); 
 
+      /*
+         note the mesh names are not necessarily the same as the subdomain names
+         depending on the train mode.
+      */
       PortTag tag = {.Mesh1 = mesh1, .Mesh2 = mesh2, .Attr1 = port->Attr1, .Attr2 = port->Attr2};
+
+      /* if the port was never seen, create a new collector */
       if (!port_tag2idx.count(tag))
       {
          port_tag2idx[tag] = port_tags.size();
          port_tags.push_back(tag);
-         port_colidxs.Append(new Array<int>(0));
+         port_colidxs.Append(new Array2D<int>);
       }
       const int index = port_tag2idx[tag];
 
       int col1, col2;
+      /*
+         column indices in snapshot matrices must be identical for all variables,
+         whether variables are separated for training or not.
+         We thus pick the column index of the first variable.
+      */
       col1 = col_idxs[num_var * (port->Mesh1)];
       col2 = col_idxs[num_var * (port->Mesh2)];
       for (int v = 0; v < num_var; v++)
@@ -238,8 +255,10 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Tr
          assert(col2 == col_idxs[v + num_var * (port->Mesh2)]);
       }
 
-      port_colidxs[index]->Append(col1);
-      port_colidxs[index]->Append(col2);
+      int row_idx = port_colidxs[index]->NumRows();
+      port_colidxs[index]->SetSize(row_idx + 1, 2);
+      (*port_colidxs[index])(row_idx, 0) = col1;
+      (*port_colidxs[index])(row_idx, 1) = col2;
    }
 }
 

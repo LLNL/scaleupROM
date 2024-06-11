@@ -937,8 +937,10 @@ void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
    }
 }
 
-void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags)
+BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<std::string> &basis_tags)
 {
+   BlockVector *U_snapshots = NULL;
+
    // View vector for U.
    if (separate_variable_basis)
       U_snapshots = new BlockVector(U->GetData(), var_offsets);
@@ -947,6 +949,25 @@ void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<s
 
    GetBasisTags(basis_tags);
    assert(U_snapshots->NumBlocks() == basis_tags.size());
+
+   return U_snapshots;
+}
+
+void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
+{
+   assert(sample_generator);
+
+   /* split the solution into each component with the corresponding tag */
+   std::vector<std::string> basis_tags;
+   BlockVector *U_snapshots = PrepareSnapshots(basis_tags);
+
+   Array<int> col_idxs;
+   sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
+   sample_generator->SaveSnapshotPorts(topol_handler, train_mode, col_idxs);
+
+   /* delete only the view vector, not the data itself. */
+   delete U_snapshots;
+   return;
 }
 
 void MultiBlockSolver::ProjectRHSOnReducedBasis()

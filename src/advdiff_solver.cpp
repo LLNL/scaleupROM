@@ -151,6 +151,10 @@ bool AdvDiffSolver::Solve(SampleGenerator *sample_generator)
       delete solver;
    }
 
+   /* save solution if sample generator is provided */
+   if (converged && sample_generator)
+      SaveSnapshots(sample_generator);
+
    return converged;
 }
 
