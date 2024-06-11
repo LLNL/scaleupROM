@@ -7,6 +7,21 @@ from copy import deepcopy
 from config import Configuration, Empty, ObjectInSpace
 from channel_config import ManhattanDistance
 
+def getInterfaces(mesh1, mesh2, disp12):
+    faces = None
+
+    face1 = -1
+    if (tuple(disp12) in mesh1.face_map):
+        face1 = mesh1.face_map[tuple(disp12)]
+
+    if (tuple(-disp12) in mesh2.face_map):
+        face2 = mesh2.face_map[tuple(-disp12)]
+        faces = [face1, face2]
+    elif (face1 > 0):
+        RuntimeError("Found a face from mesh1, but the counterpart does not exist in mesh2!")
+
+    return faces
+
 class BoxChannelConfig(Configuration):
     prefix = 'box-channel.config'
     nx = -1
@@ -18,8 +33,9 @@ class BoxChannelConfig(Configuration):
                 (0, 1):   3,
                 (-1, 0):  4}
     comp_used = []
+    periodic = False
 
-    def __init__(self, nx_, ny_):
+    def __init__(self, nx_, ny_, periodic=False):
         Configuration.__init__(self)
         self.nx, self.ny = nx_, ny_
         self.nmesh = self.nx * self.ny
@@ -31,6 +47,7 @@ class BoxChannelConfig(Configuration):
         self.test_locs = [k for k in range(self.nmesh)]
         self.test = []
         self.comp_used = []
+        self.periodic = periodic
         return
     
     def addComponent(self, component):
@@ -60,9 +77,9 @@ class BoxChannelConfig(Configuration):
         Configuration.addMesh(self, comp_idx, new_loc)
 
         for k in range(len(self.meshes)):
-            face1, face2 = self.interfaceForPair(k,-1)
-            if ((face1 < 0) or (face2 < 0)): continue
-            self.appendInterface(k, -1, face1, face2)
+            interfaces = self.interfaceForPair(k,-1)
+            for interface in interfaces:
+                self.appendInterface(k, -1, interface[0], interface[1])    
 
         used_idx = False
         for idx, loc in enumerate(self.avail_locs):
@@ -76,13 +93,33 @@ class BoxChannelConfig(Configuration):
     def interfaceForPair(self, midx1, midx2):
         mesh1, mesh2 = self.meshes[midx1], self.meshes[midx2]
         loc1, loc2 = self.loc[midx1], self.loc[midx2]
-        face1, face2 = -1, -1
+        faces = []
 
-        if (tuple(loc2-loc1) in mesh1.face_map):
-            face1 = mesh1.face_map[tuple(loc2-loc1)]
-        if (tuple(loc1-loc2) in mesh2.face_map):
-            face2 = mesh2.face_map[tuple(loc1-loc2)]
-        return face1, face2
+        # respective position between two meshes.
+        # if periodic, more possible respective positions are available.
+        disp12 = [loc2 - loc1]
+        if (self.periodic):
+            from copy import deepcopy
+            disp0 = deepcopy(disp12[0])
+            if (disp0[0] == (self.nx-1)):
+                disp12 += [deepcopy(disp0)]
+                disp12[-1][0] -= self.nx
+            if (disp0[0] == -(self.nx-1)):
+                disp12 += [deepcopy(disp0)]
+                disp12[-1][0] += self.nx
+            if (disp0[1] == (self.ny-1)):
+                disp12 += [deepcopy(disp0)]
+                disp12[-1][1] -= self.ny
+            if (disp0[1] == -(self.ny-1)):
+                disp12 += [deepcopy(disp0)]
+                disp12[-1][1] += self.ny
+
+        for disp in disp12:
+            face = getInterfaces(mesh1, mesh2, disp)
+            if (face is not None):
+                faces += [face]
+
+        return faces
     
     def close(self):
         assert(len(self.meshes) == self.nmesh)

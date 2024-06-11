@@ -64,7 +64,7 @@ void PoissonSolver::SetupBCVariables()
    bdr_coeffs = NULL;
 }
 
-void PoissonSolver::AddBCFunction(std::function<double(const Vector &)> F, const int battr)
+void PoissonSolver::AddBCFunction(std::function<double(const Vector &, double)> F, const int battr)
 {
    assert(bdr_coeffs.Size() > 0);
 

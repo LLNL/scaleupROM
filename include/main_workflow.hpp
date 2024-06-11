@@ -9,8 +9,8 @@
 #include "multiblock_solver.hpp"
 #include "random_sample_generator.hpp"
 
-double dbc2(const Vector &);
-double dbc4(const Vector &);
+double dbc2(const Vector &, double t);
+double dbc4(const Vector &, double t);
 void RunExample();
 
 MultiBlockSolver* InitSolver();

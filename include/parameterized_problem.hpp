@@ -13,8 +13,14 @@ using namespace mfem;
 namespace function_factory
 {
 
-typedef double GeneralScalarFunction(const Vector &);
-typedef void GeneralVectorFunction(const Vector &, Vector &);
+/*
+   These take the spatial location and time.
+   Time-constant functions won't use the time input in calculation.
+   For time-varying systems, corresponding FunctionCoefficient
+   must execuate SetTime to reflect the time.
+*/
+typedef double GeneralScalarFunction(const Vector &, double);
+typedef void GeneralVectorFunction(const Vector &, double, Vector &);
 
 static const double pi = 4.0 * atan(1.0);
 
@@ -23,8 +29,7 @@ namespace poisson0
    extern double k;
    extern double offset;
 
-   // TODO: function template?
-   double rhs(const Vector &x);
+   double rhs(const Vector &x, double t);
 }
 
 namespace poisson_component
@@ -33,18 +38,18 @@ namespace poisson_component
    extern double offset, bdr_offset;
    extern double bdr_idx;
 
-   double bdr(const Vector &x);
-   double rhs(const Vector &x);
+   double bdr(const Vector &x, double t);
+   double rhs(const Vector &x, double t);
 }
 
 namespace poisson_spiral
 {
    static const int N = 2;
    extern double L, Lw, k, s;
-   double rhs(const Vector &x);
+   double rhs(const Vector &x, double t);
 }
 
-namespace stokes_problem
+namespace flow_problem
 {
 
 extern double nu;
@@ -54,18 +59,35 @@ extern Vector x0;
 void dir(const Vector &x, Vector &y);
 void flux(const Vector &x, Vector &y);
 
-namespace stokes_channel
+namespace channel_flow
 {
    extern double L, U, x0;
-   void ubdr(const Vector &x, Vector &y);
+   void ubdr(const Vector &x, double t, Vector &y);
 }
 
-namespace stokes_component
+namespace component_flow
 {
    extern Vector u0, du, offsets;
    extern DenseMatrix k;
-   void ubdr(const Vector &x, Vector &y);
+   void ubdr(const Vector &x, double t, Vector &y);
 }
+
+namespace backward_facing_step
+{
+   extern double u0, y0, y1;
+   extern Vector amp, ky, freq, t_offset;
+   
+   void ubdr(const Vector &x, double t, Vector &y);
+   void uic(const Vector &x, double t, Vector &y);
+   void pic(const Vector &x, double t, Vector &y);
+}
+
+namespace periodic_flow_past_array
+{
+   extern Vector f;
+   void force(const Vector &x, double t, Vector &y);
+}
+
 }
 
 namespace linelast_problem
@@ -73,8 +95,8 @@ namespace linelast_problem
 extern double _lambda;
 extern double _mu;
 
-double lambda(const Vector &x);
-double mu(const Vector &x);
+double lambda(const Vector &x, double t);
+double mu(const Vector &x, double t);
 
 }
 
@@ -82,14 +104,14 @@ namespace linelast_disp
 {
 extern double rdisp_f;
 
-void init_disp(const Vector &x, Vector &u);
+void init_disp(const Vector &x, double t, Vector &u);
 }
 
 namespace linelast_force
 {
 extern double rforce_f;
 
-void tip_force(const Vector &x, Vector &u);
+void tip_force(const Vector &x, double t, Vector &u);
 }
 
 namespace linelast_cwtrain
@@ -143,11 +165,11 @@ extern double bxf_offset;
 extern double byf_offset;
 
 double perturb_func(const double x, const double amp, const double freq, const double offset);
-void left_disp(const Vector &x, Vector &u);
-void up_disp(const Vector &x, Vector &u);
-void down_disp(const Vector &x, Vector &u);
-void right_disp(const Vector &x, Vector &u);
-void body_force(const Vector &x, Vector &u);
+void left_disp(const Vector &x, double t, Vector &u);
+void up_disp(const Vector &x, double t, Vector &u);
+void down_disp(const Vector &x, double t, Vector &u);
+void right_disp(const Vector &x, double t, Vector &u);
+void body_force(const Vector &x, double t, Vector &u);
 }
 
 namespace linelast_frame_wind
@@ -156,11 +178,11 @@ extern double qwind_f;
 extern double density;
 extern double g;
 
-void wind_load(const Vector &x, Vector &f);
+void wind_load(const Vector &x, double t, Vector &f);
 
-void gravity_load(const Vector &x, Vector &f);
+void gravity_load(const Vector &x, double t, Vector &f);
 
-void dirichlet(const Vector &x, Vector &u);
+void dirichlet(const Vector &x, double t, Vector &u);
 
 }
 
@@ -174,7 +196,7 @@ namespace advdiff_flow_past_array
    extern double q0, dq, qoffset;
    extern Vector qk;
 
-   double qbdr(const Vector &x);
+   double qbdr(const Vector &x, double t);
 }  //  namespace advdiff_flow_past_array
 
 }  // namespace advdiff_problem
@@ -225,6 +247,10 @@ public:
    Array<int> battr;
    Array<BoundaryType> bdr_type; // abstract boundary type
 
+   /* initial condition for time-dependent problem */
+   /* size with number of variables */
+   Array<function_factory::GeneralVectorFunction *> ic_ptr;
+
    Array<function_factory::GeneralScalarFunction *> general_scalar_ptr;
    Array<function_factory::GeneralVectorFunction *> general_vector_ptr;
 
@@ -270,33 +296,33 @@ public:
    virtual ~PoissonSpiral() {};
 };
 
-class StokesProblem : public ParameterizedProblem
+class FlowProblem : public ParameterizedProblem
 {
 friend class StokesSolver;
 
 public:
-   virtual ~StokesProblem() {};
+   virtual ~FlowProblem() {};
 };
 
-class StokesChannel : public StokesProblem
+class ChannelFlow : public FlowProblem
 {
 public:
-   StokesChannel();
-   virtual ~StokesChannel() {};
+   ChannelFlow();
+   virtual ~ChannelFlow() {};
 };
 
-class StokesComponent : public StokesProblem
+class ComponentFlow : public FlowProblem
 {
 public:
-   StokesComponent();
+   ComponentFlow();
 };
 
-class StokesFlowPastArray : public StokesComponent
+class FlowPastArray : public ComponentFlow
 {
 friend class AdvDiffFlowPastArray;
 
 public:
-   StokesFlowPastArray();
+   FlowPastArray();
 
    virtual void SetParams(const std::string &key, const double &value) override;
    virtual void SetParams(const Array<int> &indexes, const Vector &values) override;
@@ -304,6 +330,19 @@ public:
 protected:
    Vector *u0;
    virtual void SetBattr();
+};
+
+class BackwardFacingStep : public FlowProblem
+{
+public:
+   BackwardFacingStep();
+   virtual ~BackwardFacingStep() {};
+};
+
+class PeriodicFlowPastArray : public FlowProblem
+{
+public:
+   PeriodicFlowPastArray();
 };
 
 class LinElastProblem : public ParameterizedProblem
@@ -355,21 +394,21 @@ namespace advdiff_problem
    flow_problem will be passed down to StokesSolver/SteadyNSSolver for obtaining velocity field.
    It must be set appropriately within each AdvDiffSolver problems.
 */
-extern StokesProblem *flow_problem;
+extern FlowProblem *flow_problem;
 
 }  // namespace advdiff_problem
 
 }  // namespace function_factory
 
-class AdvDiffFlowPastArray : public StokesFlowPastArray
+class AdvDiffFlowPastArray : public FlowPastArray
 {
 protected:
    /*
       flow_problem shares the same pointers with this class.
-      Thus every parameter set by this class is reflected to StokesFlowPastArrayProblem as well.
+      Thus every parameter set by this class is reflected to FlowPastArrayProblem as well.
       flow_problem will be passed down to StokesSolver/SteadyNSSolver for obtaining velocity field.
    */
-   StokesFlowPastArray *flow_problem = NULL;
+   FlowPastArray *flow_problem = NULL;
 
 public:
    AdvDiffFlowPastArray();
@@ -378,7 +417,7 @@ public:
 protected:
    void SetBattr() override
    {
-      StokesFlowPastArray::SetBattr();
+      FlowPastArray::SetBattr();
       flow_problem->SetBattr();
    }
 };

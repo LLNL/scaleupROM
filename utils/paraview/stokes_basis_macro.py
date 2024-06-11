@@ -16,7 +16,7 @@ num_basis = 15
 figure_dir = 'C:\\Users\\chung28\\Desktop\\slides\\figures\\stokes-4-comp-channel\\basis'
 
 # create a new 'PVD Reader'
-stokes_comp_universal_0pvd = PVDReader(registrationName='stokes_comp_universal_0.pvd', FileName='\\\\wsl$\\Ubuntu-22.04\\home\\kevin\\scaleupROM\\playground\\stokes_channel\\stokes_comp_universal_0\\stokes_comp_universal_0.pvd')
+stokes_comp_universal_0pvd = PVDReader(registrationName='stokes_comp_universal_0.pvd', FileName='\\\\wsl$\\Ubuntu-22.04\\home\\kevin\\scaleupROM\\playground\\channel_flow\\stokes_comp_universal_0\\stokes_comp_universal_0.pvd')
 stokes_comp_universal_0pvd.CellArrays = ['attribute']
 stokes_comp_universal_0pvd.PointArrays = ['pres_basis_%d' % k for k in range(num_basis)] + ['vel_basis_%d' % k for k in range(num_basis)]
 # stokes_comp_universal_0pvd.PointArrays = ['pres_basis_0', 'pres_basis_1', 'pres_basis_10', 'pres_basis_11', 'pres_basis_12', 'pres_basis_13', 'pres_basis_14', 'pres_basis_2', 'pres_basis_3', 'pres_basis_4', 'pres_basis_5', 'pres_basis_6', 'pres_basis_7', 'pres_basis_8', 'pres_basis_9', 'vel_basis_0', 'vel_basis_1', 'vel_basis_10', 'vel_basis_11', 'vel_basis_12', 'vel_basis_13', 'vel_basis_14', 'vel_basis_2', 'vel_basis_3', 'vel_basis_4', 'vel_basis_5', 'vel_basis_6', 'vel_basis_7', 'vel_basis_8', 'vel_basis_9']

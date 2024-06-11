@@ -77,6 +77,10 @@ jobs:
         run: |
             cd ${GITHUB_WORKSPACE}/build/test
             ./steady_ns_dd_mms
+      - name: Test UnsteadyNS DD solver
+        run: |
+            cd ${GITHUB_WORKSPACE}/build/test
+            ./unsteady_ns_dd_mms
       - name: Test LinearElastic DD solver
         run: |
             cd ${GITHUB_WORKSPACE}/build/test

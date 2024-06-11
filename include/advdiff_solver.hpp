@@ -50,7 +50,7 @@ public:
 
    bool Solve() override;
 
-   void SetFlowAtSubdomain(std::function<void(const Vector &, Vector &)> F, const int m=-1);
+   void SetFlowAtSubdomain(std::function<void(const Vector &, double, Vector &)> F, const int m=-1);
 
    void SetParameterizedProblem(ParameterizedProblem *problem) override;
 

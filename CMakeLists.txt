@@ -160,6 +160,8 @@ set(scaleupROMObj_SOURCES
 
   # include/navier_solver.hpp
   # src/navier_solver.cpp
+  include/unsteady_ns_solver.hpp
+  src/unsteady_ns_solver.cpp
 
   include/topology_handler.hpp
   src/topology_handler.cpp

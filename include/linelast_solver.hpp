@@ -40,10 +40,10 @@ protected:
    Array<BilinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
-   Array<ConstantCoefficient *> lambda_c;
-   Array<ConstantCoefficient *> mu_c;
-   Array<VectorFunctionCoefficient *> bdr_coeffs;
-   Array<VectorFunctionCoefficient *> rhs_coeffs;
+   Array<Coefficient *> lambda_c;
+   Array<Coefficient *> mu_c;
+   Array<VectorCoefficient *> bdr_coeffs;
+   Array<VectorCoefficient *> rhs_coeffs;
 
    // DG parameters specific to linear elasticity equation.
    double alpha = -1.0;
@@ -54,7 +54,7 @@ protected:
    double mu = 1.0;
 
    // Initial positions
-   VectorFunctionCoefficient *init_x = NULL;
+   VectorCoefficient *init_x = NULL;
 
 public:
    LinElastSolver();
@@ -84,9 +84,9 @@ public:
    virtual bool Solve();
 
    virtual void SetupBCVariables() override;
-   virtual void SetupIC(std::function<void(const Vector &, Vector &)> F);
-   virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1);
-   virtual void AddRHSFunction(std::function<void(const Vector &, Vector &)> F);
+   virtual void SetupIC(std::function<void(const Vector &, double, Vector &)> F);
+   virtual void AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr = -1);
+   virtual void AddRHSFunction(std::function<void(const Vector &, double, Vector &)> F);
    virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();
    virtual void SetupRHSBCOperators();

@@ -54,7 +54,7 @@ MultiBlockSolver::~MultiBlockSolver()
    delete U;
    delete RHS;
 
-   if (save_visual)
+   if (visual.save)
       for (int k = 0; k < paraviewColls.Size(); k++) delete paraviewColls[k];
 
    for (int k = 0; k < us.Size(); k++) delete us[k];
@@ -95,27 +95,29 @@ void MultiBlockSolver::ParseInputs()
    use_amg = config.GetOption<bool>("solver/use_amg", true);
    direct_solve = config.GetOption<bool>("solver/direct_solve", false);
 
-   save_visual = config.GetOption<bool>("visualization/enabled", false);
-   if (save_visual)
+   visual.save = config.GetOption<bool>("visualization/enabled", false);
+   if (visual.save)
    {
       // Default file path if no input file name is provided.
-      visual_dir = config.GetOption<std::string>("visualization/file_path/directory", ".");
-      visual_prefix = config.GetOption<std::string>("visualization/file_path/prefix", "paraview_output");
+      visual.dir = config.GetOption<std::string>("visualization/file_path/directory", ".");
+      visual.prefix = config.GetOption<std::string>("visualization/file_path/prefix", "paraview_output");
 
-      unified_paraview = config.GetOption<bool>("visualization/unified_paraview", false);
-      if (unified_paraview)
+      visual.unified_view = config.GetOption<bool>("visualization/unified_paraview", false);
+      if (visual.unified_view)
       {
          if (topol_mode == TopologyHandlerMode::COMPONENT)
             mfem_error("ComponentTopologyHandler does not yet support unified paraview!\n");
       }
       else
       {
-         visual_offset = config.GetOption<int>("visualization/domain_offset", 0);
-         visual_freq = config.GetOption<int>("visualization/domain_frequency", 1);
+         visual.domain_offset = config.GetOption<int>("visualization/domain_offset", 0);
+         visual.domain_interval = config.GetOption<int>("visualization/domain_frequency", 1);
       }
 
       // visualization type for pointwise error.
-      visualize_error = config.GetOption<bool>("visualization/visualize_error", false);
+      visual.save_error = config.GetOption<bool>("visualization/visualize_error", false);
+
+      visual.time_interval = config.GetOption<int>("visualization/time_interval", -1);
    }
 
    // rom inputs.
@@ -622,19 +624,19 @@ void MultiBlockSolver::AssembleROMMat()
 
 void MultiBlockSolver::InitVisualization(const std::string& output_path)
 {
-   if (!save_visual) return;
+   if (!visual.save) return;
 
    std::string file_prefix;
    if (output_path != "")
       file_prefix = output_path;
    else
    {
-      assert(visual_prefix != "");
-      assert(visual_dir != "");
-      file_prefix = visual_dir + "/" + visual_prefix;
+      assert(visual.prefix != "");
+      assert(visual.dir != "");
+      file_prefix = visual.dir + "/" + visual.prefix;
    }
 
-   if (unified_paraview)
+   if (visual.unified_view)
       InitUnifiedParaview(file_prefix);
    else
       InitIndividualParaview(file_prefix);
@@ -643,13 +645,13 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
 void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
 {
    assert(var_names.size() == num_var);
-   assert((visual_offset >= 0) && (visual_offset < numSub));
-   assert((visual_freq > 0) && (visual_freq < numSub));
+   assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
+   assert((visual.domain_interval > 0) && (visual.domain_interval < numSub));
    paraviewColls.SetSize(numSub);
    paraviewColls = NULL;
 
    std::string error_type, tmp;
-   if (visualize_error)
+   if (visual.save_error)
    {
       error_visual.SetSize(num_var * numSub);
       error_visual = NULL;
@@ -660,7 +662,7 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
    }
 
    for (int m = 0; m < numSub; m++) {
-      if ((m < visual_offset) || (m % visual_freq != 0)) continue;
+      if ((m < visual.domain_offset) || (m % visual.domain_interval != 0)) continue;
 
       ostringstream oss;
       // Each subdomain needs to be save separately.
@@ -674,7 +676,7 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
       for (int v = 0, idx = m * num_var; v < num_var; v++, idx++)
       {
          paraviewColls[m]->RegisterField(var_names[v].c_str(), us[idx]);
-         if (visualize_error)
+         if (visual.save_error)
          {
             tmp = var_names[v] + error_type;
             paraviewColls[m]->RegisterField(tmp.c_str(), error_visual[idx]);
@@ -697,7 +699,7 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
    }
 
    std::string error_type, tmp;
-   if (visualize_error)
+   if (visual.save_error)
    {
       error_visual.SetSize(num_var * numSub);
       error_visual = NULL;
@@ -723,7 +725,7 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
    for (int v = 0; v < num_var; v++)
    {
       paraviewColls[0]->RegisterField(var_names[v].c_str(), global_us_visual[v]);
-      if (visualize_error)
+      if (visual.save_error)
       {
          tmp = var_names[v] + error_type;
          paraviewColls[0]->RegisterField(tmp.c_str(), global_error_visual[v]);
@@ -734,28 +736,41 @@ void MultiBlockSolver::InitUnifiedParaview(const std::string& file_prefix)
 
 void MultiBlockSolver::SaveVisualization()
 {
-   if (!save_visual) return;
+   if (!visual.save) return;
 
-   if (unified_paraview)
+   if (visual.unified_view)
    {
       mfem_warning("Paraview is unified. Any overlapped interface dof data will not be shown.\n");
       topol_handler->TransferToGlobal(us, global_us_visual, num_var);
-      if (visualize_error)
+      if (visual.save_error)
          topol_handler->TransferToGlobal(error_visual, global_error_visual, num_var);
    }
    else
    {
-      assert((visual_offset >= 0) && (visual_offset < numSub));
-      assert((visual_freq > 0) && (visual_freq < numSub));
+      assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
+      assert((visual.domain_interval > 0) && (visual.domain_interval < numSub));
    }
 
    for (int m = 0; m < paraviewColls.Size(); m++)
    {
-      if ((!unified_paraview) && ((m < visual_offset) || (m % visual_freq != 0))) continue;
+      if ((!visual.unified_view) && ((m < visual.domain_offset) || (m % visual.domain_interval != 0))) continue;
       assert(paraviewColls[m]);
       paraviewColls[m]->Save();
    }
 };
+
+void MultiBlockSolver::SaveVisualization(const int step, const double time)
+{
+   if (!visual.save) return;
+
+   for (int m = 0; m < paraviewColls.Size(); m++)
+   {
+      paraviewColls[m]->SetCycle(step);
+      paraviewColls[m]->SetTime(time);
+   }
+
+   SaveVisualization();
+}
 
 void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
@@ -792,6 +807,25 @@ void MultiBlockSolver::SaveSolution(std::string filename)
    printf("Done!\n");
 }
 
+void MultiBlockSolver::SaveSolutionWithTime(std::string filename, const int step, const double time)
+{
+   SaveSolution(filename);
+   printf("Saving time/time step ...");
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // TODO: currently we only need solution vector. But we can add more data as we need.
+   hdf5_utils::WriteAttribute(file_id, "timestep", step);
+   hdf5_utils::WriteAttribute(file_id, "time", time);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   printf("Done!\n");
+}
+
 void MultiBlockSolver::LoadSolution(const std::string &filename)
 {
    // solution vector U must be instantiated beforehand.
@@ -822,6 +856,25 @@ void MultiBlockSolver::LoadSolution(const std::string &filename)
       printf("Done!\n");
    else
       mfem_error("solution size does not match!\n");
+}
+
+void MultiBlockSolver::LoadSolutionWithTime(const std::string &filename, int &step, double &time)
+{
+   LoadSolution(filename);
+   printf("Loading time/time step ...");
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   // TODO: currently we only need solution vector. But we can add more data as we need.
+   hdf5_utils::ReadAttribute(file_id, "timestep", step);
+   hdf5_utils::ReadAttribute(file_id, "time", time);
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   printf("Done!\n");
 }
 
 void MultiBlockSolver::CopySolution(BlockVector *input_sol)
@@ -998,7 +1051,7 @@ void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
    error.SetSize(num_var);
    ComputeRelativeError(us, test_us, error);
 
-   if (visualize_error)
+   if (visual.save_error)
       for (int k = 0; k < test_us.Size(); k++)
          subtract(*test_us[k], *us[k], *error_visual[k]);
 

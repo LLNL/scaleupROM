@@ -97,7 +97,7 @@ void StokesSolver::SetupBCVariables()
    sn_coeffs = NULL;
 }
 
-void StokesSolver::AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr)
+void StokesSolver::AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr)
 {
    assert(ud_coeffs.Size() > 0);
 
@@ -477,7 +477,7 @@ void StokesSolver::AssembleOperatorBase()
    systemOp->SetBlock(1,0, B);
 }
 
-void StokesSolver::SetupMUMPSSolver(bool set_oper)
+void StokesSolver::SetupMUMPSSolver(bool set_oper, const MUMPSSolver::MatType mat_type)
 {
    assert(systemOp);
    delete systemOp_mono;
@@ -493,7 +493,7 @@ void StokesSolver::SetupMUMPSSolver(bool set_oper)
    systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
    mumps = new MUMPSSolver(MPI_COMM_SELF);
-   mumps->SetMatrixSymType(MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
+   mumps->SetMatrixSymType(mat_type);
    if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 
@@ -1081,7 +1081,7 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
 
-   nu = function_factory::stokes_problem::nu;
+   nu = function_factory::flow_problem::nu;
    delete nu_coeff;
    nu_coeff = new ConstantCoefficient(nu);
 
@@ -1122,8 +1122,8 @@ void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(zero);
 
    // Ensure incompressibility.
-   function_factory::stokes_problem::del_u = 0.0;
-   function_factory::stokes_problem::x0.SetSize(dim);
+   function_factory::flow_problem::del_u = 0.0;
+   function_factory::flow_problem::x0.SetSize(dim);
    if (!pres_dbc)
    {
       Array<bool> nz_dbcs(numBdr);
@@ -1188,15 +1188,15 @@ void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
    Mesh *mesh = NULL;
 
    // initializing complementary flux.
-   function_factory::stokes_problem::del_u = 0.0;
+   function_factory::flow_problem::del_u = 0.0;
 
    // NOTE: corresponding ParameterizedProblem should use
-   // function_factory::stokes_problem::flux
+   // function_factory::flow_problem::flux
    // to actually enforce the incompressibility.
-   Vector *x0 = &(function_factory::stokes_problem::x0);
+   Vector *x0 = &(function_factory::flow_problem::x0);
    x0->SetSize(dim);
    (*x0) = 0.0;
-   VectorFunctionCoefficient dir_coeff(dim, function_factory::stokes_problem::dir);
+   VectorFunctionCoefficient dir_coeff(dim, function_factory::flow_problem::dir);
 
    // Determine the center of domain first.
    Vector x1(dim), dx1(dim);
@@ -1252,7 +1252,7 @@ void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
    }  // for (int m = 0; m < numSub; m++)
 
    // Set the flux to ensure incompressibility.
-   function_factory::stokes_problem::del_u = bflux / dirflux;
+   function_factory::flow_problem::del_u = bflux / dirflux;
 
    // Make sure the resulting flux is zero.
    double threshold = 1.0e-12;
@@ -1279,7 +1279,7 @@ void StokesSolver::SetComplementaryFlux(const Array<bool> nz_dbcs)
    if (abs(bflux) > threshold)
    {
       printf("boundary flux: %.5E\n", bflux);
-      mfem_error("Current boundary setup cannot ensure incompressibility!\nMake sure BC uses function_factory::stokes_problem::flux.\n");
+      mfem_error("Current boundary setup cannot ensure incompressibility!\nMake sure BC uses function_factory::flow_problem::flux.\n");
    }
    
 }

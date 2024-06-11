@@ -117,7 +117,7 @@ friend class SteadyNSOperator;
 protected:
    enum OperType {
       BASE,
-      TEMAM,
+      LF,
       NUM_OPERTYPE
    } oper_type = BASE;
 
@@ -154,7 +154,6 @@ public:
 
    void BuildDomainOperators() override;
 
-   void SetupRHSBCOperators() override;
    void SetupDomainBCOperators() override;
 
    void AssembleOperator() override;

@@ -45,10 +45,10 @@ visualization:
     prefix: sample_gen_output
 
 parameterized_problem:
-  name: stokes_channel
+  name: channel_flow
 
 single_run:
-  stokes_channel:
+  channel_flow:
     nu: 2.0
 
 sample_generation:
@@ -57,7 +57,7 @@ sample_generation:
   file_path:
     prefix: "stokes"
   parameters:
-    - key: single_run/stokes_channel/nu
+    - key: single_run/channel_flow/nu
       type: double
       sample_size: 1
       minimum: 2.0

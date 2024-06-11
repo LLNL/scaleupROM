@@ -22,19 +22,19 @@ visualization:
     prefix: sample_gen_output
 
 parameterized_problem:
-  name: stokes_channel
+  name: channel_flow
 
 single_run:
-  stokes_channel:
+  channel_flow:
     nu: 2.5
 
 sample_generation:
   maximum_number_of_snapshots: 400
   component_sampling: false
   file_path:
-    prefix: "stokes_channel"
+    prefix: "channel_flow"
   parameters:
-    - key: single_run/stokes_channel/nu
+    - key: single_run/channel_flow/nu
       type: double
       sample_size: 3
       minimum: 2.0

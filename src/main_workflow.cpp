@@ -10,6 +10,7 @@
 #include "stokes_solver.hpp"
 #include "steady_ns_solver.hpp"
 #include "advdiff_solver.hpp"
+#include "unsteady_ns_solver.hpp"
 #include "etc.hpp"
 #include <fstream>
 #include <iostream>
@@ -17,12 +18,12 @@
 using namespace std;
 using namespace mfem;
 
-double dbc2(const Vector &x)
+double dbc2(const Vector &x, double t)
 {
    return 0.1 - 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
 
-double dbc4(const Vector &x)
+double dbc4(const Vector &x, double t)
 {
    return -0.1 + 0.1 * (x(1) - 1.0) * (x(1) - 1.0);
 }
@@ -57,6 +58,7 @@ MultiBlockSolver* InitSolver()
    else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
    else if (solver_type == "linelast")   { solver = new LinElastSolver; }
    else if (solver_type == "adv-diff")   { solver = new AdvDiffSolver; }
+   else if (solver_type == "unsteady-ns")   { solver = new UnsteadyNSSolver; }
    else
    {
       printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());

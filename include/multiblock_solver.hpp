@@ -79,18 +79,29 @@ protected:
    std::string sol_dir = ".";
    std::string sol_prefix;
 
+   /* visualization options */
+   struct VisualizationOption {
+      bool save = false;
+      bool unified_view = false;
+      std::string dir = ".";
+      std::string prefix;
+      /* for individual_paraview, support partial visualization. */
+      int domain_offset = -1;
+      int domain_interval = -1;
+
+      /* time-dependent options */
+      int time_interval = -1;
+
+      /* visualizing rom solution error */
+      bool save_error = false;
+   } visual;
+
    // visualization variables
-   bool save_visual = false;
-   bool unified_paraview = false;
-   int visual_offset = -1, visual_freq = -1;    // for individual_paraview, support partial visualization.
-   std::string visual_dir = ".";
-   std::string visual_prefix;
    Array<ParaViewDataCollection *> paraviewColls;
    // Used only for the unified visualization. Size(num_var).
    Array<FiniteElementSpace *> global_fes;
    Array<GridFunction *> global_us_visual;
 
-   bool visualize_error = false;
    Array<GridFunction *> error_visual;    // Size(num_var * numSub)
    Array<GridFunction *> global_error_visual;   // point-wise error visualization
 
@@ -130,9 +141,9 @@ public:
    ROMHandlerBase* GetROMHandler() const { return rom_handler; }
    TopologyHandler* GetTopologyHandler() const { return topol_handler; }
    const TrainMode GetTrainMode() { return train_mode; }
-   const bool IsVisualizationSaved() const { return save_visual; }
+   const bool IsVisualizationSaved() const { return visual.save; }
    const std::string GetSolutionFilePrefix() const { return sol_prefix; }
-   const std::string GetVisualizationPrefix() const { return visual_prefix; }
+   const std::string GetVisualizationPrefix() const { return visual.prefix; }
    const TopologyHandlerMode GetTopologyMode() const { return topol_mode; }
    ParaViewDataCollection* GetParaViewColl(const int &k) { return paraviewColls[k]; }
    BlockVector* GetSolution() { return U; }
@@ -147,11 +158,11 @@ public:
    void SortByVariables(BlockVector &by_sub, BlockVector &by_var);
 
    virtual void SetupBCVariables();
-   virtual void AddBCFunction(std::function<double(const Vector &)> F, const int battr = -1)
+   virtual void AddBCFunction(std::function<double(const Vector &, double)> F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
    virtual void AddBCFunction(const double &F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
-   virtual void AddBCFunction(std::function<void(const Vector &, Vector &)> F, const int battr = -1)
+   virtual void AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
    virtual void AddBCFunction(const Vector &F, const int battr = -1)
    { mfem_error("Abstract method MultiBlockSolver::AddBCFunction!\n"); }
@@ -220,10 +231,15 @@ public:
    virtual void InitVisualization(const std::string& output_dir = "");
    virtual void InitUnifiedParaview(const std::string &file_prefix);
    virtual void InitIndividualParaview(const std::string &file_prefix);
+   /* time-independent visualization */
    virtual void SaveVisualization();
+   /* time-dependent visualization */
+   virtual void SaveVisualization(const int step, const double time);
 
    void SaveSolution(std::string filename = "");
+   void SaveSolutionWithTime(const std::string filename, const int step, const double time);
    void LoadSolution(const std::string &filename);
+   void LoadSolutionWithTime(const std::string &filename, int &step, double &time);
    void CopySolution(BlockVector *input_sol);
 
    virtual void AllocateROMTensorElems()
