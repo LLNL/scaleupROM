@@ -6,6 +6,7 @@
 #define SCALEUPROM_ROM_ELEMENT_COLLECTION_HPP
 
 #include "topology_handler.hpp"
+#include "rom_nonlinearform.hpp"
 #include "rom_interfaceform.hpp"
 #include "mfem.hpp"
 #include "hdf5_utils.hpp"
@@ -69,6 +70,49 @@ private:
    void LoadCompBdrElems(hid_t &file_id);
    void LoadBdrElems(hid_t &comp_grp_id, const int &comp_idx);
    void LoadItfaceElems(hid_t &file_id);
+};
+
+class ROMTensorElement : public ROMElementCollection
+{
+public:
+   Array<DenseTensor *> comp;     // Size(num_components);
+   
+   /* boundary/interface is not implemented yet.. should consider */
+   // Array<Array<DenseTensor *> *> bdr;
+   // Array<DenseTensor *> port;   // reference ports.
+
+public:
+   ROMTensorElement(TopologyHandler *topol_handler_,
+                    const Array<FiniteElementSpace *> &fes_,
+                    const bool separate_variable_)
+      : ROMElementCollection(topol_handler_, fes_, separate_variable_) {}
+
+   virtual ~ROMTensorElement();
+
+   void Save(const std::string &filename) override {}
+   void Load(const std::string &filename) override {}
+
+};
+
+class ROMEQPElement : public ROMElementCollection
+{
+public:
+   Array<ROMNonlinearForm *> comp;     // Size(num_components);
+   // boundary condition is enforced via forcing term.
+   Array<Array<ROMNonlinearForm *> *> bdr;
+   Array<ROMInterfaceForm *> port;   // reference ports.
+
+public:
+   ROMEQPElement(TopologyHandler *topol_handler_,
+                 const Array<FiniteElementSpace *> &fes_,
+                 const bool separate_variable_)
+      : ROMElementCollection(topol_handler_, fes_, separate_variable_) {}
+
+   virtual ~ROMEQPElement() {}
+
+   void Save(const std::string &filename) override {}
+   void Load(const std::string &filename) override {}
+
 };
 
 #endif
