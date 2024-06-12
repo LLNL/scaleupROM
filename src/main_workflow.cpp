@@ -423,7 +423,6 @@ void BuildROM(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMLinElems();
          test->BuildROMLinElems();
          test->SaveROMLinElems(filename);
 
@@ -514,8 +513,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       {
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
-         
-         test->AllocateROMLinElems();
 
          printf("Loading ROM projected elements.. ");
          test->LoadROMLinElems(filename);

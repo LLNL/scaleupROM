@@ -158,8 +158,9 @@ set(scaleupROMObj_SOURCES
   include/block_smoother.hpp
   src/block_smoother.cpp
 
-  # include/navier_solver.hpp
-  # src/navier_solver.cpp
+  include/rom_element_collection.hpp
+  src/rom_element_collection.cpp
+
   include/unsteady_ns_solver.hpp
   src/unsteady_ns_solver.cpp
 

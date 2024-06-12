@@ -47,20 +47,18 @@ void AdvDiffSolver::BuildDomainOperators()
    }
 }
 
-void AdvDiffSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void AdvDiffSolver::BuildCompROMLinElems()
 {
    mfem_error("AdvDiffSolver::BuildCompROMLinElems is not implemented yet!\n");
 
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
-   const int num_comp = fes_comp.Size();
-   assert(comp_mats.Size() == num_comp);
-
-   for (int c = 0; c < num_comp; c++)
+   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
    {
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      BilinearForm a_comp(fes_comp[c]);
+      BilinearForm a_comp(comp_fes[c]);
 
       a_comp.AddDomainIntegrator(new DiffusionIntegrator);
       if (full_dg)
@@ -72,8 +70,8 @@ void AdvDiffSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
       a_comp.Finalize();
 
       // Poisson equation has only one solution variable.
-      comp_mats[c]->SetSize(1, 1);
-      (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
+      rom_elems->comp[c]->SetSize(1, 1);
+      (*rom_elems->comp[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
    }
 }
 

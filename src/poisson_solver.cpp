@@ -342,18 +342,16 @@ void PoissonSolver::AssembleInterfaceMatrices()
    a_itf->AssembleInterfaceMatrices(mats);
 }
 
-void PoissonSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void PoissonSolver::BuildCompROMLinElems()
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
-   const int num_comp = fes_comp.Size();
-   assert(comp_mats.Size() == num_comp);
-
-   for (int c = 0; c < num_comp; c++)
+   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
    {
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      BilinearForm a_comp(fes_comp[c]);
+      BilinearForm a_comp(comp_fes[c]);
 
       a_comp.AddDomainIntegrator(new DiffusionIntegrator);
       if (full_dg)
@@ -363,23 +361,21 @@ void PoissonSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
       a_comp.Finalize();
 
       // Poisson equation has only one solution variable.
-      comp_mats[c]->SetSize(1, 1);
-      (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
+      rom_elems->comp[c]->SetSize(1, 1);
+      (*rom_elems->comp[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
    }
 }
 
-void PoissonSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void PoissonSolver::BuildBdrROMLinElems()
 {
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
-   const int num_comp = fes_comp.Size();
-   assert(bdr_mats.Size() == num_comp);
-
-   for (int c = 0; c < num_comp; c++)
+   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
    {
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
+      assert(rom_elems->bdr[c]->Size() == comp->bdr_attributes.Size());
 
       MatrixBlocks *bdr_mat;
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
@@ -387,31 +383,31 @@ void PoissonSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
          Array<int> bdr_marker(comp->bdr_attributes.Max());
          bdr_marker = 0;
          bdr_marker[comp->bdr_attributes[b] - 1] = 1;
-         BilinearForm a_comp(fes_comp[c]);
+         BilinearForm a_comp(comp_fes[c]);
          a_comp.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), bdr_marker);
 
          a_comp.Assemble();
          a_comp.Finalize();
 
-         bdr_mat = (*bdr_mats[c])[b];
+         bdr_mat = (*rom_elems->bdr[c])[b];
          bdr_mat->SetSize(1, 1);
          (*bdr_mat)(0, 0) = rom_handler->ProjectToRefBasis(c, c, &(a_comp.SpMat()));
       }
    }
 }
 
-void PoissonSolver::BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void PoissonSolver::BuildItfaceROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
    const int num_ref_ports = topol_handler->GetNumRefPorts();
-   assert(port_mats.Size() == num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
    {
-      assert(port_mats[p]->nrows == 2);
-      assert(port_mats[p]->ncols == 2);
+      assert(rom_elems->port[p]->nrows == 2);
+      assert(rom_elems->port[p]->ncols == 2);
 
       int c1, c2;
       topol_handler->GetComponentPair(p, c1, c2);
@@ -425,11 +421,11 @@ void PoissonSolver::BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp
 
       // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
       // Need to use two copied instances.
-      a_itf->AssembleInterfaceMatrixAtPort(p, fes_comp, spmats);
+      a_itf->AssembleInterfaceMatrixAtPort(p, comp_fes, spmats);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
-            (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], spmats(i,j));
+            (*rom_elems->port[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], spmats(i,j));
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++) delete spmats(i, j);

@@ -521,16 +521,14 @@ void StokesSolver::AssembleInterfaceMatrices()
    b_itf->AssembleInterfaceMatrices(b_mats);
 }
 
-void StokesSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void StokesSolver::BuildCompROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
    const int num_comp = topol_handler->GetNumComponents();
-   assert(comp_mats.Size() == num_comp);
-   assert(fes_comp.Size() == num_comp * num_var);
-
    assert(nu_coeff);
 
    int num_blocks = (separate_variable_basis) ? num_var: 1;
@@ -539,8 +537,8 @@ void StokesSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
       const int fidx = c * num_var;
       Mesh *comp = topol_handler->GetComponentMesh(c);
 
-      BilinearForm m_comp(fes_comp[fidx]);
-      MixedBilinearFormDGExtension b_comp(fes_comp[fidx], fes_comp[fidx+1]);
+      BilinearForm m_comp(comp_fes[fidx]);
+      MixedBilinearFormDGExtension b_comp(comp_fes[fidx], comp_fes[fidx+1]);
 
       m_comp.AddDomainIntegrator(new VectorDiffusionIntegrator(*nu_coeff));
       if (full_dg)
@@ -559,18 +557,18 @@ void StokesSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
       SparseMatrix *b_mat = &(b_comp.SpMat());
       SparseMatrix *bt_mat = Transpose(*b_mat);
 
-      comp_mats[c]->SetSize(num_blocks, num_blocks);
+      rom_elems->comp[c]->SetSize(num_blocks, num_blocks);
       if (separate_variable_basis)
       {
-         (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
-         (*comp_mats[c])(1, 0) = rom_handler->ProjectToRefBasis(fidx+1, fidx, b_mat);
-         (*comp_mats[c])(0, 1) = rom_handler->ProjectToRefBasis(fidx, fidx+1, bt_mat);
+         (*rom_elems->comp[c])(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
+         (*rom_elems->comp[c])(1, 0) = rom_handler->ProjectToRefBasis(fidx+1, fidx, b_mat);
+         (*rom_elems->comp[c])(0, 1) = rom_handler->ProjectToRefBasis(fidx, fidx+1, bt_mat);
       }
       else
       {
          Array<int> dummy1, dummy2;
          BlockMatrix *sys_comp = FormBlockMatrix(m_mat, b_mat, bt_mat, dummy1, dummy2);
-         (*comp_mats[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, sys_comp);
+         (*rom_elems->comp[c])(0, 0) = rom_handler->ProjectToRefBasis(c, c, sys_comp);
          delete sys_comp;
       }
 
@@ -578,16 +576,14 @@ void StokesSolver::BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void StokesSolver::BuildBdrROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
    const int num_comp = topol_handler->GetNumComponents();
-   assert(bdr_mats.Size() == num_comp);
-   assert(fes_comp.Size() == num_comp * num_var);
-
    assert(nu_coeff);
 
    int num_blocks = (separate_variable_basis) ? num_var: 1;
@@ -595,7 +591,7 @@ void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    {
       const int fidx = c * num_var;
       Mesh *comp = topol_handler->GetComponentMesh(c);
-      assert(bdr_mats[c]->Size() == comp->bdr_attributes.Size());
+      assert(rom_elems->bdr[c]->Size() == comp->bdr_attributes.Size());
 
       for (int b = 0; b < comp->bdr_attributes.Size(); b++)
       {
@@ -603,8 +599,8 @@ void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
          bdr_marker = 0;
          bdr_marker[comp->bdr_attributes[b] - 1] = 1;
 
-         BilinearForm m_comp(fes_comp[fidx]);
-         MixedBilinearFormDGExtension b_comp(fes_comp[fidx], fes_comp[fidx+1]);
+         BilinearForm m_comp(comp_fes[fidx]);
+         MixedBilinearFormDGExtension b_comp(comp_fes[fidx], comp_fes[fidx+1]);
 
          m_comp.AddBdrFaceIntegrator(new DGVectorDiffusionIntegrator(*nu_coeff, sigma, kappa), bdr_marker);
          b_comp.AddBdrFaceIntegrator(new DGNormalFluxIntegrator, bdr_marker);
@@ -618,7 +614,7 @@ void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
          SparseMatrix *b_mat = &(b_comp.SpMat());
          SparseMatrix *bt_mat = Transpose(*b_mat);
 
-         MatrixBlocks *bdr_mat = (*bdr_mats[c])[b];
+         MatrixBlocks *bdr_mat = (*rom_elems->bdr[c])[b];
          bdr_mat->SetSize(num_blocks, num_blocks);
          if (separate_variable_basis)
          {
@@ -639,25 +635,24 @@ void StokesSolver::BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp)
    }
 }
 
-void StokesSolver::BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp)
+void StokesSolver::BuildItfaceROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
+   assert(rom_elems);
 
    const int num_comp = topol_handler->GetNumComponents();
-   assert(fes_comp.Size() == num_comp * num_var);
    Array<FiniteElementSpace *> ufes_comp(num_comp), pfes_comp(num_comp);
    for (int c = 0; c < num_comp; c++)
    {
-      ufes_comp[c] = fes_comp[c * num_var];
-      pfes_comp[c] = fes_comp[c * num_var + 1];
+      ufes_comp[c] = comp_fes[c * num_var];
+      pfes_comp[c] = comp_fes[c * num_var + 1];
    }
 
    int num_blocks = (separate_variable_basis) ? 2 * num_var: 2;
 
    const int num_ref_ports = topol_handler->GetNumRefPorts();
-   assert(port_mats.Size() == num_ref_ports);
    for (int p = 0; p < num_ref_ports; p++)
    {
       int c1, c2;
@@ -686,22 +681,25 @@ void StokesSolver::BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp)
             // NOTE: the index also should be transposed.
             bt_mats_p(j, i) = Transpose(*b_mats_p(i, j));
 
-      port_mats[p]->SetSize(num_blocks, num_blocks);
+      rom_elems->port[p]->SetSize(num_blocks, num_blocks);
 
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
             if (separate_variable_basis)
             {
-               (*port_mats[p])(i * num_var, j * num_var) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], m_mats_p(i, j));
-               (*port_mats[p])(i * num_var + 1, j * num_var) = rom_handler->ProjectToRefBasis(c_idx[i] + 1, c_idx[j], b_mats_p(i, j));
-               (*port_mats[p])(i * num_var, j * num_var + 1) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j] + 1, bt_mats_p(i, j));
+               (*rom_elems->port[p])(i * num_var, j * num_var) = 
+                  rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], m_mats_p(i, j));
+               (*rom_elems->port[p])(i * num_var + 1, j * num_var) = 
+                  rom_handler->ProjectToRefBasis(c_idx[i] + 1, c_idx[j], b_mats_p(i, j));
+               (*rom_elems->port[p])(i * num_var, j * num_var + 1) = 
+                  rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j] + 1, bt_mats_p(i, j));
             }
             else
             {
                Array<int> dummy1, dummy2;
                BlockMatrix *tmp_mat = FormBlockMatrix(m_mats_p(i,j), b_mats_p(i,j), bt_mats_p(i,j),
                                                       dummy1, dummy2);
-               (*port_mats[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], tmp_mat);
+               (*rom_elems->port[p])(i, j) = rom_handler->ProjectToRefBasis(c_idx[i], c_idx[j], tmp_mat);
                delete tmp_mat;
             }
 

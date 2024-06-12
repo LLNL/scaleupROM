@@ -13,6 +13,7 @@
 #include "rom_handler.hpp"
 #include "hdf5_utils.hpp"
 #include "sample_generator.hpp"
+#include "rom_element_collection.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -112,13 +113,8 @@ protected:
    bool separate_variable_basis = false;
 
    // Used for bottom-up building, only with ComponentTopologyHandler.
-   // For now, assumes ROM basis represents the entire vector solution.
-   Array<MatrixBlocks *> comp_mats;     // Size(num_components);
-   // boundary condition is enforced via forcing term.
-   Array<Array<MatrixBlocks *> *> bdr_mats;
-   Array<MatrixBlocks *> port_mats;   // reference ports.
-   // DenseTensor objects from nonlinear operators
-   // will be defined per each derived MultiBlockSolver.
+   Array<FiniteElementSpace *> comp_fes;
+   ROMLinearElement *rom_elems = NULL;
 
 public:
    MultiBlockSolver();
@@ -202,27 +198,19 @@ public:
 
    // Component-wise assembly
    void GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fes);
-   virtual void AllocateROMLinElems();
+   // virtual void AllocateROMLinElems();
 
    void BuildROMLinElems();
-   virtual void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
-   virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildCompROMLinElems() = 0;
+   virtual void BuildBdrROMLinElems() = 0;
    // TODO(kevin): part of this can be transferred to InterfaceForm.
-   virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp) = 0;
+   virtual void BuildItfaceROMLinElems() = 0;
 
-   void SaveROMLinElems(const std::string &filename);
-   // Save ROM Elements in a hdf5-format file specified with file_id.
-   // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void SaveCompBdrROMLinElems(hid_t &file_id);
-   void SaveBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx);
-   void SaveItfaceROMLinElems(hid_t &file_id);
+   void SaveROMLinElems(const std::string &filename)
+   { assert(rom_elems); rom_elems->Save(filename); }
 
-   void LoadROMLinElems(const std::string &filename);
-   // Load ROM Elements in a hdf5-format file specified with file_id.
-   // TODO: add more arguments to support more general data structures of ROM Elements.
-   virtual void LoadCompBdrROMLinElems(hid_t &file_id);
-   void LoadBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx);
-   void LoadItfaceROMLinElems(hid_t &file_id);
+   void LoadROMLinElems(const std::string &filename)
+   { assert(rom_elems); rom_elems->Load(filename); }
 
    void AssembleROMMat();
 
