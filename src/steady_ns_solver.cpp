@@ -632,7 +632,6 @@ void SteadyNSSolver::SolveROM()
 void SteadyNSSolver::AllocateROMTensorElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
@@ -642,7 +641,6 @@ void SteadyNSSolver::AllocateROMTensorElems()
 void SteadyNSSolver::BuildROMTensorElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
    // Component domain system
@@ -667,7 +665,6 @@ void SteadyNSSolver::BuildROMTensorElems()
 void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(FileExists(filename));
 
    hid_t file_id;
@@ -709,7 +706,6 @@ void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
 void SteadyNSSolver::LoadROMTensorElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    hid_t file_id;
    herr_t errf = 0;
@@ -749,7 +745,6 @@ void SteadyNSSolver::LoadROMTensorElems(const std::string &filename)
 void SteadyNSSolver::AssembleROMTensorOper()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    const int num_comp = topol_handler->GetNumComponents();
    assert(comp_tensors.Size() == num_comp);
@@ -764,7 +759,6 @@ void SteadyNSSolver::AssembleROMTensorOper()
 void SteadyNSSolver::AllocateROMEQPElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    assert(rom_handler);
    assert(rom_handler->BasisLoaded());
@@ -794,7 +788,6 @@ void SteadyNSSolver::AllocateROMEQPElems()
 void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    assert(sample_generator);
    assert(rom_handler);
@@ -820,7 +813,6 @@ void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
 void SteadyNSSolver::SaveEQPElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    /*
       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
@@ -866,7 +858,6 @@ void SteadyNSSolver::SaveEQPElems(const std::string &filename)
 void SteadyNSSolver::LoadEQPElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
    hid_t file_id;
@@ -906,7 +897,6 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
 void SteadyNSSolver::AssembleROMEQPOper()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
 
    const int num_comp = rom_handler->GetNumROMRefComps();
    assert(comp_eqps.Size() == num_comp);

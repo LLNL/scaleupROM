@@ -344,7 +344,6 @@ void PoissonSolver::AssembleInterfaceMatrices()
 
 void PoissonSolver::BuildCompROMLinElems()
 {
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 
@@ -368,7 +367,6 @@ void PoissonSolver::BuildCompROMLinElems()
 
 void PoissonSolver::BuildBdrROMLinElems()
 {
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 
@@ -399,7 +397,6 @@ void PoissonSolver::BuildBdrROMLinElems()
 void PoissonSolver::BuildItfaceROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 

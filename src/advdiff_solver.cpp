@@ -51,7 +51,6 @@ void AdvDiffSolver::BuildCompROMLinElems()
 {
    mfem_error("AdvDiffSolver::BuildCompROMLinElems is not implemented yet!\n");
 
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 

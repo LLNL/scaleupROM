@@ -16,71 +16,26 @@ using namespace std;
 namespace mfem
 {
 
-const TrainMode SetTrainMode()
-{
-   TrainMode train_mode = TrainMode::NUM_TRAINMODE;
-
-   std::string train_mode_str = config.GetOption<std::string>("model_reduction/subdomain_training", "individual");
-   if (train_mode_str == "individual")       train_mode = TrainMode::INDIVIDUAL;
-   else if (train_mode_str == "universal")   train_mode = TrainMode::UNIVERSAL;
-   else
-      mfem_error("Unknown subdomain training mode!\n");
-
-   return train_mode;
-}
-
 const std::string GetBasisTagForComponent(
-   const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name)
+   const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name)
 {
-   std::string tag;
-   switch (train_mode)
-   {
-      case (INDIVIDUAL):   { tag = "dom" + std::to_string(comp_idx); break; }
-      case (UNIVERSAL):    { tag = topol_handler->GetComponentName(comp_idx); break; }
-      default:
-      {
-         mfem_error("ROMHandler::GetBasisTagForComponent - Unknown training mode!\n");
-         break;
-      }
-   }
+   std::string tag = topol_handler->GetComponentName(comp_idx);
    if (var_name != "")
       tag += "_" + var_name;
    return tag;
 }
 
 const std::string GetBasisTag(
-   const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name)
+   const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name)
 {
-   std::string tag;
-   switch (train_mode)
-   {
-      case (INDIVIDUAL):
-      {
-         tag = "dom" + std::to_string(subdomain_index);
-         break;
-      }
-      case (UNIVERSAL):
-      {
-         int c_type = topol_handler->GetMeshType(subdomain_index);
-         tag = topol_handler->GetComponentName(c_type);
-         break;
-      }
-      default:
-      {
-         mfem_error("ROMHandler::GetBasisTag - Unknown training mode!\n");
-         break;
-      }
-   }
-   if (var_name != "")
-      tag += "_" + var_name;
-   return tag;
+   int c_type = topol_handler->GetMeshType(subdomain_index);
+   return GetBasisTagForComponent(c_type, topol_handler, var_name);
 }
 
 ROMHandlerBase::ROMHandlerBase(
-   const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_var_offsets,
+   TopologyHandler *input_topol, const Array<int> &input_var_offsets,
    const std::vector<std::string> &var_names, const bool separate_variable_basis)
-   : train_mode(train_mode_),
-     topol_handler(input_topol),
+   : topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
      fom_var_names(var_names),
      fom_var_offsets(input_var_offsets),
@@ -127,10 +82,7 @@ void ROMHandlerBase::ParseInputs()
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
 
    num_rom_blocks = numSub;
-   if (train_mode == TrainMode::INDIVIDUAL)        num_rom_ref_blocks = numSub;
-   else if (train_mode == TrainMode::UNIVERSAL)    num_rom_ref_blocks = topol_handler->GetNumComponents();
-   else
-      mfem_error("ROMHandler - subdomain training mode is not set!\n");
+   num_rom_ref_blocks = topol_handler->GetNumComponents();
 
    num_rom_comp = num_rom_ref_blocks;
 
@@ -155,9 +107,9 @@ void ROMHandlerBase::ParseInputs()
       /* determine basis tag */
       std::string basis_tag;
       if (separate_variable)
-         basis_tag = GetBasisTagForComponent(b / num_var, train_mode, topol_handler, fom_var_names[b % num_var]);
+         basis_tag = GetBasisTagForComponent(b / num_var, topol_handler, fom_var_names[b % num_var]);
       else
-         basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler);
+         basis_tag = GetBasisTagForComponent(b, topol_handler);
 
       /* determine number of basis */
       num_ref_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", num_ref_basis_default, basis_list);
@@ -169,31 +121,21 @@ void ROMHandlerBase::ParseInputs()
       }
 
       /* parse the dimension of basis */
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         if (separate_variable)
-            dim_ref_basis[b] = fom_var_offsets[b+1] - fom_var_offsets[b];
-         else
-            dim_ref_basis[b] = fom_num_vdofs[b];
-      }  // if (train_mode == TrainMode::INDIVIDUAL)
-      else  // if (train_mode == TrainMode::UNIVERSAL)
-      {
-         int midx = -1;
-         int vidx = (separate_variable) ? b % num_var : 0;
-         for (int m = 0; m < numSub; m++)
-            if (topol_handler->GetMeshType(m) == (separate_variable ? b / num_var : b))
-            {
-               midx = m;
-               break;
-            }
-         assert(midx >= 0);
+      int midx = -1;
+      int vidx = (separate_variable) ? b % num_var : 0;
+      for (int m = 0; m < numSub; m++)
+         if (topol_handler->GetMeshType(m) == (separate_variable ? b / num_var : b))
+         {
+            midx = m;
+            break;
+         }
+      assert(midx >= 0);
 
-         int idx = (separate_variable) ? midx * num_var + vidx : midx;
-         if (separate_variable)
-            dim_ref_basis[b] = fom_var_offsets[idx + 1] - fom_var_offsets[idx];
-         else
-            dim_ref_basis[b] = fom_num_vdofs[idx];
-      }  // if (train_mode == TrainMode::UNIVERSAL)
+      int idx = (separate_variable) ? midx * num_var + vidx : midx;
+      if (separate_variable)
+         dim_ref_basis[b] = fom_var_offsets[idx + 1] - fom_var_offsets[idx];
+      else
+         dim_ref_basis[b] = fom_num_vdofs[idx];
    }  // for (int b = 0; b < num_rom_ref_blocks; b++)
    
    for (int k = 0; k < num_ref_basis.Size(); k++)
@@ -228,15 +170,9 @@ void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int
    std::string basis_tag;
    for (int b = 0; b < num_rom_comp; b++)
    {
-      basis_tag = GetBasisTagForComponent(b, train_mode, topol_handler, fom_var_names[1]);
+      basis_tag = GetBasisTagForComponent(b, topol_handler, fom_var_names[1]);
 
       num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag, "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
-   }
-
-   if (train_mode == TrainMode::INDIVIDUAL)
-   {
-      num_supreme = num_ref_supreme;
-      return;
    }
 
    for (int m = 0; m < numSub; m++)
@@ -258,9 +194,9 @@ void ROMHandlerBase::LoadReducedBasis()
    for (int k = 0; k < num_rom_ref_blocks; k++)
    {
       if (separate_variable)
-         basis_tags[k] = GetBasisTagForComponent(k / num_var, train_mode, topol_handler, fom_var_names[k % num_var]);
+         basis_tags[k] = GetBasisTagForComponent(k / num_var, topol_handler, fom_var_names[k % num_var]);
       else
-         basis_tags[k] = GetBasisTagForComponent(k, train_mode, topol_handler);
+         basis_tags[k] = GetBasisTagForComponent(k, topol_handler);
 
       /*
          TODO(kevin): this is a boilerplate for parallel POD/EQP training.
@@ -286,17 +222,7 @@ void ROMHandlerBase::LoadReducedBasis()
 
 int ROMHandlerBase::GetRefIndexForSubdomain(const int &subdomain_index)
 {
-   int idx = -1;
-   switch (train_mode)
-   {
-      case TrainMode::UNIVERSAL:
-      { idx = topol_handler->GetMeshType(subdomain_index); break; }
-      case TrainMode::INDIVIDUAL:
-      { idx = subdomain_index; break; }
-      default:
-      { mfem_error("LoadBasis: unknown TrainMode!\n"); break; }
-   }  // switch (train_mode)
-
+   int idx = topol_handler->GetMeshType(subdomain_index);
    assert(idx >= 0);
    return idx;
 }
@@ -351,8 +277,10 @@ void ROMHandlerBase::SetBlockSizes()
    MFEMROMHandler
 */
 
-MFEMROMHandler::MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol, const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis)
-   : ROMHandlerBase(train_mode_, input_topol, input_var_offsets, var_names, separate_variable_basis)
+MFEMROMHandler::MFEMROMHandler(
+   TopologyHandler *input_topol, const Array<int> &input_var_offsets,
+   const std::vector<std::string> &var_names, const bool separate_variable_basis)
+   : ROMHandlerBase(input_topol, input_var_offsets, var_names, separate_variable_basis)
 {
    romMat = new BlockMatrix(rom_block_offsets);
    romMat->owns_blocks = true;
@@ -409,12 +337,6 @@ void MFEMROMHandler::LoadReducedBasis()
    dom_basis.SetSize(num_rom_blocks);
    for (int k = 0; k < num_rom_blocks; k++)
    {
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         dom_basis[k] = ref_basis[k];
-         continue;
-      }
-
       int m = (separate_variable) ? k / num_var : k;
       int c = topol_handler->GetMeshType(m);
       int v = (separate_variable) ? k % num_var : 0;
@@ -969,8 +891,6 @@ void MFEMROMHandler::SaveBasisVisualization(
    assert(fes.Size() == num_var * numSub);
 
    std::string visual_prefix = config.GetRequiredOption<std::string>("basis/visualization/prefix");
-   if (train_mode == TrainMode::UNIVERSAL)
-      visual_prefix += "_universal";
 
    for (int c = 0; c < num_rom_ref_blocks; c++)
    {
@@ -978,16 +898,8 @@ void MFEMROMHandler::SaveBasisVisualization(
       file_prefix += "_" + std::to_string(c);
 
       int midx = -1;
-      switch (train_mode) {
-         case (TrainMode::INDIVIDUAL): midx = c; break;
-         case (TrainMode::UNIVERSAL):
-         {
-            for (int m = 0; m < numSub; m++)
-               if (topol_handler->GetMeshType(m) == c) { midx = m; break; }
-            break;
-         }
-         default: mfem_error("Unknown train mode!\n"); break;
-      }
+      for (int m = 0; m < numSub; m++)
+         if (topol_handler->GetMeshType(m) == c) { midx = m; break; }
       assert(midx >= 0);
 
       Mesh *mesh = fes[midx * num_var]->GetMesh();

@@ -90,40 +90,28 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm)
    return generator;
 }
 
-std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, const TrainMode &train_mode, bool separate_variable_basis)
+std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis)
 {
    std::vector<std::string> basis_tags(0);
 
    std::vector<std::string> component_list(0);
-   if (train_mode == TrainMode::INDIVIDUAL)
+   if (topol_mode == TopologyHandlerMode::SUBMESH)
    {
-      TopologyHandler *topol_handler;
-      if (topol_mode == TopologyHandlerMode::SUBMESH)          topol_handler = new SubMeshTopologyHandler();
-      else if (topol_mode == TopologyHandlerMode::COMPONENT)   topol_handler = new ComponentTopologyHandler();
-      else
-         mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
-
-      for (int c = 0; c < topol_handler->GetNumSubdomains(); c++)
-         component_list.push_back("dom" + std::to_string(c));
+      TopologyHandler *topol_handler = new SubMeshTopologyHandler();
+      for (int c = 0; c < topol_handler->GetNumComponents(); c++)
+         component_list.push_back(topol_handler->GetComponentName(c));
 
       delete topol_handler;
    }
-   else  // if (train_mode == TrainMode::UNIVERSAL)
+   else if (topol_mode == TopologyHandlerMode::COMPONENT)
    {
-      if (topol_mode == TopologyHandlerMode::SUBMESH)
-      {
-         component_list.push_back("comp0");
-      }
-      else if (topol_mode == TopologyHandlerMode::COMPONENT)
-      {
-         YAML::Node component_dict = config.FindNode("mesh/component-wise/components");
-         assert(component_dict);
-         for (int p = 0; p < component_dict.size(); p++)
-         component_list.push_back(config.GetRequiredOptionFromDict<std::string>("name", component_dict[p]));
-      }
-      else
-         mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
-   }  // if (train_mode == TrainMode::UNIVERSAL)
+      YAML::Node component_dict = config.FindNode("mesh/component-wise/components");
+      assert(component_dict);
+      for (int p = 0; p < component_dict.size(); p++)
+      component_list.push_back(config.GetRequiredOptionFromDict<std::string>("name", component_dict[p]));
+   }
+   else
+      mfem_error("GetGlobalBasisTagList - TopologyHandlerMode is not set!\n");
 
    std::vector<std::string> var_list(0);
    if (separate_variable_basis)
@@ -223,11 +211,10 @@ void CollectSamples(SampleGenerator *sample_generator)
    assert(sample_generator);
 
    TopologyHandlerMode topol_mode = SetTopologyHandlerMode();
-   TrainMode train_mode = SetTrainMode();
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    // Find the all required basis tags.
-   std::vector<std::string> basis_tags = GetGlobalBasisTagList(topol_mode, train_mode, separate_variable_basis);
+   std::vector<std::string> basis_tags = GetGlobalBasisTagList(topol_mode, separate_variable_basis);
 
    // tag-specific optional inputs.
    YAML::Node basis_list = config.FindNode("basis/tags");
