@@ -207,14 +207,23 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
       }
    }
 
-   // for SubMeshTopologyHandler, only single-component is allowed.
-   num_comp = 1;
+   /* for SubMeshTopologyHandler, each subdomain corresponds to a unique component. */
+   num_comp = numSub;
+
+   /* inidividual subdomains are unique */
    mesh_types.SetSize(numSub);
-   mesh_types = 0;
+   for (int m = 0; m < numSub; m++)
+      mesh_types[m] = m;
+
+   /* there is only 1 subdomain per component */
    sub_composition.SetSize(num_comp);
-   sub_composition = numSub;
+   sub_composition = 1;
+
+   /* every subdomain is the first mesh of its own type */
    mesh_comp_idx.SetSize(numSub);
-   for (int m = 0; m < numSub; m++) mesh_comp_idx[m] = m;
+   mesh_comp_idx = 0;
+
+   /* component names by index */
    comp_names.resize(num_comp);
    for (int c = 0; c < num_comp; c++) comp_names[c] = "comp" + std::to_string(c);
 

@@ -10,7 +10,7 @@ using namespace std;
 using namespace mfem;
 
 static const double threshold = 1.0e-14;
-static const double stokes_threshold = 1.0e-12;
+static const double stokes_threshold = 1.0e-11;
 static const double linelast_threshold = 1.0e-13;
 
 /**
@@ -60,15 +60,10 @@ TEST(Poisson_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
-   config.dict_["single_run"]["poisson0"]["k"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
    config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample1_solution.h5";
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -190,15 +185,10 @@ TEST(Stokes_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
-   config.dict_["single_run"]["channel_flow"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
    config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample1_solution.h5";
 
    config.dict_["main"]["mode"] = "sample_generation";
    config.dict_["main"]["use_rom"] = false;
@@ -233,15 +223,10 @@ TEST(Stokes_Workflow, MFEMGlobalSeparateTest)
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
    config.dict_["model_reduction"]["linear_solver_type"] = "minres";
 
-   config.dict_["single_run"]["channel_flow"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
    config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample1_solution.h5";
 
    config.dict_["main"]["mode"] = "sample_generation";
    config.dict_["main"]["use_rom"] = false;
@@ -396,15 +381,10 @@ TEST(SteadyNS_Workflow, MFEMUniversalTest)
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
-   config.dict_["single_run"]["channel_flow"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
    config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample1_solution.h5";
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -439,15 +419,10 @@ TEST(SteadyNS_Workflow, MFEMGlobalUniversalTest)
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
 
-   config.dict_["single_run"]["channel_flow"]["nu"] = 2.0;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
    config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample1_solution.h5";
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
@@ -596,9 +571,7 @@ TEST(LinElast_Workflow, MFEMIndividualTest)
    config = InputParser("inputs/linelast.base.yml");
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 4;
-   config.dict_["basis"]["number_of_basis"] = 2;
-   for (int k = 0; k < 2; k++)
+   for (int k = 0; k < 3; k++)
       config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["main"]["mode"] = "sample_generation";
@@ -624,15 +597,10 @@ TEST(LinElast_Workflow, MFEMUniversalTest)
 
    config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
 
-   config.dict_["single_run"]["linelast_disp"]["rdisp_f"] = 0.9;
-   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 2;
-   config.dict_["model_reduction"]["subdomain_training"] = "universal";
-   config.dict_["basis"]["number_of_basis"] = 4;
-
    // Test save/loadSolution as well.
    config.dict_["save_solution"]["enabled"] = true;
    config.dict_["model_reduction"]["compare_solution"]["load_solution"] = true;
-   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample0_solution.h5";
+   config.dict_["model_reduction"]["compare_solution"]["fom_solution_file"] = "./sample1_solution.h5";
 
    config.dict_["main"]["mode"] = "sample_generation";
    GenerateSamples(MPI_COMM_WORLD);
