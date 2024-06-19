@@ -88,11 +88,11 @@ public:
    virtual void AssembleInterfaceMatrices();
 
    // Component-wise assembly
-   virtual void BuildCompROMLinElems(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildBdrROMLinElems(Array<FiniteElementSpace *> &fes_comp);
-   virtual void BuildItfaceROMLinElems(Array<FiniteElementSpace *> &fes_comp);
+   virtual void BuildCompROMLinElems() override;
+   void BuildBdrROMLinElems() override;
+   void BuildItfaceROMLinElems() override;
 
-   virtual bool Solve();
+   virtual bool Solve(SampleGenerator *sample_generator = NULL);
 
    virtual void ProjectOperatorOnReducedBasis();
 

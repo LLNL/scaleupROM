@@ -72,16 +72,8 @@ MultiBlockSolver::~MultiBlockSolver()
    delete rom_handler;
    delete topol_handler;
 
-   DeletePointers(comp_mats);
-
-   for (int c = 0; c < bdr_mats.Size(); c++)
-   {
-      DeletePointers((*bdr_mats[c]));
-
-      delete bdr_mats[c];
-   }
-
-   DeletePointers(port_mats);
+   DeletePointers(comp_fes);
+   delete rom_elems;
 }
 
 void MultiBlockSolver::ParseInputs()
@@ -266,277 +258,26 @@ void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fe
    }
 }
 
-void MultiBlockSolver::AllocateROMLinElems()
-{
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
-
-   const int num_comp = topol_handler->GetNumComponents();
-   const int num_ref_ports = topol_handler->GetNumRefPorts();
-
-   comp_mats.SetSize(num_comp);
-   const int block_size = (separate_variable_basis) ? num_var : 1;
-   for (int c = 0; c < num_comp; c++)
-      comp_mats[c] = new MatrixBlocks(block_size, block_size);
-
-   bdr_mats.SetSize(num_comp);
-   for (int c = 0; c < num_comp; c++)
-   {
-      Mesh *comp = topol_handler->GetComponentMesh(c);
-      bdr_mats[c] = new Array<MatrixBlocks *>(comp->bdr_attributes.Size());
-      for (int b = 0; b < bdr_mats[c]->Size(); b++)
-         (*bdr_mats[c])[b] = new MatrixBlocks(block_size, block_size);
-   }
-   port_mats.SetSize(num_ref_ports);
-   for (int p = 0; p < num_ref_ports; p++)
-      port_mats[p] = new MatrixBlocks(2 * block_size, 2 * block_size);
-}
-
 void MultiBlockSolver::BuildROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
-   // Component domain system
-   const int num_comp = topol_handler->GetNumComponents();
-   Array<FiniteElementSpace *> fes_comp;
-   GetComponentFESpaces(fes_comp);
-
-   BuildCompROMLinElems(fes_comp);
+   BuildCompROMLinElems();
 
    // Boundary penalty matrices
-   BuildBdrROMLinElems(fes_comp);
+   BuildBdrROMLinElems();
 
    // Port penalty matrices
-   BuildItfaceROMLinElems(fes_comp);
-
-   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
-}
-
-void MultiBlockSolver::SaveROMLinElems(const std::string &filename)
-{
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
-
-   hid_t file_id;
-   herr_t errf = 0;
-   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-   assert(file_id >= 0);
-
-   // components + boundary
-   SaveCompBdrROMLinElems(file_id);
-
-   // (reference) ports
-   SaveItfaceROMLinElems(file_id);
-
-   errf = H5Fclose(file_id);
-   assert(errf >= 0);
-   return;
-}
-
-void MultiBlockSolver::SaveCompBdrROMLinElems(hid_t &file_id)
-{
-   assert(file_id >= 0);
-   hid_t grp_id;
-   herr_t errf;
-
-   grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-   assert(grp_id >= 0);
-
-   const int num_comp = topol_handler->GetNumComponents();
-   assert(comp_mats.Size() == num_comp);
-   assert(bdr_mats.Size() == num_comp);
-
-   hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
-
-   std::string dset_name;
-   for (int c = 0; c < num_comp; c++)
-   {
-      dset_name = topol_handler->GetComponentName(c);
-
-      hid_t comp_grp_id;
-      comp_grp_id = H5Gcreate(grp_id, dset_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(comp_grp_id >= 0);
-
-      hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp_mats[c]);
-
-      // boundaries are saved for each component group.
-      SaveBdrROMLinElems(comp_grp_id, c);
-
-      errf = H5Gclose(comp_grp_id);
-      assert(errf >= 0);
-   }  // for (int c = 0; c < num_comp; c++)
-
-   errf = H5Gclose(grp_id);
-   assert(errf >= 0);
-   return;
-}
-
-void MultiBlockSolver::SaveBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx)
-{
-   assert(comp_grp_id >= 0);
-   herr_t errf;
-   hid_t bdr_grp_id;
-   bdr_grp_id = H5Gcreate(comp_grp_id, "boundary", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-   assert(bdr_grp_id >= 0);
-
-   const int num_bdr = bdr_mats[comp_idx]->Size();
-   Mesh *comp = topol_handler->GetComponentMesh(comp_idx);
-   assert(num_bdr == comp->bdr_attributes.Size());
-
-   hdf5_utils::WriteAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
-   
-   Array<MatrixBlocks *> *bdr_mat_c = bdr_mats[comp_idx];
-   for (int b = 0; b < num_bdr; b++)
-      hdf5_utils::WriteDataset(bdr_grp_id, std::to_string(b), *((*bdr_mat_c)[b]));
-
-   errf = H5Gclose(bdr_grp_id);
-   assert(errf >= 0);
-   return;
-}
-
-void MultiBlockSolver::SaveItfaceROMLinElems(hid_t &file_id)
-{
-   assert(file_id >= 0);
-   herr_t errf;
-   hid_t grp_id;
-   grp_id = H5Gcreate(file_id, "ports", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-   assert(grp_id >= 0);
-
-   const int num_ref_ports = topol_handler->GetNumRefPorts();
-   assert(port_mats.Size() == num_ref_ports);
-
-   hdf5_utils::WriteAttribute(grp_id, "number_of_ports", num_ref_ports);
-   
-   std::string dset_name;
-   int c1, c2, a1, a2;
-   for (int p = 0; p < num_ref_ports; p++)
-   {
-      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
-      dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
-      dset_name += "-" + std::to_string(a1) + ":" + std::to_string(a2);
-      hdf5_utils::WriteDataset(grp_id, dset_name, *port_mats[p]);
-   }
-
-   errf = H5Gclose(grp_id);
-   assert(errf >= 0);
-   return;
-}
-
-void MultiBlockSolver::LoadROMLinElems(const std::string &filename)
-{
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
-
-   hid_t file_id;
-   herr_t errf = 0;
-   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-   assert(file_id >= 0);
-
-   // components
-   LoadCompBdrROMLinElems(file_id);
-
-   // (reference) ports
-   LoadItfaceROMLinElems(file_id);
-
-   errf = H5Fclose(file_id);
-   assert(errf >= 0);
-
-   return;
-}
-
-void MultiBlockSolver::LoadCompBdrROMLinElems(hid_t &file_id)
-{
-   assert(file_id >= 0);
-   herr_t errf;
-   hid_t grp_id;
-   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
-   assert(grp_id >= 0);
-
-   int num_comp;
-   hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
-   assert(num_comp >= topol_handler->GetNumComponents());
-   assert(comp_mats.Size() == topol_handler->GetNumComponents());
-   assert(bdr_mats.Size() == topol_handler->GetNumComponents());
-
-   std::string dset_name;
-   for (int c = 0; c < topol_handler->GetNumComponents(); c++)
-   {
-      dset_name = topol_handler->GetComponentName(c);
-
-      hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
-      assert(comp_grp_id >= 0);
-
-      hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp_mats[c]);
-
-      // boundary
-      LoadBdrROMLinElems(comp_grp_id, c);
-
-      errf = H5Gclose(comp_grp_id);
-      assert(errf >= 0);
-   }  // for (int c = 0; c < num_comp; c++)
-
-   errf = H5Gclose(grp_id);
-   assert(errf >= 0);
-}
-
-void MultiBlockSolver::LoadBdrROMLinElems(hid_t &comp_grp_id, const int &comp_idx)
-{
-   assert(comp_grp_id >= 0);
-   herr_t errf;
-   hid_t bdr_grp_id;
-   bdr_grp_id = H5Gopen2(comp_grp_id, "boundary", H5P_DEFAULT);
-   assert(bdr_grp_id >= 0);
-
-   int num_bdr;
-   hdf5_utils::ReadAttribute(bdr_grp_id, "number_of_boundaries", num_bdr);
-
-   Mesh *comp = topol_handler->GetComponentMesh(comp_idx);
-   assert(num_bdr == comp->bdr_attributes.Size());
-   assert(num_bdr = bdr_mats[comp_idx]->Size());
-
-   Array<MatrixBlocks *> *bdr_mat_c = bdr_mats[comp_idx];
-   for (int b = 0; b < num_bdr; b++)
-      hdf5_utils::ReadDataset(bdr_grp_id, std::to_string(b), *(*bdr_mat_c)[b]);
-
-   errf = H5Gclose(bdr_grp_id);
-   assert(errf >= 0);
-   return;
-}
-
-void MultiBlockSolver::LoadItfaceROMLinElems(hid_t &file_id)
-{
-   assert(file_id >= 0);
-   herr_t errf;
-   hid_t grp_id;
-   grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
-   assert(grp_id >= 0);
-
-   int num_ref_ports;
-   hdf5_utils::ReadAttribute(grp_id, "number_of_ports", num_ref_ports);
-   assert(num_ref_ports >= topol_handler->GetNumRefPorts());
-   assert(port_mats.Size() == topol_handler->GetNumRefPorts());
-
-   std::string dset_name;
-   int c1, c2, a1, a2;
-   for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
-   {
-      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
-      dset_name = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
-      dset_name += "-" + std::to_string(a1) + ":" + std::to_string(a2);
-      hdf5_utils::ReadDataset(grp_id, dset_name, *port_mats[p]);
-   }
-
-   errf = H5Gclose(grp_id);
-   assert(errf >= 0);
+   BuildItfaceROMLinElems();
 }
 
 void MultiBlockSolver::AssembleROMMat()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(train_mode == UNIVERSAL);
+   assert(rom_elems);
 
    const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
    BlockMatrix *romMat = new BlockMatrix(*rom_block_offsets);
@@ -558,7 +299,7 @@ void MultiBlockSolver::AssembleROMMat()
       for (int k = 0; k < num_block; k++)
          midx[k] = midx0 + k;
 
-      MatrixBlocks *comp_mat = comp_mats[c_type];
+      MatrixBlocks *comp_mat = rom_elems->comp[c_type];
       AddToBlockMatrix(midx, midx, *comp_mat, *romMat);
 
       // boundary matrices of each component.
@@ -574,7 +315,7 @@ void MultiBlockSolver::AssembleROMMat()
          if (bdr_type[global_idx] == BoundaryType::NEUMANN)
             continue;
 
-         MatrixBlocks *bdr_mat = (*bdr_mats[c_type])[b];
+         MatrixBlocks *bdr_mat = (*(rom_elems->bdr[c_type]))[b];
          AddToBlockMatrix(midx, midx, *bdr_mat, *romMat);
       }  // for (int b = 0; b < bdr_c2g->Size(); b++)
    }  // for (int m = 0; m < numSub; m++)
@@ -584,7 +325,7 @@ void MultiBlockSolver::AssembleROMMat()
    {
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
       const int p_type = topol_handler->GetPortType(p);
-      MatrixBlocks *port_mat = port_mats[p_type];
+      MatrixBlocks *port_mat = rom_elems->port[p_type];
 
       const int m1 = pInfo->Mesh1;
       const int m2 = pInfo->Mesh2;
@@ -918,6 +659,12 @@ void MultiBlockSolver::AssembleROMNlinOper()
 void MultiBlockSolver::InitROMHandler()
 {
    rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
+
+   if (!((topol_mode == TopologyHandlerMode::COMPONENT) && (train_mode == UNIVERSAL)))
+      return;
+
+   GetComponentFESpaces(comp_fes);
+   rom_elems = new ROMLinearElement(topol_handler, comp_fes, separate_variable_basis);
 }
 
 void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
@@ -937,8 +684,10 @@ void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
    }
 }
 
-void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<std::string> &basis_tags)
+BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<std::string> &basis_tags)
 {
+   BlockVector *U_snapshots = NULL;
+
    // View vector for U.
    if (separate_variable_basis)
       U_snapshots = new BlockVector(U->GetData(), var_offsets);
@@ -947,6 +696,25 @@ void MultiBlockSolver::PrepareSnapshots(BlockVector* &U_snapshots, std::vector<s
 
    GetBasisTags(basis_tags);
    assert(U_snapshots->NumBlocks() == basis_tags.size());
+
+   return U_snapshots;
+}
+
+void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
+{
+   assert(sample_generator);
+
+   /* split the solution into each component with the corresponding tag */
+   std::vector<std::string> basis_tags;
+   BlockVector *U_snapshots = PrepareSnapshots(basis_tags);
+
+   Array<int> col_idxs;
+   sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
+   sample_generator->SaveSnapshotPorts(topol_handler, train_mode, col_idxs);
+
+   /* delete only the view vector, not the data itself. */
+   delete U_snapshots;
+   return;
 }
 
 void MultiBlockSolver::ProjectRHSOnReducedBasis()

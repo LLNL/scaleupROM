@@ -77,7 +77,7 @@ void UnsteadyNSSolver::AssembleOperator()
       massMat->SetBlock(i, i, &(mass[i]->SpMat()));
 }
 
-bool UnsteadyNSSolver::Solve()
+bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
 {
    bool converged = true;
    int initial_step = 0;
@@ -91,6 +91,9 @@ bool UnsteadyNSSolver::Solve()
       restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
       LoadSolutionWithTime(restart_file, initial_step, time);
    }
+
+   int sample_interval = config.GetOption<int>("sample_generation/time-integration/sample_interval", 0);
+   int bootstrap = config.GetOption<int>("sample_generation/time-integration/bootstrap", 0);
 
    InitializeTimeIntegration();
 
@@ -116,6 +119,10 @@ bool UnsteadyNSSolver::Solve()
          restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), step+1);
          SaveSolutionWithTime(restart_file, step+1, time);
       }
+
+      /* save solution if sample generator is provided */
+      if (sample_generator && ((step+1) > bootstrap) && (((step+1) % sample_interval) == 0))
+         SaveSnapshots(sample_generator);
    }
 
    SortBySubdomains(*U_step, *U);

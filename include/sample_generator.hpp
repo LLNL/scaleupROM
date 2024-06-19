@@ -64,10 +64,10 @@ protected:
    std::vector<std::string> basis_tags;
    std::map<std::string, int> basis_tag2idx;
 
-   /* snapshot pairs per interface port, for nonlinear EQP */
+   /* snapshot pairs per interface port, for nonlinear interface EQP */
    std::vector<PortTag> port_tags;
    std::map<PortTag, int> port_tag2idx;
-   Array<Array<int> *> port_colidxs;
+   Array<Array2D<int> *> port_colidxs;
 
 public:
    SampleGenerator(MPI_Comm comm);

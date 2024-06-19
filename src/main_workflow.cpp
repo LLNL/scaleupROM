@@ -185,7 +185,7 @@ void GenerateSamples(MPI_Comm comm)
       test->SetupBCOperators();
       test->Assemble();
 
-      bool converged = test->Solve();
+      bool converged = test->Solve(sample_generator);
       if (!converged)
       {
          // If deterministic, terminate the sampling here.
@@ -203,19 +203,8 @@ void GenerateSamples(MPI_Comm comm)
       test->SaveSolution(sol_file);
       test->SaveVisualization();
 
-      // test->SaveSnapshot(file_idx);
-      // View-Vector of the entire solution of test, splitted according to ROM basis setup.
-      BlockVector *U_snapshots = NULL;
-      // Basis tags for each block of U_snapshots.
-      std::vector<std::string> basis_tags;
-      Array<int> col_idxs;
-      test->PrepareSnapshots(U_snapshots, basis_tags);
-      sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
-      sample_generator->SaveSnapshotPorts(test->GetTopologyHandler(), test->GetTrainMode(), col_idxs);
-
       sample_generator->ReportStatus(s);
 
-      delete U_snapshots;
       delete test;
 
       s++;
@@ -434,7 +423,6 @@ void BuildROM(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMLinElems();
          test->BuildROMLinElems();
          test->SaveROMLinElems(filename);
 
@@ -525,8 +513,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
       {
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
-         
-         test->AllocateROMLinElems();
 
          printf("Loading ROM projected elements.. ");
          test->LoadROMLinElems(filename);

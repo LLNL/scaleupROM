@@ -479,7 +479,7 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    }
 }
 
-bool SteadyNSSolver::Solve()
+bool SteadyNSSolver::Solve(SampleGenerator *sample_generator)
 {
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
@@ -565,6 +565,10 @@ bool SteadyNSSolver::Solve()
    }
 
    SortBySubdomains(sol_byvar, *U);
+
+   /* save solution if sample generator is provided */
+   if (converged && sample_generator)
+      SaveSnapshots(sample_generator);
 
    return converged;
 }
@@ -769,23 +773,7 @@ void SteadyNSSolver::AllocateROMEQPElems()
 
    const int num_comp = topol_handler->GetNumComponents();
    comp_eqps.SetSize(num_comp);
-   comp_fes.SetSize(num_comp);
    comp_eqps = NULL;
-   comp_fes = NULL;
-
-   for (int c = 0; c < num_comp; c++)
-   {
-      int midx = -1;
-      for (int m = 0; m < numSub; m++)
-         if (rom_handler->GetRefIndexForSubdomain(m) == c)
-         {
-            midx = m;
-            break;
-         }
-      assert((midx >= 0) && (midx < numSub));
-
-      comp_fes[c] = ufes[midx];
-   }
 
    DenseMatrix *basis;
    for (int c = 0; c < num_comp; c++)
@@ -796,7 +784,7 @@ void SteadyNSSolver::AllocateROMEQPElems()
       auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
       nl_integ_tmp->SetIntRule(ir_nl);
 
-      comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c]);
+      comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c * num_var]);
       comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
       comp_eqps[c]->SetBasis(*basis);
       comp_eqps[c]->SetPrecomputeMode(precompute);

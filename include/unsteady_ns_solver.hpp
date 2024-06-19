@@ -75,7 +75,7 @@ public:
    void LoadROMOperatorFromFile(const std::string input_prefix="") override
    { mfem_error("UnsteadyNSSolver::LoadROMOperatorFromFile is not implemented yet!\n"); }
 
-   bool Solve() override;
+   bool Solve(SampleGenerator *sample_generator = NULL) override;
 
    using MultiBlockSolver::SaveVisualization;
    void SaveVisualization(const int step, const double time) override;
