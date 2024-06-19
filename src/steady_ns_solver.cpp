@@ -316,19 +316,6 @@ SteadyNSSolver::~SteadyNSSolver()
    }
 }
 
-void SteadyNSSolver::InitVariables()
-{
-   StokesSolver::InitVariables();
-   if (use_rom)
-   {
-      rom_handler->SetNonlinearMode(nonlinear_mode);
-      subdomain_tensors.SetSize(numSub);
-      subdomain_tensors = NULL;
-      subdomain_eqps.SetSize(numSub);
-      subdomain_eqps = NULL;
-   }
-}
-
 void SteadyNSSolver::BuildDomainOperators()
 {
    StokesSolver::BuildDomainOperators();
@@ -632,6 +619,12 @@ void SteadyNSSolver::SolveROM()
 void SteadyNSSolver::InitROMHandler()
 {
    StokesSolver::InitROMHandler();
+
+   rom_handler->SetNonlinearMode(nonlinear_mode);
+   subdomain_tensors.SetSize(numSub);
+   subdomain_tensors = NULL;
+   subdomain_eqps.SetSize(numSub);
+   subdomain_eqps = NULL;
 
    switch (rom_handler->GetNonlinearHandling())
    {

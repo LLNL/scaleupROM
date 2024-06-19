@@ -217,8 +217,6 @@ void StokesSolver::InitVariables()
    }
 
    f_coeffs.SetSize(0);
-
-   if (use_rom) MultiBlockSolver::InitROMHandler();
 }
 
 void StokesSolver::DeterminePressureDirichlet()

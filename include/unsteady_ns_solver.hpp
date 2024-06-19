@@ -65,8 +65,7 @@ public:
    virtual ~UnsteadyNSSolver();
 
    using SteadyNSSolver::GetVariableNames;
-
-   void InitVariables() override;
+   
    void BuildDomainOperators() override;
    void AssembleOperator() override;
 

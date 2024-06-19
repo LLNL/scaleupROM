@@ -160,6 +160,8 @@ void GenerateSamples(MPI_Comm comm)
 
       test = InitSolver();
       test->InitVariables();
+      if (test->UseRom())
+         test->InitROMHandler();
 
       problem->SetSingleRun();
       test->SetParameterizedProblem(problem);
@@ -264,6 +266,7 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
       if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
 
       solver->InitVariables();
+      solver->InitROMHandler();
       // This time needs to be ROMHandler, in order not to run StokesSolver::LoadSupremizer.
       solver->GetROMHandler()->LoadReducedBasis();
 
@@ -289,6 +292,7 @@ void TrainEQP(MPI_Comm comm)
    MultiBlockSolver *test = NULL;
    test = InitSolver();
    test->InitVariables();
+   test->InitROMHandler();
 
    if (!test->IsNonlinear())
    {
@@ -383,6 +387,7 @@ void BuildROM(MPI_Comm comm)
    test = InitSolver();
    if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
    test->InitVariables();
+   test->InitROMHandler();
    // test->InitVisualization();
 
    // The ROM operator will be built based on the parameter specified for single-run.
@@ -455,6 +460,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    ParameterizedProblem *problem = InitParameterizedProblem();
    MultiBlockSolver *test = InitSolver();
    test->InitVariables();
+   if (test->UseRom()) test->InitROMHandler();
    test->InitVisualization();
 
    StopWatch solveTimer;

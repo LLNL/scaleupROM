@@ -149,8 +149,6 @@ public:
 
    using StokesSolver::GetVariableNames;
 
-   void InitVariables() override;
-
    void BuildDomainOperators() override;
 
    void SetupDomainBCOperators() override;
