@@ -166,6 +166,8 @@ public:
 
    void SolveROM() override;
 
+   void InitROMHandler() override;
+
    void AllocateROMTensorElems() override;
    void BuildROMTensorElems() override;
    void SaveROMTensorElems(const std::string &filename) override;

@@ -254,7 +254,7 @@ public:
    void LoadROMNlinElems(const std::string &input_prefix);
    void AssembleROMNlinOper();
 
-   void InitROMHandler();
+   virtual void InitROMHandler();
    void GetBasisTags(std::vector<std::string> &basis_tags);
 
    virtual BlockVector* PrepareSnapshots(std::vector<std::string> &basis_tags);

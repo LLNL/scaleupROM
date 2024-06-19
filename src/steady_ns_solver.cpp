@@ -629,6 +629,22 @@ void SteadyNSSolver::SolveROM()
    delete rom_oper;
 }
 
+void SteadyNSSolver::InitROMHandler()
+{
+   StokesSolver::InitROMHandler();
+
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         break;
+      case NonlinearHandling::EQP:
+         break;
+      default:
+         mfem_error("SteadyNSSolver::InitROMHandler- cannot initiate ROM elements!");
+         break;
+   }
+}
+
 void SteadyNSSolver::AllocateROMTensorElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
