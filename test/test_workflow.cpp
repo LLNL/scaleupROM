@@ -21,36 +21,7 @@ TEST(GoogleTestFramework, GoogleTestFrameworkFound)
    SUCCEED();
 }
 
-TEST(Poisson_Workflow, MFEMIndividualTest)
-{
-   config = InputParser("inputs/test.base.yml");
-
-   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
-   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
-   for (int k = 0; k < 4; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
-
-   config.dict_["main"]["mode"] = "sample_generation";
-   GenerateSamples(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
-
-   return;
-}
-
-TEST(Poisson_Workflow, MFEMUniversalTest)
+TEST(Poisson_Workflow, SubmeshTest)
 {
    config = InputParser("inputs/test.base.yml");
 
@@ -144,38 +115,7 @@ TEST(Poisson_Workflow, ComponentWiseWithDirectSolve)
    return;
 }
 
-TEST(Stokes_Workflow, MFEMIndividualTest)
-{
-   config = InputParser("inputs/stokes.base.yml");
-   for (int k = 0; k < 4; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
-
-   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
-   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
-
-   config.dict_["main"]["mode"] = "sample_generation";
-   config.dict_["main"]["use_rom"] = false;
-   GenerateSamples(MPI_COMM_WORLD);
-   config.dict_["main"]["use_rom"] = true;
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < stokes_threshold);
-
-   return;
-}
-
-TEST(Stokes_Workflow, MFEMUniversalTest)
+TEST(Stokes_Workflow, SubmeshTest)
 {
    config = InputParser("inputs/stokes.base.yml");
 
@@ -340,36 +280,7 @@ TEST(Stokes_Workflow, ComponentSeparateVariable)
    return;
 }
 
-TEST(SteadyNS_Workflow, MFEMIndividualTest)
-{
-   config = InputParser("inputs/steady_ns.base.yml");
-   for (int k = 0; k < 4; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
-
-   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   config.dict_["model_reduction"]["visualization"]["enabled"] = true;
-   config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
-
-   config.dict_["main"]["mode"] = "sample_generation";
-   GenerateSamples(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < stokes_threshold);
-
-   return;
-}
-
-TEST(SteadyNS_Workflow, MFEMUniversalTest)
+TEST(SteadyNS_Workflow, SubmeshTest)
 {
    config = InputParser("inputs/steady_ns.base.yml");
 
@@ -566,32 +477,7 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable_EQP)
    return;
 }
 
-TEST(LinElast_Workflow, MFEMIndividualTest)
-{
-   config = InputParser("inputs/linelast.base.yml");
-
-   config.dict_["model_reduction"]["rom_handler_type"] = "mfem";
-   for (int k = 0; k < 3; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
-
-   config.dict_["main"]["mode"] = "sample_generation";
-   GenerateSamples(MPI_COMM_WORLD);
-
-   config.dict_["main"]["mode"] = "train_rom";
-   TrainROM(MPI_COMM_WORLD);
-   config.dict_["main"]["mode"] = "build_rom";
-   BuildROM(MPI_COMM_WORLD);
-   config.dict_["main"]["mode"] = "single_run";
-   double error = SingleRun(MPI_COMM_WORLD);
-
-   // This reproductive case must have a very small error at the level of finite-precision.
-   printf("Error: %.15E\n", error);
-   EXPECT_TRUE(error < threshold);
-
-   return;
-}
-
-TEST(LinElast_Workflow, MFEMUniversalTest)
+TEST(LinElast_Workflow, SubmeshTest)
 {
    config = InputParser("inputs/linelast.base.yml");
 
@@ -680,11 +566,9 @@ TEST(LinElast_Workflow, ComponentWiseTest)
    return;
 }
 
-TEST(AdvDiff_Workflow, MFEMIndividualTest)
+TEST(AdvDiff_Workflow, SubmeshTest)
 {
    config = InputParser("inputs/advdiff.base.yml");
-   for (int k = 0; k < 4; k++)
-      config.dict_["basis"]["tags"][k]["name"] = "dom" + std::to_string(k);
 
    config.dict_["model_reduction"]["visualization"]["enabled"] = true;
    config.dict_["model_reduction"]["visualization"]["prefix"] = "basis_paraview";
