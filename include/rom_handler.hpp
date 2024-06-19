@@ -15,13 +15,6 @@
 namespace mfem
 {
 
-enum TrainMode
-{
-   INDIVIDUAL,
-   UNIVERSAL,
-   NUM_TRAINMODE
-};
-
 enum ROMBuildingLevel
 {
    NONE,
@@ -37,10 +30,8 @@ enum NonlinearHandling
    NUM_NLNHNDL
 };
 
-const TrainMode SetTrainMode();
-
-const std::string GetBasisTagForComponent(const int &comp_idx, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
-const std::string GetBasisTag(const int &subdomain_index, const TrainMode &train_mode, const TopologyHandler *topol_handler, const std::string var_name="");
+const std::string GetBasisTagForComponent(const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name="");
+const std::string GetBasisTag(const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name="");
 
 class ROMHandlerBase
 {
@@ -61,7 +52,6 @@ protected:
    bool component_sampling = false;
    bool save_lspg_basis = false;
    ROMBuildingLevel save_operator = NUM_BLD_LVL;
-   TrainMode train_mode = NUM_TRAINMODE;
    bool nonlinear_mode = false;
    bool separate_variable = false;
    NonlinearHandling nlin_handle = NUM_NLNHNDL;
@@ -120,14 +110,13 @@ protected:
 
    void ParseInputs();
 public:
-   ROMHandlerBase(const TrainMode &train_mode_, TopologyHandler *input_topol,
-              const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis);
+   ROMHandlerBase(TopologyHandler *input_topol, const Array<int> &input_var_offsets,
+      const std::vector<std::string> &var_names, const bool separate_variable_basis);
 
    virtual ~ROMHandlerBase();
 
    // access
    const int GetNumSubdomains() { return numSub; }
-   const TrainMode GetTrainMode() { return train_mode; }
    const int GetNumROMRefComps() { return num_rom_comp; }
    const int GetNumROMRefBlocks() { return num_rom_ref_blocks; }
    const int GetRefNumBasis(const int &basis_idx) { return num_ref_basis[basis_idx]; }
@@ -232,8 +221,8 @@ protected:
    mfem::BlockVector *reduced_sol = NULL;
 
 public:
-   MFEMROMHandler(const TrainMode &train_mode_, TopologyHandler *input_topol,
-                  const Array<int> &input_var_offsets, const std::vector<std::string> &var_names, const bool separate_variable_basis);
+   MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_var_offsets,
+      const std::vector<std::string> &var_names, const bool separate_variable_basis);
 
    virtual ~MFEMROMHandler();
 

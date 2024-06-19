@@ -116,8 +116,6 @@ void MultiBlockSolver::ParseInputs()
    use_rom = config.GetOption<bool>("main/use_rom", false);
    separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
-   train_mode = SetTrainMode();
-
    // save solution if single run.
    SetSolutionSaveMode(config.GetOption<bool>("save_solution/enabled", false));
 }
@@ -261,7 +259,6 @@ void MultiBlockSolver::GetComponentFESpaces(Array<FiniteElementSpace *> &comp_fe
 void MultiBlockSolver::BuildROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
 
    BuildCompROMLinElems();
@@ -276,7 +273,6 @@ void MultiBlockSolver::BuildROMLinElems()
 void MultiBlockSolver::AssembleROMMat()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_elems);
 
    const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
@@ -658,9 +654,9 @@ void MultiBlockSolver::AssembleROMNlinOper()
 
 void MultiBlockSolver::InitROMHandler()
 {
-   rom_handler = new MFEMROMHandler(train_mode, topol_handler, var_offsets, var_names, separate_variable_basis);
+   rom_handler = new MFEMROMHandler(topol_handler, var_offsets, var_names, separate_variable_basis);
 
-   if (!((topol_mode == TopologyHandlerMode::COMPONENT) && (train_mode == UNIVERSAL)))
+   if (!(topol_mode == TopologyHandlerMode::COMPONENT))
       return;
 
    GetComponentFESpaces(comp_fes);
@@ -674,13 +670,13 @@ void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
       basis_tags.resize(numSub * num_var);
       for (int m = 0, idx = 0; m < numSub; m++)
          for (int v = 0; v < num_var; v++, idx++)
-            basis_tags[idx] = GetBasisTag(m, train_mode, topol_handler, var_names[v]);
+            basis_tags[idx] = GetBasisTag(m, topol_handler, var_names[v]);
    }
    else
    {
       basis_tags.resize(numSub);
       for (int m = 0; m < numSub; m++)
-         basis_tags[m] = GetBasisTag(m, train_mode, topol_handler);
+         basis_tags[m] = GetBasisTag(m, topol_handler);
    }
 }
 
@@ -710,7 +706,7 @@ void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
 
    Array<int> col_idxs;
    sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
-   sample_generator->SaveSnapshotPorts(topol_handler, train_mode, col_idxs);
+   sample_generator->SaveSnapshotPorts(topol_handler, col_idxs);
 
    /* delete only the view vector, not the data itself. */
    delete U_snapshots;

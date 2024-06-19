@@ -524,7 +524,6 @@ void StokesSolver::AssembleInterfaceMatrices()
 void StokesSolver::BuildCompROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 
@@ -579,7 +578,6 @@ void StokesSolver::BuildCompROMLinElems()
 void StokesSolver::BuildBdrROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 
@@ -638,7 +636,6 @@ void StokesSolver::BuildBdrROMLinElems()
 void StokesSolver::BuildItfaceROMLinElems()
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(train_mode == UNIVERSAL);
    assert(rom_handler->BasisLoaded());
    assert(rom_elems);
 
@@ -964,13 +961,13 @@ void StokesSolver::LoadSupremizer()
    rom_handler->ParseSupremizerInput(num_ref_supreme, num_supreme);
 
    const int num_comp = topol_handler->GetNumComponents();
-   int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
+   const int size = num_comp;
    DenseMatrix supreme_data;
    DenseMatrix *supreme = NULL;
    for (int m = 0; m < size; m++)
    {
       // Load the supremizer basis.
-      std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      std::string basis_tag = GetBasisTagForComponent(m, topol_handler, "sup");
       /*
          TODO(kevin): this is a boilerplate for parallel POD/EQP training.
          In full parallelization, all processes will participate in this supremizer reading procedure.
@@ -1298,30 +1295,21 @@ void StokesSolver::EnrichSupremizer()
 
    std::string basis_prefix = rom_handler->GetBasisPrefix();
 
-   if (train_mode == TrainMode::UNIVERSAL)
-      GetComponentFESpaces(comp_fes);
+   GetComponentFESpaces(comp_fes);
 
    Array<int> num_ref_supreme, num_supreme;
    rom_handler->ParseSupremizerInput(num_ref_supreme, num_supreme);
 
    const int num_comp = topol_handler->GetNumComponents();
-   int size = (train_mode == TrainMode::INDIVIDUAL) ? numSub : num_comp;
+   const int size = num_comp;
    for (int m = 0; m < size; m++)
    {
       // Load pressure ROM basis.
       rom_handler->GetReferenceBasis(m * num_var, ubasis);
       rom_handler->GetReferenceBasis(m * num_var + 1, pbasis);
 
-      if (train_mode == TrainMode::INDIVIDUAL)
-      {
-         ufes_comp = ufes[m];
-         pfes_comp = pfes[m];
-      }
-      else
-      {
-         ufes_comp = comp_fes[m * num_var];
-         pfes_comp = comp_fes[m * num_var + 1];
-      }
+      ufes_comp = comp_fes[m * num_var];
+      pfes_comp = comp_fes[m * num_var + 1];
       
       // Divergence operator.
       MixedBilinearFormDGExtension b_comp(ufes_comp, pfes_comp);
@@ -1345,7 +1333,7 @@ void StokesSolver::EnrichSupremizer()
       Orthonormalize(*ubasis, *supreme);
 
       // Save the supremizer basis.
-      std::string basis_tag = GetBasisTagForComponent(m, train_mode, topol_handler, "sup");
+      std::string basis_tag = GetBasisTagForComponent(m, topol_handler, "sup");
       /*
          TODO(kevin): this is a boilerplate for parallel POD/EQP training.
          In full parallelization, all processes will participate in this supremizer writing procedure.

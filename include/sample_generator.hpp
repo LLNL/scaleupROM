@@ -111,7 +111,7 @@ public:
       The appended column indices of each basis tag are stored in col_idxs.
    */
    void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags, Array<int> &col_idxs);
-   void SaveSnapshotPorts(TopologyHandler *topol_handler, const TrainMode &train_mode, const Array<int> &col_idxs);
+   void SaveSnapshotPorts(TopologyHandler *topol_handler, const Array<int> &col_idxs);
    void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag);
    void WriteSnapshots();
    void WriteSnapshotPorts();

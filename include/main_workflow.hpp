@@ -15,7 +15,7 @@ void RunExample();
 
 MultiBlockSolver* InitSolver();
 SampleGenerator* InitSampleGenerator(MPI_Comm comm);
-std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, const TrainMode &train_mode, bool separate_variable_basis);
+std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis);
 
 void GenerateSamples(MPI_Comm comm);
 void CollectSamples(SampleGenerator *sample_generator);

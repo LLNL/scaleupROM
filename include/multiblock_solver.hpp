@@ -108,7 +108,6 @@ protected:
 
    // rom variables.
    ROMHandlerBase *rom_handler = NULL;
-   TrainMode train_mode = NUM_TRAINMODE;
    bool use_rom = false;
    bool separate_variable_basis = false;
 
@@ -136,7 +135,6 @@ public:
    const bool UseRom() const { return use_rom; }
    ROMHandlerBase* GetROMHandler() const { return rom_handler; }
    TopologyHandler* GetTopologyHandler() const { return topol_handler; }
-   const TrainMode GetTrainMode() { return train_mode; }
    const bool IsVisualizationSaved() const { return visual.save; }
    const std::string GetSolutionFilePrefix() const { return sol_prefix; }
    const std::string GetVisualizationPrefix() const { return visual.prefix; }

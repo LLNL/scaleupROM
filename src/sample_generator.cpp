@@ -202,7 +202,7 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::st
    }
 }
 
-void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const TrainMode &train_mode, const Array<int> &col_idxs)
+void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Array<int> &col_idxs)
 {
    assert(topol_handler);
    const int numSub = topol_handler->GetNumSubdomains();
@@ -217,14 +217,14 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Tr
       const PortInfo *port = topol_handler->GetPortInfo(p);
 
       /*
-         We save the snapshot ports by dom%d (INDIVIDUAL) or component names (UNIVERSAL).
+         We save the snapshot ports by component names.
          Variable separation does not matter at this point.
          Though we use basis tags here, it is only for the sake of
          getting consistent domain/component mesh names.
       */
       std::string mesh1, mesh2;
-      mesh1 = GetBasisTag(port->Mesh1, train_mode, topol_handler);
-      mesh2 = GetBasisTag(port->Mesh2, train_mode, topol_handler); 
+      mesh1 = GetBasisTag(port->Mesh1, topol_handler);
+      mesh2 = GetBasisTag(port->Mesh2, topol_handler); 
 
       /*
          note the mesh names are not necessarily the same as the subdomain names
