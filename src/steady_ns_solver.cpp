@@ -853,7 +853,7 @@ void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
    double eqp_tol = config.GetOption<double>("model_reduction/eqp/relative_tolerance", 1.0e-2);
 
    /* EQP NNLS for each reference ROM component */
-   std::string basis_tag;
+   BasisTag basis_tag;
    for (int c = 0; c < num_comp; c++)
    {
       int idx = (separate_variable_basis) ? c * num_var : c;

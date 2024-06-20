@@ -90,9 +90,9 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm)
    return generator;
 }
 
-std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis)
+std::vector<BasisTag> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis)
 {
-   std::vector<std::string> basis_tags(0);
+   std::vector<BasisTag> basis_tags(0);
 
    std::vector<std::string> component_list(0);
    if (topol_mode == TopologyHandlerMode::SUBMESH)
@@ -132,9 +132,9 @@ std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_
    {
       if (separate_variable_basis)
          for (int v = 0; v < var_list.size(); v++)
-            basis_tags.push_back(component_list[c] + "_" + var_list[v]);
+            basis_tags.push_back(BasisTag(component_list[c], var_list[v]));
       else
-         basis_tags.push_back(component_list[c]);
+         basis_tags.push_back(BasisTag(component_list[c]));
    }
 
    return basis_tags;
@@ -216,7 +216,7 @@ void CollectSamples(SampleGenerator *sample_generator)
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    // Find the all required basis tags.
-   std::vector<std::string> basis_tags = GetGlobalBasisTagList(topol_mode, separate_variable_basis);
+   std::vector<BasisTag> basis_tags = GetGlobalBasisTagList(topol_mode, separate_variable_basis);
 
    // tag-specific optional inputs.
    YAML::Node basis_list = config.FindNode("basis/tags");
@@ -345,7 +345,7 @@ void TrainEQP(MPI_Comm comm)
    delete test;
 }
 
-void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
+void FindSnapshotFilesForBasis(const BasisTag &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
 {
    file_list.clear();
 
@@ -356,7 +356,7 @@ void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &
    if (basis_list)
    {
       // Find if additional inputs are specified for basis_tag.
-      YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tag, basis_list);
+      YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tag.print(), basis_list);
       
       // If basis_tag has additional inputs, parse them.
       if (basis_tag_input)

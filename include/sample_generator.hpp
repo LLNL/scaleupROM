@@ -61,8 +61,8 @@ protected:
    Array<CAROM::Options*> snapshot_options;
    Array<CAROM::BasisGenerator*> snapshot_generators;
    // each snapshot will be sorted out by its basis tag.
-   std::vector<std::string> basis_tags;
-   std::map<std::string, int> basis_tag2idx;
+   std::vector<BasisTag> basis_tags;
+   std::map<BasisTag, int> basis_tag2idx;
 
    /* snapshot pairs per interface port, for nonlinear interface EQP */
    std::vector<PortTag> port_tags;
@@ -84,8 +84,8 @@ public:
    Parameter* GetParam(const int &k) { return params[k]; }
    const std::string GetSamplePrefix()
    { return sample_dir + "/" + sample_prefix + "_sample"; }
-   const std::string GetBaseFilename(const std::string &prefix, const std::string &basis_tag)
-   { return prefix + "_" + basis_tag; }
+   const std::string GetBaseFilename(const std::string &prefix, const BasisTag &basis_tag)
+   { return prefix + "_" + basis_tag.print(); }
 
    // Generate parameter space as listed in sample_generation/problem_name.
    virtual void SetParamSpaceSizes();
@@ -110,12 +110,12 @@ public:
       Number of blocks in U_snapshots must be equal to the size of snapshot_basis_tags.
       The appended column indices of each basis tag are stored in col_idxs.
    */
-   void SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags, Array<int> &col_idxs);
+   void SaveSnapshot(BlockVector *U_snapshots, std::vector<BasisTag> &snapshot_basis_tags, Array<int> &col_idxs);
    void SaveSnapshotPorts(TopologyHandler *topol_handler, const Array<int> &col_idxs);
-   void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag);
+   void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const BasisTag &basis_tag);
    void WriteSnapshots();
    void WriteSnapshotPorts();
-   const CAROM::Matrix* LookUpSnapshot(const std::string &basis_tag);
+   const CAROM::Matrix* LookUpSnapshot(const BasisTag &basis_tag);
 
    void ReportStatus(const int &sample_idx);
 
@@ -123,7 +123,7 @@ public:
       Collect snapshot matrices from the file list to the specified basis tag.
    */
    void CollectSnapshots(const std::string &basis_prefix,
-                         const std::string &basis_tag,
+                         const BasisTag &basis_tag,
                          const std::vector<std::string> &file_list);
    /*
       Perform SVD over snapshot for basis_tag.

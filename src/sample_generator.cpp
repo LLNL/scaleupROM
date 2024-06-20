@@ -177,7 +177,7 @@ const std::string SampleGenerator::GetSamplePath(const int &idx, const std::stri
    return full_path;
 }
 
-void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags, Array<int> &col_idxs)
+void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<BasisTag> &snapshot_basis_tags, Array<int> &col_idxs)
 {
    assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
    col_idxs.SetSize(U_snapshots->NumBlocks());
@@ -218,13 +218,13 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Ar
 
       /*
          We save the snapshot ports by component names.
-         Variable separation does not matter at this point.
-         Though we use basis tags here, it is only for the sake of
-         getting consistent domain/component mesh names.
+         Variable separation does not matter at this point..
       */
+      int c1 = topol_handler->GetMeshType(port->Mesh1);
+      int c2 = topol_handler->GetMeshType(port->Mesh2);
       std::string mesh1, mesh2;
-      mesh1 = GetBasisTag(port->Mesh1, topol_handler);
-      mesh2 = GetBasisTag(port->Mesh2, topol_handler); 
+      mesh1 = topol_handler->GetComponentName(c1);
+      mesh2 = topol_handler->GetComponentName(c2);
 
       /*
          note the mesh names are not necessarily the same as the subdomain names
@@ -262,7 +262,7 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Ar
    }
 }
 
-void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag)
+void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const BasisTag &basis_tag)
 {
    const std::string filename = GetBaseFilename(prefix, basis_tag);
 
@@ -322,7 +322,7 @@ void SampleGenerator::WriteSnapshotPorts()
    return;
 }
 
-const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_tag)
+const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const BasisTag &basis_tag)
 {
    assert(snapshot_generators.Size() > 0);
    assert(snapshot_generators.Size() == basis_tags.size());
@@ -337,7 +337,7 @@ const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_ta
 
    if (idx < 0)
    {
-      printf("basis tag: %s\n", basis_tag.c_str());
+      printf("basis tag: %s\n", basis_tag.print().c_str());
       mfem_error("SampleGenerator::LookUpSnapshot- basis tag does not exist in snapshot list!\n");
    }
 
@@ -354,12 +354,12 @@ void SampleGenerator::ReportStatus(const int &sample_idx)
    printf("Basis tags: %ld\n", basis_tags.size());
    printf("%20.20s\t# of snapshots\n", "Basis tags");
    for (int k = 0; k < basis_tags.size(); k++)
-      printf("%20.20s\t%d\n", basis_tags[k].c_str(), snapshot_generators[k]->getNumSamples());
+      printf("%20.20s\t%d\n", basis_tags[k].print().c_str(), snapshot_generators[k]->getNumSamples());
    printf("==============================================\n");
 }
 
 void SampleGenerator::CollectSnapshots(const std::string &basis_prefix,
-                                       const std::string &basis_tag,
+                                       const BasisTag &basis_tag,
                                        const std::vector<std::string> &file_list)
 {
    // Get dimension from the first snapshot file.
@@ -402,7 +402,7 @@ void SampleGenerator::FormReducedBasis(const std::string &basis_prefix)
       if (basis_list)
       {
          // Find if additional inputs are specified for basis_tags[p].
-         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[k], basis_list);
+         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[k].print(), basis_list);
          
          // If basis_tags[p] has additional inputs, parse them.
          // parse tag-specific number of basis.

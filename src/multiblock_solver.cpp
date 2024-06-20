@@ -633,7 +633,7 @@ void MultiBlockSolver::InitROMHandler()
    rom_elems = new ROMLinearElement(topol_handler, comp_fes, separate_variable_basis);
 }
 
-void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
+void MultiBlockSolver::GetBasisTags(std::vector<BasisTag> &basis_tags)
 {
    if (separate_variable_basis)
    {
@@ -650,7 +650,7 @@ void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
    }
 }
 
-BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<std::string> &basis_tags)
+BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tags)
 {
    BlockVector *U_snapshots = NULL;
 
@@ -671,7 +671,7 @@ void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
    assert(sample_generator);
 
    /* split the solution into each component with the corresponding tag */
-   std::vector<std::string> basis_tags;
+   std::vector<BasisTag> basis_tags;
    BlockVector *U_snapshots = PrepareSnapshots(basis_tags);
 
    Array<int> col_idxs;

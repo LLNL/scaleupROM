@@ -242,9 +242,9 @@ public:
    { mfem_error("Abstract method MultiBlockSolver::AssembleROMNlinOper!\n"); }
 
    virtual void InitROMHandler();
-   void GetBasisTags(std::vector<std::string> &basis_tags);
+   void GetBasisTags(std::vector<BasisTag> &basis_tags);
 
-   virtual BlockVector* PrepareSnapshots(std::vector<std::string> &basis_tags);
+   virtual BlockVector* PrepareSnapshots(std::vector<BasisTag> &basis_tags);
    void SaveSnapshots(SampleGenerator *sample_generator);
 
    virtual void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }
