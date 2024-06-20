@@ -404,12 +404,11 @@ void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
    if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
       return;
 
-   std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
-   assert(FileExists(filename));
+   std::string filename = rom_handler->GetOperatorPrefix() + ".tensor.h5";
 
    hid_t file_id;
    herr_t errf = 0;
-   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
    assert(file_id >= 0);
 
    hid_t grp_id;
@@ -438,7 +437,7 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    subdomain_tensors.SetSize(numSub);
    subdomain_tensors = NULL;
    {
-      std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
+      std::string filename = rom_handler->GetOperatorPrefix() + ".tensor.h5";
       assert(FileExists(filename));
 
       hid_t file_id;
@@ -625,12 +624,19 @@ void SteadyNSSolver::InitROMHandler()
    subdomain_tensors = NULL;
    subdomain_eqps.SetSize(numSub);
    subdomain_eqps = NULL;
+}
+
+void SteadyNSSolver::AllocateROMNlinElems()
+{
+   assert(rom_handler);
 
    switch (rom_handler->GetNonlinearHandling())
    {
       case NonlinearHandling::TENSOR:
+         AllocateROMTensorElems();
          break;
       case NonlinearHandling::EQP:
+         AllocateROMEQPElems();
          break;
       default:
          mfem_error("SteadyNSSolver::InitROMHandler- cannot initiate ROM elements!");
@@ -638,10 +644,56 @@ void SteadyNSSolver::InitROMHandler()
    }
 }
 
+void SteadyNSSolver::SaveROMNlinElems(const std::string &input_prefix)
+{
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         SaveROMTensorElems(input_prefix + ".tensor.h5");
+         break;
+      case NonlinearHandling::EQP:
+         SaveEQPElems(input_prefix + ".eqp.h5");
+         break;
+      default:
+         mfem_error("SteadyNSSolver::SaveROMNlinElems- cannot initiate ROM elements!");
+         break;
+   }
+}
+
+void SteadyNSSolver::LoadROMNlinElems(const std::string &input_prefix)
+{
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         LoadROMTensorElems(input_prefix + ".tensor.h5");
+         break;
+      case NonlinearHandling::EQP:
+         LoadEQPElems(input_prefix + ".eqp.h5");
+         break;
+      default:
+         mfem_error("SteadyNSSolver::SaveROMNlinElems- cannot initiate ROM elements!");
+         break;
+   }
+}
+
+void SteadyNSSolver::AssembleROMNlinOper()
+{
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         AssembleROMTensorOper();
+         break;
+      case NonlinearHandling::EQP:
+         AssembleROMEQPOper();
+         break;
+      default:
+         mfem_error("SteadyNSSolver::SaveROMNlinElems- cannot initiate ROM elements!");
+         break;
+   }
+}
+
 void SteadyNSSolver::AllocateROMTensorElems()
 {
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
    comp_tensors = NULL;
@@ -654,8 +706,6 @@ void SteadyNSSolver::BuildROMTensorElems()
 
    // Component domain system
    const int num_comp = topol_handler->GetNumComponents();
-   Array<FiniteElementSpace *> fes_comp;
-   GetComponentFESpaces(fes_comp);
 
    DenseMatrix *basis = NULL;
    assert(comp_tensors.Size() == num_comp);
@@ -665,27 +715,24 @@ void SteadyNSSolver::BuildROMTensorElems()
       const int fidx = c * num_var;
       const int cidx = (separate_variable_basis) ? fidx : c;
       rom_handler->GetReferenceBasis(cidx, basis);
-      comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
+      comp_tensors[c] = GetReducedTensor(basis, comp_fes[fidx]);
    }  // for (int c = 0; c < num_comp; c++)
-
-   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
 }
 
 void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(FileExists(filename));
 
    hid_t file_id;
    herr_t errf = 0;
-   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
    assert(file_id >= 0);
 
    const int num_comp = topol_handler->GetNumComponents();
    assert(comp_tensors.Size() == num_comp);
 
    hid_t grp_id;
-   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
    assert(grp_id >= 0);
 
    std::string dset_name;
@@ -695,7 +742,7 @@ void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
       dset_name = topol_handler->GetComponentName(c);
 
       hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
+      comp_grp_id = H5Gcreate(grp_id, dset_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
@@ -767,8 +814,6 @@ void SteadyNSSolver::AssembleROMTensorOper()
 
 void SteadyNSSolver::AllocateROMEQPElems()
 {
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-
    assert(rom_handler);
    assert(rom_handler->BasisLoaded());
 
@@ -794,7 +839,7 @@ void SteadyNSSolver::AllocateROMEQPElems()
    }   
 }
 
-void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
+void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
 

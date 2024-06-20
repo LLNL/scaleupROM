@@ -622,36 +622,6 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
    *U = *input_sol;
 }
 
-void MultiBlockSolver::AllocateROMNlinElems()
-{
-   assert(nonlinear_mode);
-   assert(rom_handler);
-   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
-
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AllocateROMTensorElems();
-   else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
-}
-
-void MultiBlockSolver::LoadROMNlinElems(const std::string &input_prefix)
-{
-   assert(nonlinear_mode);
-   assert(rom_handler);
-   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
-
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    LoadROMTensorElems(input_prefix + ".h5");
-   else if (rom_nlin_mode == NonlinearHandling::EQP)  LoadEQPElems(input_prefix + ".eqp.h5");
-}
-
-void MultiBlockSolver::AssembleROMNlinOper()
-{
-   assert(nonlinear_mode);
-   assert(rom_handler);
-   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
-
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AssembleROMTensorOper();
-   else if (rom_nlin_mode == NonlinearHandling::EQP)  AssembleROMEQPOper();
-}
-
 void MultiBlockSolver::InitROMHandler()
 {
    rom_handler = new MFEMROMHandler(topol_handler, var_offsets, var_names, separate_variable_basis);

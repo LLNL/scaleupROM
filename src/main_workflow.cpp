@@ -304,6 +304,7 @@ void TrainEQP(MPI_Comm comm)
    if (!test->UseRom()) mfem_error("ROM must be enabled for EQP training!\n");
 
    test->LoadReducedBasis();
+   test->AllocateROMNlinElems();
 
    ROMHandlerBase *rom = test->GetROMHandler();
    ROMBuildingLevel save_operator = rom->GetBuildingLevel();
@@ -316,7 +317,7 @@ void TrainEQP(MPI_Comm comm)
    else
       mfem_error("Unknown TopologyHandler Mode!\n");
 
-   std::string filename = rom->GetOperatorPrefix() + ".eqp.h5";
+   std::string oper_prefix = rom->GetOperatorPrefix();
    switch (save_operator)
    {
       case ROMBuildingLevel::COMPONENT:
@@ -324,9 +325,8 @@ void TrainEQP(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMEQPElems();
-         test->TrainEQPElems(sample_generator);
-         test->SaveEQPElems(filename);
+         test->TrainROMEQPElems(sample_generator);
+         test->SaveROMNlinElems(oper_prefix);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -398,6 +398,9 @@ void BuildROM(MPI_Comm comm)
    test->BuildOperators();
    test->SetupBCOperators();
    test->LoadReducedBasis();
+
+   if (test->IsNonlinear())
+      test->AllocateROMNlinElems();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
    ROMHandlerBase *rom = test->GetROMHandler();
@@ -407,7 +410,7 @@ void BuildROM(MPI_Comm comm)
    if (save_operator == ROMBuildingLevel::GLOBAL)
       test->Assemble();
 
-   std::string filename = rom->GetOperatorPrefix() + ".h5";
+   std::string oper_prefix = rom->GetOperatorPrefix();
    switch (save_operator)
    {
       case ROMBuildingLevel::COMPONENT:
@@ -416,20 +419,19 @@ void BuildROM(MPI_Comm comm)
             mfem_error("Submesh does not support component rom building level!\n");
 
          test->BuildROMLinElems();
-         test->SaveROMLinElems(filename);
+         test->SaveROMLinElems(oper_prefix + ".h5");
 
          if ((test->IsNonlinear()) && (rom->GetNonlinearHandling() == NonlinearHandling::TENSOR))
          {
-            test->AllocateROMTensorElems();
             test->BuildROMTensorElems();
-            test->SaveROMTensorElems(filename);
+            test->SaveROMNlinElems(oper_prefix);
          }
          break;
       }
       case ROMBuildingLevel::GLOBAL:
       {
          test->ProjectOperatorOnReducedBasis();
-         test->SaveROMOperator(filename);
+         test->SaveROMOperator(oper_prefix + ".h5");
          break;
       }
       case ROMBuildingLevel::NONE:
@@ -485,6 +487,9 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    {
       rom = test->GetROMHandler();
       test->LoadReducedBasis();
+
+      if (test->IsNonlinear())
+         test->AllocateROMNlinElems();
    }
 
    solveTimer.Start();
@@ -517,7 +522,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
          if (test->IsNonlinear())
          {
-            test->AllocateROMNlinElems();
             test->LoadROMNlinElems(rom->GetOperatorPrefix());
             test->AssembleROMNlinOper();
          }

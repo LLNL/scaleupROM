@@ -87,28 +87,16 @@ public:
    void SolveROM() override
    { mfem_error("UnsteadyNSSolver::SolveROM is not implemented yet!\n"); }
 
-   void AllocateROMEQPElems() override
-   { mfem_error("UnsteadyNSSolver::AllocateROMEQPElems is not implemented yet!\n"); }
-   void TrainEQPElems(SampleGenerator *sample_generator) override
-   { mfem_error("UnsteadyNSSolver::TrainEQPElems is not implemented yet!\n"); }
-   void SaveEQPElems(const std::string &filename) override
-   { mfem_error("UnsteadyNSSolver::SaveEQPElems is not implemented yet!\n"); }
-   void LoadEQPElems(const std::string &filename) override
-   { mfem_error("UnsteadyNSSolver::LoadEQPElems is not implemented yet!\n"); }
-   void AssembleROMEQPOper() override
-   { mfem_error("UnsteadyNSSolver::AssembleROMEQPOper is not implemented yet!\n"); }
-
-   /* Tensorial ROM is not supported for unsteady NS */
-   void AllocateROMTensorElems() override
-   { mfem_error("UnsteadyNSSolver::AllocateROMTensorElems is not implemented yet!\n"); }
    void BuildROMTensorElems() override
    { mfem_error("UnsteadyNSSolver::BuildROMTensorElems is not implemented yet!\n"); }
-   void SaveROMTensorElems(const std::string &filename) override
-   { mfem_error("UnsteadyNSSolver::SaveROMTensorElems is not implemented yet!\n"); }
-   void LoadROMTensorElems(const std::string &filename) override
-   { mfem_error("UnsteadyNSSolver::LoadROMTensorElems is not implemented yet!\n"); }
-   void AssembleROMTensorOper() override
-   { mfem_error("UnsteadyNSSolver::AssembleROMTensorOper is not implemented yet!\n"); }
+   void TrainROMEQPElems(SampleGenerator *sample_generator) override
+   { mfem_error("UnsteadyNSSolver::TrainROMEQPElems is not implemented yet!\n"); }
+   void SaveROMNlinElems(const std::string &input_prefix) override
+   { mfem_error("UnsteadyNSSolver::SaveROMNlinElems is not implemented yet!\n"); }
+   void LoadROMNlinElems(const std::string &input_prefix) override
+   { mfem_error("UnsteadyNSSolver::LoadROMNlinElems is not implemented yet!\n"); }
+   void AssembleROMNlinOper() override
+   { mfem_error("UnsteadyNSSolver::AssembleROMNlinOper is not implemented yet!\n"); }
 
 private:
    void InitializeTimeIntegration();

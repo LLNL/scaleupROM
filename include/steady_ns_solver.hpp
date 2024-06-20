@@ -166,20 +166,25 @@ public:
 
    void InitROMHandler() override;
 
-   void AllocateROMTensorElems() override;
-   void BuildROMTensorElems() override;
-   void SaveROMTensorElems(const std::string &filename) override;
-   void LoadROMTensorElems(const std::string &filename) override;
-   void AssembleROMTensorOper() override;
-
-   void AllocateROMEQPElems() override;
-   void TrainEQPElems(SampleGenerator *sample_generator) override;
-   void SaveEQPElems(const std::string &filename) override;
-   void LoadEQPElems(const std::string &filename) override;
-   void AssembleROMEQPOper() override;
+   virtual void AllocateROMNlinElems() override;
+   virtual void BuildROMTensorElems() override;
+   virtual void TrainROMEQPElems(SampleGenerator *sample_generator) override;
+   virtual void SaveROMNlinElems(const std::string &input_prefix) override;
+   virtual void LoadROMNlinElems(const std::string &input_prefix) override;
+   virtual void AssembleROMNlinOper() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
+   
+   void AllocateROMTensorElems();
+   void SaveROMTensorElems(const std::string &filename);
+   void LoadROMTensorElems(const std::string &filename);
+   void AssembleROMTensorOper();
+
+   void AllocateROMEQPElems();
+   void SaveEQPElems(const std::string &filename);
+   void LoadEQPElems(const std::string &filename);
+   void AssembleROMEQPOper();
 };
 
 #endif
