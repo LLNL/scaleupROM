@@ -413,6 +413,8 @@ int main(int argc, char *argv[])
          if (use_dg)
             nVarf->AddInteriorFaceIntegrator(lf_integ2);
          nVarf->AddBdrFaceIntegrator(lf_bdr_integ1, u_ess_attr);
+         /* having linear-only term causes sub-optimal convergence */
+         // fform->AddBdrFaceIntegrator(new DGBdrLaxFriedrichsLFIntegrator(ucoeff, &zeta_coeff), u_ess_attr);
       }
       break;
       case Scheme::TEMAM:
