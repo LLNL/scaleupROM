@@ -741,8 +741,11 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
    assert(ir);
 
    ConstantCoefficient pi(3.141592);
+   Vector ud(dim);
+   for (int d = 0; d < dim; d++) ud(d) = 2.0 * UniformRandom() - 1.0;
+   VectorConstantCoefficient ud_coeff(ud);
    auto *integ = new DGLaxFriedrichsFluxIntegrator(pi);
-   auto *integ_bdr = new DGLaxFriedrichsFluxIntegrator(pi);
+   auto *integ_bdr = new DGLaxFriedrichsFluxIntegrator(pi, &ud_coeff);
    integ->SetIntRule(ir);
    integ_bdr->SetIntRule(ir);
 
@@ -1107,9 +1110,13 @@ TEST(ROMNonlinearForm, SetupEQPSystemForBdrFaceIntegrator)
    IntegrationRule ir = IntRules.Get(fes->GetFE(0)->GetGeomType(),
                                     (int)(ceil(1.5 * (2 * fes->GetMaxElementOrder() - 1))));
    ConstantCoefficient pi(3.141592);
-   auto *integ1 = new DGLaxFriedrichsFluxIntegrator(pi);
+   Vector ud(dim);
+   for (int d = 0; d < dim; d++) ud(d) = 2.0 * UniformRandom() - 1.0;
+   VectorConstantCoefficient ud_coeff(ud);
+
+   auto *integ1 = new DGLaxFriedrichsFluxIntegrator(pi, &ud_coeff);
    integ1->SetIntRule(&ir);
-   auto *integ2 = new DGLaxFriedrichsFluxIntegrator(pi);
+   auto *integ2 = new DGLaxFriedrichsFluxIntegrator(pi, &ud_coeff);
    integ2->SetIntRule(&ir);
 
    NonlinearForm *nform(new NonlinearForm(fes));
