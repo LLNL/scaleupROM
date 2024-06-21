@@ -1,0 +1,84 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: true
+  solver: steady-ns
+
+navier-stokes:
+  operator-type: lf
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "box-channel.1x1.periodic.h5"
+    components:
+      - name: "square-circle"
+        file: "square-circle.msh.mfem"
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: false
+
+solver:
+  direct_solve: true
+
+visualization:
+  enable: false
+  output_dir: dd_mms_output
+
+parameterized_problem:
+  name: periodic_flow_past_array
+
+single_run:
+  periodic_flow_past_array:
+    nu: 1.1
+    fx: 0.5
+    fy: -0.5
+
+sample_generation:
+  maximum_number_of_snapshots: 400
+  component_sampling: false
+  file_path:
+    prefix: "stokes"
+  parameters:
+    - key: single_run/periodic_flow_past_array/nu
+      type: double
+      sample_size: 3
+      minimum: 1.0
+      maximum: 1.2
+
+sample_collection:
+  mode: port
+
+basis:
+  prefix: "stokes"
+  tags:
+    - name: "square-circle_vel"
+      number_of_basis: 3
+    - name: "square-circle_pres"
+      number_of_basis: 3
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  separate_variable_basis: true
+  rom_handler_type: mfem
+  # individual/universal
+  subdomain_training: universal
+  nonlinear_handling: eqp
+  eqp:
+    relative_tolerance: 1.0e-11
+    precompute: true
+  save_operator:
+    level: component
+    prefix: "test.rom_elem"
+  compare_solution:
+    enabled: true
+  linear_solver_type: direct
+  linear_system_type: us

@@ -104,13 +104,13 @@ class BoxChannelConfig(Configuration):
             if (disp0[0] == (self.nx-1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][0] -= self.nx
-            if (disp0[0] == -(self.nx-1)):
+            if ((disp0[0] == -(self.nx-1)) and not (self.nx == 1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][0] += self.nx
             if (disp0[1] == (self.ny-1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][1] -= self.ny
-            if (disp0[1] == -(self.ny-1)):
+            if ((disp0[1] == -(self.ny-1)) and not (self.ny == 1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][1] += self.ny
 

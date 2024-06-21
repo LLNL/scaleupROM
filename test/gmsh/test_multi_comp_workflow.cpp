@@ -219,6 +219,37 @@ TEST(ComponentWiseTest, SteadyNSTest_SeparateVariable_EQP)
    return;
 }
 
+
+TEST(SteadyNS_Workflow, InterfaceEQP)
+{
+   config = InputParser("steadyns.interface_eqp.yml");
+
+   printf("\nSample Generation \n\n");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   // config.dict_["main"]["mode"] = "train_eqp";
+   // TrainEQP(MPI_COMM_WORLD);
+
+   // printf("\nBuild ROM \n\n");
+
+   // config.dict_["main"]["mode"] = "build_rom";
+   // BuildROM(MPI_COMM_WORLD);
+
+   // config.dict_["main"]["mode"] = "single_run";
+   // double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
+
+   // // This reproductive case must have a very small error at the level of finite-precision.
+   // printf("Error: %.15E\n", error);
+   // EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
 TEST(MultiComponentGlobalROM, StokesTest)
 {
    config = InputParser("stokes.component.yml");
