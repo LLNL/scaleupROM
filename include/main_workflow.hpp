@@ -19,6 +19,8 @@ std::vector<BasisTag> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mod
 
 void GenerateSamples(MPI_Comm comm);
 void CollectSamples(SampleGenerator *sample_generator);
+void CollectSamplesByPort(SampleGenerator *sample_generator, const std::string &basis_prefix);
+void CollectSamplesByBasis(SampleGenerator *sample_generator, const std::string &basis_prefix);
 void BuildROM(MPI_Comm comm);
 void TrainROM(MPI_Comm comm);
 // supremizer-enrichment etc..

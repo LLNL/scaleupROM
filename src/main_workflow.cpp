@@ -210,6 +210,40 @@ void GenerateSamples(MPI_Comm comm)
 
 void CollectSamples(SampleGenerator *sample_generator)
 {
+   std::string mode = config.GetOption<std::string>("sample_collection/mode", "basis");
+   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
+
+   if (mode == "basis")
+      CollectSamplesByBasis(sample_generator, basis_prefix);
+   else if (mode == "port")
+      CollectSamplesByPort(sample_generator, basis_prefix);
+   else
+      mfem_error("CollectSamples: unknown sample collection mode!\n");
+}
+
+void CollectSamplesByPort(SampleGenerator *sample_generator, const std::string &basis_prefix)
+{
+   // parse the sample snapshot file list.
+   std::vector<std::string> file_list = config.GetOption<std::vector<std::string>>(
+                                 "sample_collection/port_files", std::vector<std::string>(0));
+   YAML::Node port_format = config.FindNode("sample_collection/port_fileformat");
+   // if file list is specified with a format, parse through the format.
+   if (port_format)
+   {
+      FilenameParam port_param("", port_format);
+      port_param.ParseFilenames(file_list);
+   }
+
+   // if additional inputs are not specified for port files, set default port file name.
+   if (file_list.size() == 0)
+      file_list.push_back(sample_generator->GetSamplePrefix() + ".port.h5");
+
+   for (int f = 0; f < file_list.size(); f++)
+      sample_generator->CollectSnapshotsByPort(basis_prefix, file_list[f]);
+}
+
+void CollectSamplesByBasis(SampleGenerator *sample_generator, const std::string &basis_prefix)
+{
    assert(sample_generator);
 
    TopologyHandlerMode topol_mode = SetTopologyHandlerMode();
@@ -221,8 +255,6 @@ void CollectSamples(SampleGenerator *sample_generator)
    // tag-specific optional inputs.
    YAML::Node basis_list = config.FindNode("basis/tags");
 
-   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
-
    // loop over the required basis tag list.
    for (int p = 0; p < basis_tags.size(); p++)
    {
@@ -232,7 +264,7 @@ void CollectSamples(SampleGenerator *sample_generator)
       FindSnapshotFilesForBasis(basis_tags[p], default_filename, file_list);
       assert(file_list.size() > 0);
 
-      sample_generator->CollectSnapshots(basis_prefix, basis_tags[p], file_list);
+      sample_generator->CollectSnapshotsByBasis(basis_prefix, basis_tags[p], file_list);
    }  // for (int p = 0; p < basis_tags.size(); p++)
 }
 

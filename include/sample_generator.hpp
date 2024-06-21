@@ -122,9 +122,14 @@ public:
    /*
       Collect snapshot matrices from the file list to the specified basis tag.
    */
-   void CollectSnapshots(const std::string &basis_prefix,
-                         const BasisTag &basis_tag,
-                         const std::vector<std::string> &file_list);
+   void CollectSnapshotsByBasis(const std::string &basis_prefix,
+                              const BasisTag &basis_tag,
+                              const std::vector<std::string> &file_list);
+   /*
+      Collect snapshot matrices from the file list to the specified port tag file.
+   */
+   void CollectSnapshotsByPort(const std::string &basis_prefix,
+                               const std::string &port_tag_file);
    /*
       Perform SVD over snapshot for basis_tag.
       Calculate the energy fraction for num_basis.
@@ -136,6 +141,8 @@ private:
    const int GetDimFromSnapshots(const std::string &filename);
    // Save all singular value spectrum. Calculate the coverage for ref_num_basis (optional).
    void SaveSV(CAROM::BasisGenerator *basis_generator, const std::string& prefix, const int &ref_num_basis = -1);
+
+   const int GetSnapshotOffset(const std::string &comp);
 
 };
 
