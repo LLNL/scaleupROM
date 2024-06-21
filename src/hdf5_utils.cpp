@@ -83,6 +83,18 @@ void WriteAttribute(hid_t &dest, std::string attribute, const std::string &value
    H5Tclose(attrType);
 }
 
+void ReadAttribute(hid_t &source, std::string attribute, BasisTag &value)
+{
+   ReadAttribute(source, attribute + "_comp", value.comp);
+   ReadAttribute(source, attribute + "_var", value.var);
+}
+
+void WriteAttribute(hid_t &source, std::string attribute, const BasisTag &value)
+{
+   WriteAttribute(source, attribute + "_comp", value.comp);
+   WriteAttribute(source, attribute + "_var", value.var);
+}
+
 void ReadDataset(hid_t &source, std::string dataset, DenseMatrix &value)
 {
    herr_t errf = 0;

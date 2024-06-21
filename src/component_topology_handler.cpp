@@ -12,7 +12,7 @@ using namespace std;
 using namespace mfem;
 
 ComponentTopologyHandler::ComponentTopologyHandler()
-   : TopologyHandler(COMPONENT)
+   : TopologyHandler(TopologyHandlerMode::COMPONENT)
 {
    verbose = config.GetOption<bool>("mesh/component-wise/verbose", false);
    write_ports = config.GetOption<bool>("mesh/component-wise/write_ports", false);

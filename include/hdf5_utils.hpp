@@ -8,6 +8,7 @@
 #include "mfem.hpp"
 #include "hdf5.h"
 #include "linalg_utils.hpp"
+#include "rom_handler.hpp"
 
 using namespace mfem;
 
@@ -24,6 +25,9 @@ int GetDatasetSize(hid_t &source, std::string dataset, hsize_t* &dims);
 
 void ReadAttribute(hid_t &source, std::string attribute, std::string &value);
 void WriteAttribute(hid_t &source, std::string attribute, const std::string &value);
+
+void ReadAttribute(hid_t &source, std::string attribute, BasisTag &value);
+void WriteAttribute(hid_t &source, std::string attribute, const BasisTag &value);
 
 template <typename T>
 void ReadAttribute(hid_t &source, std::string attribute, T &value) {
