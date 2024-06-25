@@ -20,7 +20,7 @@ domain-decomposition:
 
 discretization:
   order: 1
-  full-discrete-galerkin: false
+  full-discrete-galerkin: true
 
 solver:
   direct_solve: true

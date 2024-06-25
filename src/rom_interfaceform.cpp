@@ -346,7 +346,7 @@ void ROMInterfaceForm::TrainEQPForRefPort(const int p,
    Array<double> qw;
    Array<int> fidxs;
 
-   for (int it = 0; it < fnfi.Size(); it)
+   for (int it = 0; it < fnfi.Size(); it++)
    {
       const IntegrationRule *ir = fnfi[it]->GetIntegrationRule();
       assert(ir);

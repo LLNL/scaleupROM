@@ -129,6 +129,7 @@ protected:
    
    // integration rule for nonliear operator.
    const IntegrationRule *ir_nl = NULL;
+   const IntegrationRule *ir_face = NULL;
 
    // interface integrator
    InterfaceForm *nl_itf = NULL;
@@ -137,6 +138,7 @@ protected:
    // component ROM element for nonlinear convection.
    Array<DenseTensor *> comp_tensors, subdomain_tensors;
    Array<ROMNonlinearForm *> comp_eqps, subdomain_eqps;
+   ROMInterfaceForm *itf_eqp = NULL;
 
    Solver *J_solver = NULL;
    GMRESSolver *J_gmres = NULL;

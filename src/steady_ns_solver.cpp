@@ -281,7 +281,10 @@ SteadyNSSolver::SteadyNSSolver()
    else
       mfem_error("SteadyNSSolver: unknown operator type!\n");
 
-   ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
+   ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(),
+                          (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
+   ir_face = &(IntRules.Get(meshes[0]->GetInteriorFaceTransformations(0)->GetGeometryType(),
+                            (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 
    /* SteadyNSSolver requires all the meshes to have the same element type. */
    int num_comp = topol_handler->GetNumComponents();
@@ -312,7 +315,10 @@ SteadyNSSolver::~SteadyNSSolver()
             DeletePointers(subdomain_tensors);
       }
       else if (rom_handler->GetNonlinearHandling() == NonlinearHandling::EQP)
+      {
          DeletePointers(comp_eqps);
+         delete itf_eqp;
+      }
    }
 }
 
@@ -338,10 +344,12 @@ void SteadyNSSolver::BuildDomainOperators()
          {
             auto *lf_integ1 = new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta);
             lf_integ1->SetIntRule(ir_nl);
+            auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+            lf_integ2->SetIntRule(ir_face);
 
             hs[m]->AddDomainIntegrator(lf_integ1);
             if (full_dg)
-               hs[m]->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
+               hs[m]->AddInteriorFaceIntegrator(lf_integ2);
          }
          break;
          default:
@@ -353,8 +361,9 @@ void SteadyNSSolver::BuildDomainOperators()
    if (oper_type == OperType::LF)
    {
       nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
-      nl_itf->AddInterfaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
-      // nl_interface->SetIntRule(ir_nl);
+      auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+      lf_integ2->SetIntRule(ir_face);
+      nl_itf->AddInterfaceIntegrator(lf_integ2);
    }
 }
 
@@ -363,6 +372,8 @@ void SteadyNSSolver::SetupDomainBCOperators()
    StokesSolver::SetupDomainBCOperators();
 
    if (oper_type != OperType::LF) return;
+
+   HyperReductionIntegrator *lf_integ2 = NULL;
 
    assert(hs.Size() == numSub);
    for (int m = 0; m < numSub; m++)
@@ -375,12 +386,15 @@ void SteadyNSSolver::SetupDomainBCOperators()
 
          // TODO: Non-homogeneous Neumann stress bc
          if (bdr_type[b] == BoundaryType::NEUMANN)
-            hs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta), *bdr_markers[b]);
+            lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
          else
          {
             assert(BCExistsOnBdr(b));
-            hs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]), *bdr_markers[b]);
+            lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]);
          }
+
+         lf_integ2->SetIntRule(ir_face);
+         hs[m]->AddBdrFaceIntegrator(lf_integ2, *bdr_markers[b]);
       }
    }
    
@@ -624,6 +638,14 @@ void SteadyNSSolver::InitROMHandler()
    subdomain_tensors = NULL;
    subdomain_eqps.SetSize(numSub);
    subdomain_eqps = NULL;
+
+   if (oper_type == OperType::LF)
+   {
+      Array<FiniteElementSpace *> comp_ufes(topol_handler->GetNumComponents());
+      for (int c = 0; c < comp_ufes.Size(); c++)
+         comp_ufes[c] = comp_fes[c * num_var];
+      itf_eqp = new ROMInterfaceForm(meshes, ufes, comp_ufes, topol_handler);
+   }
 }
 
 void SteadyNSSolver::AllocateROMNlinElems()
@@ -824,19 +846,57 @@ void SteadyNSSolver::AllocateROMEQPElems()
    comp_eqps = NULL;
 
    DenseMatrix *basis;
+   HyperReductionIntegrator *nl_integ_tmp = NULL;
+   InterfaceNonlinearFormIntegrator *lf_integ2 = NULL;
    for (int c = 0; c < num_comp; c++)
    {
       int idx = (separate_variable_basis) ? c * num_var : c;
       rom_handler->GetReferenceBasis(idx, basis);
 
-      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
-      nl_integ_tmp->SetIntRule(ir_nl);
-
       comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c * num_var]);
-      comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+
+      switch (oper_type)
+      {
+      case (OperType::BASE):
+         nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+         break;
+      
+      case (OperType::LF):
+         nl_integ_tmp = new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+         lf_integ2->SetIntRule(ir_face);
+
+         comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+         if (full_dg)
+            comp_eqps[c]->AddInteriorFaceIntegrator(lf_integ2);
+         break;
+
+      default:
+         break;
+      }
+      
       comp_eqps[c]->SetBasis(*basis);
       comp_eqps[c]->SetPrecomputeMode(precompute);
-   }   
+   }
+
+   if (oper_type == OperType::LF)
+   {
+      assert(itf_eqp);
+      lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+      lf_integ2->SetIntRule(ir_face);
+
+      itf_eqp->AddInterfaceIntegrator(lf_integ2);
+
+      for (int c = 0; c < num_comp; c++)
+      {
+         int idx = (separate_variable_basis) ? c * num_var : c;
+         rom_handler->GetReferenceBasis(idx, basis);
+         itf_eqp->SetBasisAtComponent(c, *basis);
+      }
+   }
 }
 
 void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
@@ -862,6 +922,50 @@ void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
       const CAROM::Matrix *snapshots = sample_generator->LookUpSnapshot(basis_tag);
       comp_eqps[c]->TrainEQP(*snapshots, eqp_tol);
    }
+
+   if (oper_type != OperType::LF) return;
+
+   /* EQP NNLS for interface ROM, for each reference port */
+   for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
+   {
+      int c1, c2, a1, a2;
+      // TODO(kevin): at least component topology handler maintain attrs the same for both reference and subdomain.
+      // Need to check submesh topology handler.
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+
+      PortTag tag = {.Mesh1 = topol_handler->GetComponentName(c1),
+                     .Mesh2 = topol_handler->GetComponentName(c2),
+                     .Attr1 = a1, .Attr2 = a2};
+
+      /* Load snapshot matrices for the reference port */
+      int idx1 = (separate_variable_basis) ? c1 * num_var : c1;
+      int idx2 = (separate_variable_basis) ? c2 * num_var : c2;
+      BasisTag basis_tag1 = rom_handler->GetRefBasisTag(idx1);
+      BasisTag basis_tag2 = rom_handler->GetRefBasisTag(idx2);
+
+      /*
+         BasisGenerator::getSnapshotMatrix deletes the existing snapshot matrix,
+         and creates a new snapshot matrix.
+         If LookUpSnapshot happens to find the same basis twice,
+         it will nullify the first pointer.
+       */
+      const CAROM::Matrix *snapshots1 = sample_generator->LookUpSnapshot(basis_tag1);
+      const CAROM::Matrix *snapshots2 = NULL;
+      if (basis_tag1 == basis_tag2)
+         snapshots2 = snapshots1;
+      else
+         snapshots2 = sample_generator->LookUpSnapshot(basis_tag2);
+
+      /* Load bases for the reference port */
+      DenseMatrix *basis1, *basis2;
+      rom_handler->GetReferenceBasis(idx1, basis1);
+      rom_handler->GetReferenceBasis(idx2, basis2);
+
+      /* Load column indices for the reference port */
+      Array2D<int> *port_colidx = sample_generator->LookUpSnapshotPortColOffsets(tag);
+
+      itf_eqp->TrainEQPForRefPort(p, *snapshots1, *snapshots2, *port_colidx, eqp_tol);
+   }  // for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
 }
 
 void SteadyNSSolver::SaveEQPElems(const std::string &filename)

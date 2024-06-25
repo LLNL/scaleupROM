@@ -232,8 +232,8 @@ TEST(SteadyNS_Workflow, InterfaceEQP)
    config.dict_["main"]["mode"] = "train_rom";
    TrainROM(MPI_COMM_WORLD);
 
-   // config.dict_["main"]["mode"] = "train_eqp";
-   // TrainEQP(MPI_COMM_WORLD);
+   config.dict_["main"]["mode"] = "train_eqp";
+   TrainEQP(MPI_COMM_WORLD);
 
    // printf("\nBuild ROM \n\n");
 
