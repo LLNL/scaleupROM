@@ -13,9 +13,14 @@ namespace mfem
 {
 
 ROMInterfaceForm::ROMInterfaceForm(
-   Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, TopologyHandler *topol_)
-   : InterfaceForm(meshes_, fes_, topol_), numPorts(topol_->GetNumPorts())
+   Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, Array<FiniteElementSpace *> &comp_fes_, TopologyHandler *topol_)
+   : InterfaceForm(meshes_, fes_, topol_), numPorts(topol_->GetNumPorts()), numRefPorts(topol_->GetNumRefPorts()),
+     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_)
 {
+   comp_basis.SetSize(num_comp);
+   comp_basis = NULL;
+   comp_basis_dof_offsets.SetSize(num_comp);
+
    basis.SetSize(numSub);
    basis = NULL;
    basis_dof_offsets.SetSize(numSub);
@@ -26,17 +31,26 @@ ROMInterfaceForm::ROMInterfaceForm(
 
 ROMInterfaceForm::~ROMInterfaceForm()
 {
-   DeletePointers(fnfi_sample);
+   DeletePointers(fnfi_ref_sample);
 }
 
-void ROMInterfaceForm::SetBasisAtSubdomain(const int m, DenseMatrix &basis_, const int offset)
+void ROMInterfaceForm::SetBasisAtComponent(const int c, DenseMatrix &basis_, const int offset)
 {
    // assert(basis_.NumCols() == height);
-   assert(basis_.NumRows() >= fes[m]->GetTrueVSize() + offset);
-   assert(basis.Size() == numSub);
+   assert(basis_.NumRows() >= comp_fes[c]->GetTrueVSize() + offset);
+   assert(basis.Size() == num_comp);
 
-   basis[m] = &basis_;
-   basis_dof_offsets[m] = offset;
+   comp_basis[c] = &basis_;
+   comp_basis_dof_offsets[c] = offset;
+
+   for (int m = 0; m < numSub; m++)
+   {
+      if (topol_handler->GetMeshType(m) != c)
+         continue;
+      
+      basis[m] = &basis_;
+      basis_dof_offsets[m] = offset;
+   }
 }
 
 void ROMInterfaceForm::UpdateBlockOffsets()
@@ -291,9 +305,64 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
    DeletePointers(quadmats);
 }
 
+void ROMInterfaceForm::TrainEQPForRefPort(const int p,
+   const CAROM::Matrix &snapshot1, const CAROM::Matrix &snapshot2,
+   const Array2D<int> &snap_pair_idx, const double eqp_tol)
+{
+   int c1, c2, a1, a2;
+   // TODO(kevin): at least component topology handler maintain attrs the same for both reference and subdomain.
+   // Need to check submesh topology handler.
+   topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+   Array<InterfaceInfo> *itf_info = topol_handler->GetRefInterfaceInfos(p);
+
+   FiniteElementSpace *fes1 = comp_fes[c1];
+   FiniteElementSpace *fes2 = comp_fes[c2];
+   assert(fes1 && fes2);
+
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will have to consider local matrix construction from local snapshot/basis matrix.
+   */
+   assert(snapshot1.distributed());
+   assert(snapshot2.distributed());
+   CAROM::Matrix snapshot1_work(snapshot1), snapshot2_work(snapshot2);
+   snapshot1_work.gather();
+   snapshot2_work.gather();
+   assert(snapshot1_work.numRows() >= fes1->GetTrueVSize());
+   assert(snapshot2_work.numRows() >= fes2->GetTrueVSize());
+
+   DenseMatrix *basis1 = comp_basis[c1];
+   DenseMatrix *basis2 = comp_basis[c2];
+   const int basis1_offset = comp_basis_dof_offsets[c1];
+   const int basis2_offset = comp_basis_dof_offsets[c2];
+   assert(basis1 && basis2);
+
+   // NOTE(kevin): these will be resized within the routines as needed.
+   // just initializing with distribute option.
+   CAROM::Matrix Gt(1,1, true);
+   CAROM::Vector rhs_Gw(1, false);
+
+   Array<int> el, qp;
+   Array<double> qw;
+   Array<int> fidxs;
+
+   for (int it = 0; it < fnfi.Size(); it)
+   {
+      const IntegrationRule *ir = fnfi[it]->GetIntegrationRule();
+      assert(ir);
+      const int nqe = ir->GetNPoints();
+
+      SetupEQPSystem(snapshot1_work, snapshot2_work, snap_pair_idx,
+                     *basis1, *basis2, basis1_offset, basis2_offset,
+                     fes1, fes2, itf_info, fnfi[it], Gt, rhs_Gw);
+      TrainEQPForIntegrator(nqe, Gt, rhs_Gw, eqp_tol, el, qp, qw);
+      UpdateInterFaceIntegratorSampling(it, p, el, qp, qw);
+   }
+}
+
 void ROMInterfaceForm::SetupEQPSystem(
    const CAROM::Matrix &snapshot1, const CAROM::Matrix &snapshot2,
-   const Array<int> &snap1_idx, const Array<int> &snap2_idx,
+   const Array2D<int> &snap_pair_idx,
    DenseMatrix &basis1, DenseMatrix &basis2,
    const int &basis1_offset, const int &basis2_offset,
    FiniteElementSpace *fes1, FiniteElementSpace *fes2,
@@ -335,12 +404,12 @@ void ROMInterfaceForm::SetupEQPSystem(
       We take the snapshot pairs given by snap1/2_idx.
       These two arrays should have the same size.
    */
-   const int nsnap = snap1_idx.Size();
-   assert(nsnap == snap2_idx.Size());
+   const int nsnap = snap_pair_idx.NumRows();
+   assert(snap_pair_idx.NumCols() == 2);
    const int nsnap1 = snapshot1.numColumns();
    const int nsnap2 = snapshot2.numColumns();
-   assert((snap1_idx.Min() >= 0) && (snap1_idx.Max() < nsnap1));
-   assert((snap2_idx.Min() >= 0) && (snap2_idx.Max() < nsnap2));
+   // assert((snap1_idx.Min() >= 0) && (snap1_idx.Max() < nsnap1));
+   // assert((snap2_idx.Min() >= 0) && (snap2_idx.Max() < nsnap2));
 
    const int ne_global = itf_infos->Size();
    const int ne = CAROM::split_dimension(ne_global, MPI_COMM_WORLD);
@@ -376,9 +445,9 @@ void ROMInterfaceForm::SetupEQPSystem(
    {
       // NOTE(kevin): have to copy the vector since libROM matrix is row-major.
       for (int k = 0; k < fes1->GetTrueVSize(); ++k)
-         v1_i[k] = snapshot1(k, snap1_idx[i]);
+         v1_i[k] = snapshot1(k, snap_pair_idx(i, 0));
       for (int k = 0; k < fes2->GetTrueVSize(); ++k)
-         v2_i[k] = snapshot2(k, snap2_idx[i]);
+         v2_i[k] = snapshot2(k, snap_pair_idx(i, 1));
 
       for (int e = elem_offsets[rank], eidx = 0; e < elem_offsets[rank+1]; e++, eidx++)
       {

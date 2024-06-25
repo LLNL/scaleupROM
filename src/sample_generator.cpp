@@ -353,6 +353,21 @@ const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const BasisTag &basis_tag)
    return snapshot_generators[idx]->getSnapshotMatrix();
 }
 
+Array2D<int>* SampleGenerator::LookUpSnapshotPortColOffsets(const PortTag &port_tag)
+{
+   assert(port_colidxs.Size() > 0);
+   assert(port_colidxs.Size() == port_tags.size());
+
+   int idx = -1;
+   if (port_tag2idx.count(port_tag))
+      idx = port_tag2idx[port_tag];
+
+   if (idx < 0)
+      mfem_error("SampleGenerator::LookUpSnapshotPortColOffsets- port tag does not exist in port list!\n");
+
+   return port_colidxs[idx];
+}
+
 void SampleGenerator::ReportStatus(const int &sample_idx)
 {
    if (sample_idx % report_freq != 0) return;

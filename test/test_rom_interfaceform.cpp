@@ -98,10 +98,11 @@ TEST(ROMInterfaceForm, InterfaceAddMult)
    for (int m = 0; m < numSub; m++)
       basis[m]->MultTranspose(y.GetBlock(m), Pty.GetBlock(m));
 
-   ROMInterfaceForm *rform = new ROMInterfaceForm(meshes, fes, submesh);
+   ROMInterfaceForm *rform = new ROMInterfaceForm(meshes, fes, fes, submesh);
    rform->AddInterfaceIntegrator(integ2);
+   /* For submesh, mesh index is the same as component index */
    for (int m = 0; m < numSub; m++)
-      rform->SetBasisAtSubdomain(m, *basis[m]);
+      rform->SetBasisAtComponent(m, *basis[m]);
    rform->UpdateBlockOffsets();
 
    // we set the full elements/quadrature points,
@@ -204,10 +205,11 @@ TEST(ROMInterfaceForm, InterfaceGetGradient)
 
    BlockVector rom_y(rom_block_offsets);
 
-   ROMInterfaceForm *rform = new ROMInterfaceForm(meshes, fes, submesh);
+   ROMInterfaceForm *rform = new ROMInterfaceForm(meshes, fes, fes, submesh);
    rform->AddInterfaceIntegrator(integ2);
+   /* For submesh, mesh index is the same as component index */
    for (int m = 0; m < numSub; m++)
-      rform->SetBasisAtSubdomain(m, *basis[m]);
+      rform->SetBasisAtComponent(m, *basis[m]);
    rform->UpdateBlockOffsets();
 
    // we set the full elements/quadrature points,
@@ -349,11 +351,11 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
          snapshots2(i, j) = 2.0 * UniformRandom() - 1.0;
 
    /* fictitious pair indices */
-   Array<int> snap1_idx(num_snap), snap2_idx(num_snap);
+   Array2D<int> snap_pair_idx(num_snap, 2);
    for (int i = 0; i < num_snap; i++)
    {
-      snap1_idx[i] = UniformRandom(0, nsnap1-1);
-      snap2_idx[i] = UniformRandom(0, nsnap2-1);
+      snap_pair_idx(i, 0) = UniformRandom(0, nsnap1-1);
+      snap_pair_idx(i, 1) = UniformRandom(0, nsnap2-1);
    }
 
    /* bases generated from fictitious snapshots */
@@ -421,18 +423,19 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    nform->AddInterfaceIntegrator(integ1);
 
    /* EQP interface operator */
-   ROMInterfaceForm *rform(new ROMInterfaceForm(meshes, fes, submesh));
+   ROMInterfaceForm *rform(new ROMInterfaceForm(meshes, fes, fes, submesh));
    rform->AddInterfaceIntegrator(integ2);
 
    Array<DenseMatrix *> bases(numSub);
+   /* For submesh, mesh index is the same as component index */
    for (int m = 0; m < bases.Size(); m++)
    {
       bases[m] = new DenseMatrix(fes[m]->GetTrueVSize(), nb_def);
       *bases[m] = 0.0;
-      rform->SetBasisAtSubdomain(m, *bases[m]);
+      rform->SetBasisAtComponent(m, *bases[m]);
    }
-   rform->SetBasisAtSubdomain(midx[0], basis1);
-   rform->SetBasisAtSubdomain(midx[1], basis2);
+   rform->SetBasisAtComponent(midx[0], basis1);
+   rform->SetBasisAtComponent(midx[1], basis2);
    rform->UpdateBlockOffsets();
    // rform->SetPrecomputeMode(false);
 
@@ -446,8 +449,8 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    Vector basis_col;
    for (int s = 0; s < num_snap; s++)
    {
-      snapshots1.GetColumnReference(snap1_idx[s], snap1);
-      snapshots2.GetColumnReference(snap2_idx[s], snap2);
+      snapshots1.GetColumnReference(snap_pair_idx(s, 0), snap1);
+      snapshots2.GetColumnReference(snap_pair_idx(s, 1), snap2);
 
       rhs_vec1 = 0.0; rhs_vec2 = 0.0;
       nform->AssembleInterfaceVector(mesh1, mesh2, fes1, fes2, itf_infos, snap1, snap2, rhs_vec1, rhs_vec2);
@@ -475,7 +478,7 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
 
    /* equivalent operation must happen within this routine */
    rform->SetupEQPSystem(carom_snapshots1_work, carom_snapshots2_work,
-                         snap1_idx, snap2_idx, basis1, basis2, 0, 0,
+                         snap_pair_idx, basis1, basis2, 0, 0,
                          fes1, fes2, itf_infos, integ2, Gt, rhs2);
 
    for (int k = 0; k < rhs1.dim(); k++)
@@ -494,8 +497,8 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    BlockVector rom_sol(rom_blocks), rom_rhs2_vec(rom_blocks);
    for (int s = 0; s < num_snap; s++)
    {
-      snapshots1.GetColumnReference(snap1_idx[s], snap1);
-      snapshots2.GetColumnReference(snap2_idx[s], snap2);
+      snapshots1.GetColumnReference(snap_pair_idx(s, 0), snap1);
+      snapshots2.GetColumnReference(snap_pair_idx(s, 1), snap2);
 
       rom_sol = 0.0;
       basis1.MultTranspose(snap1, rom_sol.GetBlock(midx[0]));
