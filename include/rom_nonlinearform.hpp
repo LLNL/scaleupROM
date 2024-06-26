@@ -13,14 +13,6 @@
 namespace mfem
 {
 
-enum IntegratorType
-{
-   DOMAIN,
-   INTERIORFACE,
-   BDRFACE,
-   NUM_INTEG_TYPE
-};
-
 class ROMNonlinearForm : public NonlinearForm
 {
 private:
@@ -95,9 +87,13 @@ public:
       assert((i >= 0) && (i < dnfi.Size()));
       assert(dnfi.Size() == dnfi_sample.Size());
 
-      dnfi_sample[i] = new Array<SampleInfo>(0);
+      dnfi_sample[i] = new Array<SampleInfo>(el.Size());
       for (int s = 0; s < el.Size(); s++)
-         dnfi_sample[i]->Append({.el=el[s], .face=-1, .be=-1, .qp=qp[s], .qw=qw[s]});
+      {
+         (*dnfi_sample[i])[s].el = el[s];
+         (*dnfi_sample[i])[s].qp = qp[s];
+         (*dnfi_sample[i])[s].qw = qw[s];
+      }
    }
 
    /// Access all integrators added with AddDomainIntegrator().
@@ -116,9 +112,13 @@ public:
       assert((i >= 0) && (i < fnfi.Size()));
       assert(fnfi.Size() == fnfi_sample.Size());
 
-      fnfi_sample[i] = new Array<SampleInfo>(0);
+      fnfi_sample[i] = new Array<SampleInfo>(face.Size());
       for (int s = 0; s < face.Size(); s++)
-         fnfi_sample[i]->Append({.el=-1, .face=face[s], .be=-1, .qp=qp[s], .qw=qw[s]});
+      {
+         (*fnfi_sample[i])[s].face = face[s];
+         (*fnfi_sample[i])[s].qp = qp[s];
+         (*fnfi_sample[i])[s].qw = qw[s];
+      }
    }
 
    /** @brief Access all interior face integrators added with
@@ -149,9 +149,13 @@ public:
       assert((i >= 0) && (i < bfnfi.Size()));
       assert(bfnfi.Size() == bfnfi_sample.Size());
 
-      bfnfi_sample[i] = new Array<SampleInfo>(0);
+      bfnfi_sample[i] = new Array<SampleInfo>(be.Size());
       for (int s = 0; s < be.Size(); s++)
-         bfnfi_sample[i]->Append({.el=-1, .face=-1, .be=be[s], .qp=qp[s], .qw=qw[s]});
+      {
+         (*bfnfi_sample[i])[s].be = be[s];
+         (*bfnfi_sample[i])[s].qp = qp[s];
+         (*bfnfi_sample[i])[s].qw = qw[s];
+      }
    }
 
    /** @brief Access all boundary face integrators added with

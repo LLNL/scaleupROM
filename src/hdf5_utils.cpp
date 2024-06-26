@@ -491,4 +491,101 @@ void WriteDataset(hid_t &source, std::string dataset, const MatrixBlocks &value)
    assert(errf >= 0);
 }
 
+void ReadDataset(hid_t &source, std::string dataset, const IntegratorType type, Array<SampleInfo> &value)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      case IntegratorType::INTERFACE:     eldset = "itf"; break;
+      default:
+         mfem_error("hdf5_utils::ReadDataset- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   assert(source >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gopen2(source, dataset.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::ReadDataset(grp_id, eldset, el);
+   hdf5_utils::ReadDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::ReadDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   value.SetSize(el.Size());
+   for (int k = 0; k < el.Size(); k++)
+   {
+      value[k].qp = qp[k];
+      value[k].qw = qw[k];
+      switch (type)
+      {
+         case IntegratorType::DOMAIN:        value[k].el = el[k]; break;
+         case IntegratorType::INTERIORFACE:  value[k].face = el[k]; break;
+         case IntegratorType::BDRFACE:       value[k].be = el[k]; break;
+         case IntegratorType::INTERFACE:     value[k].itf = el[k]; break;
+      }
+   }
+
+   return;
+}
+
+void WriteDataset(hid_t &source, std::string dataset, const IntegratorType type, const Array<SampleInfo> &value)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      case IntegratorType::INTERFACE:     eldset = "itf"; break;
+      default:
+         mfem_error("hdf5_utils::WriteDataset- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   el.SetSize(0);
+   qp.SetSize(0);
+   qw.SetSize(0);
+
+   for (int s = 0; s < value.Size(); s++)
+   {
+      switch (type)
+      {
+         case IntegratorType::DOMAIN:        el.Append(value[s].el); break;
+         case IntegratorType::INTERIORFACE:  el.Append(value[s].face); break;
+         case IntegratorType::BDRFACE:       el.Append(value[s].be); break;
+         case IntegratorType::INTERFACE:     el.Append(value[s].itf); break;
+      }
+      qp.Append(value[s].qp);
+      qw.Append(value[s].qw);
+   }
+
+   assert(source >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(source, dataset.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::WriteDataset(grp_id, eldset, el);
+   hdf5_utils::WriteDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::WriteDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   return;
+}
+
 }
