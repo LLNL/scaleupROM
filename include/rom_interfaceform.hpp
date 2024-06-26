@@ -7,6 +7,7 @@
 
 #include "interface_form.hpp"
 #include "rom_handler.hpp"
+#include "hdf5_utils.hpp"
 
 namespace mfem
 {
@@ -84,9 +85,13 @@ public:
       if (fnfi_ref_sample[idx])
          delete fnfi_ref_sample[idx];
 
-      fnfi_ref_sample[idx] = new Array<SampleInfo>(0);
+      fnfi_ref_sample[idx] = new Array<SampleInfo>(itf.Size());
       for (int s = 0; s < itf.Size(); s++)
-         fnfi_ref_sample[idx]->Append({.el=-1, .face=-1, .be=-1, .itf=itf[s], .qp=qp[s], .qw=qw[s]});
+      {
+         (*fnfi_ref_sample[idx])[s].itf = itf[s];
+         (*fnfi_ref_sample[idx])[s].qp = qp[s];
+         (*fnfi_ref_sample[idx])[s].qw = qw[s];
+      }
 
       for (int p = 0; p < numPorts; p++)
       {
@@ -116,6 +121,8 @@ public:
    void TrainEQPForIntegrator(const int nqe, const CAROM::Matrix &Gt,
                               const CAROM::Vector &rhs_Gw, const double eqp_tol,
                               Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+
+   void SaveEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname);
 
 private:
    /* These methods are not available in this class */

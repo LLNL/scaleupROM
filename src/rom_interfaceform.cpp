@@ -623,4 +623,31 @@ void ROMInterfaceForm::TrainEQPForIntegrator(
       printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 }
 
+void ROMInterfaceForm::SaveEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname)
+{
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   Array<SampleInfo> *ref_sample = NULL;
+   int c1, c2, a1, a2;
+   std::string port_dset;
+   for (int p = 0; p < numRefPorts; p++)
+   {
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+      port_dset = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
+      port_dset += "-" + std::to_string(a1) + ":" + std::to_string(a2);
+      ref_sample = fnfi_ref_sample[p + k * numRefPorts];
+
+      hdf5_utils::WriteDataset(grp_id, port_dset, IntegratorType::INTERFACE, *ref_sample);
+   }
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+   return;
+}
+
 }

@@ -999,12 +999,16 @@ void SteadyNSSolver::SaveEQPElems(const std::string &filename)
          assert(comp_eqps[c]);
          dset_name = topol_handler->GetComponentName(c);
 
-         // only one integrator exists in each nonlinear form.
-         comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name);
+         comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name + "_integ0");
+         if ((oper_type == OperType::LF) && (full_dg))
+            comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::INTERIORFACE, 0, grp_id, dset_name + "_integ1");
       }  // for (int c = 0; c < num_comp; c++)
 
       errf = H5Gclose(grp_id);
       assert(errf >= 0);
+
+      if (oper_type == OperType::LF)
+         itf_eqp->SaveEQPForIntegrator(0, file_id, "interface_integ0");
 
       errf = H5Fclose(file_id);
       assert(errf >= 0);
@@ -1039,7 +1043,9 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
       dset_name = topol_handler->GetComponentName(c);
 
       // only one integrator exists in each nonlinear form.
-      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name);
+      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name + "_integ0");
+      if ((oper_type == OperType::LF) && (full_dg))
+         comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::INTERIORFACE, 1, grp_id, dset_name + "_integ1");
 
       if (comp_eqps[c]->PrecomputeMode())
          comp_eqps[c]->PrecomputeCoefficients();
