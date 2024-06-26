@@ -283,7 +283,7 @@ SteadyNSSolver::SteadyNSSolver()
 
    ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(),
                           (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
-   ir_face = &(IntRules.Get(meshes[0]->GetInteriorFaceTransformations(0)->GetGeometryType(),
+   ir_face = &(IntRules.Get(meshes[0]->GetBdrElementGeometry(0),
                             (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 
    /* SteadyNSSolver requires all the meshes to have the same element type. */
