@@ -677,7 +677,7 @@ ChannelFlow::ChannelFlow()
    battr.SetSize(5);
    for (int b = 0; b < 5; b++)
       battr[b] = b+1;
-   bdr_type.SetSize(4);
+   bdr_type.SetSize(5);
    bdr_type = BoundaryType::ZERO;
    bdr_type[1] = BoundaryType::NEUMANN;
    bdr_type[3] = BoundaryType::DIRICHLET;
