@@ -97,15 +97,25 @@ class SteadyNSEQPROM : public SteadyNSROM
 {
 protected:
    Array<ROMNonlinearForm *> hs; // not owned by SteadyNSEQPROM.
+   ROMInterfaceForm *itf = NULL; // not owned by SteadyNSEQPROM.
+
+   Array<int> u_offsets;
+   Array<int> u_idxs;
+
+   mutable Vector x_u, y_u;
 
 public:
-   SteadyNSEQPROM(SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true)
-      : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_) {}
+   SteadyNSEQPROM(SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, ROMInterfaceForm *itf_,
+                  const Array<int> &block_offsets_, const bool direct_solve_=true);
 
    virtual ~SteadyNSEQPROM() {}
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;
+
+private:
+   void GetVel(const Vector &x, Vector &x_u) const;
+   void AddVel(const Vector &y_u, Vector &y) const;
 };
 
 class SteadyNSSolver : public StokesSolver

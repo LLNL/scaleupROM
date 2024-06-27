@@ -235,10 +235,10 @@ TEST(SteadyNS_Workflow, InterfaceEQP)
    config.dict_["main"]["mode"] = "train_eqp";
    TrainEQP(MPI_COMM_WORLD);
 
-   // printf("\nBuild ROM \n\n");
+   printf("\nBuild ROM \n\n");
 
-   // config.dict_["main"]["mode"] = "build_rom";
-   // BuildROM(MPI_COMM_WORLD);
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
 
    // config.dict_["main"]["mode"] = "single_run";
    // double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
