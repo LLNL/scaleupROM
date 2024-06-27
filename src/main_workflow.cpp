@@ -90,9 +90,9 @@ SampleGenerator* InitSampleGenerator(MPI_Comm comm)
    return generator;
 }
 
-std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis)
+std::vector<BasisTag> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis)
 {
-   std::vector<std::string> basis_tags(0);
+   std::vector<BasisTag> basis_tags(0);
 
    std::vector<std::string> component_list(0);
    if (topol_mode == TopologyHandlerMode::SUBMESH)
@@ -132,9 +132,9 @@ std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_
    {
       if (separate_variable_basis)
          for (int v = 0; v < var_list.size(); v++)
-            basis_tags.push_back(component_list[c] + "_" + var_list[v]);
+            basis_tags.push_back(BasisTag(component_list[c], var_list[v]));
       else
-         basis_tags.push_back(component_list[c]);
+         basis_tags.push_back(BasisTag(component_list[c]));
    }
 
    return basis_tags;
@@ -160,6 +160,8 @@ void GenerateSamples(MPI_Comm comm)
 
       test = InitSolver();
       test->InitVariables();
+      if (test->UseRom())
+         test->InitROMHandler();
 
       problem->SetSingleRun();
       test->SetParameterizedProblem(problem);
@@ -208,18 +210,50 @@ void GenerateSamples(MPI_Comm comm)
 
 void CollectSamples(SampleGenerator *sample_generator)
 {
+   std::string mode = config.GetOption<std::string>("sample_collection/mode", "basis");
+   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
+
+   if (mode == "basis")
+      CollectSamplesByBasis(sample_generator, basis_prefix);
+   else if (mode == "port")
+      CollectSamplesByPort(sample_generator, basis_prefix);
+   else
+      mfem_error("CollectSamples: unknown sample collection mode!\n");
+}
+
+void CollectSamplesByPort(SampleGenerator *sample_generator, const std::string &basis_prefix)
+{
+   // parse the sample snapshot file list.
+   std::vector<std::string> file_list = config.GetOption<std::vector<std::string>>(
+                                 "sample_collection/port_files", std::vector<std::string>(0));
+   YAML::Node port_format = config.FindNode("sample_collection/port_fileformat");
+   // if file list is specified with a format, parse through the format.
+   if (port_format)
+   {
+      FilenameParam port_param("", port_format);
+      port_param.ParseFilenames(file_list);
+   }
+
+   // if additional inputs are not specified for port files, set default port file name.
+   if (file_list.size() == 0)
+      file_list.push_back(sample_generator->GetSamplePrefix() + ".port.h5");
+
+   for (int f = 0; f < file_list.size(); f++)
+      sample_generator->CollectSnapshotsByPort(basis_prefix, file_list[f]);
+}
+
+void CollectSamplesByBasis(SampleGenerator *sample_generator, const std::string &basis_prefix)
+{
    assert(sample_generator);
 
    TopologyHandlerMode topol_mode = SetTopologyHandlerMode();
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    // Find the all required basis tags.
-   std::vector<std::string> basis_tags = GetGlobalBasisTagList(topol_mode, separate_variable_basis);
+   std::vector<BasisTag> basis_tags = GetGlobalBasisTagList(topol_mode, separate_variable_basis);
 
    // tag-specific optional inputs.
    YAML::Node basis_list = config.FindNode("basis/tags");
-
-   std::string basis_prefix = config.GetOption<std::string>("basis/prefix", "basis");
 
    // loop over the required basis tag list.
    for (int p = 0; p < basis_tags.size(); p++)
@@ -230,7 +264,7 @@ void CollectSamples(SampleGenerator *sample_generator)
       FindSnapshotFilesForBasis(basis_tags[p], default_filename, file_list);
       assert(file_list.size() > 0);
 
-      sample_generator->CollectSnapshots(basis_prefix, basis_tags[p], file_list);
+      sample_generator->CollectSnapshotsByBasis(basis_prefix, basis_tags[p], file_list);
    }  // for (int p = 0; p < basis_tags.size(); p++)
 }
 
@@ -264,6 +298,7 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
       if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
 
       solver->InitVariables();
+      solver->InitROMHandler();
       // This time needs to be ROMHandler, in order not to run StokesSolver::LoadSupremizer.
       solver->GetROMHandler()->LoadReducedBasis();
 
@@ -289,6 +324,7 @@ void TrainEQP(MPI_Comm comm)
    MultiBlockSolver *test = NULL;
    test = InitSolver();
    test->InitVariables();
+   test->InitROMHandler();
 
    if (!test->IsNonlinear())
    {
@@ -300,6 +336,7 @@ void TrainEQP(MPI_Comm comm)
    if (!test->UseRom()) mfem_error("ROM must be enabled for EQP training!\n");
 
    test->LoadReducedBasis();
+   test->AllocateROMNlinElems();
 
    ROMHandlerBase *rom = test->GetROMHandler();
    ROMBuildingLevel save_operator = rom->GetBuildingLevel();
@@ -312,7 +349,7 @@ void TrainEQP(MPI_Comm comm)
    else
       mfem_error("Unknown TopologyHandler Mode!\n");
 
-   std::string filename = rom->GetOperatorPrefix() + ".eqp.h5";
+   std::string oper_prefix = rom->GetOperatorPrefix();
    switch (save_operator)
    {
       case ROMBuildingLevel::COMPONENT:
@@ -320,9 +357,8 @@ void TrainEQP(MPI_Comm comm)
          if (topol_mode == TopologyHandlerMode::SUBMESH)
             mfem_error("Submesh does not support component rom building level!\n");
 
-         test->AllocateROMEQPElems();
-         test->TrainEQPElems(sample_generator);
-         test->SaveEQPElems(filename);
+         test->TrainROMEQPElems(sample_generator);
+         test->SaveROMNlinElems(oper_prefix);
          break;
       }
       case ROMBuildingLevel::GLOBAL:
@@ -341,7 +377,7 @@ void TrainEQP(MPI_Comm comm)
    delete test;
 }
 
-void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
+void FindSnapshotFilesForBasis(const BasisTag &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list)
 {
    file_list.clear();
 
@@ -352,7 +388,7 @@ void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &
    if (basis_list)
    {
       // Find if additional inputs are specified for basis_tag.
-      YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tag, basis_list);
+      YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tag.print(), basis_list);
       
       // If basis_tag has additional inputs, parse them.
       if (basis_tag_input)
@@ -383,6 +419,7 @@ void BuildROM(MPI_Comm comm)
    test = InitSolver();
    if (!test->UseRom()) mfem_error("ROM must be enabled for BuildROM!\n");
    test->InitVariables();
+   test->InitROMHandler();
    // test->InitVisualization();
 
    // The ROM operator will be built based on the parameter specified for single-run.
@@ -393,6 +430,9 @@ void BuildROM(MPI_Comm comm)
    test->BuildOperators();
    test->SetupBCOperators();
    test->LoadReducedBasis();
+
+   if (test->IsNonlinear())
+      test->AllocateROMNlinElems();
    
    TopologyHandlerMode topol_mode = test->GetTopologyMode();
    ROMHandlerBase *rom = test->GetROMHandler();
@@ -402,7 +442,7 @@ void BuildROM(MPI_Comm comm)
    if (save_operator == ROMBuildingLevel::GLOBAL)
       test->Assemble();
 
-   std::string filename = rom->GetOperatorPrefix() + ".h5";
+   std::string oper_prefix = rom->GetOperatorPrefix();
    switch (save_operator)
    {
       case ROMBuildingLevel::COMPONENT:
@@ -411,20 +451,19 @@ void BuildROM(MPI_Comm comm)
             mfem_error("Submesh does not support component rom building level!\n");
 
          test->BuildROMLinElems();
-         test->SaveROMLinElems(filename);
+         test->SaveROMLinElems(oper_prefix + ".h5");
 
          if ((test->IsNonlinear()) && (rom->GetNonlinearHandling() == NonlinearHandling::TENSOR))
          {
-            test->AllocateROMTensorElems();
             test->BuildROMTensorElems();
-            test->SaveROMTensorElems(filename);
+            test->SaveROMNlinElems(oper_prefix);
          }
          break;
       }
       case ROMBuildingLevel::GLOBAL:
       {
          test->ProjectOperatorOnReducedBasis();
-         test->SaveROMOperator(filename);
+         test->SaveROMOperator(oper_prefix + ".h5");
          break;
       }
       case ROMBuildingLevel::NONE:
@@ -455,6 +494,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    ParameterizedProblem *problem = InitParameterizedProblem();
    MultiBlockSolver *test = InitSolver();
    test->InitVariables();
+   if (test->UseRom()) test->InitROMHandler();
    test->InitVisualization();
 
    StopWatch solveTimer;
@@ -479,6 +519,9 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    {
       rom = test->GetROMHandler();
       test->LoadReducedBasis();
+
+      if (test->IsNonlinear())
+         test->AllocateROMNlinElems();
    }
 
    solveTimer.Start();
@@ -511,7 +554,6 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
          if (test->IsNonlinear())
          {
-            test->AllocateROMNlinElems();
             test->LoadROMNlinElems(rom->GetOperatorPrefix());
             test->AssembleROMNlinOper();
          }

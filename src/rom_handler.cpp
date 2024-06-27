@@ -16,16 +16,17 @@ using namespace std;
 namespace mfem
 {
 
-const std::string GetBasisTagForComponent(
+const BasisTag GetBasisTagForComponent(
    const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name)
 {
-   std::string tag = topol_handler->GetComponentName(comp_idx);
+   BasisTag tag;
+   tag.comp = topol_handler->GetComponentName(comp_idx);
    if (var_name != "")
-      tag += "_" + var_name;
+      tag.var = var_name;
    return tag;
 }
 
-const std::string GetBasisTag(
+const BasisTag GetBasisTag(
    const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name)
 {
    int c_type = topol_handler->GetMeshType(subdomain_index);
@@ -105,18 +106,18 @@ void ROMHandlerBase::ParseInputs()
    for (int b = 0; b < num_rom_ref_blocks; b++)
    {
       /* determine basis tag */
-      std::string basis_tag;
+      BasisTag basis_tag;
       if (separate_variable)
          basis_tag = GetBasisTagForComponent(b / num_var, topol_handler, fom_var_names[b % num_var]);
       else
          basis_tag = GetBasisTagForComponent(b, topol_handler);
 
       /* determine number of basis */
-      num_ref_basis[b] = config.LookUpFromDict("name", basis_tag, "number_of_basis", num_ref_basis_default, basis_list);
+      num_ref_basis[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_basis", num_ref_basis_default, basis_list);
 
       if (num_ref_basis[b] < 0)
       {
-         printf("Cannot find the number of basis for %s!\n", basis_tag.c_str());
+         printf("Cannot find the number of basis for %s!\n", basis_tag.print().c_str());
          mfem_error("Or specify the default number of basis!\n");
       }
 
@@ -167,12 +168,12 @@ void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int
 
    YAML::Node basis_list = config.FindNode("basis/tags");
 
-   std::string basis_tag;
+   BasisTag basis_tag;
    for (int b = 0; b < num_rom_comp; b++)
    {
       basis_tag = GetBasisTagForComponent(b, topol_handler, fom_var_names[1]);
 
-      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag, "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
+      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
    }
 
    for (int m = 0; m < numSub; m++)
@@ -205,7 +206,7 @@ void ROMHandlerBase::LoadReducedBasis()
       */
       {
          int local_dim = CAROM::split_dimension(dim_ref_basis[k], MPI_COMM_WORLD);
-         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k], CAROM::Database::formats::HDF5_MPIO, local_dim);
+         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k].print(), CAROM::Database::formats::HDF5_MPIO, local_dim);
 
          carom_ref_basis[k] = new CAROM::Matrix(*basis_reader->getSpatialBasis(num_ref_basis[k]));
          carom_ref_basis[k]->gather();

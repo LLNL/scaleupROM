@@ -137,8 +137,8 @@ namespace mfem
 void AddToBlockMatrix(const Array<int> &ridx, const Array<int> &cidx, const MatrixBlocks &mats, BlockMatrix &bmat)
 {
    assert(bmat.owns_blocks);
-   assert(bmat.NumRowBlocks() >= mats.nrows);
-   assert(bmat.NumColBlocks() >= mats.ncols);
+   // assert(bmat.NumRowBlocks() >= mats.nrows);
+   // assert(bmat.NumColBlocks() >= mats.ncols);
    assert(ridx.Size() == mats.nrows);
    assert(cidx.Size() == mats.ncols);
    assert((ridx.Min() >= 0) && (ridx.Max() < bmat.NumRowBlocks()));

@@ -168,8 +168,27 @@ public:
    virtual Mesh* GetMesh(const int k) { return &(*meshes[k]); }
    virtual Mesh* GetGlobalMesh() { return pmesh; }
 
-   // SubMeshTopologyHandler assumes only one component.
-   virtual Mesh* GetComponentMesh(const int &c) { return GetMesh(0); }
+   // In SubMeshTopologyHandler, each subdomain is unique component.
+   virtual Mesh* GetComponentMesh(const int &c) { return GetMesh(c); }
+
+   virtual const int GetPortType(const int &port_idx) { return port_idx; }
+   virtual const int GetNumRefPorts() { return num_ports; }
+   // return component indexes for a reference port
+   virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2)
+   {
+      comp1 = port_infos[ref_port_idx].Mesh1;
+      comp2 = port_infos[ref_port_idx].Mesh2;
+      return;
+   }
+   virtual void GetRefPortInfo(const int &ref_port_idx, int &comp1, int &comp2, int &attr1, int &attr2)
+   {
+      comp1 = port_infos[ref_port_idx].Mesh1;
+      comp2 = port_infos[ref_port_idx].Mesh2;
+      attr1 = port_infos[ref_port_idx].Attr1;
+      attr2 = port_infos[ref_port_idx].Attr2;
+   }
+   virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k)
+   { return GetInterfaceInfos(k); }
 
    // Export mesh pointers and interface info.
    virtual void ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData &topol_data);

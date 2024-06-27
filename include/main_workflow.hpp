@@ -15,10 +15,12 @@ void RunExample();
 
 MultiBlockSolver* InitSolver();
 SampleGenerator* InitSampleGenerator(MPI_Comm comm);
-std::vector<std::string> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis);
+std::vector<BasisTag> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mode, bool separate_variable_basis);
 
 void GenerateSamples(MPI_Comm comm);
 void CollectSamples(SampleGenerator *sample_generator);
+void CollectSamplesByPort(SampleGenerator *sample_generator, const std::string &basis_prefix);
+void CollectSamplesByBasis(SampleGenerator *sample_generator, const std::string &basis_prefix);
 void BuildROM(MPI_Comm comm);
 void TrainROM(MPI_Comm comm);
 // supremizer-enrichment etc..
@@ -26,7 +28,7 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator);
 // EQP training, could include hypre-reduction optimization.
 void TrainEQP(MPI_Comm comm);
 // Input parsing routine to list out all snapshot files for training a basis.
-void FindSnapshotFilesForBasis(const std::string &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list);
+void FindSnapshotFilesForBasis(const BasisTag &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list);
 // return relative error if comparing solution.
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
 

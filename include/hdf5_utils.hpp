@@ -8,6 +8,22 @@
 #include "mfem.hpp"
 #include "hdf5.h"
 #include "linalg_utils.hpp"
+#include "rom_handler.hpp"
+#include "hyperreduction_integ.hpp"
+
+namespace mfem
+{
+
+enum IntegratorType
+{
+   DOMAIN,
+   INTERIORFACE,
+   BDRFACE,
+   INTERFACE,
+   NUM_INTEG_TYPE
+};
+
+}
 
 using namespace mfem;
 
@@ -24,6 +40,9 @@ int GetDatasetSize(hid_t &source, std::string dataset, hsize_t* &dims);
 
 void ReadAttribute(hid_t &source, std::string attribute, std::string &value);
 void WriteAttribute(hid_t &source, std::string attribute, const std::string &value);
+
+void ReadAttribute(hid_t &source, std::string attribute, BasisTag &value);
+void WriteAttribute(hid_t &source, std::string attribute, const BasisTag &value);
 
 template <typename T>
 void ReadAttribute(hid_t &source, std::string attribute, T &value) {
@@ -173,6 +192,9 @@ void WriteDataset(hid_t &source, std::string dataset, const DenseTensor &value);
 
 void ReadDataset(hid_t &source, std::string dataset, MatrixBlocks &value);
 void WriteDataset(hid_t &source, std::string dataset, const MatrixBlocks &value);
+
+void ReadDataset(hid_t &source, std::string dataset, const IntegratorType type, Array<SampleInfo> &value);
+void WriteDataset(hid_t &source, std::string dataset, const IntegratorType type, const Array<SampleInfo> &value);
 
 inline bool pathExists(hid_t id, const std::string& path)
 {

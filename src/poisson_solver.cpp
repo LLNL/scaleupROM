@@ -152,8 +152,6 @@ void PoissonSolver::InitVariables()
    }
 
    rhs_coeffs.SetSize(0);
-
-   if (use_rom) MultiBlockSolver::InitROMHandler();
 }
 
 void PoissonSolver::BuildOperators()

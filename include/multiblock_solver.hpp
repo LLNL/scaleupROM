@@ -228,36 +228,23 @@ public:
    void LoadSolutionWithTime(const std::string &filename, int &step, double &time);
    void CopySolution(BlockVector *input_sol);
 
-   virtual void AllocateROMTensorElems()
-   { mfem_error("Abstract method MultiBlockSolver::AllocateROMTensorElems!\n"); }
+   virtual void AllocateROMNlinElems()
+   { mfem_error("Abstract method MultiBlockSolver::AllocateROMNlinElems!\n"); }
    virtual void BuildROMTensorElems()
    { mfem_error("Abstract method MultiBlockSolver::BuildROMTensorElems!\n"); }
-   virtual void SaveROMTensorElems(const std::string &filename)
-   { mfem_error("Abstract method MultiBlockSolver::SaveROMTensorElems!\n"); }
-   virtual void LoadROMTensorElems(const std::string &filename)
-   { mfem_error("Abstract method MultiBlockSolver::LoadROMTensorElems!\n"); }
-   virtual void AssembleROMTensorOper()
-   { mfem_error("Abstract method MultiBlockSolver::AssembleROMTensorOper!\n"); }
+   virtual void TrainROMEQPElems(SampleGenerator *sample_generator)
+   { mfem_error("Abstract method MultiBlockSolver::TrainROMEQPElems!\n"); }
+   virtual void SaveROMNlinElems(const std::string &input_prefix)
+   { mfem_error("Abstract method MultiBlockSolver::SaveROMNlinElems!\n"); }
+   virtual void LoadROMNlinElems(const std::string &input_prefix)
+   { mfem_error("Abstract method MultiBlockSolver::LoadROMNlinElems!\n"); }
+   virtual void AssembleROMNlinOper()
+   { mfem_error("Abstract method MultiBlockSolver::AssembleROMNlinOper!\n"); }
 
-   virtual void AllocateROMEQPElems()
-   { mfem_error("Abstract method MultiBlockSolver::AllocateROMEQPElems!\n"); }
-   virtual void TrainEQPElems(SampleGenerator *sample_generator)
-   { mfem_error("Abstract method MultiBlockSolver::TrainEQPElems!\n"); }
-   virtual void SaveEQPElems(const std::string &filename)
-   { mfem_error("Abstract method MultiBlockSolver::SaveEQP!\n"); }
-   virtual void LoadEQPElems(const std::string &filename)
-   { mfem_error("Abstract method MultiBlockSolver::LoadEQP!\n"); }
-   virtual void AssembleROMEQPOper()
-   { mfem_error("Abstract method MultiBlockSolver::AssembleROMEQPOper!\n"); }
+   virtual void InitROMHandler();
+   void GetBasisTags(std::vector<BasisTag> &basis_tags);
 
-   void AllocateROMNlinElems();
-   void LoadROMNlinElems(const std::string &input_prefix);
-   void AssembleROMNlinOper();
-
-   void InitROMHandler();
-   void GetBasisTags(std::vector<std::string> &basis_tags);
-
-   virtual BlockVector* PrepareSnapshots(std::vector<std::string> &basis_tags);
+   virtual BlockVector* PrepareSnapshots(std::vector<BasisTag> &basis_tags);
    void SaveSnapshots(SampleGenerator *sample_generator);
 
    virtual void LoadReducedBasis() { rom_handler->LoadReducedBasis(); }

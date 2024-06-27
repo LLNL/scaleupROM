@@ -242,6 +242,7 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
 
    stokes_solver = new StokesSolver;
    stokes_solver->InitVariables();
+   if (use_rom) stokes_solver->InitROMHandler();
    stokes_solver->SetSolutionSaveMode(save_flow);
 
    bool flow_loaded = false;
