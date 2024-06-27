@@ -123,6 +123,7 @@ public:
                               Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
 
    void SaveEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname);
+   void LoadEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname);
 
 private:
    /* These methods are not available in this class */

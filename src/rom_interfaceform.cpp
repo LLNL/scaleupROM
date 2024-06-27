@@ -38,7 +38,7 @@ void ROMInterfaceForm::SetBasisAtComponent(const int c, DenseMatrix &basis_, con
 {
    // assert(basis_.NumCols() == height);
    assert(basis_.NumRows() >= comp_fes[c]->GetTrueVSize() + offset);
-   assert(basis.Size() == num_comp);
+   assert(comp_basis.Size() == num_comp);
 
    comp_basis[c] = &basis_;
    comp_basis_dof_offsets[c] = offset;
@@ -67,7 +67,7 @@ void ROMInterfaceForm::UpdateBlockOffsets()
 }
 
 void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
-{     
+{
    assert(block_offsets.Min() >= 0);
    assert(x.Size() == block_offsets.Last());
    assert(y.Size() == block_offsets.Last());
@@ -643,6 +643,46 @@ void ROMInterfaceForm::SaveEQPForIntegrator(const int k, hid_t file_id, const st
       ref_sample = fnfi_ref_sample[p + k * numRefPorts];
 
       hdf5_utils::WriteDataset(grp_id, port_dset, IntegratorType::INTERFACE, *ref_sample);
+   }
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+   return;
+}
+
+void ROMInterfaceForm::LoadEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname)
+{
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   Array<SampleInfo> *ref_sample = NULL;
+   int c1, c2, a1, a2;
+   std::string port_dset;
+   for (int p = 0; p < numRefPorts; p++)
+   {
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+      port_dset = topol_handler->GetComponentName(c1) + ":" + topol_handler->GetComponentName(c2);
+      port_dset += "-" + std::to_string(a1) + ":" + std::to_string(a2);
+
+      const int port_idx = p + k * numRefPorts;
+      if (fnfi_ref_sample[port_idx])
+         delete fnfi_ref_sample[port_idx];
+      fnfi_ref_sample[port_idx] = new Array<SampleInfo>(0);
+
+      hdf5_utils::ReadDataset(grp_id, port_dset, IntegratorType::INTERFACE,
+                              *fnfi_ref_sample[port_idx]);
+   }
+
+   /* update subdomain ports */
+   for (int p = 0; p < numPorts; p++)
+   {
+      int rp = topol_handler->GetPortType(p);
+      
+      fnfi_sample[p + k * numPorts] = fnfi_ref_sample[rp + k * numRefPorts];
    }
 
    errf = H5Gclose(grp_id);
