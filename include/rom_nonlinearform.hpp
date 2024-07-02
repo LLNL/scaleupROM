@@ -128,7 +128,8 @@ public:
                              Array<int> &bdr_marker)
    {
       bfnfi.Append(nfi);
-      bfnfi_marker.Append(&bdr_marker);
+      // Decided to own it, as opposed to the parent class.
+      bfnfi_marker.Append(new Array<int>(bdr_marker));
       bfnfi_sample.Append(NULL);
    }
 

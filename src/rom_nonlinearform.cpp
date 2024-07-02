@@ -40,6 +40,8 @@ ROMNonlinearForm::~ROMNonlinearForm()
    {
       delete bfnfi[i];
       delete bfnfi_sample[i];
+      // Decided to own it, as opposed to the parent class.
+      delete bfnfi_marker[i];
    }
 
    printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
