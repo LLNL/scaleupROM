@@ -526,13 +526,7 @@ void ReadDataset(hid_t &source, std::string dataset, const IntegratorType type, 
    {
       value[k].qp = qp[k];
       value[k].qw = qw[k];
-      switch (type)
-      {
-         case IntegratorType::DOMAIN:        value[k].el = el[k]; break;
-         case IntegratorType::INTERIORFACE:  value[k].face = el[k]; break;
-         case IntegratorType::BDRFACE:       value[k].be = el[k]; break;
-         case IntegratorType::INTERFACE:     value[k].itf = el[k]; break;
-      }
+      value[k].el = el[k];
    }
 
    return;
@@ -560,13 +554,7 @@ void WriteDataset(hid_t &source, std::string dataset, const IntegratorType type,
 
    for (int s = 0; s < value.Size(); s++)
    {
-      switch (type)
-      {
-         case IntegratorType::DOMAIN:        el.Append(value[s].el); break;
-         case IntegratorType::INTERIORFACE:  el.Append(value[s].face); break;
-         case IntegratorType::BDRFACE:       el.Append(value[s].be); break;
-         case IntegratorType::INTERFACE:     el.Append(value[s].itf); break;
-      }
+      el.Append(value[s].el);
       qp.Append(value[s].qp);
       qw.Append(value[s].qw);
    }

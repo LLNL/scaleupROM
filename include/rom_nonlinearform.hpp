@@ -63,7 +63,7 @@ public:
    void TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol = 1.0e-2);
    void TrainEQPForIntegrator(HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt,
                               const CAROM::Vector &rhs_Gw, const double eqp_tol,
-                              Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+                              Array<SampleInfo> &samples);
    void SetupEQPSystemForDomainIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                           CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
    void SetupEQPSystemForInteriorFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
@@ -82,18 +82,12 @@ public:
       dnfi_sample.Append(NULL);
    }
 
-   void UpdateDomainIntegratorSampling(const int i, const Array<int> &el, const Array<int> &qp, const Array<double> &qw)
+   void UpdateDomainIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < dnfi.Size()));
       assert(dnfi.Size() == dnfi_sample.Size());
 
-      dnfi_sample[i] = new Array<SampleInfo>(el.Size());
-      for (int s = 0; s < el.Size(); s++)
-      {
-         (*dnfi_sample[i])[s].el = el[s];
-         (*dnfi_sample[i])[s].qp = qp[s];
-         (*dnfi_sample[i])[s].qw = qw[s];
-      }
+      dnfi_sample[i] = new Array<SampleInfo>(samples);
    }
 
    /// Access all integrators added with AddDomainIntegrator().
@@ -107,18 +101,12 @@ public:
       fnfi_sample.Append(NULL);
    }
 
-   void UpdateInteriorFaceIntegratorSampling(const int i, const Array<int> &face, const Array<int> &qp, const Array<double> &qw)
+   void UpdateInteriorFaceIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < fnfi.Size()));
       assert(fnfi.Size() == fnfi_sample.Size());
 
-      fnfi_sample[i] = new Array<SampleInfo>(face.Size());
-      for (int s = 0; s < face.Size(); s++)
-      {
-         (*fnfi_sample[i])[s].face = face[s];
-         (*fnfi_sample[i])[s].qp = qp[s];
-         (*fnfi_sample[i])[s].qw = qw[s];
-      }
+      fnfi_sample[i] = new Array<SampleInfo>(samples);
    }
 
    /** @brief Access all interior face integrators added with
@@ -144,18 +132,12 @@ public:
       bfnfi_sample.Append(NULL);
    }
 
-   void UpdateBdrFaceIntegratorSampling(const int i, const Array<int> &be, const Array<int> &qp, const Array<double> &qw)
+   void UpdateBdrFaceIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < bfnfi.Size()));
       assert(bfnfi.Size() == bfnfi_sample.Size());
 
-      bfnfi_sample[i] = new Array<SampleInfo>(be.Size());
-      for (int s = 0; s < be.Size(); s++)
-      {
-         (*bfnfi_sample[i])[s].be = be[s];
-         (*bfnfi_sample[i])[s].qp = qp[s];
-         (*bfnfi_sample[i])[s].qw = qw[s];
-      }
+      bfnfi_sample[i] = new Array<SampleInfo>(samples);
    }
 
    /** @brief Access all boundary face integrators added with

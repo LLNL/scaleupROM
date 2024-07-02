@@ -58,16 +58,15 @@ TEST(ROMNonlinearForm, VectorConvectionTrilinearFormIntegrator)
    const int nqe = ir.GetNPoints();
    const int ne = fes->GetNE();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(ne * nqe), sample_qp(ne * nqe);
-   Array<double> sample_qw(ne * nqe);
+   Array<SampleInfo> samples(ne * nqe);
    for (int e = 0, idx = 0; e < ne; e++)
       for (int q = 0; q < nqe; q++, idx++)
       {
-         sample_el[idx] = e;
-         sample_qp[idx] = q;
-         sample_qw[idx] = w_el[q];
+         samples[idx].el = e;
+         samples[idx].qp = q;
+         samples[idx].qw = w_el[q];
       }
-   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateDomainIntegratorSampling(0, samples);
 
    Vector rom_u(num_basis), u(fes->GetTrueVSize());
    for (int k = 0; k < rom_u.Size(); k++)
@@ -128,16 +127,15 @@ TEST(ROMNonlinearForm, IncompressibleInviscidFluxNLFIntegrator)
    const int nqe = ir.GetNPoints();
    const int ne = fes->GetNE();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(ne * nqe), sample_qp(ne * nqe);
-   Array<double> sample_qw(ne * nqe);
+   Array<SampleInfo> samples(ne * nqe);
    for (int e = 0, idx = 0; e < ne; e++)
       for (int q = 0; q < nqe; q++, idx++)
       {
-         sample_el[idx] = e;
-         sample_qp[idx] = q;
-         sample_qw[idx] = w_el[q];
+         samples[idx].el = e;
+         samples[idx].qp = q;
+         samples[idx].qw = w_el[q];
       }
-   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateDomainIntegratorSampling(0, samples);
 
    Vector rom_u(num_basis), u(fes->GetTrueVSize());
    for (int k = 0; k < rom_u.Size(); k++)
@@ -199,8 +197,7 @@ TEST(ROMNonlinearForm, DGLaxFriedrichsFluxIntegrator)
    const int nqe = ir.GetNPoints();
    const int nf = mesh->GetNumFaces();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(0), sample_qp(0);
-   Array<double> sample_qw(0);
+   Array<SampleInfo> samples(0);
    for (int f = 0; f < nf; f++)
    {
       tr = mesh->GetInteriorFaceTransformations(f);
@@ -208,12 +205,10 @@ TEST(ROMNonlinearForm, DGLaxFriedrichsFluxIntegrator)
 
       for (int q = 0; q < nqe; q++)
       {
-         sample_el.Append(f);
-         sample_qp.Append(q);
-         sample_qw.Append(w_el[q]);
+         samples.Append({.el = f, .qp = q, .qw = w_el[q]});
       }
    }
-   rform->UpdateInteriorFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateInteriorFaceIntegratorSampling(0, samples);
 
    Vector rom_u(num_basis), u(fes->GetTrueVSize());
    for (int k = 0; k < rom_u.Size(); k++)
@@ -270,15 +265,14 @@ TEST(ROMNonlinearForm_gradient, VectorConvectionTrilinearFormIntegrator)
    const int nqe = ir.GetNPoints();
    const int ne = fes->GetNE();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(nsample), sample_qp(nsample);
-   Array<double> sample_qw(nsample);
+   Array<SampleInfo> samples(nsample);
    for (int s = 0; s < nsample; s++)
    {
-      sample_el[s] = UniformRandom(0, ne-1);
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = UniformRandom(0, ne-1);
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
    }
-   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateDomainIntegratorSampling(0, samples);
 
    Vector rom_u(num_basis);
    for (int k = 0; k < rom_u.Size(); k++)
@@ -359,15 +353,14 @@ TEST(ROMNonlinearForm_gradient, IncompressibleInviscidFluxNLFIntegrator)
    const int nqe = ir.GetNPoints();
    const int ne = fes->GetNE();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(nsample), sample_qp(nsample);
-   Array<double> sample_qw(nsample);
+   Array<SampleInfo> samples(nsample);
    for (int s = 0; s < nsample; s++)
    {
-      sample_el[s] = UniformRandom(0, ne-1);
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = UniformRandom(0, ne-1);
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
    }
-   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateDomainIntegratorSampling(0, samples);
 
    Vector rom_u(num_basis);
    for (int k = 0; k < rom_u.Size(); k++)
@@ -448,8 +441,7 @@ TEST(ROMNonlinearForm_gradient, DGLaxFriedrichsFluxIntegrator)
    const int nqe = ir.GetNPoints();
    const int nf = mesh->GetNumFaces();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(nsample), sample_qp(nsample);
-   Array<double> sample_qw(nsample);
+   Array<SampleInfo> samples(nsample);
 
    int s = 0;
    FaceElementTransformations *tr;
@@ -459,13 +451,13 @@ TEST(ROMNonlinearForm_gradient, DGLaxFriedrichsFluxIntegrator)
       tr = mesh->GetInteriorFaceTransformations(f);
       if (tr == NULL) continue;
 
-      sample_el[s] = f;
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = f;
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
 
       s++;
    }
-   rform->UpdateInteriorFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateInteriorFaceIntegratorSampling(0, samples);
 
    Vector rom_u(num_basis);
    for (int k = 0; k < rom_u.Size(); k++)
@@ -547,15 +539,14 @@ TEST(ROMNonlinearForm_fast, VectorConvectionTrilinearFormIntegrator)
    const int nqe = ir.GetNPoints();
    const int ne = fes->GetNE();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(nsample), sample_qp(nsample);
-   Array<double> sample_qw(nsample);
+   Array<SampleInfo> samples(nsample);
    for (int s = 0; s < nsample; s++)
    {
-      sample_el[s] = UniformRandom(0, ne-1);
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = UniformRandom(0, ne-1);
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
    }
-   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateDomainIntegratorSampling(0, samples);
    rform->PrecomputeCoefficients();
 
    Vector rom_u(num_basis);
@@ -644,15 +635,14 @@ TEST(ROMNonlinearForm_fast, IncompressibleInviscidFluxNLFIntegrator)
    const int nqe = ir.GetNPoints();
    const int ne = fes->GetNE();
    Array<double> const& w_el = ir.GetWeights();
-   Array<int> sample_el(nsample), sample_qp(nsample);
-   Array<double> sample_qw(nsample);
+   Array<SampleInfo> samples(nsample);
    for (int s = 0; s < nsample; s++)
    {
-      sample_el[s] = UniformRandom(0, ne-1);
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = UniformRandom(0, ne-1);
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
    }
-   rform->UpdateDomainIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateDomainIntegratorSampling(0, samples);
    rform->PrecomputeCoefficients();
 
    Vector rom_u(num_basis);
@@ -761,8 +751,7 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
    const int nf = mesh->GetNumFaces();
    const int nbe = fes->GetNBE();
    Array<double> const& w_el = ir->GetWeights();
-   Array<int> sample_el(nsample), sample_qp(nsample);
-   Array<double> sample_qw(nsample);
+   Array<SampleInfo> samples(nsample);
 
    FaceElementTransformations *tr;
 
@@ -774,13 +763,13 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
       tr = mesh->GetInteriorFaceTransformations(f);
       if (tr == NULL) continue;
 
-      sample_el[s] = f;
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = f;
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
 
       s++;
    }
-   rform->UpdateInteriorFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateInteriorFaceIntegratorSampling(0, samples);
 
    /* fill up boundary face samples */
    s = 0;
@@ -790,13 +779,13 @@ TEST(ROMNonlinearForm_fast, DGLaxFriedrichsFluxIntegrator)
       tr = mesh->GetBdrFaceTransformations(be);
       if (tr == NULL) continue;
 
-      sample_el[s] = be;
-      sample_qp[s] = UniformRandom(0, nqe-1);
-      sample_qw[s] = UniformRandom();
+      samples[s].el = be;
+      samples[s].qp = UniformRandom(0, nqe-1);
+      samples[s].qw = UniformRandom();
 
       s++;
    }
-   rform->UpdateBdrFaceIntegratorSampling(0, sample_el, sample_qp, sample_qw);
+   rform->UpdateBdrFaceIntegratorSampling(0, samples);
 
    rform->PrecomputeCoefficients();
 

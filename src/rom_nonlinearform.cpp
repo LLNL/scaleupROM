@@ -160,7 +160,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int face = sample->face;
+            int face = sample->el;
             tr = mesh->GetInteriorFaceTransformations(face);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
@@ -236,7 +236,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int be = sample->be;
+            int be = sample->el;
             const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
@@ -417,7 +417,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int face = sample->face;
+            int face = sample->el;
             tr = mesh->GetInteriorFaceTransformations(face);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
@@ -493,7 +493,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int be = sample->be;
+            int be = sample->el;
             const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
@@ -637,7 +637,7 @@ void ROMNonlinearForm::PrecomputeCoefficients()
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int be = sample->be;
+            int be = sample->el;
 
             const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
@@ -687,25 +687,24 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
    CAROM::Matrix Gt(1,1, true);
    CAROM::Vector rhs_Gw(1, false);
 
-   Array<int> el, qp;
-   Array<double> qw;
+   Array<SampleInfo> samples;
    Array<int> fidxs;
    Mesh *mesh = fes->GetMesh();
 
    for (int k = 0; k < dnfi.Size(); k++)
    {
       SetupEQPSystemForDomainIntegrator(snapshots_work, dnfi[k], Gt, rhs_Gw);
-      TrainEQPForIntegrator(dnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
-      UpdateDomainIntegratorSampling(k, el, qp, qw);
+      TrainEQPForIntegrator(dnfi[k], Gt, rhs_Gw, eqp_tol, samples);
+      UpdateDomainIntegratorSampling(k, samples);
    }
 
    for (int k = 0; k < fnfi.Size(); k++)
    {
       SetupEQPSystemForInteriorFaceIntegrator(snapshots_work, fnfi[k], Gt, rhs_Gw, fidxs);
-      TrainEQPForIntegrator(fnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
-      for (int s = 0; s < el.Size(); s++)
-         el[s] = fidxs[el[s]];
-      UpdateInteriorFaceIntegratorSampling(k, el, qp, qw);
+      TrainEQPForIntegrator(fnfi[k], Gt, rhs_Gw, eqp_tol, samples);
+      for (int s = 0; s < samples.Size(); s++)
+         samples[s].el = fidxs[samples[s].el];
+      UpdateInteriorFaceIntegratorSampling(k, samples);
    }
 
    // Which boundary attributes need to be processed?
@@ -731,16 +730,16 @@ void ROMNonlinearForm::TrainEQP(const CAROM::Matrix &snapshots, const double eqp
       }
 
       SetupEQPSystemForBdrFaceIntegrator(snapshots_work, bfnfi[k], bdr_attr_marker, Gt, rhs_Gw, fidxs);
-      TrainEQPForIntegrator(bfnfi[k], Gt, rhs_Gw, eqp_tol, el, qp, qw);
-      for (int s = 0; s < el.Size(); s++)
-         el[s] = fidxs[el[s]];
-      UpdateBdrFaceIntegratorSampling(k, el, qp, qw);
+      TrainEQPForIntegrator(bfnfi[k], Gt, rhs_Gw, eqp_tol, samples);
+      for (int s = 0; s < samples.Size(); s++)
+         samples[s].el = fidxs[samples[s].el];
+      UpdateBdrFaceIntegratorSampling(k, samples);
    }
 }
 
 void ROMNonlinearForm::TrainEQPForIntegrator(
    HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw,
-   const double eqp_tol, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw)
+   const double eqp_tol, Array<SampleInfo> &samples)
 {
    const IntegrationRule *ir = nlfi->GetIntegrationRule();
 
@@ -825,21 +824,17 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
    MPI_Allgatherv(eqpSol.getData(), eqpSol.dim(), MPI_DOUBLE, eqpSol_global.getData(),
                   eqp_sol_cnts.data(), eqp_sol_offsets.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
-   sample_el.SetSize(0);
-   sample_qp.SetSize(0);
-   sample_qw.SetSize(0);
+   samples.SetSize(0);
    for (int i = 0; i < eqpSol_global.dim(); ++i)
    {
       if (eqpSol_global(i) > 1.0e-12)
       {
          const int e = i / nqe;  // Element index
-         sample_el.Append(i / nqe);
-         sample_qp.Append(i % nqe);
-         sample_qw.Append(eqpSol_global(i));
+         samples.Append({.el = i / nqe, .qp = i % nqe, .qw = eqpSol_global(i)});
       }
    }
-   printf("Size of sampled qp: %d\n", sample_el.Size());
-   if (nnz != sample_el.Size())
+   printf("Size of sampled qp: %d\n", samples.Size());
+   if (nnz != samples.Size())
       printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 }
 
@@ -1258,12 +1253,7 @@ void ROMNonlinearForm::GetEQPForIntegrator(
 
    for (int s = 0; s < sample->Size(); s++)
    {
-      switch (type)
-      {
-         case IntegratorType::DOMAIN:        el.Append((*sample)[s].el); break;
-         case IntegratorType::INTERIORFACE:  el.Append((*sample)[s].face); break;
-         case IntegratorType::BDRFACE:       el.Append((*sample)[s].be); break;
-      }
+      el.Append((*sample)[s].el);
       qp.Append((*sample)[s].qp);
       qw.Append((*sample)[s].qw);
    }

@@ -113,17 +113,14 @@ TEST(ROMInterfaceForm, InterfaceAddMult)
    for (int p = 0; p < nport; p++)
    {
       Array<InterfaceInfo> *interface_infos = submesh->GetInterfaceInfos(p);
-      Array<int> sample_itf(0), sample_qp(0);
-      Array<double> sample_qw(0);
+      Array<SampleInfo> samples(0);
       for (int itf = 0; itf < interface_infos->Size(); itf++)
          for (int q = 0; q < nqe; q++)
          {
-            sample_itf.Append(itf);
-            sample_qp.Append(q);
-            sample_qw.Append(w_el[q]);
+            samples.Append({.el=itf, .qp=q, .qw=w_el[q]});
          }
 
-      rform->UpdateInterFaceIntegratorSampling(0, p, sample_itf, sample_qp, sample_qw);
+      rform->UpdateInterFaceIntegratorSampling(0, p, samples);
    }
    
    rom_y = 0.0; 
@@ -220,17 +217,14 @@ TEST(ROMInterfaceForm, InterfaceGetGradient)
    for (int p = 0; p < nport; p++)
    {
       Array<InterfaceInfo> *interface_infos = submesh->GetInterfaceInfos(p);
-      Array<int> sample_itf(0), sample_qp(0);
-      Array<double> sample_qw(0);
+      Array<SampleInfo> samples(0);
       for (int itf = 0; itf < interface_infos->Size(); itf++)
          for (int q = 0; q < nqe; q++)
          {
-            sample_itf.Append(itf);
-            sample_qp.Append(q);
-            sample_qw.Append(w_el[q]);
+            samples.Append({.el=itf, .qp=q, .qw=w_el[q]});
          }
 
-      rform->UpdateInterFaceIntegratorSampling(0, p, sample_itf, sample_qp, sample_qw);
+      rform->UpdateInterFaceIntegratorSampling(0, p, samples);
    }
    
    rom_y = 0.0; 
@@ -485,12 +479,11 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
       EXPECT_NEAR(rhs1(k), rhs2(k), threshold);
 
    double eqp_tol = 1.0e-10;
-   Array<int> sample_el(0), sample_qp(0);
-   Array<double> sample_qw(0);
+   Array<SampleInfo> samples(0);
    const int nqe = ir->GetNPoints();
-   rform->TrainEQPForIntegrator(nqe, Gt, rhs2, eqp_tol, sample_el, sample_qp, sample_qw);
+   rform->TrainEQPForIntegrator(nqe, Gt, rhs2, eqp_tol, samples);
    // if (rform->PrecomputeMode()) rform->PrecomputeCoefficients();
-   rform->UpdateInterFaceIntegratorSampling(0, pidx, sample_el, sample_qp, sample_qw);
+   rform->UpdateInterFaceIntegratorSampling(0, pidx, samples);
 
    DenseMatrix rom_rhs1(rhs1.getData(), NB, num_snap), rom_rhs2(NB, num_snap);
    Array<int> rom_blocks = rform->GetBlockOffsets();

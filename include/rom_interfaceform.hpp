@@ -74,8 +74,8 @@ public:
          fnfi_sample.Append(NULL);
    }
 
-   void UpdateInterFaceIntegratorSampling(const int i, const int rp, const Array<int> &itf,
-                                          const Array<int> &qp, const Array<double> &qw)
+   void UpdateInterFaceIntegratorSampling(const int i, const int rp,
+                                          const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < fnfi.Size()));
       assert((rp >= 0) && (rp < numRefPorts));
@@ -85,13 +85,7 @@ public:
       if (fnfi_ref_sample[idx])
          delete fnfi_ref_sample[idx];
 
-      fnfi_ref_sample[idx] = new Array<SampleInfo>(itf.Size());
-      for (int s = 0; s < itf.Size(); s++)
-      {
-         (*fnfi_ref_sample[idx])[s].itf = itf[s];
-         (*fnfi_ref_sample[idx])[s].qp = qp[s];
-         (*fnfi_ref_sample[idx])[s].qw = qw[s];
-      }
+      fnfi_ref_sample[idx] = new Array<SampleInfo>(samples);
 
       for (int p = 0; p < numPorts; p++)
       {
@@ -120,7 +114,7 @@ public:
 
    void TrainEQPForIntegrator(const int nqe, const CAROM::Matrix &Gt,
                               const CAROM::Vector &rhs_Gw, const double eqp_tol,
-                              Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+                              Array<SampleInfo> &samples);
 
    void SaveEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname);
    void LoadEQPForIntegrator(const int k, hid_t file_id, const std::string &dsetname);

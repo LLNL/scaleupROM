@@ -132,7 +132,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int itf = sample->itf;
+            int itf = sample->el;
             InterfaceInfo *if_info = &((*interface_infos)[itf]);
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
@@ -255,7 +255,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
          SampleInfo *sample = sample_info->GetData();
          for (int i = 0; i < sample_info->Size(); i++, sample++)
          {
-            int itf = sample->itf;
+            int itf = sample->el;
             InterfaceInfo *if_info = &((*interface_infos)[itf]);
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
@@ -342,8 +342,7 @@ void ROMInterfaceForm::TrainEQPForRefPort(const int p,
    CAROM::Matrix Gt(1,1, true);
    CAROM::Vector rhs_Gw(1, false);
 
-   Array<int> el, qp;
-   Array<double> qw;
+   Array<SampleInfo> samples;
    Array<int> fidxs;
 
    for (int it = 0; it < fnfi.Size(); it++)
@@ -355,8 +354,8 @@ void ROMInterfaceForm::TrainEQPForRefPort(const int p,
       SetupEQPSystem(snapshot1_work, snapshot2_work, snap_pair_idx,
                      *basis1, *basis2, basis1_offset, basis2_offset,
                      fes1, fes2, itf_info, fnfi[it], Gt, rhs_Gw);
-      TrainEQPForIntegrator(nqe, Gt, rhs_Gw, eqp_tol, el, qp, qw);
-      UpdateInterFaceIntegratorSampling(it, p, el, qp, qw);
+      TrainEQPForIntegrator(nqe, Gt, rhs_Gw, eqp_tol, samples);
+      UpdateInterFaceIntegratorSampling(it, p, samples);
    }
 }
 
@@ -526,7 +525,7 @@ void ROMInterfaceForm::SetupEQPSystem(
 
 void ROMInterfaceForm::TrainEQPForIntegrator(
    const int nqe, const CAROM::Matrix &Gt, const CAROM::Vector &rhs_Gw,
-   const double eqp_tol, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw)
+   const double eqp_tol, Array<SampleInfo> &samples)
 {
    //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
    // CAROM::Vector const& w, CAROM::Matrix & Gt,
@@ -605,21 +604,17 @@ void ROMInterfaceForm::TrainEQPForIntegrator(
    MPI_Allgatherv(eqpSol.getData(), eqpSol.dim(), MPI_DOUBLE, eqpSol_global.getData(),
                   eqp_sol_cnts.data(), eqp_sol_offsets.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
-   sample_el.SetSize(0);
-   sample_qp.SetSize(0);
-   sample_qw.SetSize(0);
+   samples.SetSize(0);
    for (int i = 0; i < eqpSol_global.dim(); ++i)
    {
       if (eqpSol_global(i) > 1.0e-12)
       {
          const int e = i / nqe;  // Element index
-         sample_el.Append(i / nqe);
-         sample_qp.Append(i % nqe);
-         sample_qw.Append(eqpSol_global(i));
+         samples.Append({.el = i / nqe, .qp = i % nqe, .qw = eqpSol_global(i)});
       }
    }
-   printf("Size of sampled qp: %d\n", sample_el.Size());
-   if (nnz != sample_el.Size())
+   printf("Size of sampled qp: %d\n", samples.Size());
+   if (nnz != samples.Size())
       printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 }
 
