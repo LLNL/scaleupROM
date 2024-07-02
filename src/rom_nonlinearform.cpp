@@ -1216,8 +1216,7 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
    return;
 }
 
-void ROMNonlinearForm::GetEQPForIntegrator(
-   const IntegratorType type, const int k, Array<int> &el, Array<int> &qp, Array<double> &qw)
+Array<SampleInfo>* ROMNonlinearForm::GetEQPForIntegrator(const IntegratorType type, const int k)
 {
    Array<SampleInfo> *sample = NULL;
    switch (type)
@@ -1247,16 +1246,7 @@ void ROMNonlinearForm::GetEQPForIntegrator(
          mfem_error("Unknown Integrator type!\n");
    }
 
-   el.SetSize(0);
-   qp.SetSize(0);
-   qw.SetSize(0);
-
-   for (int s = 0; s < sample->Size(); s++)
-   {
-      el.Append((*sample)[s].el);
-      qp.Append((*sample)[s].qp);
-      qw.Append((*sample)[s].qw);
-   }
+   return sample;
 }
 
 void ROMNonlinearForm::SaveEQPForIntegrator(

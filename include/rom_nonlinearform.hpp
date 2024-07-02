@@ -71,7 +71,7 @@ public:
    void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                            const Array<int> &bdr_attr_marker, CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs);
 
-   void GetEQPForIntegrator(const IntegratorType type, const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   Array<SampleInfo>* GetEQPForIntegrator(const IntegratorType type, const int k);
    void SaveEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
    void LoadEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
 
