@@ -6,6 +6,7 @@
 #include "interfaceinteg.hpp"
 #include "rom_interfaceform.hpp"
 #include "etc.hpp"
+#include "component_topology_handler.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -517,6 +518,219 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    delete basis1_generator;
    delete basis2_generator;
 }
+
+// // TODO(kevin): figure out how to set up interface for self.
+// TEST(ROMInterfaceForm, Self_Interface)
+// {
+//    config = InputParser("inputs/test.interface.yml");
+//    const int order = UniformRandom(1, 1);
+
+//    ComponentTopologyHandler *topol = new ComponentTopologyHandler();
+
+//    Array<Mesh *> meshes;
+//    TopologyData topol_data;
+//    topol->ExportInfo(meshes, topol_data);
+//    const int dim = topol_data.dim;
+//    const int numSub = topol_data.numSub;
+
+//    const int pidx = UniformRandom(0, topol->GetNumPorts()-1);
+//    const PortInfo *pInfo = topol->GetPortInfo(pidx);
+//    Array<InterfaceInfo>* const itf_infos = topol->GetInterfaceInfos(pidx);
+
+//    Array<int> midx(2);
+//    Mesh *mesh1, *mesh2;
+
+//    midx[0] = pInfo->Mesh1;
+//    midx[1] = pInfo->Mesh2;
+//    assert(midx[0] == midx[1]);
+
+//    mesh1 = meshes[midx[0]];
+//    mesh2 = meshes[midx[1]];
+   
+//    FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+//    Array<FiniteElementSpace *> fes(numSub);
+//    for (int m = 0; m < numSub; m++)
+//       fes[m] = new FiniteElementSpace(meshes[m], dg_coll, dim);
+
+//    FiniteElementSpace *fes1, *fes2;
+//    fes1 = fes[midx[0]];
+//    fes2 = fes[midx[1]];
+
+//    const int ndofs1 = fes1->GetTrueVSize();
+//    const int ndofs2 = fes2->GetTrueVSize();
+//    assert(ndofs1 == ndofs2);
+
+//    /* number of snapshots on the domain */
+//    /* we only have only one domain */
+//    const int nsnap = UniformRandom(3, 5);
+//    /* same number of basis to fully represent snapshots */
+//    const int num_basis = nsnap;
+//    const int NB = num_basis + num_basis;
+//    const int num_snap = nsnap;
+
+//    /* fictitious snapshots */
+//    DenseMatrix snapshots(ndofs1, nsnap);
+//    for (int i = 0; i < ndofs1; i++)
+//       for (int j = 0; j < nsnap; j++)
+//          snapshots(i, j) = 2.0 * UniformRandom() - 1.0;
+
+//    /* fictitious pair indices */
+//    Array2D<int> snap_pair_idx(num_snap, 2);
+//    for (int i = 0; i < num_snap; i++)
+//    {
+//       snap_pair_idx(i, 0) = i;
+//       snap_pair_idx(i, 1) = i;
+//    }
+
+//    /* bases generated from fictitious snapshots */
+//    DenseMatrix basis(ndofs1, num_basis);
+//    const CAROM::Matrix *carom_snapshots;
+//    CAROM::BasisGenerator *basis_generator;
+//    {
+//       CAROM::Options options(ndofs1, nsnap, 1, true);
+//       options.static_svd_preserve_snapshot = true;
+//       basis_generator = new CAROM::BasisGenerator(options, false, "test_basis");
+//       Vector snapshot(ndofs1);
+//       for (int s = 0; s < nsnap; s++)
+//       {
+//          snapshots.GetColumnReference(s, snapshot);
+//          basis_generator->takeSample(snapshot.GetData());
+//       }
+//       basis_generator->endSamples();
+//       carom_snapshots = basis_generator->getSnapshotMatrix();
+
+//       CAROM::BasisReader basis_reader("test_basis");
+//       const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
+//       CAROM::CopyMatrix(*carom_basis, basis);
+//    }
+
+//    /* get integration rule for eqp */
+//    const IntegrationRule *ir = NULL;
+//    for (int be = 0; be < fes1->GetNBE(); be++)
+//    {
+//       FaceElementTransformations *tr = mesh1->GetBdrFaceTransformations(be);
+//       if (tr != NULL)
+//       {
+//          ir = &IntRules.Get(tr->GetGeometryType(),
+//                             (int)(ceil(1.5 * (2 * fes1->GetMaxElementOrder() - 1))));
+//          break;
+//       }
+//    }
+//    assert(ir);
+
+//    ConstantCoefficient pi(3.141592);
+//    auto *integ1 = new DGLaxFriedrichsFluxIntegrator(pi);
+//    integ1->SetIntRule(ir);
+//    auto *integ2 = new DGLaxFriedrichsFluxIntegrator(pi);
+//    integ2->SetIntRule(ir);
+
+//    /* FOM interface operator */
+//    InterfaceForm *nform(new InterfaceForm(meshes, fes, topol));
+//    nform->AddInterfaceIntegrator(integ1);
+
+//    /* EQP interface operator */
+//    ROMInterfaceForm *rform(new ROMInterfaceForm(meshes, fes, fes, topol));
+//    rform->AddInterfaceIntegrator(integ2);
+
+//    rform->SetBasisAtComponent(midx[0], basis);
+//    rform->UpdateBlockOffsets();
+//    // rform->SetPrecomputeMode(false);
+
+//    CAROM::Vector rhs1(num_snap * NB, false);
+//    CAROM::Vector rhs2(num_snap * NB, false);
+//    CAROM::Matrix Gt(1, 1, true);
+
+//    /* exact right-hand side by inner product of basis and fom vectors */
+//    Vector rhs_vec1(ndofs1), rhs_vec2(ndofs2);
+//    Vector snap1(ndofs1), snap2(ndofs2);
+//    Vector basis_col;
+//    for (int s = 0; s < num_snap; s++)
+//    {
+//       snapshots.GetColumnReference(snap_pair_idx(s, 0), snap1);
+//       snapshots.GetColumnReference(snap_pair_idx(s, 1), snap2);
+
+//       rhs_vec1 = 0.0; rhs_vec2 = 0.0;
+//       nform->AssembleInterfaceVector(mesh1, mesh2, fes1, fes2, itf_infos, snap1, snap2, rhs_vec1, rhs_vec2);
+
+//       for (int b = 0; b < num_basis; b++)
+//       {
+//          basis.GetColumnReference(b, basis_col);
+//          rhs1(b + s * NB) = basis_col * rhs_vec1;
+//       }
+//       for (int b = 0; b < num_basis; b++)
+//       {
+//          basis.GetColumnReference(b, basis_col);
+//          rhs1(b + num_basis + s * NB) = basis_col * rhs_vec2;
+//       }
+//    }
+
+//    /*
+//       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+//       Will have to consider parallel-compatible test.
+//    */
+//    CAROM::Matrix carom_snapshots1_work(*carom_snapshots);
+//    carom_snapshots1_work.gather();
+//    CAROM::Matrix carom_snapshots2_work(*carom_snapshots);
+//    carom_snapshots2_work.gather();
+
+//    /* equivalent operation must happen within this routine */
+//    rform->SetupEQPSystem(carom_snapshots1_work, carom_snapshots2_work,
+//                          snap_pair_idx, basis, basis, 0, 0,
+//                          fes1, fes2, itf_infos, integ2, Gt, rhs2);
+
+//    for (int k = 0; k < rhs1.dim(); k++)
+//       EXPECT_NEAR(rhs1(k), rhs2(k), threshold);
+
+//    double eqp_tol = 1.0e-10;
+//    Array<SampleInfo> samples(0);
+//    const int nqe = ir->GetNPoints();
+//    rform->TrainEQPForIntegrator(nqe, Gt, rhs2, eqp_tol, samples);
+//    // if (rform->PrecomputeMode()) rform->PrecomputeCoefficients();
+//    rform->UpdateInterFaceIntegratorSampling(0, pidx, samples);
+
+//    DenseMatrix rom_rhs1(rhs1.getData(), NB, num_snap), rom_rhs2(NB, num_snap);
+//    Array<int> rom_blocks = rform->GetBlockOffsets();
+//    BlockVector rom_sol(rom_blocks), rom_rhs2_vec(rom_blocks);
+//    for (int s = 0; s < num_snap; s++)
+//    {
+//       snapshots.GetColumnReference(snap_pair_idx(s, 0), snap1);
+//       snapshots.GetColumnReference(snap_pair_idx(s, 1), snap2);
+
+//       rom_sol = 0.0;
+//       basis.MultTranspose(snap1, rom_sol.GetBlock(midx[0]));
+//       basis.MultTranspose(snap2, rom_sol.GetBlock(midx[1]));
+// {
+//    printf("rom_sol:\n");
+//    for (int k = 0; k < rom_sol.Size(); k++)
+//       printf("%.3e\t", rom_sol(k));
+//    printf("\n");
+// }
+//       rom_rhs2_vec = 0.0;
+//       rform->InterfaceAddMult(rom_sol, rom_rhs2_vec);
+// {
+//    printf("rom_rhs2_vec:\n");
+//    for (int k = 0; k < rom_rhs2_vec.Size(); k++)
+//       printf("%.3e\t", rom_rhs2_vec(k));
+//    printf("\n");
+// }
+
+//       for (int b = 0; b < num_basis; b++)
+//          rom_rhs2(b, s) = rom_rhs2_vec.GetBlock(midx[0])(b);
+//       for (int b = 0; b < num_basis; b++)
+//          rom_rhs2(b + num_basis, s) = rom_rhs2_vec.GetBlock(midx[1])(b);
+//    }
+
+//    for (int i = 0; i < NB; i++)
+//       for (int j = 0; j < num_snap; j++)
+//          EXPECT_NEAR(rom_rhs1(i, j), rom_rhs2(i, j), threshold);
+
+//    delete topol;
+//    delete dg_coll;
+//    DeletePointers(fes);
+//    delete nform;
+//    delete rform;
+//    delete basis_generator;
+// }
 
 int main(int argc, char* argv[])
 {

@@ -10,8 +10,10 @@ navier-stokes:
 mesh:
   type: component-wise
   component-wise:
-    global_config: "box-channel.1x1.periodic.h5"
+    global_config: "box-channel.2x2.periodic.h5"
     components:
+      - name: "empty"
+        file: "square.tri.mesh"
       - name: "square-circle"
         file: "square-circle.msh.mfem"
 
@@ -55,11 +57,7 @@ sample_collection:
 
 basis:
   prefix: "stokes"
-  tags:
-    - name: "square-circle_vel"
-      number_of_basis: 3
-    - name: "square-circle_pres"
-      number_of_basis: 3
+  number_of_basis: 6
   svd:
     save_spectrum: true
     update_right_sv: false
