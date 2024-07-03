@@ -42,18 +42,21 @@ single_run:
 
 sample_generation:
   maximum_number_of_snapshots: 400
-  component_sampling: false
   file_path:
     prefix: "stokes"
   parameters:
     - key: single_run/periodic_flow_past_array/nu
       type: double
-      sample_size: 3
+      sample_size: 2
       minimum: 1.0
-      maximum: 1.2
+      maximum: 1.1
 
 sample_collection:
   mode: port
+  port_fileformat:
+    format: stokes%d_sample.port.h5
+    minimum: 0
+    maximum: 1
 
 basis:
   prefix: "stokes"

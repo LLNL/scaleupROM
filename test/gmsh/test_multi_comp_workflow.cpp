@@ -11,7 +11,7 @@ using namespace mfem;
 
 static const double threshold = 1.0e-14;
 static const double stokes_threshold = 2.0e-12;
-static const double ns_threshold = 1.0e-7;
+static const double ns_threshold = 1.0e-9;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
@@ -256,6 +256,13 @@ TEST(SteadyNS_Workflow, InterfaceEQP)
    printf("\nSample Generation \n\n");
    
    config.dict_["main"]["mode"] = "sample_generation";
+   config.dict_["sample_generation"]["file_path"]["prefix"] = "stokes0";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["sample_generation"]["file_path"]["prefix"] = "stokes1";
+   config.dict_["sample_generation"]["parameters"][0]["sample_size"] = 1;
+   config.dict_["sample_generation"]["parameters"][0]["minimum"] = 1.2;
+   config.dict_["sample_generation"]["parameters"][0]["maximum"] = 1.2;
    GenerateSamples(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "train_rom";
