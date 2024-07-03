@@ -100,7 +100,7 @@ public:
    Array<ROMNonlinearForm *> comp;     // Size(num_components);
    // boundary condition is enforced via forcing term.
    Array<Array<ROMNonlinearForm *> *> bdr;
-   Array<ROMInterfaceForm *> port;   // reference ports.
+   ROMInterfaceForm *port = NULL;   // reference ports.
 
 public:
    ROMEQPElement(TopologyHandler *topol_handler_,

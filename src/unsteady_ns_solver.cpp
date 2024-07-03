@@ -45,11 +45,6 @@ UnsteadyNSSolver::~UnsteadyNSSolver()
    delete Hop;
 }
 
-void UnsteadyNSSolver::InitVariables()
-{
-   StokesSolver::InitVariables();
-}
-
 void UnsteadyNSSolver::BuildDomainOperators()
 {
    SteadyNSSolver::BuildDomainOperators();

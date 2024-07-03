@@ -177,7 +177,7 @@ const std::string SampleGenerator::GetSamplePath(const int &idx, const std::stri
    return full_path;
 }
 
-void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<std::string> &snapshot_basis_tags, Array<int> &col_idxs)
+void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<BasisTag> &snapshot_basis_tags, Array<int> &col_idxs)
 {
    assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
    col_idxs.SetSize(U_snapshots->NumBlocks());
@@ -218,13 +218,13 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Ar
 
       /*
          We save the snapshot ports by component names.
-         Variable separation does not matter at this point.
-         Though we use basis tags here, it is only for the sake of
-         getting consistent domain/component mesh names.
+         Variable separation does not matter at this point..
       */
+      int c1 = topol_handler->GetMeshType(port->Mesh1);
+      int c2 = topol_handler->GetMeshType(port->Mesh2);
       std::string mesh1, mesh2;
-      mesh1 = GetBasisTag(port->Mesh1, topol_handler);
-      mesh2 = GetBasisTag(port->Mesh2, topol_handler); 
+      mesh1 = topol_handler->GetComponentName(c1);
+      mesh2 = topol_handler->GetComponentName(c2);
 
       /*
          note the mesh names are not necessarily the same as the subdomain names
@@ -262,7 +262,7 @@ void SampleGenerator::SaveSnapshotPorts(TopologyHandler *topol_handler, const Ar
    }
 }
 
-void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const std::string &basis_tag)
+void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const BasisTag &basis_tag)
 {
    const std::string filename = GetBaseFilename(prefix, basis_tag);
 
@@ -298,9 +298,13 @@ void SampleGenerator::WriteSnapshotPorts()
    file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
    assert(file_id >= 0);
 
-   hdf5_utils::WriteAttribute(file_id, "sample_prefix", GetSamplePrefix());
+   /* this is the path to all associated snapshot matrices */
+   char sample_path[PATH_MAX];
+   realpath(GetSamplePrefix().c_str(), sample_path);
+   hdf5_utils::WriteAttribute(file_id, "sample_prefix", std::string(sample_path));
+   
+   /* write port information */
    hdf5_utils::WriteAttribute(file_id, "number_of_ports", (int) port_tags.size());
-
    for (int p = 0; p < port_tags.size(); p++)
    {
       hid_t grp_id;
@@ -317,12 +321,17 @@ void SampleGenerator::WriteSnapshotPorts()
       assert(errf >= 0);
    }
 
+   /* write basis tag list */
+   hdf5_utils::WriteAttribute(file_id, "number_of_basistags", (int) basis_tags.size());
+   for (int b = 0; b < basis_tags.size(); b++)
+      hdf5_utils::WriteAttribute(file_id, std::string("basistag" + std::to_string(b)).c_str(), basis_tags[b]);
+
    errf = H5Fclose(file_id);
    assert(errf >= 0);
    return;
 }
 
-const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_tag)
+const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const BasisTag &basis_tag)
 {
    assert(snapshot_generators.Size() > 0);
    assert(snapshot_generators.Size() == basis_tags.size());
@@ -337,11 +346,26 @@ const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const std::string &basis_ta
 
    if (idx < 0)
    {
-      printf("basis tag: %s\n", basis_tag.c_str());
+      printf("basis tag: %s\n", basis_tag.print().c_str());
       mfem_error("SampleGenerator::LookUpSnapshot- basis tag does not exist in snapshot list!\n");
    }
 
    return snapshot_generators[idx]->getSnapshotMatrix();
+}
+
+Array2D<int>* SampleGenerator::LookUpSnapshotPortColOffsets(const PortTag &port_tag)
+{
+   assert(port_colidxs.Size() > 0);
+   assert(port_colidxs.Size() == port_tags.size());
+
+   int idx = -1;
+   if (port_tag2idx.count(port_tag))
+      idx = port_tag2idx[port_tag];
+
+   if (idx < 0)
+      mfem_error("SampleGenerator::LookUpSnapshotPortColOffsets- port tag does not exist in port list!\n");
+
+   return port_colidxs[idx];
 }
 
 void SampleGenerator::ReportStatus(const int &sample_idx)
@@ -354,12 +378,12 @@ void SampleGenerator::ReportStatus(const int &sample_idx)
    printf("Basis tags: %ld\n", basis_tags.size());
    printf("%20.20s\t# of snapshots\n", "Basis tags");
    for (int k = 0; k < basis_tags.size(); k++)
-      printf("%20.20s\t%d\n", basis_tags[k].c_str(), snapshot_generators[k]->getNumSamples());
+      printf("%20.20s\t%d\n", basis_tags[k].print().c_str(), snapshot_generators[k]->getNumSamples());
    printf("==============================================\n");
 }
 
-void SampleGenerator::CollectSnapshots(const std::string &basis_prefix,
-                                       const std::string &basis_tag,
+void SampleGenerator::CollectSnapshotsByBasis(const std::string &basis_prefix,
+                                       const BasisTag &basis_tag,
                                        const std::vector<std::string> &file_list)
 {
    // Get dimension from the first snapshot file.
@@ -373,12 +397,89 @@ void SampleGenerator::CollectSnapshots(const std::string &basis_prefix,
    */
    int local_num_vdofs = CAROM::split_dimension(fom_num_vdof, MPI_COMM_WORLD);
 
-   // Append snapshot generator.
-   AddSnapshotGenerator(local_num_vdofs, basis_prefix, basis_tag);
-   CAROM::BasisGenerator *basis_generator = snapshot_generators.Last();
+   /* if the tag was never seen before, append a new snapshot generator */
+   if (!basis_tag2idx.count(basis_tag))
+      AddSnapshotGenerator(local_num_vdofs, basis_prefix, basis_tag);
+   int index = basis_tag2idx[basis_tag];
+   CAROM::BasisGenerator *basis_generator = snapshot_generators[index];
 
    for (int s = 0; s < file_list.size(); s++)
       basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5_MPIO);
+}
+
+void SampleGenerator::CollectSnapshotsByPort(
+   const std::string &basis_prefix, const std::string &port_tag_file)
+{
+   // TODO(kevin): we need to see how this impacts the parallel I/O..
+
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fopen(port_tag_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   std::string sample_path;
+   hdf5_utils::ReadAttribute(file_id, "sample_prefix", sample_path);
+   printf("SampleGenerator: snapshot port prefix=%s\n", sample_path.c_str());
+
+   int num_ports = -1;
+   hdf5_utils::ReadAttribute(file_id, "number_of_ports", num_ports);
+
+   for (int p = 0; p < num_ports; p++)
+   {
+      hid_t grp_id;
+      grp_id = H5Gopen2(file_id, std::to_string(p).c_str(), H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      PortTag port_tag;
+      hdf5_utils::ReadAttribute(grp_id, "Mesh1", port_tag.Mesh1);
+      hdf5_utils::ReadAttribute(grp_id, "Mesh2", port_tag.Mesh2);
+      hdf5_utils::ReadAttribute(grp_id, "Attr1", port_tag.Attr1);
+      hdf5_utils::ReadAttribute(grp_id, "Attr2", port_tag.Attr2);
+
+      /* if the tag was never seen before, create a new port tag */
+      if (!port_tag2idx.count(port_tag))
+      {
+         port_tag2idx[port_tag] = port_tags.size();
+         port_tags.push_back(port_tag);
+         port_colidxs.Append(new Array2D<int>);
+      }
+      int idx = port_tag2idx[port_tag];
+
+      /* if other snapshots are already collected, column indices must be offseted */
+      int col_offset1 = GetSnapshotOffset(port_tag.Mesh1);
+      int col_offset2 = GetSnapshotOffset(port_tag.Mesh2);
+
+      Array2D<int> tmp_colidx;
+      hdf5_utils::ReadDataset(grp_id, "col_idxs", tmp_colidx);
+
+      int row_offset = port_colidxs[idx]->NumRows();
+      port_colidxs[idx]->SetSize(row_offset + tmp_colidx.NumRows(), 2);
+      for (int r = 0, r0 = row_offset; r < tmp_colidx.NumRows(); r++, r0++)
+      {
+         (*port_colidxs[idx])(r0, 0) = tmp_colidx(r, 0) + col_offset1;
+         (*port_colidxs[idx])(r0, 1) = tmp_colidx(r, 1) + col_offset2;
+      }
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+   }  // for (int p = 0; p < num_ports; p++)
+
+   /* read snapshots from basis tag list */
+   int num_basistag = -1;
+   hdf5_utils::ReadAttribute(file_id, "number_of_basistags", num_basistag);
+   assert(num_basistag > 0);
+   BasisTag basis_tag;
+   std::vector<std::string> snapshot_file(1);
+   for (int b = 0; b < num_basistag; b++)
+   {
+      hdf5_utils::ReadAttribute(file_id, std::string("basistag" + std::to_string(b)).c_str(), basis_tag);
+      snapshot_file[0] = GetBaseFilename(sample_path, basis_tag) + "_snapshot";
+      CollectSnapshotsByBasis(basis_prefix, basis_tag, snapshot_file);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
 }
 
 void SampleGenerator::FormReducedBasis(const std::string &basis_prefix)
@@ -402,7 +503,7 @@ void SampleGenerator::FormReducedBasis(const std::string &basis_prefix)
       if (basis_list)
       {
          // Find if additional inputs are specified for basis_tags[p].
-         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[k], basis_list);
+         YAML::Node basis_tag_input = config.LookUpFromDict("name", basis_tags[k].print(), basis_list);
          
          // If basis_tags[p] has additional inputs, parse them.
          // parse tag-specific number of basis.
@@ -480,4 +581,25 @@ void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::
    // TODO: hdf5 format + parallel case.
    std::string filename = prefix + "_sv.txt";
    CAROM::PrintVector(*rom_sv, filename);
+}
+
+const int SampleGenerator::GetSnapshotOffset(const std::string &comp)
+{
+   int offset = 0, tmp = -1;
+
+   assert(basis_tags.size() == snapshot_generators.Size());
+   for (int b = 0; b < basis_tags.size(); b++)
+   {
+      if (basis_tags[b].comp != comp) continue;
+
+      offset = snapshot_generators[b]->getNumSamples();
+
+      if (tmp < 0)
+         tmp = offset;
+
+      if (offset != tmp)
+         mfem_error("SampleGenerator::GetSnapshotOffset- Number of samples over variables does not match!\n");
+   }
+
+   return offset;
 }

@@ -217,8 +217,6 @@ void StokesSolver::InitVariables()
    }
 
    f_coeffs.SetSize(0);
-
-   if (use_rom) MultiBlockSolver::InitROMHandler();
 }
 
 void StokesSolver::DeterminePressureDirichlet()
@@ -967,7 +965,7 @@ void StokesSolver::LoadSupremizer()
    for (int m = 0; m < size; m++)
    {
       // Load the supremizer basis.
-      std::string basis_tag = GetBasisTagForComponent(m, topol_handler, "sup");
+      BasisTag basis_tag = GetBasisTagForComponent(m, topol_handler, "sup");
       /*
          TODO(kevin): this is a boilerplate for parallel POD/EQP training.
          In full parallelization, all processes will participate in this supremizer reading procedure.
@@ -976,7 +974,7 @@ void StokesSolver::LoadSupremizer()
       {
          hid_t file_id;
          herr_t errf = 0;
-         std::string filename(basis_prefix + "_" + basis_tag + ".h5");
+         std::string filename(basis_prefix + "_" + basis_tag.print() + ".h5");
          printf("\nOpening file %s.. ", filename.c_str());
          file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
          assert(file_id >= 0);
@@ -1333,7 +1331,7 @@ void StokesSolver::EnrichSupremizer()
       Orthonormalize(*ubasis, *supreme);
 
       // Save the supremizer basis.
-      std::string basis_tag = GetBasisTagForComponent(m, topol_handler, "sup");
+      BasisTag basis_tag = GetBasisTagForComponent(m, topol_handler, "sup");
       /*
          TODO(kevin): this is a boilerplate for parallel POD/EQP training.
          In full parallelization, all processes will participate in this supremizer writing procedure.
@@ -1342,7 +1340,7 @@ void StokesSolver::EnrichSupremizer()
       {
          hid_t file_id;
          herr_t errf = 0;
-         std::string filename(basis_prefix + "_" + basis_tag + ".h5");
+         std::string filename(basis_prefix + "_" + basis_tag.print() + ".h5");
          file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
          assert(file_id >= 0);
 

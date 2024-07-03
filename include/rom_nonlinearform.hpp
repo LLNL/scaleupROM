@@ -13,14 +13,6 @@
 namespace mfem
 {
 
-enum IntegratorType
-{
-   DOMAIN,
-   INTERIORFACE,
-   BDRFACE,
-   NUM_INTEG_TYPE
-};
-
 class ROMNonlinearForm : public NonlinearForm
 {
 private:
@@ -71,7 +63,7 @@ public:
    void TrainEQP(const CAROM::Matrix &snapshots, const double eqp_tol = 1.0e-2);
    void TrainEQPForIntegrator(HyperReductionIntegrator *nlfi, const CAROM::Matrix &Gt,
                               const CAROM::Vector &rhs_Gw, const double eqp_tol,
-                              Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+                              Array<SampleInfo> &samples);
    void SetupEQPSystemForDomainIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                           CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw);
    void SetupEQPSystemForInteriorFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
@@ -79,7 +71,7 @@ public:
    void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                            const Array<int> &bdr_attr_marker, CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs);
 
-   void GetEQPForIntegrator(const IntegratorType type, const int k, Array<int> &sample_el, Array<int> &sample_qp, Array<double> &sample_qw);
+   Array<SampleInfo>* GetEQPForIntegrator(const IntegratorType type, const int k);
    void SaveEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
    void LoadEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
 
@@ -90,14 +82,12 @@ public:
       dnfi_sample.Append(NULL);
    }
 
-   void UpdateDomainIntegratorSampling(const int i, const Array<int> &el, const Array<int> &qp, const Array<double> &qw)
+   void UpdateDomainIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < dnfi.Size()));
       assert(dnfi.Size() == dnfi_sample.Size());
 
-      dnfi_sample[i] = new Array<SampleInfo>(0);
-      for (int s = 0; s < el.Size(); s++)
-         dnfi_sample[i]->Append({.el=el[s], .face=-1, .be=-1, .qp=qp[s], .qw=qw[s]});
+      dnfi_sample[i] = new Array<SampleInfo>(samples);
    }
 
    /// Access all integrators added with AddDomainIntegrator().
@@ -111,14 +101,12 @@ public:
       fnfi_sample.Append(NULL);
    }
 
-   void UpdateInteriorFaceIntegratorSampling(const int i, const Array<int> &face, const Array<int> &qp, const Array<double> &qw)
+   void UpdateInteriorFaceIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < fnfi.Size()));
       assert(fnfi.Size() == fnfi_sample.Size());
 
-      fnfi_sample[i] = new Array<SampleInfo>(0);
-      for (int s = 0; s < face.Size(); s++)
-         fnfi_sample[i]->Append({.el=-1, .face=face[s], .be=-1, .qp=qp[s], .qw=qw[s]});
+      fnfi_sample[i] = new Array<SampleInfo>(samples);
    }
 
    /** @brief Access all interior face integrators added with
@@ -140,18 +128,17 @@ public:
                              Array<int> &bdr_marker)
    {
       bfnfi.Append(nfi);
-      bfnfi_marker.Append(&bdr_marker);
+      // Decided to own it, as opposed to the parent class.
+      bfnfi_marker.Append(new Array<int>(bdr_marker));
       bfnfi_sample.Append(NULL);
    }
 
-   void UpdateBdrFaceIntegratorSampling(const int i, const Array<int> &be, const Array<int> &qp, const Array<double> &qw)
+   void UpdateBdrFaceIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
       assert((i >= 0) && (i < bfnfi.Size()));
       assert(bfnfi.Size() == bfnfi_sample.Size());
 
-      bfnfi_sample[i] = new Array<SampleInfo>(0);
-      for (int s = 0; s < be.Size(); s++)
-         bfnfi_sample[i]->Append({.el=-1, .face=-1, .be=be[s], .qp=qp[s], .qw=qw[s]});
+      bfnfi_sample[i] = new Array<SampleInfo>(samples);
    }
 
    /** @brief Access all boundary face integrators added with

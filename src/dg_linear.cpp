@@ -474,7 +474,7 @@ void DGBdrTemamLFIntegrator::AssembleRHSElementVect(
       }
 
       w = ip.weight;
-      if (Z) w *= Z->Eval(*(Tr.Face), eip);
+      if (Z) w *= Z->Eval(Tr, ip);
 
       Q.Eval(Qvec, *Tr.Elem1, eip);
 

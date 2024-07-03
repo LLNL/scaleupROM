@@ -1,0 +1,14 @@
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "meshes/box-channel.1x1.x_periodic.h5"
+    components:
+      - name: "empty"
+        file: "meshes/square.tri.mesh"
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true

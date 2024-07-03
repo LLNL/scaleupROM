@@ -197,6 +197,22 @@ void pic(const Vector &x, double t, Vector &y)
 
 }  // namespace backward_facing_step
 
+namespace lid_driven_cavity
+{
+
+double u0, L;
+
+void ubdr(const Vector &x, double t, Vector &y)
+{
+   const int dim = x.Size();
+   y.SetSize(dim);
+   y = 0.0;
+
+   y(0) = 4.0 / L / L * u0 * x(0) * (L - x(0));
+}
+
+}  // namespace lid_driven_cavity
+
 namespace periodic_flow_past_array
 {
 
@@ -497,6 +513,14 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new BackwardFacingStep();
    }
+   else if (problem_name == "lid_driven_cavity")
+   {
+      problem = new LidDrivenCavity();
+   }
+   else if (problem_name == "force_driven_corner")
+   {
+      problem = new ForceDrivenCorner();
+   }
    else if (problem_name == "periodic_flow_past_array")
    {
       problem = new PeriodicFlowPastArray();
@@ -677,7 +701,7 @@ ChannelFlow::ChannelFlow()
    battr.SetSize(5);
    for (int b = 0; b < 5; b++)
       battr[b] = b+1;
-   bdr_type.SetSize(4);
+   bdr_type.SetSize(5);
    bdr_type = BoundaryType::ZERO;
    bdr_type[1] = BoundaryType::NEUMANN;
    bdr_type[3] = BoundaryType::DIRICHLET;
@@ -885,6 +909,49 @@ BackwardFacingStep::BackwardFacingStep()
 }
 
 /*
+   LidDrivenCavity
+*/
+
+LidDrivenCavity::LidDrivenCavity()
+   : FlowProblem()
+{
+   /* Assume there are only five boundary attributes: 1, 2, 3, 4, 5 */
+   battr.SetSize(5);
+   for (int b = 0; b < 5; b++)
+      battr[b] = b+1;
+   
+   /*
+      All boundaries are zero except boundary attribute 3
+   */
+   bdr_type.SetSize(5);
+   bdr_type = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::DIRICHLET;
+   bdr_type[0] = BoundaryType::DIRICHLET;
+
+   // pointer to static function.
+   vector_bdr_ptr.SetSize(5);
+   vector_rhs_ptr = NULL;
+   /* technically only vector_bdr_ptr[2] will be used. */
+   vector_bdr_ptr = &(function_factory::flow_problem::lid_driven_cavity::ubdr);
+
+   param_num = 3;
+
+   // Default values.
+   function_factory::flow_problem::nu = 1.0;
+   function_factory::flow_problem::lid_driven_cavity::u0 = 1.0;
+   function_factory::flow_problem::lid_driven_cavity::L = 1.0;
+
+   param_map["nu"] = 0;
+   param_map["u0"] = 1;
+   param_map["L"] = 2;
+
+   param_ptr.SetSize(param_num);
+   param_ptr[0] = &(function_factory::flow_problem::nu);
+   param_ptr[1] = &(function_factory::flow_problem::lid_driven_cavity::u0);
+   param_ptr[2] = &(function_factory::flow_problem::lid_driven_cavity::L);
+}
+
+/*
    PeriodicFlowPastArray
 */
 
@@ -918,6 +985,26 @@ PeriodicFlowPastArray::PeriodicFlowPastArray()
    for (int i = 0; i < 3; i++)
       param_ptr[1+i] = &(function_factory::flow_problem::periodic_flow_past_array::f[i]);
 
+}
+
+/*
+   ForceDrivenCorner
+*/
+
+ForceDrivenCorner::ForceDrivenCorner()
+   : PeriodicFlowPastArray()
+{
+   battr.SetSize(5);
+   for (int b = 0; b < 5; b++)
+      battr[b] = b+1;
+   bdr_type.SetSize(5);
+   bdr_type = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   bdr_type[3] = BoundaryType::NEUMANN;
+
+   // pointer to static function.
+   vector_bdr_ptr.SetSize(5);
+   vector_bdr_ptr = NULL;
 }
 
 /*

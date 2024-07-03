@@ -30,8 +30,50 @@ enum NonlinearHandling
    NUM_NLNHNDL
 };
 
-const std::string GetBasisTagForComponent(const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name="");
-const std::string GetBasisTag(const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name="");
+struct BasisTag
+{
+   /* component mesh name */
+   std::string comp = "";
+   /* variable name, if separate basis is used */
+   std::string var = "";
+
+   BasisTag() {}
+
+   BasisTag(const std::string &comp_, const std::string &var_="")
+      : comp(comp_), var(var_) {}
+
+   const std::string print() const
+   {
+      std::string tag = comp;
+      if (var != "")
+         tag += "_" + var;
+      return tag;
+   }
+
+   bool operator==(const BasisTag &tag) const
+   {
+      return ((comp == tag.comp) && (var == tag.var));
+   }
+
+   bool operator<(const BasisTag &tag) const
+   {
+      if (comp == tag.comp)
+         return (var < tag.var);
+
+      return (comp < tag.comp);
+   }
+
+   BasisTag& operator=(const BasisTag &tag)
+   {
+      comp = tag.comp;
+      var = tag.var;
+      return *this;
+   }
+};
+
+
+const BasisTag GetBasisTagForComponent(const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name="");
+const BasisTag GetBasisTag(const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name="");
 
 class ROMHandlerBase
 {
@@ -81,7 +123,7 @@ protected:
    Array<int> dim_ref_basis;
    Array<CAROM::Matrix*> carom_ref_basis;
    Array<int> rom_comp_block_offsets;
-   std::vector<std::string> basis_tags;
+   std::vector<BasisTag> basis_tags;
    bool basis_loaded;
    bool operator_loaded;
 
@@ -126,7 +168,7 @@ public:
    const bool SeparateVariable() { return separate_variable; }
    const std::string GetOperatorPrefix() { return operator_prefix; }
    const std::string GetBasisPrefix() { return basis_prefix; }
-   const std::string GetRefBasisTag(const int ref_idx) { return basis_tags[ref_idx]; }
+   const BasisTag GetRefBasisTag(const int ref_idx) { return basis_tags[ref_idx]; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
    const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
    virtual SparseMatrix* GetOperator() = 0;

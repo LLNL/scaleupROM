@@ -11,12 +11,13 @@ namespace mfem
 {
 
 struct SampleInfo {
-   // TODO(kevin): all integrators could use the same integer variable, reducing the memory size of this struct.
-   int el;         // element index (used for DomainIntegrator)
-   int face;       // face index (used for InteriorFaceIntegrator)
-   int be;         // boundary element index (used for BdrFaceIntegrator)
-   int itf;        // interface info index (used for InterfaceIntegrator)
-   // can add dofs for other hyper reductions.
+   /*
+      - For DomainIntegrator: element index
+      - For BdrFaceIntegrator: boundary element index
+      - For InteriorFaceIntegrator: face index
+      - For InterfaceIntegrator: interface info index
+   */
+   int el;
 
    int qp;         // quadrature point
    double qw;      // quadrature weight

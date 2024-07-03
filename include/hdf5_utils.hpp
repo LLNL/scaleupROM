@@ -8,6 +8,22 @@
 #include "mfem.hpp"
 #include "hdf5.h"
 #include "linalg_utils.hpp"
+#include "rom_handler.hpp"
+#include "hyperreduction_integ.hpp"
+
+namespace mfem
+{
+
+enum IntegratorType
+{
+   DOMAIN,
+   INTERIORFACE,
+   BDRFACE,
+   INTERFACE,
+   NUM_INTEG_TYPE
+};
+
+}
 
 using namespace mfem;
 
@@ -24,6 +40,9 @@ int GetDatasetSize(hid_t &source, std::string dataset, hsize_t* &dims);
 
 void ReadAttribute(hid_t &source, std::string attribute, std::string &value);
 void WriteAttribute(hid_t &source, std::string attribute, const std::string &value);
+
+void ReadAttribute(hid_t &source, std::string attribute, BasisTag &value);
+void WriteAttribute(hid_t &source, std::string attribute, const BasisTag &value);
 
 template <typename T>
 void ReadAttribute(hid_t &source, std::string attribute, T &value) {
@@ -68,8 +87,11 @@ void ReadDataset(hid_t &source, std::string dataset, Array<T> &value)
    assert(errf >= 0);
 
    value.SetSize(dims[0]);
-   hid_t dataType = hdf5_utils::GetType(value[0]);
-   H5Dread(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Write());
+   if (dims[0] > 0)
+   {
+      hid_t dataType = hdf5_utils::GetType(value[0]);
+      H5Dread(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Write());
+   }
 
    errf = H5Dclose(dset_id);
    assert(errf >= 0);
@@ -115,7 +137,8 @@ void WriteDataset(hid_t &source, std::string dataset, const Array<T> &value)
 {
    herr_t errf = 0;
 
-   hid_t dataType = hdf5_utils::GetType(value[0]);
+   T tmp;
+   hid_t dataType = hdf5_utils::GetType(tmp);
    hsize_t dims[1];
    dims[0] = value.Size();
 
@@ -125,8 +148,11 @@ void WriteDataset(hid_t &source, std::string dataset, const Array<T> &value)
    hid_t dset_id = H5Dcreate2(source, dataset.c_str(), dataType, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
    assert(dset_id >= 0);
 
-   errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
-   assert(errf >= 0);
+   if (dims[0] > 0)
+   {
+      errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
+      assert(errf >= 0);
+   }
 
    errf = H5Dclose(dset_id);
    assert(errf >= 0);
@@ -173,6 +199,9 @@ void WriteDataset(hid_t &source, std::string dataset, const DenseTensor &value);
 
 void ReadDataset(hid_t &source, std::string dataset, MatrixBlocks &value);
 void WriteDataset(hid_t &source, std::string dataset, const MatrixBlocks &value);
+
+void ReadDataset(hid_t &source, std::string dataset, const IntegratorType type, Array<SampleInfo> &value);
+void WriteDataset(hid_t &source, std::string dataset, const IntegratorType type, const Array<SampleInfo> &value);
 
 inline bool pathExists(hid_t id, const std::string& path)
 {

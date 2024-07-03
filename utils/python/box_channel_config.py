@@ -33,9 +33,9 @@ class BoxChannelConfig(Configuration):
                 (0, 1):   3,
                 (-1, 0):  4}
     comp_used = []
-    periodic = False
+    periodic = [False, False]
 
-    def __init__(self, nx_, ny_, periodic=False):
+    def __init__(self, nx_, ny_, periodic=[False, False]):
         Configuration.__init__(self)
         self.nx, self.ny = nx_, ny_
         self.nmesh = self.nx * self.ny
@@ -98,19 +98,20 @@ class BoxChannelConfig(Configuration):
         # respective position between two meshes.
         # if periodic, more possible respective positions are available.
         disp12 = [loc2 - loc1]
-        if (self.periodic):
-            from copy import deepcopy
-            disp0 = deepcopy(disp12[0])
+        from copy import deepcopy
+        disp0 = deepcopy(disp12[0])
+        if (self.periodic[0]):
             if (disp0[0] == (self.nx-1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][0] -= self.nx
-            if (disp0[0] == -(self.nx-1)):
+            if ((disp0[0] == -(self.nx-1)) and not (self.nx == 1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][0] += self.nx
+        if (self.periodic[1]):
             if (disp0[1] == (self.ny-1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][1] -= self.ny
-            if (disp0[1] == -(self.ny-1)):
+            if ((disp0[1] == -(self.ny-1)) and not (self.ny == 1)):
                 disp12 += [deepcopy(disp0)]
                 disp12[-1][1] += self.ny
 

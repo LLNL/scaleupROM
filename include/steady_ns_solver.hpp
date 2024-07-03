@@ -97,15 +97,25 @@ class SteadyNSEQPROM : public SteadyNSROM
 {
 protected:
    Array<ROMNonlinearForm *> hs; // not owned by SteadyNSEQPROM.
+   ROMInterfaceForm *itf = NULL; // not owned by SteadyNSEQPROM.
+
+   Array<int> u_offsets;
+   Array<int> u_idxs;
+
+   mutable Vector x_u, y_u;
 
 public:
-   SteadyNSEQPROM(SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true)
-      : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_) {}
+   SteadyNSEQPROM(SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, ROMInterfaceForm *itf_,
+                  const Array<int> &block_offsets_, const bool direct_solve_=true);
 
    virtual ~SteadyNSEQPROM() {}
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;
+
+private:
+   void GetVel(const Vector &x, Vector &x_u) const;
+   void AddVel(const Vector &y_u, Vector &y) const;
 };
 
 class SteadyNSSolver : public StokesSolver
@@ -123,12 +133,14 @@ protected:
 
    double zeta = 1.0;
    ConstantCoefficient *zeta_coeff = NULL, *minus_zeta = NULL, *minus_half_zeta = NULL;
+   VectorConstantCoefficient *zero = NULL;
 
    // operator for nonlinear convection.
    Array<NonlinearForm *> hs;
    
    // integration rule for nonliear operator.
    const IntegrationRule *ir_nl = NULL;
+   const IntegrationRule *ir_face = NULL;
 
    // interface integrator
    InterfaceForm *nl_itf = NULL;
@@ -137,6 +149,7 @@ protected:
    // component ROM element for nonlinear convection.
    Array<DenseTensor *> comp_tensors, subdomain_tensors;
    Array<ROMNonlinearForm *> comp_eqps, subdomain_eqps;
+   ROMInterfaceForm *itf_eqp = NULL;
 
    Solver *J_solver = NULL;
    GMRESSolver *J_gmres = NULL;
@@ -148,8 +161,6 @@ public:
    virtual ~SteadyNSSolver();
 
    using StokesSolver::GetVariableNames;
-
-   void InitVariables() override;
 
    void BuildDomainOperators() override;
 
@@ -166,20 +177,27 @@ public:
 
    void SolveROM() override;
 
-   void AllocateROMTensorElems() override;
-   void BuildROMTensorElems() override;
-   void SaveROMTensorElems(const std::string &filename) override;
-   void LoadROMTensorElems(const std::string &filename) override;
-   void AssembleROMTensorOper() override;
+   void InitROMHandler() override;
 
-   void AllocateROMEQPElems() override;
-   void TrainEQPElems(SampleGenerator *sample_generator) override;
-   void SaveEQPElems(const std::string &filename) override;
-   void LoadEQPElems(const std::string &filename) override;
-   void AssembleROMEQPOper() override;
+   virtual void AllocateROMNlinElems() override;
+   virtual void BuildROMTensorElems() override;
+   virtual void TrainROMEQPElems(SampleGenerator *sample_generator) override;
+   virtual void SaveROMNlinElems(const std::string &input_prefix) override;
+   virtual void LoadROMNlinElems(const std::string &input_prefix) override;
+   virtual void AssembleROMNlinOper() override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
+   
+   void AllocateROMTensorElems();
+   void SaveROMTensorElems(const std::string &filename);
+   void LoadROMTensorElems(const std::string &filename);
+   void AssembleROMTensorOper();
+
+   void AllocateROMEQPElems();
+   void SaveEQPElems(const std::string &filename);
+   void LoadEQPElems(const std::string &filename);
+   void AssembleROMEQPOper();
 };
 
 #endif

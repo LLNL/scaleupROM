@@ -383,7 +383,7 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
 {
    assert(var_names.size() == num_var);
    assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
-   assert((visual.domain_interval > 0) && (visual.domain_interval < numSub));
+   assert((visual.domain_interval > 0) && (visual.domain_interval <= numSub));
    paraviewColls.SetSize(numSub);
    paraviewColls = NULL;
 
@@ -485,7 +485,7 @@ void MultiBlockSolver::SaveVisualization()
    else
    {
       assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
-      assert((visual.domain_interval > 0) && (visual.domain_interval < numSub));
+      assert((visual.domain_interval > 0) && (visual.domain_interval <= numSub));
    }
 
    for (int m = 0; m < paraviewColls.Size(); m++)
@@ -622,36 +622,6 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
    *U = *input_sol;
 }
 
-void MultiBlockSolver::AllocateROMNlinElems()
-{
-   assert(nonlinear_mode);
-   assert(rom_handler);
-   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
-
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AllocateROMTensorElems();
-   else if (rom_nlin_mode == NonlinearHandling::EQP)  AllocateROMEQPElems();
-}
-
-void MultiBlockSolver::LoadROMNlinElems(const std::string &input_prefix)
-{
-   assert(nonlinear_mode);
-   assert(rom_handler);
-   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
-
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    LoadROMTensorElems(input_prefix + ".h5");
-   else if (rom_nlin_mode == NonlinearHandling::EQP)  LoadEQPElems(input_prefix + ".eqp.h5");
-}
-
-void MultiBlockSolver::AssembleROMNlinOper()
-{
-   assert(nonlinear_mode);
-   assert(rom_handler);
-   NonlinearHandling rom_nlin_mode = rom_handler->GetNonlinearHandling();
-
-   if (rom_nlin_mode == NonlinearHandling::TENSOR)    AssembleROMTensorOper();
-   else if (rom_nlin_mode == NonlinearHandling::EQP)  AssembleROMEQPOper();
-}
-
 void MultiBlockSolver::InitROMHandler()
 {
    rom_handler = new MFEMROMHandler(topol_handler, var_offsets, var_names, separate_variable_basis);
@@ -663,7 +633,7 @@ void MultiBlockSolver::InitROMHandler()
    rom_elems = new ROMLinearElement(topol_handler, comp_fes, separate_variable_basis);
 }
 
-void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
+void MultiBlockSolver::GetBasisTags(std::vector<BasisTag> &basis_tags)
 {
    if (separate_variable_basis)
    {
@@ -680,7 +650,7 @@ void MultiBlockSolver::GetBasisTags(std::vector<std::string> &basis_tags)
    }
 }
 
-BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<std::string> &basis_tags)
+BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tags)
 {
    BlockVector *U_snapshots = NULL;
 
@@ -701,7 +671,7 @@ void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
    assert(sample_generator);
 
    /* split the solution into each component with the corresponding tag */
-   std::vector<std::string> basis_tags;
+   std::vector<BasisTag> basis_tags;
    BlockVector *U_snapshots = PrepareSnapshots(basis_tags);
 
    Array<int> col_idxs;

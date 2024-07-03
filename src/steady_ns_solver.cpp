@@ -214,6 +214,37 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
    SteadyNSTensorROM
 */
 
+SteadyNSEQPROM::SteadyNSEQPROM(
+   SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, ROMInterfaceForm *itf_,
+   const Array<int> &block_offsets_, const bool direct_solve_)
+   : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_), itf(itf_)
+{
+   if (!separate_variable)
+   {
+      u_offsets = block_offsets;
+      x_u.SetSize(block_offsets.Last());
+      y_u.SetSize(block_offsets.Last());
+      u_idxs.SetSize(numSub);
+      for (int m = 0; m < numSub; m++) u_idxs[m] = m;
+      return;
+   }
+   
+   u_offsets.SetSize(numSub+1);
+   u_offsets = 0;
+   for (int k = 0; k < numSub; k++)
+   {
+      u_offsets[k+1] = block_offsets[1 + k * num_var] - block_offsets[k * num_var];
+   }
+   u_offsets.PartialSum();
+
+   x_u.SetSize(u_offsets.Last());
+   y_u.SetSize(u_offsets.Last());
+
+   u_idxs.SetSize(numSub);
+   for (int m = 0; m < numSub; m++)
+      u_idxs[m] = m * num_var;
+}
+
 void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
 {
    y = 0.0;
@@ -227,6 +258,13 @@ void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
 
       hs[m]->AddMult(x_comp, y_comp);
    }
+
+   if (!itf) return;
+
+   GetVel(x, x_u);
+   y_u = 0.0;
+   itf->InterfaceAddMult(x_u, y_u);
+   AddVel(y_u, y);
 }
 
 Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
@@ -234,8 +272,36 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
    delete jac_mono;
    delete jac_hypre;
    jac_mono = new SparseMatrix(*linearOp);
-   DenseMatrix *jac_comp;
 
+   if (itf)
+   {
+      BlockMatrix jac(block_offsets);
+      jac.owns_blocks = true;
+   
+      Array2D<SparseMatrix *> mats(numSub, numSub);
+      for (int i = 0; i < numSub; i++)
+         for (int j = 0; j < numSub; j++)
+         {
+            int iidx = (separate_variable) ? i * num_var : i;
+            int jidx = (separate_variable) ? j * num_var : j;
+            mats(i, j) = new SparseMatrix(block_offsets[iidx+1] - block_offsets[iidx],
+                                          block_offsets[jidx+1] - block_offsets[jidx]);
+         }
+
+      GetVel(x, x_u);
+      itf->InterfaceGetGradient(x_u, mats);
+
+      MatrixBlocks u_mats(mats);
+
+      AddToBlockMatrix(u_idxs, u_idxs, u_mats, jac);
+      jac.Finalize();
+      SparseMatrix *tmp = jac.CreateMonolithic();
+      (*jac_mono) += *tmp;
+      
+      delete tmp;
+   }
+
+   DenseMatrix *jac_comp;
    for (int m = 0; m < numSub; m++)
    {
       int midx = (separate_variable) ? m * num_var : m;
@@ -256,6 +322,43 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
       return *jac_mono;
 }
 
+void SteadyNSEQPROM::GetVel(const Vector &x, Vector &x_u) const
+{
+   if (!separate_variable)
+   {
+      x_u = x;
+      return;
+   }
+   x_u.SetSize(u_offsets.Last());
+
+   BlockVector x_block(const_cast<Vector &>(x).GetData(), block_offsets);
+   BlockVector u_block(x_u.GetData(), u_offsets);
+   for (int m = 0; m < numSub; m++)
+   {
+      Vector tmp;
+      u_block.GetBlockView(m, tmp);
+      tmp = x_block.GetBlock(m * num_var);
+   }
+}
+
+void SteadyNSEQPROM::AddVel(const Vector &y_u, Vector &y) const
+{
+   if (!separate_variable)
+   {
+      y += y_u;
+      return;
+   }
+
+   BlockVector u_block(const_cast<Vector &>(y_u).GetData(), u_offsets);
+   BlockVector y_block(y.GetData(), block_offsets);
+   for (int m = 0; m < numSub; m++)
+   {
+      Vector tmp;
+      y_block.GetBlockView(m * num_var, tmp);
+      tmp += u_block.GetBlock(m);
+   }
+}
+
 /*
    SteadyNSSolver
 */
@@ -264,6 +367,10 @@ SteadyNSSolver::SteadyNSSolver()
    : StokesSolver()
 {
    nonlinear_mode = true;
+
+   Vector zero_vec(dim);
+   zero_vec = 0.0;
+   zero = new VectorConstantCoefficient(zero_vec);
 
    // StokesSolver reads viscosity from stokes/nu.
    nu = config.GetOption<double>("stokes/nu", 1.0);
@@ -281,7 +388,10 @@ SteadyNSSolver::SteadyNSSolver()
    else
       mfem_error("SteadyNSSolver: unknown operator type!\n");
 
-   ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(), (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
+   ir_nl = &(IntRules.Get(ufes[0]->GetFE(0)->GetGeomType(),
+                          (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
+   ir_face = &(IntRules.Get(meshes[0]->GetBdrElementGeometry(0),
+                            (int)(ceil(1.5 * (2 * ufes[0]->GetMaxElementOrder() - 1)))));
 
    /* SteadyNSSolver requires all the meshes to have the same element type. */
    int num_comp = topol_handler->GetNumComponents();
@@ -293,6 +403,7 @@ SteadyNSSolver::SteadyNSSolver()
 
 SteadyNSSolver::~SteadyNSSolver()
 {
+   delete zero;
    delete zeta_coeff;
    delete minus_zeta;
    delete minus_half_zeta;
@@ -312,20 +423,10 @@ SteadyNSSolver::~SteadyNSSolver()
             DeletePointers(subdomain_tensors);
       }
       else if (rom_handler->GetNonlinearHandling() == NonlinearHandling::EQP)
+      {
          DeletePointers(comp_eqps);
-   }
-}
-
-void SteadyNSSolver::InitVariables()
-{
-   StokesSolver::InitVariables();
-   if (use_rom)
-   {
-      rom_handler->SetNonlinearMode(nonlinear_mode);
-      subdomain_tensors.SetSize(numSub);
-      subdomain_tensors = NULL;
-      subdomain_eqps.SetSize(numSub);
-      subdomain_eqps = NULL;
+         delete itf_eqp;
+      }
    }
 }
 
@@ -351,10 +452,12 @@ void SteadyNSSolver::BuildDomainOperators()
          {
             auto *lf_integ1 = new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta);
             lf_integ1->SetIntRule(ir_nl);
+            auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+            lf_integ2->SetIntRule(ir_face);
 
             hs[m]->AddDomainIntegrator(lf_integ1);
             if (full_dg)
-               hs[m]->AddInteriorFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
+               hs[m]->AddInteriorFaceIntegrator(lf_integ2);
          }
          break;
          default:
@@ -366,8 +469,9 @@ void SteadyNSSolver::BuildDomainOperators()
    if (oper_type == OperType::LF)
    {
       nl_itf = new InterfaceForm(meshes, ufes, topol_handler);
-      nl_itf->AddInterfaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta));
-      // nl_interface->SetIntRule(ir_nl);
+      auto *lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+      lf_integ2->SetIntRule(ir_face);
+      nl_itf->AddInterfaceIntegrator(lf_integ2);
    }
 }
 
@@ -376,6 +480,8 @@ void SteadyNSSolver::SetupDomainBCOperators()
    StokesSolver::SetupDomainBCOperators();
 
    if (oper_type != OperType::LF) return;
+
+   HyperReductionIntegrator *lf_integ2 = NULL;
 
    assert(hs.Size() == numSub);
    for (int m = 0; m < numSub; m++)
@@ -388,12 +494,15 @@ void SteadyNSSolver::SetupDomainBCOperators()
 
          // TODO: Non-homogeneous Neumann stress bc
          if (bdr_type[b] == BoundaryType::NEUMANN)
-            hs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta), *bdr_markers[b]);
+            lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
          else
          {
             assert(BCExistsOnBdr(b));
-            hs[m]->AddBdrFaceIntegrator(new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]), *bdr_markers[b]);
+            lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[b]);
          }
+
+         lf_integ2->SetIntRule(ir_face);
+         hs[m]->AddBdrFaceIntegrator(lf_integ2, *bdr_markers[b]);
       }
    }
    
@@ -417,12 +526,11 @@ void SteadyNSSolver::SaveROMOperator(const std::string input_prefix)
    if (rom_handler->GetNonlinearHandling() != NonlinearHandling::TENSOR)
       return;
 
-   std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
-   assert(FileExists(filename));
+   std::string filename = rom_handler->GetOperatorPrefix() + ".tensor.h5";
 
    hid_t file_id;
    herr_t errf = 0;
-   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
    assert(file_id >= 0);
 
    hid_t grp_id;
@@ -451,7 +559,7 @@ void SteadyNSSolver::LoadROMOperatorFromFile(const std::string input_prefix)
    subdomain_tensors.SetSize(numSub);
    subdomain_tensors = NULL;
    {
-      std::string filename = rom_handler->GetOperatorPrefix() + ".h5";
+      std::string filename = rom_handler->GetOperatorPrefix() + ".tensor.h5";
       assert(FileExists(filename));
 
       hid_t file_id;
@@ -621,7 +729,7 @@ void SteadyNSSolver::SolveROM()
    {
       assert(subdomain_eqps.Size() == numSub);
       for (int m = 0; m < numSub; m++) assert(subdomain_eqps[m]);
-      rom_oper = new SteadyNSEQPROM(rom_handler->GetOperator(), subdomain_eqps, *(rom_handler->GetBlockOffsets()));
+      rom_oper = new SteadyNSEQPROM(rom_handler->GetOperator(), subdomain_eqps, itf_eqp, *(rom_handler->GetBlockOffsets()));
    }
    
    rom_handler->NonlinearSolve(*rom_oper, U_domain);
@@ -629,10 +737,93 @@ void SteadyNSSolver::SolveROM()
    delete rom_oper;
 }
 
+void SteadyNSSolver::InitROMHandler()
+{
+   StokesSolver::InitROMHandler();
+
+   rom_handler->SetNonlinearMode(nonlinear_mode);
+   subdomain_tensors.SetSize(numSub);
+   subdomain_tensors = NULL;
+   subdomain_eqps.SetSize(numSub);
+   subdomain_eqps = NULL;
+
+   if (oper_type == OperType::LF)
+   {
+      Array<FiniteElementSpace *> comp_ufes(topol_handler->GetNumComponents());
+      for (int c = 0; c < comp_ufes.Size(); c++)
+         comp_ufes[c] = comp_fes[c * num_var];
+      itf_eqp = new ROMInterfaceForm(meshes, ufes, comp_ufes, topol_handler);
+   }
+}
+
+void SteadyNSSolver::AllocateROMNlinElems()
+{
+   assert(rom_handler);
+
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         AllocateROMTensorElems();
+         break;
+      case NonlinearHandling::EQP:
+         AllocateROMEQPElems();
+         break;
+      default:
+         mfem_error("SteadyNSSolver::InitROMHandler- cannot initiate ROM elements!");
+         break;
+   }
+}
+
+void SteadyNSSolver::SaveROMNlinElems(const std::string &input_prefix)
+{
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         SaveROMTensorElems(input_prefix + ".tensor.h5");
+         break;
+      case NonlinearHandling::EQP:
+         SaveEQPElems(input_prefix + ".eqp.h5");
+         break;
+      default:
+         mfem_error("SteadyNSSolver::SaveROMNlinElems- cannot initiate ROM elements!");
+         break;
+   }
+}
+
+void SteadyNSSolver::LoadROMNlinElems(const std::string &input_prefix)
+{
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         LoadROMTensorElems(input_prefix + ".tensor.h5");
+         break;
+      case NonlinearHandling::EQP:
+         LoadEQPElems(input_prefix + ".eqp.h5");
+         break;
+      default:
+         mfem_error("SteadyNSSolver::SaveROMNlinElems- cannot initiate ROM elements!");
+         break;
+   }
+}
+
+void SteadyNSSolver::AssembleROMNlinOper()
+{
+   switch (rom_handler->GetNonlinearHandling())
+   {
+      case NonlinearHandling::TENSOR:
+         AssembleROMTensorOper();
+         break;
+      case NonlinearHandling::EQP:
+         AssembleROMEQPOper();
+         break;
+      default:
+         mfem_error("SteadyNSSolver::SaveROMNlinElems- cannot initiate ROM elements!");
+         break;
+   }
+}
+
 void SteadyNSSolver::AllocateROMTensorElems()
 {
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-
    const int num_comp = topol_handler->GetNumComponents();
    comp_tensors.SetSize(num_comp);
    comp_tensors = NULL;
@@ -645,8 +836,6 @@ void SteadyNSSolver::BuildROMTensorElems()
 
    // Component domain system
    const int num_comp = topol_handler->GetNumComponents();
-   Array<FiniteElementSpace *> fes_comp;
-   GetComponentFESpaces(fes_comp);
 
    DenseMatrix *basis = NULL;
    assert(comp_tensors.Size() == num_comp);
@@ -656,27 +845,24 @@ void SteadyNSSolver::BuildROMTensorElems()
       const int fidx = c * num_var;
       const int cidx = (separate_variable_basis) ? fidx : c;
       rom_handler->GetReferenceBasis(cidx, basis);
-      comp_tensors[c] = GetReducedTensor(basis, fes_comp[fidx]);
+      comp_tensors[c] = GetReducedTensor(basis, comp_fes[fidx]);
    }  // for (int c = 0; c < num_comp; c++)
-
-   for (int k = 0 ; k < fes_comp.Size(); k++) delete fes_comp[k];
 }
 
 void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(FileExists(filename));
 
    hid_t file_id;
    herr_t errf = 0;
-   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
    assert(file_id >= 0);
 
    const int num_comp = topol_handler->GetNumComponents();
    assert(comp_tensors.Size() == num_comp);
 
    hid_t grp_id;
-   grp_id = H5Gopen2(file_id, "components", H5P_DEFAULT);
+   grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
    assert(grp_id >= 0);
 
    std::string dset_name;
@@ -686,7 +872,7 @@ void SteadyNSSolver::SaveROMTensorElems(const std::string &filename)
       dset_name = topol_handler->GetComponentName(c);
 
       hid_t comp_grp_id;
-      comp_grp_id = H5Gopen2(grp_id, dset_name.c_str(), H5P_DEFAULT);
+      comp_grp_id = H5Gcreate(grp_id, dset_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(comp_grp_id >= 0);
 
       hdf5_utils::WriteDataset(comp_grp_id, "tensor", *comp_tensors[c]);
@@ -758,8 +944,6 @@ void SteadyNSSolver::AssembleROMTensorOper()
 
 void SteadyNSSolver::AllocateROMEQPElems()
 {
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-
    assert(rom_handler);
    assert(rom_handler->BasisLoaded());
 
@@ -770,22 +954,86 @@ void SteadyNSSolver::AllocateROMEQPElems()
    comp_eqps = NULL;
 
    DenseMatrix *basis;
+   HyperReductionIntegrator *nl_integ_tmp = NULL;
+   InterfaceNonlinearFormIntegrator *lf_integ2 = NULL;
    for (int c = 0; c < num_comp; c++)
    {
       int idx = (separate_variable_basis) ? c * num_var : c;
       rom_handler->GetReferenceBasis(idx, basis);
 
-      auto nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
-      nl_integ_tmp->SetIntRule(ir_nl);
-
       comp_eqps[c] = new ROMNonlinearForm(basis->NumCols(), comp_fes[c * num_var]);
-      comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+
+      switch (oper_type)
+      {
+      case (OperType::BASE):
+         nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+         break;
+      
+      case (OperType::LF):
+         nl_integ_tmp = new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+         lf_integ2->SetIntRule(ir_face);
+
+         comp_eqps[c]->AddDomainIntegrator(nl_integ_tmp);
+         if (full_dg)
+            comp_eqps[c]->AddInteriorFaceIntegrator(lf_integ2);
+         break;
+
+      default:
+         break;
+      }
+      
       comp_eqps[c]->SetBasis(*basis);
       comp_eqps[c]->SetPrecomputeMode(precompute);
-   }   
+   }  // for (int c = 0; c < num_comp; c++)
+
+   if (oper_type != OperType::LF)
+      return;
+
+   /* allocate rom nonlinear form with boundary integrators */
+   InterfaceNonlinearFormIntegrator *lf_bdr = NULL;
+   for (int c = 0; c < num_comp; c++)
+   {
+      /* For LF integrator, boundary eqp integrators are needed */
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+      for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+      {
+         Array<int> bdr_marker(comp->bdr_attributes.Max());
+         bdr_marker = 0;
+         bdr_marker[comp->bdr_attributes[b] - 1] = 1;
+
+         /* non-homogeneous Dirichlet + Neumann */
+         lf_bdr = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+         lf_bdr->SetIntRule(ir_face);
+         comp_eqps[c]->AddBdrFaceIntegrator(lf_bdr, bdr_marker);
+
+         /* homogeneous Dirichlet */
+         lf_bdr = new DGLaxFriedrichsFluxIntegrator(*minus_zeta, zero);
+         lf_bdr->SetIntRule(ir_face);
+         comp_eqps[c]->AddBdrFaceIntegrator(lf_bdr, bdr_marker);
+      }  // for (int b = 0; b < comp->bdr_attributes.Size(); b++)
+   }  // for (int c = 0; c < num_comp; c++)
+   
+   /* allocate rom interface form */
+   assert(itf_eqp);
+   lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+   lf_integ2->SetIntRule(ir_face);
+
+   itf_eqp->AddInterfaceIntegrator(lf_integ2);
+
+   for (int c = 0; c < num_comp; c++)
+   {
+      int idx = (separate_variable_basis) ? c * num_var : c;
+      rom_handler->GetReferenceBasis(idx, basis);
+      itf_eqp->SetBasisAtComponent(c, *basis);
+   }
+   itf_eqp->UpdateBlockOffsets();
 }
 
-void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
+void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
 {
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
 
@@ -799,7 +1047,7 @@ void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
    double eqp_tol = config.GetOption<double>("model_reduction/eqp/relative_tolerance", 1.0e-2);
 
    /* EQP NNLS for each reference ROM component */
-   std::string basis_tag;
+   BasisTag basis_tag;
    for (int c = 0; c < num_comp; c++)
    {
       int idx = (separate_variable_basis) ? c * num_var : c;
@@ -808,6 +1056,50 @@ void SteadyNSSolver::TrainEQPElems(SampleGenerator *sample_generator)
       const CAROM::Matrix *snapshots = sample_generator->LookUpSnapshot(basis_tag);
       comp_eqps[c]->TrainEQP(*snapshots, eqp_tol);
    }
+
+   if (oper_type != OperType::LF) return;
+
+   /* EQP NNLS for interface ROM, for each reference port */
+   for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
+   {
+      int c1, c2, a1, a2;
+      // TODO(kevin): at least component topology handler maintain attrs the same for both reference and subdomain.
+      // Need to check submesh topology handler.
+      topol_handler->GetRefPortInfo(p, c1, c2, a1, a2);
+
+      PortTag tag = {.Mesh1 = topol_handler->GetComponentName(c1),
+                     .Mesh2 = topol_handler->GetComponentName(c2),
+                     .Attr1 = a1, .Attr2 = a2};
+
+      /* Load snapshot matrices for the reference port */
+      int idx1 = (separate_variable_basis) ? c1 * num_var : c1;
+      int idx2 = (separate_variable_basis) ? c2 * num_var : c2;
+      BasisTag basis_tag1 = rom_handler->GetRefBasisTag(idx1);
+      BasisTag basis_tag2 = rom_handler->GetRefBasisTag(idx2);
+
+      /*
+         BasisGenerator::getSnapshotMatrix deletes the existing snapshot matrix,
+         and creates a new snapshot matrix.
+         If LookUpSnapshot happens to find the same basis twice,
+         it will nullify the first pointer.
+       */
+      const CAROM::Matrix *snapshots1 = sample_generator->LookUpSnapshot(basis_tag1);
+      const CAROM::Matrix *snapshots2 = NULL;
+      if (basis_tag1 == basis_tag2)
+         snapshots2 = snapshots1;
+      else
+         snapshots2 = sample_generator->LookUpSnapshot(basis_tag2);
+
+      /* Load bases for the reference port */
+      DenseMatrix *basis1, *basis2;
+      rom_handler->GetReferenceBasis(idx1, basis1);
+      rom_handler->GetReferenceBasis(idx2, basis2);
+
+      /* Load column indices for the reference port */
+      Array2D<int> *port_colidx = sample_generator->LookUpSnapshotPortColOffsets(tag);
+
+      itf_eqp->TrainEQPForRefPort(p, *snapshots1, *snapshots2, *port_colidx, eqp_tol);
+   }  // for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
 }
 
 void SteadyNSSolver::SaveEQPElems(const std::string &filename)
@@ -841,12 +1133,29 @@ void SteadyNSSolver::SaveEQPElems(const std::string &filename)
          assert(comp_eqps[c]);
          dset_name = topol_handler->GetComponentName(c);
 
-         // only one integrator exists in each nonlinear form.
-         comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name);
+         comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name + "_integ0");
+         if (oper_type == OperType::LF)
+         {
+            if (full_dg)
+               comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::INTERIORFACE, 0, grp_id, dset_name + "_integ1");
+
+            Mesh *comp = topol_handler->GetComponentMesh(c);
+            int num_bdr = comp->bdr_attributes.Size();
+            for (int b = 0; b < num_bdr; b++)
+            {
+               comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::BDRFACE, 2 * b, grp_id,
+                                                  dset_name + "_bdr" + std::to_string(b));
+               comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::BDRFACE, 2 * b + 1, grp_id,
+                                                  dset_name + "_zero" + std::to_string(b));
+            }  // for (int b = 0; b < num_bdr; b++)
+         }  // if (oper_type == OperType::LF)
       }  // for (int c = 0; c < num_comp; c++)
 
       errf = H5Gclose(grp_id);
       assert(errf >= 0);
+
+      if (oper_type == OperType::LF)
+         itf_eqp->SaveEQPForIntegrator(0, file_id, "interface_integ0");
 
       errf = H5Fclose(file_id);
       assert(errf >= 0);
@@ -881,7 +1190,22 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
       dset_name = topol_handler->GetComponentName(c);
 
       // only one integrator exists in each nonlinear form.
-      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name);
+      comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::DOMAIN, 0, grp_id, dset_name + "_integ0");
+      if (oper_type == OperType::LF)
+      {
+         if (full_dg)
+            comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::INTERIORFACE, 0, grp_id, dset_name + "_integ1");
+
+         Mesh *comp = topol_handler->GetComponentMesh(c);
+         int num_bdr = comp->bdr_attributes.Size();
+         for (int b = 0; b < num_bdr; b++)
+         {
+            comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::BDRFACE, 2 * b, grp_id,
+                                                dset_name + "_bdr" + std::to_string(b));
+            comp_eqps[c]->LoadEQPForIntegrator(IntegratorType::BDRFACE, 2 * b + 1, grp_id,
+                                                dset_name + "_zero" + std::to_string(b));
+         }  // for (int b = 0; b < num_bdr; b++)
+      }  // if (oper_type == OperType::LF)
 
       if (comp_eqps[c]->PrecomputeMode())
          comp_eqps[c]->PrecomputeCoefficients();
@@ -889,6 +1213,9 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
 
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
+
+   if (oper_type == OperType::LF)
+      itf_eqp->LoadEQPForIntegrator(0, file_id, "interface_integ0");
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
@@ -903,8 +1230,85 @@ void SteadyNSSolver::AssembleROMEQPOper()
 
    subdomain_eqps.SetSize(numSub);
    subdomain_eqps = NULL;
+
+   DenseMatrix *basis;
+   HyperReductionIntegrator *nl_integ_tmp = NULL;
+   InterfaceNonlinearFormIntegrator *lf_integ2 = NULL, *lf_bdr = NULL;
    for (int m = 0; m < numSub; m++)
-      subdomain_eqps[m] = comp_eqps[rom_handler->GetRefIndexForSubdomain(m)];
+   {
+      int c_type = topol_handler->GetMeshType(m);
+      int idx = (separate_variable_basis) ? m * num_var : m;
+      rom_handler->GetDomainBasis(idx, basis);
+
+      subdomain_eqps[m] = new ROMNonlinearForm(basis->NumCols(), ufes[m]);
+
+      switch (oper_type)
+      {
+      case (OperType::BASE):
+         nl_integ_tmp = new VectorConvectionTrilinearFormIntegrator(*zeta_coeff);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         subdomain_eqps[m]->AddDomainIntegrator(nl_integ_tmp);
+
+         subdomain_eqps[m]->UpdateDomainIntegratorSampling(0,
+            *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::DOMAIN, 0)));
+         break;
+      
+      case (OperType::LF):
+      {
+         nl_integ_tmp = new IncompressibleInviscidFluxNLFIntegrator(*minus_zeta);
+         nl_integ_tmp->SetIntRule(ir_nl);
+         lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+         lf_integ2->SetIntRule(ir_face);
+
+         subdomain_eqps[m]->AddDomainIntegrator(nl_integ_tmp);
+         if (full_dg)
+            subdomain_eqps[m]->AddInteriorFaceIntegrator(lf_integ2);
+
+         subdomain_eqps[m]->UpdateDomainIntegratorSampling(0,
+            *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::DOMAIN, 0)));
+         if (full_dg)
+            subdomain_eqps[m]->UpdateInteriorFaceIntegratorSampling(0,
+               *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::INTERIORFACE, 0)));
+
+         Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+         int idx = 0;
+         for (int b = 0; b < bdr_c2g->Size(); b++)
+         {
+            int global_idx = global_bdr_attributes.Find((*bdr_c2g)[b]);
+            if (global_idx < 0) continue;
+
+            // TODO: Non-homogeneous Neumann stress bc
+            if (bdr_type[global_idx] == BoundaryType::NEUMANN)
+               lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta);
+            else
+            {
+               assert(BCExistsOnBdr(global_idx));
+               lf_integ2 = new DGLaxFriedrichsFluxIntegrator(*minus_zeta, ud_coeffs[global_idx]);
+            }
+
+            lf_integ2->SetIntRule(ir_face);
+            subdomain_eqps[m]->AddBdrFaceIntegrator(lf_integ2, *bdr_markers[global_idx]);
+
+            int kind = (bdr_type[global_idx] == BoundaryType::ZERO) ? 1 : 0;
+            subdomain_eqps[m]->UpdateBdrFaceIntegratorSampling(idx,
+               *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::BDRFACE, 2 * b + kind)));
+
+            idx++;
+         }  // for (int b = 0; b < bdr_c2g->Size(); b++)
+      }  break;
+
+      default:
+         break;
+      }  // switch (oper_type)
+
+      subdomain_eqps[m]->SetBasis(*basis);
+      // TODO(kevin): load these coefficients, not re-computing.
+      subdomain_eqps[m]->SetPrecomputeMode(comp_eqps[c_type]->PrecomputeMode());
+      if (subdomain_eqps[m]->PrecomputeMode())
+         subdomain_eqps[m]->PrecomputeCoefficients();
+   }  // for (int m = 0; m < numSub; m++)
+
+   /* ROMInterfaceForm is already loaded */
 }
 
 DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace)

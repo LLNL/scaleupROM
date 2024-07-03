@@ -1712,7 +1712,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
 void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeInteriorFaceCoeffs(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
-   const int face = sample.face;
+   const int face = sample.el;
    FaceElementTransformations *T = fes->GetMesh()->GetInteriorFaceTransformations(face);
    assert(T != NULL);
    assert(T->Elem2No >= 0);
@@ -1723,7 +1723,7 @@ void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeInteriorFaceCoeffs(
 void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeBdrFaceCoeffs(
    const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
 {
-   const int be = sample.be;
+   const int be = sample.el;
    FaceElementTransformations *T = fes->GetMesh()->GetBdrFaceTransformations(be);
    assert(T != NULL);
    assert(T->Elem2No < 0);

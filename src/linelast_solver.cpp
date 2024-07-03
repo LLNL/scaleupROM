@@ -133,8 +133,6 @@ void LinElastSolver::InitVariables()
       // Does this make any difference?
       us[m]->SetTrueVector();
    }
-   if (use_rom)
-     MultiBlockSolver::InitROMHandler();
 }
 
 void LinElastSolver::BuildOperators()
