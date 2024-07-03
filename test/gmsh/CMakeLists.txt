@@ -7,8 +7,10 @@ file(COPY square.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY square.tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY test.multi_comp.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY box-channel.1x1.periodic.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
+file(COPY box-channel.1x2.h5 DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY test.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY stokes.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
+file(COPY steadyns.lf.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY steadyns.interface_eqp.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 
 ADD_CUSTOM_COMMAND(

@@ -752,6 +752,7 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
    //    void SolveNNLS(const int rank, const double nnls_tol, const int maxNNLSnnz,
    // CAROM::Vector const& w, CAROM::Matrix & Gt,
    // CAROM::Vector & sol)
+   const double normRHS = rhs_Gw.norm();
    double nnls_tol = 1.0e-11;
    int maxNNLSnnz = 0;
    CAROM::Vector eqpSol(Gt.numRows(), true);
@@ -804,7 +805,6 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
       Gt.transposeMult(eqpSol, res);
 
       const double normGsol = res.norm();
-      const double normRHS = rhs_Gw.norm();
 
       res -= rhs_Gw;
       const double relNorm = res.norm() / std::max(normGsol, normRHS);

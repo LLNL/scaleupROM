@@ -87,8 +87,11 @@ void ReadDataset(hid_t &source, std::string dataset, Array<T> &value)
    assert(errf >= 0);
 
    value.SetSize(dims[0]);
-   hid_t dataType = hdf5_utils::GetType(value[0]);
-   H5Dread(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Write());
+   if (dims[0] > 0)
+   {
+      hid_t dataType = hdf5_utils::GetType(value[0]);
+      H5Dread(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Write());
+   }
 
    errf = H5Dclose(dset_id);
    assert(errf >= 0);
@@ -134,7 +137,8 @@ void WriteDataset(hid_t &source, std::string dataset, const Array<T> &value)
 {
    herr_t errf = 0;
 
-   hid_t dataType = hdf5_utils::GetType(value[0]);
+   T tmp;
+   hid_t dataType = hdf5_utils::GetType(tmp);
    hsize_t dims[1];
    dims[0] = value.Size();
 
@@ -144,8 +148,11 @@ void WriteDataset(hid_t &source, std::string dataset, const Array<T> &value)
    hid_t dset_id = H5Dcreate2(source, dataset.c_str(), dataType, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
    assert(dset_id >= 0);
 
-   errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
-   assert(errf >= 0);
+   if (dims[0] > 0)
+   {
+      errf = H5Dwrite(dset_id, dataType, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.Read());
+      assert(errf >= 0);
+   }
 
    errf = H5Dclose(dset_id);
    assert(errf >= 0);

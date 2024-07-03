@@ -517,9 +517,9 @@ ParameterizedProblem* InitParameterizedProblem()
    {
       problem = new LidDrivenCavity();
    }
-   else if (problem_name == "force_driven_cavity")
+   else if (problem_name == "force_driven_corner")
    {
-      problem = new ForceDrivenCavity();
+      problem = new ForceDrivenCorner();
    }
    else if (problem_name == "periodic_flow_past_array")
    {
@@ -988,10 +988,10 @@ PeriodicFlowPastArray::PeriodicFlowPastArray()
 }
 
 /*
-   ForceDrivenCavity
+   ForceDrivenCorner
 */
 
-ForceDrivenCavity::ForceDrivenCavity()
+ForceDrivenCorner::ForceDrivenCorner()
    : PeriodicFlowPastArray()
 {
    battr.SetSize(5);
@@ -999,6 +999,8 @@ ForceDrivenCavity::ForceDrivenCavity()
       battr[b] = b+1;
    bdr_type.SetSize(5);
    bdr_type = BoundaryType::ZERO;
+   bdr_type[2] = BoundaryType::NEUMANN;
+   bdr_type[3] = BoundaryType::NEUMANN;
 
    // pointer to static function.
    vector_bdr_ptr.SetSize(5);

@@ -359,11 +359,11 @@ public:
    PeriodicFlowPastArray();
 };
 
-class ForceDrivenCavity : public PeriodicFlowPastArray
+class ForceDrivenCorner : public PeriodicFlowPastArray
 {
 public:
-   ForceDrivenCavity();
-   virtual ~ForceDrivenCavity() {};
+   ForceDrivenCorner();
+   virtual ~ForceDrivenCorner() {};
 };
 
 class LinElastProblem : public ParameterizedProblem
