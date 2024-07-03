@@ -383,7 +383,7 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
 {
    assert(var_names.size() == num_var);
    assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
-   assert((visual.domain_interval > 0) && (visual.domain_interval < numSub));
+   assert((visual.domain_interval > 0) && (visual.domain_interval <= numSub));
    paraviewColls.SetSize(numSub);
    paraviewColls = NULL;
 
@@ -485,7 +485,7 @@ void MultiBlockSolver::SaveVisualization()
    else
    {
       assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
-      assert((visual.domain_interval > 0) && (visual.domain_interval < numSub));
+      assert((visual.domain_interval > 0) && (visual.domain_interval <= numSub));
    }
 
    for (int m = 0; m < paraviewColls.Size(); m++)

@@ -82,6 +82,13 @@ namespace backward_facing_step
    void pic(const Vector &x, double t, Vector &y);
 }
 
+namespace lid_driven_cavity
+{
+   extern double u0, L;
+   
+   void ubdr(const Vector &x, double t, Vector &y);
+}
+
 namespace periodic_flow_past_array
 {
    extern Vector f;
@@ -339,10 +346,24 @@ public:
    virtual ~BackwardFacingStep() {};
 };
 
+class LidDrivenCavity : public FlowProblem
+{
+public:
+   LidDrivenCavity();
+   virtual ~LidDrivenCavity() {};
+};
+
 class PeriodicFlowPastArray : public FlowProblem
 {
 public:
    PeriodicFlowPastArray();
+};
+
+class ForceDrivenCavity : public PeriodicFlowPastArray
+{
+public:
+   ForceDrivenCavity();
+   virtual ~ForceDrivenCavity() {};
 };
 
 class LinElastProblem : public ParameterizedProblem
