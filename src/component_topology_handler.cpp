@@ -732,6 +732,10 @@ void ComponentTopologyHandler::SetupPorts()
       assert(port_infos[p].Attr1 == ref_port->Attr1);
       assert(port_infos[p].Attr2 == ref_port->Attr2);
 
+      if ((ref_port->Component1 == ref_port->Component2) &&
+          (port_infos[p].Mesh1 == port_infos[p].Mesh2))
+         mfem_error("Currently interface to a mesh itself is not supported!\n");
+
       interface_infos[p] = ref_interfaces[port_types[p]];
    }
 
