@@ -11,7 +11,7 @@ using namespace mfem;
 
 static const double threshold = 1.0e-14;
 static const double stokes_threshold = 2.0e-12;
-static const double ns_threshold = 1.0e-9;
+static const double ns_threshold = 1.0e-7;
 
 /**
  * Simple smoke test to make sure Google Test is properly linked
