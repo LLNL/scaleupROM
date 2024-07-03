@@ -133,6 +133,7 @@ protected:
 
    double zeta = 1.0;
    ConstantCoefficient *zeta_coeff = NULL, *minus_zeta = NULL, *minus_half_zeta = NULL;
+   VectorConstantCoefficient *zero = NULL;
 
    // operator for nonlinear convection.
    Array<NonlinearForm *> hs;
