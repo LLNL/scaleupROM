@@ -573,7 +573,10 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    if (use_restart)
       ProjectGlobalToDomainBasis(U, reduced_sol);
    else
-      (*reduced_sol) = 0.0;
+   {
+      for (int k = 0; k < reduced_sol->Size(); k++)
+         (*reduced_sol)(k) = UniformRandom();
+   }
 
    int maxIter = config.GetOption<int>("solver/max_iter", 100);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
