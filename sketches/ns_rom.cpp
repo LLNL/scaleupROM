@@ -1435,7 +1435,7 @@ int main(int argc, char *argv[])
          rom_nlinf->SetBasis(u_basis);
 
          rom_nlinf->TrainEQP(*snapshots, eqp_tol);
-         Array<SampleInfo> *samples = rom_nlinf->GetEQPForIntegrator(IntegratorType::DOMAIN, 0);
+         Array<SampleInfo> *samples = &(rom_nlinf->GetEQPForIntegrator(IntegratorType::DOMAIN, 0)->samples);
 
          {  // save empirical quadrature point locations.
             ElementTransformation *T;

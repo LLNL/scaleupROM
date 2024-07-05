@@ -1802,8 +1802,11 @@ void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeFaceCoeffs(
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+
    const bool el2 = (T.Elem2No >= 0);
 
    dim = shapes1[s]->NumRows();
@@ -1846,8 +1849,11 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+
    const bool el2 = (T.Elem2No >= 0);
 
    dim = shapes1[s]->NumRows();

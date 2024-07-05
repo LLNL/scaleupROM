@@ -6,8 +6,6 @@
 #define SCALEUPROM_ROM_ELEMENT_COLLECTION_HPP
 
 #include "topology_handler.hpp"
-#include "rom_nonlinearform.hpp"
-#include "rom_interfaceform.hpp"
 #include "mfem.hpp"
 #include "hdf5_utils.hpp"
 
@@ -94,25 +92,25 @@ public:
 
 };
 
-class ROMEQPElement : public ROMElementCollection
-{
-public:
-   Array<ROMNonlinearForm *> comp;     // Size(num_components);
-   // boundary condition is enforced via forcing term.
-   Array<Array<ROMNonlinearForm *> *> bdr;
-   ROMInterfaceForm *port = NULL;   // reference ports.
+// class ROMEQPElement : public ROMElementCollection
+// {
+// public:
+//    Array<ROMNonlinearForm *> comp;     // Size(num_components);
+//    // boundary condition is enforced via forcing term.
+//    Array<Array<ROMNonlinearForm *> *> bdr;
+//    ROMInterfaceForm *port = NULL;   // reference ports.
 
-public:
-   ROMEQPElement(TopologyHandler *topol_handler_,
-                 const Array<FiniteElementSpace *> &fes_,
-                 const bool separate_variable_)
-      : ROMElementCollection(topol_handler_, fes_, separate_variable_) {}
+// public:
+//    ROMEQPElement(TopologyHandler *topol_handler_,
+//                  const Array<FiniteElementSpace *> &fes_,
+//                  const bool separate_variable_)
+//       : ROMElementCollection(topol_handler_, fes_, separate_variable_) {}
 
-   virtual ~ROMEQPElement() {}
+//    virtual ~ROMEQPElement() {}
 
-   void Save(const std::string &filename) override {}
-   void Load(const std::string &filename) override {}
+//    void Save(const std::string &filename) override {}
+//    void Load(const std::string &filename) override {}
 
-};
+// };
 
 #endif

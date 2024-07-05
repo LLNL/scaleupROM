@@ -10,6 +10,83 @@ using namespace std;
 namespace mfem
 {
 
+void EQPElement::Save(hid_t file_id, const std::string &dsetname, const IntegratorType type)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      case IntegratorType::INTERFACE:     eldset = "itf"; break;
+      default:
+         mfem_error("EQPElement::Save- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   el.SetSize(0);
+   qp.SetSize(0);
+   qw.SetSize(0);
+
+   for (int s = 0; s < samples.Size(); s++)
+   {
+      el.Append(samples[s]->info.el);
+      qp.Append(samples[s]->info.qp);
+      qw.Append(samples[s]->info.qw);
+   }
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::WriteDataset(grp_id, eldset, el);
+   hdf5_utils::WriteDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::WriteDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+}
+
+void EQPElement::Load(hid_t file_id, const std::string &dsetname, const IntegratorType type)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      case IntegratorType::INTERFACE:     eldset = "itf"; break;
+      default:
+         mfem_error("EQPElement::Load- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::ReadDataset(grp_id, eldset, el);
+   hdf5_utils::ReadDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::ReadDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   samples.SetSize(el.Size());
+   for (int k = 0; k < el.Size(); k++)
+      samples[k] = new EQPSample(SampleInfo({.el=el[k], .qp=qp[k], .qw=qw[k]}));
+}
+
 void HyperReductionIntegrator::AssembleQuadratureVector(
    const FiniteElement &el, ElementTransformation &T, const IntegrationPoint &ip,
    const double &iw, const Vector &eltest, Vector &elquad)
@@ -67,7 +144,7 @@ void HyperReductionIntegrator::AppendPrecomputeBdrFaceCoeffs(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -75,7 +152,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -83,7 +160,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -91,7 +168,7 @@ void HyperReductionIntegrator::AddAssembleGrad_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -473,8 +550,11 @@ void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeDomainCoeffs(
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
@@ -506,8 +586,11 @@ void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
@@ -791,8 +874,11 @@ void IncompressibleInviscidFluxNLFIntegrator::AppendPrecomputeDomainCoeffs(
 }
 
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
@@ -813,8 +899,11 @@ void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
 }
 
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 

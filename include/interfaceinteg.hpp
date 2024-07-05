@@ -341,11 +341,11 @@ public:
                                     DenseMatrix &basis,
                                     const SampleInfo &sample) override;
 
-   void AddAssembleVector_Fast(const int s, const double qw,
-                              FaceElementTransformations &T, const IntegrationPoint &ip,
+   void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample,
+                              FaceElementTransformations &T,
                               const Vector &x, Vector &y) override;
-   void AddAssembleGrad_Fast(const int s, const double qw,
-                           FaceElementTransformations &T, const IntegrationPoint &ip,
+   void AddAssembleGrad_Fast(const int s, const EQPSample &eqp_sample,
+                           FaceElementTransformations &T,
                            const Vector &x, DenseMatrix &jac) override;
 
    void AssembleInterfaceVector(const FiniteElement &el1,

@@ -9,7 +9,6 @@
 #include "hdf5.h"
 #include "linalg_utils.hpp"
 #include "rom_handler.hpp"
-#include "hyperreduction_integ.hpp"
 
 namespace mfem
 {
@@ -21,6 +20,20 @@ enum IntegratorType
    BDRFACE,
    INTERFACE,
    NUM_INTEG_TYPE
+};
+
+struct SampleInfo
+{
+   /*
+      - For DomainIntegrator: element index
+      - For BdrFaceIntegrator: boundary element index
+      - For InteriorFaceIntegrator: face index
+      - For InterfaceIntegrator: interface info index
+   */
+   int el;
+
+   int qp;         // quadrature point
+   double qw;      // quadrature weight
 };
 
 }
