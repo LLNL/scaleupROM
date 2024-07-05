@@ -1343,15 +1343,6 @@ void ROMNonlinearForm::LoadEQPForIntegrator(
    return;
 }
 
-void ROMNonlinearForm::GetBasisElement(
-   const DenseMatrix &basis, const int col, const Array<int> vdofs, Vector &basis_el, DofTransformation *dof_trans)
-{
-   Vector tmp;
-   const_cast<DenseMatrix &>(basis).GetColumnReference(col, tmp);
-   tmp.GetSubVector(vdofs, basis_el);   // this involves a copy.
-   if (dof_trans) {dof_trans->InvTransformPrimal(basis_el); }
-}
-
 void ROMNonlinearForm::PrecomputeDomainEQPSample(
    const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
 {

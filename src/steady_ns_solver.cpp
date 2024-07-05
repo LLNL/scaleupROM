@@ -1031,6 +1031,8 @@ void SteadyNSSolver::AllocateROMEQPElems()
       itf_eqp->SetBasisAtComponent(c, *basis);
    }
    itf_eqp->UpdateBlockOffsets();
+
+   itf_eqp->SetPrecomputeMode(precompute);
 }
 
 void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
@@ -1215,7 +1217,12 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
    assert(errf >= 0);
 
    if (oper_type == OperType::LF)
+   {
       itf_eqp->LoadEQPForIntegrator(0, file_id, "interface_integ0");
+
+      if (itf_eqp->PrecomputeMode())
+         itf_eqp->PrecomputeCoefficients();
+   }
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
@@ -1304,8 +1311,6 @@ void SteadyNSSolver::AssembleROMEQPOper()
       subdomain_eqps[m]->SetBasis(*basis);
       // TODO(kevin): load these coefficients, not re-computing.
       subdomain_eqps[m]->SetPrecomputeMode(comp_eqps[c_type]->PrecomputeMode());
-      if (subdomain_eqps[m]->PrecomputeMode())
-         subdomain_eqps[m]->PrecomputeCoefficients();
    }  // for (int m = 0; m < numSub; m++)
 
    /* ROMInterfaceForm is already loaded */

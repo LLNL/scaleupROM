@@ -626,6 +626,49 @@ void TensorAddScaledContract(const DenseTensor &tensor, const double w, const Ve
    return;
 }
 
+void TensorMult(const DenseTensor &tensor, const Vector &x, DenseMatrix &M)
+{
+   M = 0.0;
+   
+   const double *tdata = tensor.HostRead();
+   const double *dx = x.HostRead();
+   double *dM;
+
+   for (int k = 0; k < tensor.SizeK(); k++, dx++)
+   {
+      dM = M.HostReadWrite();
+      for (int j = 0; j < tensor.SizeJ(); j++)
+         for (int i = 0; i < tensor.SizeI(); i++, tdata++, dM++)
+            (*dM) += (*tdata) * (*dx);
+   }
+
+   return;
+}
+
+void TensorAddMultOnJ(const DenseTensor &tensor, const Vector &x, DenseMatrix &M)
+{  
+   const double *tdata;
+   const double *dx;
+   double *dM = M.HostReadWrite();
+
+   const int stride = tensor.SizeI();
+   for (int k = 0; k < tensor.SizeK(); k++)
+   {
+      for (int i = 0; i < tensor.SizeI(); i++, dM++)
+      {
+         dx = x.HostRead();
+         tdata = tensor.GetData(k) + i;
+         for (int j = 0; j < tensor.SizeJ(); j++)
+         {
+            (*dM) += (*tdata) * (*dx);
+            tdata += stride;
+         }
+      }
+   }
+
+   return;
+}
+
 void TensorAddMultTranspose(const DenseTensor &tensor, const Vector &x, const int axis, DenseMatrix &M)
 {
    int size_ax, size_nx;
@@ -900,6 +943,15 @@ void CGOptimizer::Mult(const Vector &rhs, Vector &sol) const
    }
 
    return;
+}
+
+void GetBasisElement(
+   const DenseMatrix &basis, const int col, const Array<int> vdofs, Vector &basis_el, DofTransformation *dof_trans)
+{
+   Vector tmp;
+   const_cast<DenseMatrix &>(basis).GetColumnReference(col, tmp);
+   tmp.GetSubVector(vdofs, basis_el);   // this involves a copy.
+   if (dof_trans) {dof_trans->InvTransformPrimal(basis_el); }
 }
 
 }

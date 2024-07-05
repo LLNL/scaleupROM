@@ -182,6 +182,12 @@ void AddSubMatrixRtAP(const DenseMatrix& R, const Array<int> &Rrows,
 void TensorContract(const DenseTensor &tensor, const Vector &xi, const Vector &xj, Vector &yk);
 // y_k += w * T_{ijk} * x_i * x_j
 void TensorAddScaledContract(const DenseTensor &tensor, const double w, const Vector &xi, const Vector &xj, Vector &yk);
+// Contracts along the last axis.
+// M_{ij} = T_{ijk} * x_k
+void TensorMult(const DenseTensor &tensor, const Vector &x, DenseMatrix &M);
+// Contracts along the last axis.
+// M_{ik} += T_{ijk} * x_j
+void TensorAddMultOnJ(const DenseTensor &tensor, const Vector &x, DenseMatrix &M);
 // Contracts along the axis (0 or 1) and add the multipled transpose.
 // axis 0: M_{kj} += T_{ijk} * x_i
 // axis 1: M_{ki} += T_{ijk} * x_j
@@ -226,6 +232,9 @@ private:
 
    double Brent(const Vector &rhs, const Vector &xi, Vector &sol, double b0 = 1e-1, double lin_tol = 1e-2) const;
 };
+
+void GetBasisElement(const DenseMatrix &basis, const int col, const Array<int> vdofs,
+                     Vector &basis_el, DofTransformation *dof_trans=NULL);
 
 }
 

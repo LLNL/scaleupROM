@@ -64,6 +64,8 @@ public:
    const bool PrecomputeMode() { return precompute; }
    void SetPrecomputeMode(const bool precompute_) { precompute = precompute_; }
 
+   void PrecomputeCoefficients();
+
    void SetBasisAtComponent(const int c, DenseMatrix &basis_, const int offset=0);
    void UpdateBlockOffsets();
 
@@ -131,6 +133,9 @@ private:
    using InterfaceForm::AssembleInterfaceVector;
    using InterfaceForm::AssembleInterfaceGrad;
 
+   void PrecomputeEQPSample(const IntegrationRule &ir, const InterfaceInfo &it_info,
+                            FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+                            const DenseMatrix &basis1, const DenseMatrix &basis2, EQPSample &eqp_sample);
 };
 
 } // namespace mfem

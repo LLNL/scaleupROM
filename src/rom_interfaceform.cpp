@@ -139,7 +139,10 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
             if (precompute)
-               mfem_error("ROMInterfaceForm- precompute mode is not implemented!\n");
+            {
+               fnfi[k]->AddAssembleVector_Fast(*sample, *tr1, *tr2, x1, x2, y1, y2);
+               continue;
+            }
 
             if (itf != prev_itf)
             {
@@ -261,7 +264,10 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
             if (precompute)
-               mfem_error("ROMInterfaceForm- precompute mode is not implemented!\n");
+            {
+               fnfi[k]->AddAssembleGrad_Fast(*sample, *tr1, *tr2, x1, x2, mats_p);
+               continue;
+            }
 
             if (itf != prev_itf)
             {
@@ -679,6 +685,122 @@ void ROMInterfaceForm::LoadEQPForIntegrator(const int k, hid_t file_id, const st
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
    return;
+}
+
+void ROMInterfaceForm::PrecomputeCoefficients()
+{
+   assert(comp_basis.Size() == num_comp);
+   for (int k = 0; k < num_comp; k++)
+      assert(comp_basis[k]);
+
+   Array<InterfaceInfo> *interface_infos = NULL;
+   const IntegrationRule *ir = NULL;
+   EQPElement *eqp_elem = NULL;
+   FiniteElementSpace *fes1 = NULL, *fes2 = NULL;
+   DenseMatrix *basis1 = NULL, *basis2 = NULL;
+   int c1, c2;
+
+   for (int k = 0; k < fnfi.Size(); k++)
+   {
+      ir = fnfi[k]->GetIntegrationRule();
+      assert(ir);
+
+      for (int p = 0; p < numRefPorts; p++)
+      {
+         interface_infos = topol_handler->GetRefInterfaceInfos(p);
+         assert(interface_infos);
+
+         eqp_elem = fnfi_sample[p + k * numRefPorts];
+         assert(eqp_elem);
+
+         topol_handler->GetComponentPair(p, c1, c2);
+
+         basis1 = comp_basis[c1];
+         basis2 = comp_basis[c2];
+
+         fes1 = comp_fes[c1];
+         fes2 = comp_fes[c2];
+
+         for (int i = 0; i < eqp_elem->Size(); i++)
+         {
+            EQPSample *sample = eqp_elem->GetSample(i);
+            const int itf = sample->info.el;
+
+            PrecomputeEQPSample(*ir, (*interface_infos)[itf], fes1, fes2,
+                                *basis1, *basis2, *sample);
+         }  // for (int i = 0; i < eqp_elem->Size(); i++)
+      }  // for (int p = 0; p < numRefPorts; p++)
+   }  // for (int k = 0; k < fnfi.Size(); k++)
+}
+
+void ROMInterfaceForm::PrecomputeEQPSample(
+   const IntegrationRule &ir, const InterfaceInfo &it_info, FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+   const DenseMatrix &basis1, const DenseMatrix &basis2, EQPSample &eqp_sample)
+{
+   const int nbasis1 = basis1.NumCols();
+   const int nbasis2 = basis2.NumCols();
+
+   Mesh *mesh1 = fes1->GetMesh();
+   Mesh *mesh2 = fes2->GetMesh();
+
+   FaceElementTransformations *tr1, *tr2;
+   topol_handler->GetInterfaceTransformations(mesh1, mesh2, &it_info, tr1, tr2);
+
+   const FiniteElement *fe1 = fes1->GetFE(tr1->Elem1No);
+   const FiniteElement *fe2 = fes2->GetFE(tr2->Elem1No);
+
+   Array<int> vdofs1, vdofs2;
+   fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+   fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+   
+   int dim = fe1->GetDim();
+   int ndofs1 = fe1->GetDof();
+   int ndofs2 = fe2->GetDof();
+
+   const IntegrationPoint &ip = ir.IntPoint(eqp_sample.info.qp);
+
+   Vector shape1, shape2;
+
+   shape1.SetSize(ndofs1);
+   shape2.SetSize(ndofs2);
+
+   tr1->SetAllIntPoints(&ip);
+   tr2->SetAllIntPoints(&ip);
+
+   const IntegrationPoint &eip1 = tr1->GetElement1IntPoint();
+   fe1->CalcShape(eip1, shape1);
+   const IntegrationPoint &eip2 = tr2->GetElement2IntPoint();
+   fe2->CalcShape(eip2, shape2);
+
+   Vector basis1_i, basis2_i;
+   DenseMatrix *vec1s, *vec2s;
+   vec1s = new DenseMatrix(dim, nbasis1);
+   vec2s = new DenseMatrix(dim, nbasis2);
+
+   Vector vec1, vec2;
+   DenseMatrix elv1, elv2;
+   for (int i = 0; i < nbasis1; i++)
+   {
+      GetBasisElement(basis1, i, vdofs1, basis1_i);
+      elv1.UseExternalData(basis1_i.GetData(), ndofs1, dim);
+
+      vec1s->GetColumnReference(i, vec1);
+      elv1.MultTranspose(shape1, vec1);
+   }
+
+   for (int i = 0; i < nbasis2; i++)
+   {
+      GetBasisElement(basis2, i, vdofs2, basis2_i);
+      elv2.UseExternalData(basis2_i.GetData(), ndofs2, dim);
+
+      vec2s->GetColumnReference(i, vec2);
+      elv2.MultTranspose(shape2, vec2);
+   }
+
+   eqp_sample.shape1 = vec1s;
+   eqp_sample.shape2 = vec2s;
+
+   // TODO(kevin): compute dshape1, dshape2.
 }
 
 }

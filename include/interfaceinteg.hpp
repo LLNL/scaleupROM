@@ -71,17 +71,15 @@ public:
                                           const Vector &eltest1, const Vector &eltest2,
                                           Array2D<DenseMatrix*> &quadmats);
 
-   virtual void AddAssembleVector_Fast(const int s, const double qw,
+   virtual void AddAssembleVector_Fast(const EQPSample &eqp_sample,
                                        FaceElementTransformations &Tr1,
                                        FaceElementTransformations &Tr2,
-                                       const IntegrationPoint &ip,
                                        const Vector &x1, const Vector &x2,
                                        Vector &y1, Vector &y2);
 
-   virtual void AddAssembleGrad_Fast(const int s, const double qw,
+   virtual void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
                                      FaceElementTransformations &Tr1,
                                      FaceElementTransformations &Tr2,
-                                     const IntegrationPoint &ip,
                                      const Vector &x1, const Vector &x2,
                                      Array2D<SparseMatrix *> &jac);
 };
@@ -300,8 +298,6 @@ private:
    DenseMatrix udof1, udof2, elv1, elv2;
    DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
 
-   // precomputed basis value at the sample point.
-   Array<DenseMatrix *> shapes1, shapes2;
 public:
    DGLaxFriedrichsFluxIntegrator(Coefficient &q, VectorCoefficient *ud = NULL, const IntegrationRule *ir = NULL)
       : InterfaceNonlinearFormIntegrator(ir), Q(&q), UD(ud) {}
@@ -373,17 +369,15 @@ public:
                                  const Vector &eltest1, const Vector &eltest2,
                                  Array2D<DenseMatrix*> &quadmats) override;
 
-   void AddAssembleVector_Fast(const int s, const double qw,
+   void AddAssembleVector_Fast(const EQPSample &eqp_sample,
                               FaceElementTransformations &Tr1,
                               FaceElementTransformations &Tr2,
-                              const IntegrationPoint &ip,
                               const Vector &x1, const Vector &x2,
                               Vector &y1, Vector &y2) override;
 
-   void AddAssembleGrad_Fast(const int s, const double qw,
+   void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
                            FaceElementTransformations &Tr1,
                            FaceElementTransformations &Tr2,
-                           const IntegrationPoint &ip,
                            const Vector &x1, const Vector &x2,
                            Array2D<SparseMatrix *> &jac) override;
 
