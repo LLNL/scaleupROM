@@ -228,6 +228,13 @@ public:
        The state @a x must be a true-dof vector. */
    virtual Operator &GetGradient(const Vector &x) const;
 
+private:
+   void GetBasisElement(const DenseMatrix &basis, const int col,
+                        const Array<int> vdofs, Vector &basis_el,
+                        DofTransformation *dof_trans = NULL);
+
+   void PrecomputeDomainEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
+
 };
 
 } // namespace mfem

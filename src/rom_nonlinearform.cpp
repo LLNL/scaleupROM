@@ -593,12 +593,13 @@ void ROMNonlinearForm::PrecomputeCoefficients()
    {
       for (int k = 0; k < dnfi.Size(); k++)
       {
+         const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          EQPElement *eqp_elem = dnfi_sample[k];
+         assert(ir);
          assert(eqp_elem);
 
-         for (int i = 0; i < eqp_elem->samples.Size(); i++)
-            dnfi[k]->AppendPrecomputeDomainCoeffs(fes, *basis,
-                                 eqp_elem->GetSample(i)->info);
+         for (int i = 0; i < eqp_elem->Size(); i++)
+            PrecomputeDomainEQPSample(*ir, *basis, *eqp_elem->GetSample(i));
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
 
@@ -1338,6 +1339,57 @@ void ROMNonlinearForm::LoadEQPForIntegrator(
    }
 
    return;
+}
+
+void ROMNonlinearForm::GetBasisElement(
+   const DenseMatrix &basis, const int col, const Array<int> vdofs, Vector &basis_el, DofTransformation *dof_trans)
+{
+   Vector tmp;
+   const_cast<DenseMatrix &>(basis).GetColumnReference(col, tmp);
+   tmp.GetSubVector(vdofs, basis_el);   // this involves a copy.
+   if (dof_trans) {dof_trans->InvTransformPrimal(basis_el); }
+}
+
+void ROMNonlinearForm::PrecomputeDomainEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
+{
+   const int nbasis = basis.NumCols();
+   const int el = eqp_sample.info.el;
+
+   const FiniteElement *fe = fes->GetFE(el);
+   Array<int> vdofs;
+   // TODO(kevin): not exactly sure what doftrans impacts.
+   DofTransformation *doftrans = fes->GetElementVDofs(el, vdofs);
+   ElementTransformation *T = fes->GetElementTransformation(el);
+   const IntegrationPoint &ip = ir.IntPoint(eqp_sample.info.qp);
+
+   const int nd = fe->GetDof();
+   int dim = fe->GetDim();
+
+   Vector shape(nd);
+   DenseMatrix dshape(nd, dim), EF;
+
+   T->SetIntPoint(&ip);
+   fe->CalcShape(ip, shape);
+   fe->CalcPhysDShape(*T, dshape);
+
+   Vector basis_i;
+   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
+   eqp_sample.dshape1.SetSize(0);
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i, doftrans);
+      EF.UseExternalData(basis_i.GetData(), nd, dim);
+
+      Vector vec1;
+      vec1s->GetColumnReference(i, vec1);
+      EF.MultTranspose(shape, vec1);
+
+      DenseMatrix *gradEF1 = new DenseMatrix(dim);
+      MultAtB(EF, dshape, *gradEF1);
+      eqp_sample.dshape1.Append(gradEF1);
+   }
+   eqp_sample.shape1 = vec1s;
 }
 
 }
