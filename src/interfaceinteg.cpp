@@ -1754,8 +1754,8 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    if (Q) { w *= Q->Eval(T, ip); }
 
    assert(y.Size() == x.Size());
-   shapes1->AddMultTranspose(flux, y, 1.0);
-   if (el2) shapes2->AddMultTranspose(flux, y, -1.0);
+   shapes1->AddMultTranspose(flux, y, -w);
+   if (el2) shapes2->AddMultTranspose(flux, y, w);
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
