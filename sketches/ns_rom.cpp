@@ -1435,16 +1435,17 @@ int main(int argc, char *argv[])
          rom_nlinf->SetBasis(u_basis);
 
          rom_nlinf->TrainEQP(*snapshots, eqp_tol);
-         Array<SampleInfo> *samples = &(rom_nlinf->GetEQPForIntegrator(IntegratorType::DOMAIN, 0)->samples);
+         EQPElement *eqp_elem = rom_nlinf->GetEQPForIntegrator(IntegratorType::DOMAIN, 0);
 
          {  // save empirical quadrature point locations.
             ElementTransformation *T;
             Vector loc(dim);
-            DenseMatrix qp_loc(samples->Size(), dim);
-            for (int p = 0; p < samples->Size(); p++)
+            DenseMatrix qp_loc(eqp_elem->Size(), dim);
+            for (int p = 0; p < eqp_elem->Size(); p++)
             {
-               T = ufes->GetElementTransformation((*samples)[p].el);
-               const IntegrationPoint &ip = ir->IntPoint((*samples)[p].qp);
+               EQPSample *sample = eqp_elem->GetSample(p);
+               T = ufes->GetElementTransformation(sample->info.el);
+               const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
                T->Transform(ip, loc);
 
                for (int d = 0; d < dim; d++)
