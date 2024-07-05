@@ -8,6 +8,7 @@
 #include "interface_form.hpp"
 #include "rom_handler.hpp"
 #include "hdf5_utils.hpp"
+#include "hyperreduction_integ.hpp"
 
 namespace mfem
 {
@@ -35,21 +36,21 @@ protected:
    /*
       View Array of fnfi_ref_sample.
       Array of size (fnfi.Size() * topol_handler->GetNumPorts()),
-      where each element is another Array of EQP samples
+      where each element is an EQPElement
       at the given port p and the given integrator i.
       For the port p and the integrator i,
          fnfi_sample[p + i * numPorts]
    */
-   Array<Array<SampleInfo> *> fnfi_sample;
+   Array<EQPElement *> fnfi_sample;
 
    /*
       Array of size (fnfi.Size() * topol_handler->GetNumRefPorts()),
-      where each element is another Array of EQP samples
+      where each element is an EQPElement
       at the given reference port p and the given integrator i.
       For the reference port p and the integrator i,
          fnfi_sample[p + i * numRefPorts]
    */
-   Array<Array<SampleInfo> *> fnfi_ref_sample;
+   Array<EQPElement *> fnfi_ref_sample;
 
    /// @brief Flag for precomputing necessary coefficients for fast computation.
    bool precompute = false;
@@ -59,6 +60,9 @@ public:
                     Array<FiniteElementSpace *> &comp_fes_, TopologyHandler *topol_);
 
    virtual ~ROMInterfaceForm();
+
+   const bool PrecomputeMode() { return precompute; }
+   void SetPrecomputeMode(const bool precompute_) { precompute = precompute_; }
 
    void SetBasisAtComponent(const int c, DenseMatrix &basis_, const int offset=0);
    void UpdateBlockOffsets();
@@ -85,7 +89,7 @@ public:
       if (fnfi_ref_sample[idx])
          delete fnfi_ref_sample[idx];
 
-      fnfi_ref_sample[idx] = new Array<SampleInfo>(samples);
+      fnfi_ref_sample[idx] = new EQPElement(samples);
 
       for (int p = 0; p < numPorts; p++)
       {

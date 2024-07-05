@@ -1459,6 +1459,8 @@ void ROMNonlinearForm::PrecomputeFaceEQPSample(
 
    eqp_sample.shape1 = vec1s;
    if (el2) eqp_sample.shape2 = vec2s;
+
+   // TODO(kevin): compute dshape1 and dshape2 as well.
 }
 
 void ROMNonlinearForm::PrecomputeInteriorFaceEQPSample(
