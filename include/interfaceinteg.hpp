@@ -14,8 +14,8 @@ namespace mfem
 class InterfaceNonlinearFormIntegrator : virtual public HyperReductionIntegrator
 {
 protected:
-  InterfaceNonlinearFormIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)
-      : HyperReductionIntegrator(precomputable_, ir) {}
+   InterfaceNonlinearFormIntegrator(const IntegrationRule *ir = NULL)
+      : HyperReductionIntegrator(ir) {}
 public:
    // FaceElementTransformations belongs to one mesh (having mesh pointer).
    // In order to extract element/transformation from each mesh,
@@ -304,7 +304,7 @@ private:
    Array<DenseMatrix *> shapes1, shapes2;
 public:
    DGLaxFriedrichsFluxIntegrator(Coefficient &q, VectorCoefficient *ud = NULL, const IntegrationRule *ir = NULL)
-      : InterfaceNonlinearFormIntegrator(true, ir), Q(&q), UD(ud) {}
+      : InterfaceNonlinearFormIntegrator(ir), Q(&q), UD(ud) {}
 
    void AssembleFaceVector(const FiniteElement &el1,
                            const FiniteElement &el2,
@@ -333,13 +333,6 @@ public:
                               const double &iw,
                               const Vector &eltest,
                               DenseMatrix &quadmat) override;
-
-   void AppendPrecomputeInteriorFaceCoeffs(const FiniteElementSpace *fes,
-                                       DenseMatrix &basis,
-                                       const SampleInfo &sample) override;
-   void AppendPrecomputeBdrFaceCoeffs(const FiniteElementSpace *fes,
-                                    DenseMatrix &basis,
-                                    const SampleInfo &sample) override;
 
    void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample,
                               FaceElementTransformations &T,
@@ -416,11 +409,6 @@ private:
                              const DenseMatrix &elfun1, const DenseMatrix &elfun2,
                              double &w, DenseMatrix &gradu1, DenseMatrix &gradu2,
                              DenseMatrix &elmat11, DenseMatrix &elmat12, DenseMatrix &elmat21, DenseMatrix &elmat22);
-
-   void AppendPrecomputeFaceCoeffs(const FiniteElementSpace *fes, 
-                                    FaceElementTransformations *T,
-                                    DenseMatrix &basis,
-                                    const SampleInfo &sample);
 
 };
 

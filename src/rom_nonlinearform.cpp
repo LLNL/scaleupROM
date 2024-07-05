@@ -114,7 +114,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
             int el = sample->info.el;
             T = fes->GetElementTransformation(el);
 
-            if (precompute && (dnfi[k]->precomputable))
+            if (precompute)
             {
                dnfi[k]->AddAssembleVector_Fast(i, *sample, *T, x, y);
                continue;
@@ -161,7 +161,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
             int face = sample->info.el;
             tr = mesh->GetInteriorFaceTransformations(face);
 
-            if (precompute && (fnfi[k]->precomputable))
+            if (precompute)
             {
                fnfi[k]->AddAssembleVector_Fast(i, *sample, *tr, x, y);
                continue;
@@ -250,7 +250,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
             tr = mesh->GetBdrFaceTransformations (be);
 
-            if (precompute && (bfnfi[k]->precomputable))
+            if (precompute)
             {
                bfnfi[k]->AddAssembleVector_Fast(i, *sample, *tr, x, y);
                continue;
@@ -374,7 +374,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             jac_timers[2]->Stop();
 
             jac_timers[3]->Start();
-            if (precompute && (dnfi[k]->precomputable))
+            if (precompute)
             {
                dnfi[k]->AddAssembleGrad_Fast(i, *sample, *T, x, *Grad);
                continue;
@@ -424,7 +424,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             int face = sample->info.el;
             tr = mesh->GetInteriorFaceTransformations(face);
 
-            if (precompute && (fnfi[k]->precomputable))
+            if (precompute)
             {
                fnfi[k]->AddAssembleGrad_Fast(i, *sample, *tr, x, *Grad);
                continue;
@@ -514,7 +514,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
             tr = mesh->GetBdrFaceTransformations (be);
 
-            if (precompute && (bfnfi[k]->precomputable))
+            if (precompute)
             {
                bfnfi[k]->AddAssembleGrad_Fast(i, *sample, *tr, x, *Grad);
                continue;
@@ -607,12 +607,13 @@ void ROMNonlinearForm::PrecomputeCoefficients()
    {
       for (int k = 0; k < fnfi.Size(); k++)
       {
+         const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
          EQPElement *eqp_elem = fnfi_sample[k];
+         assert(ir);
          assert(eqp_elem);
 
-         for (int i = 0; i < eqp_elem->samples.Size(); i++)
-            fnfi[k]->AppendPrecomputeInteriorFaceCoeffs(fes, *basis,
-                                       eqp_elem->GetSample(i)->info);
+         for (int i = 0; i < eqp_elem->Size(); i++)
+            PrecomputeInteriorFaceEQPSample(*ir, *basis, *eqp_elem->GetSample(i));
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
 
@@ -641,11 +642,12 @@ void ROMNonlinearForm::PrecomputeCoefficients()
 
       for (int k = 0; k < bfnfi.Size(); k++)
       {
+         const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
          EQPElement *eqp_elem = bfnfi_sample[k];
+         assert(ir);
          assert(eqp_elem);
 
-         int prev_be = -1;
-         for (int i = 0; i < eqp_elem->samples.Size(); i++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
             EQPSample *sample = eqp_elem->GetSample(i);
             int be = sample->info.el;
@@ -661,7 +663,7 @@ void ROMNonlinearForm::PrecomputeCoefficients()
                // continue;
             }
 
-            bfnfi[k]->AppendPrecomputeBdrFaceCoeffs(fes, *basis, sample->info);
+            PrecomputeBdrFaceEQPSample(*ir, *basis, *sample);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
@@ -1390,6 +1392,95 @@ void ROMNonlinearForm::PrecomputeDomainEQPSample(
       eqp_sample.dshape1.Append(gradEF1);
    }
    eqp_sample.shape1 = vec1s;
+}
+
+void ROMNonlinearForm::PrecomputeFaceEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis,
+   FaceElementTransformations *T, EQPSample &eqp_sample)
+{
+   const int nbasis = basis.NumCols();
+
+   const bool el2 = (T->Elem2No >= 0);
+
+   const FiniteElement *fe1 = fes->GetFE(T->Elem1No);
+   const FiniteElement *fe2 = (el2) ? fes->GetFE(T->Elem2No) : fe1;
+
+   Array<int> vdofs, vdofs2;
+   fes->GetElementVDofs(T->Elem1No, vdofs);
+   if (el2)
+   {
+      fes->GetElementVDofs(T->Elem2No, vdofs2);
+      vdofs.Append(vdofs2);
+   }
+
+   int dim = fe1->GetDim();
+   int ndofs1 = fe1->GetDof();
+   int ndofs2 = (el2) ? fe2->GetDof() : 0;
+
+   const IntegrationPoint &ip = ir.IntPoint(eqp_sample.info.qp);
+
+   Vector shape1, shape2;
+
+   shape1.SetSize(ndofs1);
+   if (el2) shape2.SetSize(ndofs2);
+
+   T->SetAllIntPoints(&ip);
+
+   const IntegrationPoint &eip1 = T->GetElement1IntPoint();
+   fe1->CalcShape(eip1, shape1);
+   if (el2)
+   {
+      const IntegrationPoint &eip2 = T->GetElement2IntPoint();
+      fe2->CalcShape(eip2, shape2);
+   }
+
+   Vector basis_i;
+   DenseMatrix *vec1s, *vec2s;
+   vec1s = new DenseMatrix(dim, nbasis);
+   if (el2) vec2s = new DenseMatrix(dim, nbasis);
+
+   Vector vec1, vec2;
+   DenseMatrix elv1, elv2;
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i);
+      elv1.UseExternalData(basis_i.GetData(), ndofs1, dim);
+      if (el2) elv2.UseExternalData(basis_i.GetData() + ndofs1 * dim, ndofs2, dim);
+
+      vec1s->GetColumnReference(i, vec1);
+      elv1.MultTranspose(shape1, vec1);
+
+      if (el2)
+      {
+         vec2s->GetColumnReference(i, vec2);
+         elv2.MultTranspose(shape2, vec2);
+      }
+   }
+
+   eqp_sample.shape1 = vec1s;
+   if (el2) eqp_sample.shape2 = vec2s;
+}
+
+void ROMNonlinearForm::PrecomputeInteriorFaceEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
+{
+   const int face = eqp_sample.info.el;
+   FaceElementTransformations *T = fes->GetMesh()->GetInteriorFaceTransformations(face);
+   assert(T != NULL);
+   assert(T->Elem2No >= 0);
+
+   PrecomputeFaceEQPSample(ir, basis, T, eqp_sample);
+}
+
+void ROMNonlinearForm::PrecomputeBdrFaceEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
+{
+   const int be = eqp_sample.info.el;
+   FaceElementTransformations *T = fes->GetMesh()->GetBdrFaceTransformations(be);
+   assert(T != NULL);
+   assert(T->Elem2No < 0);
+
+   PrecomputeFaceEQPSample(ir, basis, T, eqp_sample);
 }
 
 }

@@ -67,12 +67,9 @@ public:
 
 class HyperReductionIntegrator : virtual public NonlinearFormIntegrator
 {
-public:
-   const bool precomputable;
-
 protected:
-   HyperReductionIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)
-      : precomputable(precomputable_), NonlinearFormIntegrator(ir) {}
+   HyperReductionIntegrator(const IntegrationRule *ir = NULL)
+      : NonlinearFormIntegrator(ir) {}
 
    // removed const qualifier for basis in order to use its column view vector.
    void GetBasisElement(DenseMatrix &basis, const int col,
@@ -142,7 +139,7 @@ private:
 public:
    VectorConvectionTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
       // : HyperReductionIntegrator(true), Q(&q), vQ(vq), coeffs(0) { }
-      : HyperReductionIntegrator(true), Q(&q), vQ(vq) { }
+      : HyperReductionIntegrator(), Q(&q), vQ(vq) { }
 
    VectorConvectionTrilinearFormIntegrator() = default;
 
@@ -195,7 +192,7 @@ private:
 
 public:
    IncompressibleInviscidFluxNLFIntegrator(Coefficient &q)
-      : HyperReductionIntegrator(true), Q(&q) { }
+      : HyperReductionIntegrator(), Q(&q) { }
 
    IncompressibleInviscidFluxNLFIntegrator() = default;
 

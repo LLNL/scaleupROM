@@ -137,7 +137,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (fnfi[k]->precomputable))
+            if (precompute)
                mfem_error("ROMInterfaceForm- precompute mode is not implemented!\n");
             else
             {
@@ -172,7 +172,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 
                AddMultTransposeSubMatrix(*basis1, vdofs1, el_y1, y1);
                AddMultTransposeSubMatrix(*basis2, vdofs2, el_y2, y2);
-            }  // if not (precompute && (fnfi[k]->precomputable))
+            }  // if not (precompute)
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
@@ -260,7 +260,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
             const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (fnfi[k]->precomputable))
+            if (precompute)
                mfem_error("ROMInterfaceForm- precompute mode is not implemented!\n");
             else
             {
@@ -297,7 +297,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
                AddSubMatrixRtAP(*basis1, vdofs1, *quadmats(0, 1), *basis2, vdofs2, *mats_p(0, 1));
                AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 0), *basis1, vdofs1, *mats_p(1, 0));
                AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 1), *basis2, vdofs2, *mats_p(1, 1));
-            }  // if not (precompute && (fnfi[k]->precomputable))
+            }  // if not (precompute)
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)

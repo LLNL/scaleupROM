@@ -234,6 +234,10 @@ private:
                         DofTransformation *dof_trans = NULL);
 
    void PrecomputeDomainEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
+   void PrecomputeFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis,
+                                FaceElementTransformations *T, EQPSample &eqp_sample);
+   void PrecomputeInteriorFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
+   void PrecomputeBdrFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
 
 };
 
