@@ -9,6 +9,7 @@
 #include "hyperreduction_integ.hpp"
 #include "linalg/NNLS.h"
 #include "hdf5_utils.hpp"
+#include "rom_element_collection.hpp"
 
 namespace mfem
 {
@@ -30,24 +31,31 @@ protected:
    /// Set of Domain Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> dnfi; // owned
    // hyper reduction sampling indexes.
-   Array<Array<SampleInfo> *> dnfi_sample;
+   Array<EQPElement *> dnfi_sample;
 
    /// Set of interior face Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> fnfi; // owned
-   Array<Array<SampleInfo> *> fnfi_sample;
+   Array<EQPElement *> fnfi_sample;
 
    /// Set of boundary face Integrators to be assembled (added).
    Array<HyperReductionIntegrator*> bfnfi; // owned
-   Array<Array<SampleInfo> *> bfnfi_sample;
+   Array<EQPElement *> bfnfi_sample;
 
    /// @brief Flag for precomputing necessary coefficients for fast computation.
    bool precompute = false;
+
+   /*
+      Flag for being reference ROMNonlinearForm.
+      If not reference, all EQPElement arrays are view arrays, not owning them.
+      reference should be turned on only for component RONNonlinearForm.
+    */
+   const bool reference;
 
 public:
    /// Construct a NonlinearForm on the given FiniteElementSpace, @a f.
    /** As an Operator, the NonlinearForm has input and output size equal to the
       number of true degrees of freedom, i.e. f->GetTrueVSize(). */
-   ROMNonlinearForm(const int num_basis, FiniteElementSpace *f);
+   ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, const bool reference_=true);
 
    /** @brief Destroy the NonlinearForm including the owned
        NonlinearFormIntegrator%s and gradient Operator. */
@@ -71,7 +79,7 @@ public:
    void SetupEQPSystemForBdrFaceIntegrator(const CAROM::Matrix &snapshots, HyperReductionIntegrator *nlfi, 
                                            const Array<int> &bdr_attr_marker, CAROM::Matrix &Gt, CAROM::Vector &rhs_Gw, Array<int> &bidxs);
 
-   Array<SampleInfo>* GetEQPForIntegrator(const IntegratorType type, const int k);
+   EQPElement* GetEQPForIntegrator(const IntegratorType type, const int k);
    void SaveEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
    void LoadEQPForIntegrator(const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname);
 
@@ -84,10 +92,23 @@ public:
 
    void UpdateDomainIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
+      if (!reference)
+         mfem_error("ROMNonlinearForm::UpdateDomainIntegratorSampling is allowed only for reference!\n");
       assert((i >= 0) && (i < dnfi.Size()));
       assert(dnfi.Size() == dnfi_sample.Size());
 
-      dnfi_sample[i] = new Array<SampleInfo>(samples);
+      if (dnfi_sample[i]) delete dnfi_sample[i];
+      dnfi_sample[i] = new EQPElement(samples);
+   }
+
+   void SetDomainEQPElems(const int i, EQPElement* const eqp_elem)
+   {
+      if (reference)
+         mfem_error("ROMNonlinearForm::SetDomainEQPElems is allowed only for non-reference!\n");
+      assert((i >= 0) && (i < dnfi.Size()));
+      assert(dnfi.Size() == dnfi_sample.Size());
+
+      dnfi_sample[i] = eqp_elem;
    }
 
    /// Access all integrators added with AddDomainIntegrator().
@@ -103,10 +124,23 @@ public:
 
    void UpdateInteriorFaceIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
+      if (!reference)
+         mfem_error("ROMNonlinearForm::UpdateInteriorFaceIntegratorSampling is allowed only for reference!\n");
       assert((i >= 0) && (i < fnfi.Size()));
       assert(fnfi.Size() == fnfi_sample.Size());
 
-      fnfi_sample[i] = new Array<SampleInfo>(samples);
+      if (fnfi_sample[i]) delete fnfi_sample[i];
+      fnfi_sample[i] = new EQPElement(samples);
+   }
+
+   void SetInteriorEQPElems(const int i, EQPElement* const eqp_elem)
+   {
+      if (reference)
+         mfem_error("ROMNonlinearForm::SetInteriorEQPElems is allowed only for non-reference!\n");
+      assert((i >= 0) && (i < fnfi.Size()));
+      assert(fnfi.Size() == fnfi_sample.Size());
+
+      fnfi_sample[i] = eqp_elem;
    }
 
    /** @brief Access all interior face integrators added with
@@ -135,10 +169,23 @@ public:
 
    void UpdateBdrFaceIntegratorSampling(const int i, const Array<SampleInfo> &samples)
    {
+      if (!reference)
+         mfem_error("ROMNonlinearForm::UpdateBdrFaceIntegratorSampling is allowed only for reference!\n");
       assert((i >= 0) && (i < bfnfi.Size()));
       assert(bfnfi.Size() == bfnfi_sample.Size());
 
-      bfnfi_sample[i] = new Array<SampleInfo>(samples);
+      if (bfnfi_sample[i]) delete bfnfi_sample[i];
+      bfnfi_sample[i] = new EQPElement(samples);
+   }
+
+   void SetBdrEQPElems(const int i, EQPElement* const eqp_elem)
+   {
+      if (reference)
+         mfem_error("ROMNonlinearForm::SetBdrEQPElems is allowed only for non-reference!\n");
+      assert((i >= 0) && (i < bfnfi.Size()));
+      assert(bfnfi.Size() == bfnfi_sample.Size());
+
+      bfnfi_sample[i] = eqp_elem;
    }
 
    /** @brief Access all boundary face integrators added with
@@ -180,6 +227,13 @@ public:
 
        The state @a x must be a true-dof vector. */
    virtual Operator &GetGradient(const Vector &x) const;
+
+private:
+   void PrecomputeDomainEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
+   void PrecomputeFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis,
+                                FaceElementTransformations *T, EQPSample &eqp_sample);
+   void PrecomputeInteriorFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
+   void PrecomputeBdrFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
 
 };
 

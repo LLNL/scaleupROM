@@ -12,11 +12,11 @@
 using namespace std;
 using namespace mfem;
 
-enum IntegratorType {
+enum TestIntegratorType {
    DOMAIN, INTERIOR, BDR
 };
 
-void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bool use_dg=false)
+void CheckGradient(NonlinearFormIntegrator *integ, const TestIntegratorType type, bool use_dg=false)
 {   
    // 1. Parse command-line options.
    std::string mesh_file = config.GetRequiredOption<std::string>("mesh/filename");
@@ -67,13 +67,13 @@ void CheckGradient(NonlinearFormIntegrator *integ, const IntegratorType type, bo
    integ->SetIntRule(&gll_ir_nl);
    switch (type)
    {
-      case DOMAIN:
+      case TestIntegratorType::DOMAIN:
          nform->AddDomainIntegrator(integ);
          break;
-      case INTERIOR:
+      case TestIntegratorType::INTERIOR:
          nform->AddInteriorFaceIntegrator(integ);
          break;
-      case BDR:
+      case TestIntegratorType::BDR:
          nform->AddBdrFaceIntegrator(integ, ess_attr);
          break;
       default:
@@ -176,7 +176,7 @@ TEST(IncompressibleInviscidFlux, Test_grad)
    auto *nlc_nlfi = new IncompressibleInviscidFluxNLFIntegrator(pi);
    // auto *nlc_nlfi = new VectorConvectionNLFIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::DOMAIN, use_dg);
+   CheckGradient(nlc_nlfi, TestIntegratorType::DOMAIN, use_dg);
 
    return;
 }
@@ -189,7 +189,7 @@ TEST(DGLaxFriedrichsFlux, Test_grad_interior)
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new DGLaxFriedrichsFluxIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::INTERIOR, true);
+   CheckGradient(nlc_nlfi, TestIntegratorType::INTERIOR, true);
 
    return;
 }
@@ -202,7 +202,7 @@ TEST(DGLaxFriedrichsFlux, Test_grad_bdr)
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new DGLaxFriedrichsFluxIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+   CheckGradient(nlc_nlfi, TestIntegratorType::BDR, true);
 
    return;
 }
@@ -215,7 +215,7 @@ TEST(DGTemamFlux, Test_grad_interior)
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new DGTemamFluxIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::INTERIOR, true);
+   CheckGradient(nlc_nlfi, TestIntegratorType::INTERIOR, true);
 
    return;
 }
@@ -228,7 +228,7 @@ TEST(DGTemamFlux, Test_grad_bdr)
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new DGTemamFluxIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::BDR, true);
+   CheckGradient(nlc_nlfi, TestIntegratorType::BDR, true);
 
    return;
 }
@@ -241,7 +241,7 @@ TEST(VectorConvectionTrilinearFormIntegrator, Test_grad)
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new VectorConvectionTrilinearFormIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::DOMAIN, false);
+   CheckGradient(nlc_nlfi, TestIntegratorType::DOMAIN, false);
 
    return;
 }
@@ -254,7 +254,7 @@ TEST(TemamTrilinearFormIntegrator, Test_grad)
    ConstantCoefficient pi(3.141592);
    auto *nlc_nlfi = new TemamTrilinearFormIntegrator(pi);
     
-   CheckGradient(nlc_nlfi, IntegratorType::DOMAIN, false);
+   CheckGradient(nlc_nlfi, TestIntegratorType::DOMAIN, false);
 
    return;
 }

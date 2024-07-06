@@ -83,7 +83,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    int basis1_offset, basis2_offset;
    Vector x1, x2, y1, y2;
    Array<InterfaceInfo> *interface_infos = NULL;
-   Array<SampleInfo> *sample_info = NULL;
+   EQPElement *eqp_elem = NULL;
 
    /* interface-related infos */
    FaceElementTransformations *tr1, *tr2;
@@ -98,7 +98,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
       const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
       assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-      for (int p = 0; p < numPorts; p++, sample_info++)
+      for (int p = 0; p < numPorts; p++)
       {
          const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
@@ -125,54 +125,56 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
          interface_infos = topol_handler->GetInterfaceInfos(p);
          assert(interface_infos);
 
-         sample_info = fnfi_sample[p + k * numPorts];
-         if (!sample_info) continue;
+         eqp_elem = fnfi_sample[p + k * numPorts];
+         if (!eqp_elem) continue;
 
          int prev_itf = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int itf = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+
+            int itf = sample->info.el;
             InterfaceInfo *if_info = &((*interface_infos)[itf]);
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
-            if (precompute && (fnfi[k]->precomputable))
-               mfem_error("ROMInterfaceForm- precompute mode is not implemented!\n");
-            else
+            if (precompute)
             {
-               if (itf != prev_itf)
-               {
-                  if ((tr1 == NULL) || (tr2 == NULL))
-                     mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
+               fnfi[k]->AddAssembleVector_Fast(*sample, *tr1, *tr2, x1, x2, y1, y2);
+               continue;
+            }
 
-                  fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
-                  fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+            if (itf != prev_itf)
+            {
+               if ((tr1 == NULL) || (tr2 == NULL))
+                  mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
 
-                  if (basis1_offset > 0)
-                     for (int v = 0; v < vdofs1.Size(); v++)
-                        vdofs1[v] += basis1_offset;
-                  if (basis2_offset > 0)
-                     for (int v = 0; v < vdofs2.Size(); v++)
-                        vdofs2[v] += basis2_offset;
+               fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+               fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
 
-                  // Both domains will have the adjacent element as Elem1.
-                  fe1 = fes1->GetFE(tr1->Elem1No);
-                  fe2 = fes2->GetFE(tr2->Elem1No);
+               if (basis1_offset > 0)
+                  for (int v = 0; v < vdofs1.Size(); v++)
+                     vdofs1[v] += basis1_offset;
+               if (basis2_offset > 0)
+                  for (int v = 0; v < vdofs2.Size(); v++)
+                     vdofs2[v] += basis2_offset;
 
-                  MultSubMatrix(*basis1, vdofs1, x1, el_x1);
-                  MultSubMatrix(*basis2, vdofs2, x2, el_x2);
+               // Both domains will have the adjacent element as Elem1.
+               fe1 = fes1->GetFE(tr1->Elem1No);
+               fe2 = fes2->GetFE(tr2->Elem1No);
 
-                  prev_itf = itf;
-               }  // if (itf != prev_itf)
+               MultSubMatrix(*basis1, vdofs1, x1, el_x1);
+               MultSubMatrix(*basis2, vdofs2, x2, el_x2);
 
-               fnfi[k]->AssembleQuadratureVector(
-                  *fe1, *fe2, *tr1, *tr2, ip, sample->qw, el_x1, el_x2, el_y1, el_y2);
+               prev_itf = itf;
+            }  // if (itf != prev_itf)
 
-               AddMultTransposeSubMatrix(*basis1, vdofs1, el_y1, y1);
-               AddMultTransposeSubMatrix(*basis2, vdofs2, el_y2, y2);
-            }  // if not (precompute && (fnfi[k]->precomputable))
+            fnfi[k]->AssembleQuadratureVector(
+               *fe1, *fe2, *tr1, *tr2, ip, sample->info.qw, el_x1, el_x2, el_y1, el_y2);
+
+            AddMultTransposeSubMatrix(*basis1, vdofs1, el_y1, y1);
+            AddMultTransposeSubMatrix(*basis2, vdofs2, el_y2, y2);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
@@ -200,7 +202,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
    int basis1_offset, basis2_offset;
    Vector x1, x2;
    Array<InterfaceInfo> *interface_infos = NULL;
-   Array<SampleInfo> *sample_info = NULL;
+   EQPElement *eqp_elem = NULL;
 
    /* interface-related infos */
    FaceElementTransformations *tr1, *tr2;
@@ -219,7 +221,7 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
       const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
       assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-      for (int p = 0; p < numPorts; p++, sample_info++)
+      for (int p = 0; p < numPorts; p++)
       {
          const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
@@ -248,56 +250,58 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
          interface_infos = topol_handler->GetInterfaceInfos(p);
          assert(interface_infos);
 
-         sample_info = fnfi_sample[p + k * numPorts];
-         if (!sample_info) continue;
+         eqp_elem = fnfi_sample[p + k * numPorts];
+         if (!eqp_elem) continue;
 
          int prev_itf = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int itf = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+
+            int itf = sample->info.el;
             InterfaceInfo *if_info = &((*interface_infos)[itf]);
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
-            if (precompute && (fnfi[k]->precomputable))
-               mfem_error("ROMInterfaceForm- precompute mode is not implemented!\n");
-            else
+            if (precompute)
             {
-               if (itf != prev_itf)
-               {
-                  if ((tr1 == NULL) || (tr2 == NULL))
-                     mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
+               fnfi[k]->AddAssembleGrad_Fast(*sample, *tr1, *tr2, x1, x2, mats_p);
+               continue;
+            }
 
-                  fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
-                  fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+            if (itf != prev_itf)
+            {
+               if ((tr1 == NULL) || (tr2 == NULL))
+                  mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
 
-                  if (basis1_offset > 0)
-                     for (int v = 0; v < vdofs1.Size(); v++)
-                        vdofs1[v] += basis1_offset;
-                  if (basis2_offset > 0)
-                     for (int v = 0; v < vdofs2.Size(); v++)
-                        vdofs2[v] += basis2_offset;
+               fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+               fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
 
-                  // Both domains will have the adjacent element as Elem1.
-                  fe1 = fes1->GetFE(tr1->Elem1No);
-                  fe2 = fes2->GetFE(tr2->Elem1No);
+               if (basis1_offset > 0)
+                  for (int v = 0; v < vdofs1.Size(); v++)
+                     vdofs1[v] += basis1_offset;
+               if (basis2_offset > 0)
+                  for (int v = 0; v < vdofs2.Size(); v++)
+                     vdofs2[v] += basis2_offset;
 
-                  MultSubMatrix(*basis1, vdofs1, x1, el_x1);
-                  MultSubMatrix(*basis2, vdofs2, x2, el_x2);
+               // Both domains will have the adjacent element as Elem1.
+               fe1 = fes1->GetFE(tr1->Elem1No);
+               fe2 = fes2->GetFE(tr2->Elem1No);
 
-                  prev_itf = itf;
-               }  // if (itf != prev_itf)
+               MultSubMatrix(*basis1, vdofs1, x1, el_x1);
+               MultSubMatrix(*basis2, vdofs2, x2, el_x2);
 
-               fnfi[k]->AssembleQuadratureGrad(
-                  *fe1, *fe2, *tr1, *tr2, ip, sample->qw, el_x1, el_x2, quadmats);
+               prev_itf = itf;
+            }  // if (itf != prev_itf)
 
-               AddSubMatrixRtAP(*basis1, vdofs1, *quadmats(0, 0), *basis1, vdofs1, *mats_p(0, 0));
-               AddSubMatrixRtAP(*basis1, vdofs1, *quadmats(0, 1), *basis2, vdofs2, *mats_p(0, 1));
-               AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 0), *basis1, vdofs1, *mats_p(1, 0));
-               AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 1), *basis2, vdofs2, *mats_p(1, 1));
-            }  // if not (precompute && (fnfi[k]->precomputable))
+            fnfi[k]->AssembleQuadratureGrad(
+               *fe1, *fe2, *tr1, *tr2, ip, sample->info.qw, el_x1, el_x2, quadmats);
+
+            AddSubMatrixRtAP(*basis1, vdofs1, *quadmats(0, 0), *basis1, vdofs1, *mats_p(0, 0));
+            AddSubMatrixRtAP(*basis1, vdofs1, *quadmats(0, 1), *basis2, vdofs2, *mats_p(0, 1));
+            AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 0), *basis1, vdofs1, *mats_p(1, 0));
+            AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 1), *basis2, vdofs2, *mats_p(1, 1));
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
@@ -390,7 +394,11 @@ void ROMInterfaceForm::SetupEQPSystem(
 
    const IntegrationRule *ir = nlfi->GetIntegrationRule();
    Mesh *mesh1 = fes1->GetMesh();
-   Mesh *mesh2 = fes2->GetMesh();
+   Mesh *mesh2;
+   if (mesh1 == fes2->GetMesh())
+      mesh2 = new Mesh(*mesh1);
+   else
+      mesh2 = fes2->GetMesh();
 
    const int vdim1 = fes1->GetVDim();
    const int vdim2 = fes2->GetVDim();
@@ -520,6 +528,9 @@ void ROMInterfaceForm::SetupEQPSystem(
    // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
    Gt.transposeMult(w, rhs_Gw);
 
+   if (mesh1 == fes2->GetMesh())
+      delete mesh2;
+
    return;
 }
 
@@ -627,7 +638,7 @@ void ROMInterfaceForm::SaveEQPForIntegrator(const int k, hid_t file_id, const st
    grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
    assert(grp_id >= 0);
 
-   Array<SampleInfo> *ref_sample = NULL;
+   EQPElement *ref_sample = NULL;
    int c1, c2, a1, a2;
    std::string port_dset;
    for (int p = 0; p < numRefPorts; p++)
@@ -637,7 +648,7 @@ void ROMInterfaceForm::SaveEQPForIntegrator(const int k, hid_t file_id, const st
       port_dset += "-" + std::to_string(a1) + ":" + std::to_string(a2);
       ref_sample = fnfi_ref_sample[p + k * numRefPorts];
 
-      hdf5_utils::WriteDataset(grp_id, port_dset, IntegratorType::INTERFACE, *ref_sample);
+      ref_sample->Save(grp_id, port_dset, IntegratorType::INTERFACE);
    }
 
    errf = H5Gclose(grp_id);
@@ -654,7 +665,6 @@ void ROMInterfaceForm::LoadEQPForIntegrator(const int k, hid_t file_id, const st
    grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
    assert(grp_id >= 0);
 
-   Array<SampleInfo> *ref_sample = NULL;
    int c1, c2, a1, a2;
    std::string port_dset;
    for (int p = 0; p < numRefPorts; p++)
@@ -666,10 +676,9 @@ void ROMInterfaceForm::LoadEQPForIntegrator(const int k, hid_t file_id, const st
       const int port_idx = p + k * numRefPorts;
       if (fnfi_ref_sample[port_idx])
          delete fnfi_ref_sample[port_idx];
-      fnfi_ref_sample[port_idx] = new Array<SampleInfo>(0);
+      fnfi_ref_sample[port_idx] = new EQPElement;
 
-      hdf5_utils::ReadDataset(grp_id, port_dset, IntegratorType::INTERFACE,
-                              *fnfi_ref_sample[port_idx]);
+      fnfi_ref_sample[port_idx]->Load(grp_id, port_dset, IntegratorType::INTERFACE);
    }
 
    /* update subdomain ports */
@@ -683,6 +692,129 @@ void ROMInterfaceForm::LoadEQPForIntegrator(const int k, hid_t file_id, const st
    errf = H5Gclose(grp_id);
    assert(errf >= 0);
    return;
+}
+
+void ROMInterfaceForm::PrecomputeCoefficients()
+{
+   assert(comp_basis.Size() == num_comp);
+   for (int k = 0; k < num_comp; k++)
+      assert(comp_basis[k]);
+
+   Array<InterfaceInfo> *interface_infos = NULL;
+   const IntegrationRule *ir = NULL;
+   EQPElement *eqp_elem = NULL;
+   Mesh *mesh1, *mesh2;
+   FaceElementTransformations *tr1, *tr2;
+   FiniteElementSpace *fes1 = NULL, *fes2 = NULL;
+   DenseMatrix *basis1 = NULL, *basis2 = NULL;
+   int c1, c2;
+
+   for (int k = 0; k < fnfi.Size(); k++)
+   {
+      ir = fnfi[k]->GetIntegrationRule();
+      assert(ir);
+
+      for (int p = 0; p < numRefPorts; p++)
+      {
+         interface_infos = topol_handler->GetRefInterfaceInfos(p);
+         assert(interface_infos);
+
+         eqp_elem = fnfi_ref_sample[p + k * numRefPorts];
+         assert(eqp_elem);
+
+         topol_handler->GetComponentPair(p, c1, c2);
+
+         basis1 = comp_basis[c1];
+         basis2 = comp_basis[c2];
+
+         fes1 = comp_fes[c1];
+         fes2 = comp_fes[c2];
+
+         mesh1 = topol_handler->GetComponentMesh(c1);
+         if (c1 == c2)
+            mesh2 = new Mesh(*mesh1);
+         else
+            mesh2 = topol_handler->GetComponentMesh(c2);
+
+         for (int i = 0; i < eqp_elem->Size(); i++)
+         {
+            EQPSample *sample = eqp_elem->GetSample(i);
+            const int itf = sample->info.el;
+            topol_handler->GetInterfaceTransformations(mesh1, mesh2, &(*interface_infos)[itf], tr1, tr2);
+
+            PrecomputeEQPSample(*ir, tr1, tr2, fes1, fes2,
+                                *basis1, *basis2, *sample);
+         }  // for (int i = 0; i < eqp_elem->Size(); i++)
+
+         if (c1 == c2)
+            delete mesh2;
+      }  // for (int p = 0; p < numRefPorts; p++)
+   }  // for (int k = 0; k < fnfi.Size(); k++)
+}
+
+void ROMInterfaceForm::PrecomputeEQPSample(
+   const IntegrationRule &ir, FaceElementTransformations *tr1, FaceElementTransformations *tr2,
+   FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+   const DenseMatrix &basis1, const DenseMatrix &basis2, EQPSample &eqp_sample)
+{
+   const int nbasis1 = basis1.NumCols();
+   const int nbasis2 = basis2.NumCols();
+
+   const FiniteElement *fe1 = fes1->GetFE(tr1->Elem1No);
+   const FiniteElement *fe2 = fes2->GetFE(tr2->Elem1No);
+
+   Array<int> vdofs1, vdofs2;
+   fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+   fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+   
+   int dim = fe1->GetDim();
+   int ndofs1 = fe1->GetDof();
+   int ndofs2 = fe2->GetDof();
+
+   const IntegrationPoint &ip = ir.IntPoint(eqp_sample.info.qp);
+
+   Vector shape1, shape2;
+
+   shape1.SetSize(ndofs1);
+   shape2.SetSize(ndofs2);
+
+   tr1->SetAllIntPoints(&ip);
+   tr2->SetAllIntPoints(&ip);
+
+   const IntegrationPoint &eip1 = tr1->GetElement1IntPoint();
+   fe1->CalcShape(eip1, shape1);
+   const IntegrationPoint &eip2 = tr2->GetElement1IntPoint();
+   fe2->CalcShape(eip2, shape2);
+
+   Vector basis1_i, basis2_i;
+   DenseMatrix *vec1s, *vec2s;
+   vec1s = new DenseMatrix(dim, nbasis1);
+   vec2s = new DenseMatrix(dim, nbasis2);
+
+   Vector vec1, vec2;
+   DenseMatrix elv1, elv2;
+   for (int i = 0; i < nbasis1; i++)
+   {
+      GetBasisElement(basis1, i, vdofs1, basis1_i);
+      elv1.UseExternalData(basis1_i.GetData(), ndofs1, dim);
+
+      vec1s->GetColumnReference(i, vec1);
+      elv1.MultTranspose(shape1, vec1);
+   }
+
+   for (int i = 0; i < nbasis2; i++)
+   {
+      GetBasisElement(basis2, i, vdofs2, basis2_i);
+      elv2.UseExternalData(basis2_i.GetData(), ndofs2, dim);
+
+      vec2s->GetColumnReference(i, vec2);
+      elv2.MultTranspose(shape2, vec2);
+   }
+
+   eqp_sample.shape1 = vec1s;
+   eqp_sample.shape2 = vec2s;
+
+   // TODO(kevin): compute dshape1, dshape2.
 }
 
 }

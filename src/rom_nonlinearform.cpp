@@ -11,8 +11,8 @@ using namespace std;
 namespace mfem
 {
 
-ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f)
-   : NonlinearForm(f)
+ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, const bool reference_)
+   : NonlinearForm(f), reference(reference_)
 {
    height = width = num_basis;
 
@@ -24,24 +24,18 @@ ROMNonlinearForm::~ROMNonlinearForm()
    delete Grad;
    delete basis;
 
-   for (int i = 0; i <  dnfi.Size(); i++)
-   {
-      delete dnfi[i];
-      delete dnfi_sample[i];
-   }
+   DeletePointers(dnfi);
+   DeletePointers(fnfi);
+   DeletePointers(bfnfi);
+   // Decided to own it, as opposed to the parent class.
+   DeletePointers(bfnfi_marker);
 
-   for (int i = 0; i <  fnfi.Size(); i++)
+   /* only component ROMNonlinearForm owns EQP elements */
+   if (reference)
    {
-      delete fnfi[i];
-      delete fnfi_sample[i];
-   }
-
-   for (int i = 0; i < bfnfi.Size(); i++)
-   {
-      delete bfnfi[i];
-      delete bfnfi_sample[i];
-      // Decided to own it, as opposed to the parent class.
-      delete bfnfi_marker[i];
+      DeletePointers(dnfi_sample);
+      DeletePointers(fnfi_sample);
+      DeletePointers(bfnfi_sample);
    }
 
    printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
@@ -110,36 +104,37 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<SampleInfo> *sample_info = dnfi_sample[k];
-         assert(sample_info);
+         EQPElement *eqp_elem = dnfi_sample[k];
+         assert(eqp_elem);
 
          int prev_el = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int el = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+            int el = sample->info.el;
             T = fes->GetElementTransformation(el);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (dnfi[k]->precomputable))
-               dnfi[k]->AddAssembleVector_Fast(i, sample->qw, *T, ip, x, y);
-            else
+            if (precompute)
             {
-               if (el != prev_el)
-               {
-                  fe = fes->GetFE(el);
-                  doftrans = fes->GetElementVDofs(el, vdofs);
-                  MultSubMatrix(*basis, vdofs, x, el_x);
-                  if (doftrans) { doftrans->InvTransformPrimal(el_x); }
+               dnfi[k]->AddAssembleVector_Fast(*sample, *T, x, y);
+               continue;
+            }
 
-                  prev_el = el;
-               }
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+            if (el != prev_el)
+            {
+               fe = fes->GetFE(el);
+               doftrans = fes->GetElementVDofs(el, vdofs);
+               MultSubMatrix(*basis, vdofs, x, el_x);
+               if (doftrans) { doftrans->InvTransformPrimal(el_x); }
 
-               dnfi[k]->AssembleQuadratureVector(*fe, *T, ip, sample->qw, el_x, el_y);
-               if (doftrans) { doftrans->TransformDual(el_y); }
+               prev_el = el;
+            }
 
-               AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
-            }  // not (precompute && (dnfi[k]->precomputable))
+            dnfi[k]->AssembleQuadratureVector(*fe, *T, ip, sample->info.qw, el_x, el_y);
+            if (doftrans) { doftrans->TransformDual(el_y); }
+
+            AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
@@ -155,47 +150,50 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<SampleInfo> *sample_info = fnfi_sample[k];
-         assert(sample_info);
+         EQPElement *eqp_elem = fnfi_sample[k];
+         assert(eqp_elem);
 
          int prev_face = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int face = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+
+            int face = sample->info.el;
             tr = mesh->GetInteriorFaceTransformations(face);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (fnfi[k]->precomputable))
-               fnfi[k]->AddAssembleVector_Fast(i, sample->qw, *tr, ip, x, y);
-            else
+            if (precompute)
             {
-               if (face != prev_face)
+               fnfi[k]->AddAssembleVector_Fast(*sample, *tr, x, y);
+               continue;
+            }
+
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+
+            if (face != prev_face)
+            {
+               if (tr == NULL)
                {
-                  if (tr == NULL)
-                  {
-                     // for EQP, this indicates an ill sampling.
-                     // for other hyper reductions, we can simply continue the loop.
-                     mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
-                  }  // if (tr == NULL)
+                  // for EQP, this indicates an ill sampling.
+                  // for other hyper reductions, we can simply continue the loop.
+                  mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
+               }  // if (tr == NULL)
 
-                  fe1 = fes->GetFE(tr->Elem1No);
-                  fe2 = fes->GetFE(tr->Elem2No);
+               fe1 = fes->GetFE(tr->Elem1No);
+               fe2 = fes->GetFE(tr->Elem2No);
 
-                  fes->GetElementVDofs(tr->Elem1No, vdofs);
-                  fes->GetElementVDofs(tr->Elem2No, vdofs2);
-                  vdofs.Append (vdofs2);
+               fes->GetElementVDofs(tr->Elem1No, vdofs);
+               fes->GetElementVDofs(tr->Elem2No, vdofs2);
+               vdofs.Append (vdofs2);
 
-                  MultSubMatrix(*basis, vdofs, x, el_x);
+               MultSubMatrix(*basis, vdofs, x, el_x);
 
-                  prev_face = face;
-               }  // if (face != prev_face)
+               prev_face = face;
+            }  // if (face != prev_face)
 
-               fnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->qw, el_x, el_y);
+            fnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->info.qw, el_x, el_y);
 
-               AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
-            }  // not (precompute && (dnfi[k]->precomputable))
+            AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
@@ -231,14 +229,14 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
          const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<SampleInfo> *sample_info = bfnfi_sample[k];
-         assert(sample_info);
+         EQPElement *eqp_elem = bfnfi_sample[k];
+         assert(eqp_elem);
 
          int prev_be = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int be = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+            int be = sample->info.el;
             const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
@@ -251,39 +249,41 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
             }
 
             tr = mesh->GetBdrFaceTransformations (be);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (bfnfi[k]->precomputable))
-               bfnfi[k]->AddAssembleVector_Fast(i, sample->qw, *tr, ip, x, y);
-            else
+            if (precompute)
             {
-               if (be != prev_be)
+               bfnfi[k]->AddAssembleVector_Fast(*sample, *tr, x, y);
+               continue;
+            }
+
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+
+            if (be != prev_be)
+            {
+               if (tr == NULL)
                {
-                  if (tr == NULL)
-                  {
-                     // for EQP, this indicates an ill sampling.
-                     // for other hyper reductions, we can simply continue the loop.
-                     mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
-                  }
-
-                  fes->GetElementVDofs(tr->Elem1No, vdofs);
-
-                  fe1 = fes->GetFE(tr->Elem1No);
-                  // The fe2 object is really a dummy and not used on the boundaries,
-                  // but we can't dereference a NULL pointer, and we don't want to
-                  // actually make a fake element.
-                  fe2 = fe1;
-
-                  MultSubMatrix(*basis, vdofs, x, el_x);
-
-                  prev_be = be;
+                  // for EQP, this indicates an ill sampling.
+                  // for other hyper reductions, we can simply continue the loop.
+                  mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
                }
 
-               bfnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->qw, el_x, el_y);
+               fes->GetElementVDofs(tr->Elem1No, vdofs);
 
-               AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
-            }  // not (precompute && (dnfi[k]->precomputable))
+               fe1 = fes->GetFE(tr->Elem1No);
+               // The fe2 object is really a dummy and not used on the boundaries,
+               // but we can't dereference a NULL pointer, and we don't want to
+               // actually make a fake element.
+               fe2 = fe1;
+
+               MultSubMatrix(*basis, vdofs, x, el_x);
+
+               prev_be = be;
+            }
+
+            bfnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->info.qw, el_x, el_y);
+
+            AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
@@ -360,41 +360,43 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<SampleInfo> *sample_info = dnfi_sample[k];
-         assert(sample_info);
+         EQPElement *eqp_elem = dnfi_sample[k];
+         assert(eqp_elem);
 
          int prev_el = -1;
-         SampleInfo *sample = sample_info->GetData();
          jac_timers[1]->Stop();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
             jac_timers[2]->Start();
-            int el = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+            int el = sample->info.el;
             T = fes->GetElementTransformation(el);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
             jac_timers[2]->Stop();
 
             jac_timers[3]->Start();
-            if (precompute && (dnfi[k]->precomputable))
-               dnfi[k]->AddAssembleGrad_Fast(i, sample->qw, *T, ip, x, *Grad);
-            else
+            if (precompute)
             {
-               if (el != prev_el)
-               {
-                  fe = fes->GetFE(el);
-                  doftrans = fes->GetElementVDofs(el, vdofs);
-                  MultSubMatrix(*basis, vdofs, x, el_x);
-                  if (doftrans) { doftrans->InvTransformPrimal(el_x); }
+               dnfi[k]->AddAssembleGrad_Fast(*sample, *T, x, *Grad);
+               continue;
+            }
 
-                  prev_el = el;
-               }
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+            if (el != prev_el)
+            {
+               fe = fes->GetFE(el);
+               doftrans = fes->GetElementVDofs(el, vdofs);
+               MultSubMatrix(*basis, vdofs, x, el_x);
+               if (doftrans) { doftrans->InvTransformPrimal(el_x); }
 
-               dnfi[k]->AssembleQuadratureGrad(*fe, *T, ip, sample->qw, el_x, elmat);
-               if (doftrans) { doftrans->TransformDual(elmat); }
+               prev_el = el;
+            }
 
-               AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
-               // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
-            }  // not (precompute && (dnfi[k]->precomputable))
+            dnfi[k]->AssembleQuadratureGrad(*fe, *T, ip, sample->info.qw, el_x, elmat);
+            if (doftrans) { doftrans->TransformDual(elmat); }
+
+            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+
             jac_timers[3]->Stop();
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
@@ -412,47 +414,50 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<SampleInfo> *sample_info = fnfi_sample[k];
-         assert(sample_info);
+         EQPElement *eqp_elem = fnfi_sample[k];
+         assert(eqp_elem);
 
          int prev_face = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int face = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+            int face = sample->info.el;
             tr = mesh->GetInteriorFaceTransformations(face);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (fnfi[k]->precomputable))
-               fnfi[k]->AddAssembleGrad_Fast(i, sample->qw, *tr, ip, x, *Grad);
-            else
+            if (precompute)
             {
-               if (face != prev_face)
+               fnfi[k]->AddAssembleGrad_Fast(*sample, *tr, x, *Grad);
+               continue;
+            }
+
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+
+            if (face != prev_face)
+            {
+               if (tr == NULL)
                {
-                  if (tr == NULL)
-                  {
-                     // for EQP, this indicates an ill sampling.
-                     // for other hyper reductions, we can simply continue the loop.
-                     mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
-                  }  // if (tr == NULL)
+                  // for EQP, this indicates an ill sampling.
+                  // for other hyper reductions, we can simply continue the loop.
+                  mfem_error("InteriorFaceTransformation of the sampled face is NULL,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
+               }  // if (tr == NULL)
 
-                  fe1 = fes->GetFE(tr->Elem1No);
-                  fe2 = fes->GetFE(tr->Elem2No);
+               fe1 = fes->GetFE(tr->Elem1No);
+               fe2 = fes->GetFE(tr->Elem2No);
 
-                  fes->GetElementVDofs(tr->Elem1No, vdofs);
-                  fes->GetElementVDofs(tr->Elem2No, vdofs2);
-                  vdofs.Append (vdofs2);
+               fes->GetElementVDofs(tr->Elem1No, vdofs);
+               fes->GetElementVDofs(tr->Elem2No, vdofs2);
+               vdofs.Append (vdofs2);
 
-                  MultSubMatrix(*basis, vdofs, x, el_x);
+               MultSubMatrix(*basis, vdofs, x, el_x);
 
-                  prev_face = face;
-               }  // if (face != prev_face)
+               prev_face = face;
+            }  // if (face != prev_face)
 
-               fnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
-               AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
-               // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
-            }  // not (precompute && (dnfi[k]->precomputable))
+            fnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->info.qw, el_x, elmat);
+            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
@@ -488,14 +493,14 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-         Array<SampleInfo> *sample_info = bfnfi_sample[k];
-         assert(sample_info);
+         EQPElement *eqp_elem = bfnfi_sample[k];
+         assert(eqp_elem);
 
          int prev_be = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int be = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+            int be = sample->info.el;
             const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
                    (*bfnfi_marker[k])[bdr_attr-1] == 0)
@@ -508,39 +513,42 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             }
 
             tr = mesh->GetBdrFaceTransformations (be);
-            const IntegrationPoint &ip = ir->IntPoint(sample->qp);
 
-            if (precompute && (bfnfi[k]->precomputable))
-               bfnfi[k]->AddAssembleGrad_Fast(i, sample->qw, *tr, ip, x, *Grad);
-            else
+            if (precompute)
             {
-               if (be != prev_be)
+               bfnfi[k]->AddAssembleGrad_Fast(*sample, *tr, x, *Grad);
+               continue;
+            }
+
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+
+            if (be != prev_be)
+            {
+               if (tr == NULL)
                {
-                  if (tr == NULL)
-                  {
-                     // for EQP, this indicates an ill sampling.
-                     // for other hyper reductions, we can simply continue the loop.
-                     mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
-                  }
-
-                  fes->GetElementVDofs(tr->Elem1No, vdofs);
-
-                  fe1 = fes->GetFE(tr->Elem1No);
-                  // The fe2 object is really a dummy and not used on the boundaries,
-                  // but we can't dereference a NULL pointer, and we don't want to
-                  // actually make a fake element.
-                  fe2 = fe1;
-
-                  MultSubMatrix(*basis, vdofs, x, el_x);
-
-                  prev_be = be;
+                  // for EQP, this indicates an ill sampling.
+                  // for other hyper reductions, we can simply continue the loop.
+                  mfem_error("BdrFaceTransformation of the sampled face is NULL,\n"
+                           "   indicating that an empty quadrature point is sampled.\n");
                }
 
-               bfnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->qw, el_x, elmat);
-               AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
-               // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
-            }  // not (precompute && (dnfi[k]->precomputable))
+               fes->GetElementVDofs(tr->Elem1No, vdofs);
+
+               fe1 = fes->GetFE(tr->Elem1No);
+               // The fe2 object is really a dummy and not used on the boundaries,
+               // but we can't dereference a NULL pointer, and we don't want to
+               // actually make a fake element.
+               fe2 = fe1;
+
+               MultSubMatrix(*basis, vdofs, x, el_x);
+
+               prev_be = be;
+            }
+
+            bfnfi[k]->AssembleQuadratureGrad(*fe1, *fe2, *tr, ip, sample->info.qw, el_x, elmat);
+            AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
+            // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
+
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
@@ -585,12 +593,13 @@ void ROMNonlinearForm::PrecomputeCoefficients()
    {
       for (int k = 0; k < dnfi.Size(); k++)
       {
-         Array<SampleInfo> *sample_info = dnfi_sample[k];
-         assert(sample_info);
+         const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
+         EQPElement *eqp_elem = dnfi_sample[k];
+         assert(ir);
+         assert(eqp_elem);
 
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
-            dnfi[k]->AppendPrecomputeDomainCoeffs(fes, *basis, *sample);
+         for (int i = 0; i < eqp_elem->Size(); i++)
+            PrecomputeDomainEQPSample(*ir, *basis, *eqp_elem->GetSample(i));
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
 
@@ -598,12 +607,13 @@ void ROMNonlinearForm::PrecomputeCoefficients()
    {
       for (int k = 0; k < fnfi.Size(); k++)
       {
-         Array<SampleInfo> *sample_info = fnfi_sample[k];
-         assert(sample_info);
+         const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
+         EQPElement *eqp_elem = fnfi_sample[k];
+         assert(ir);
+         assert(eqp_elem);
 
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
-            fnfi[k]->AppendPrecomputeInteriorFaceCoeffs(fes, *basis, *sample);
+         for (int i = 0; i < eqp_elem->Size(); i++)
+            PrecomputeInteriorFaceEQPSample(*ir, *basis, *eqp_elem->GetSample(i));
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
 
@@ -632,14 +642,15 @@ void ROMNonlinearForm::PrecomputeCoefficients()
 
       for (int k = 0; k < bfnfi.Size(); k++)
       {
-         Array<SampleInfo> *sample_info = bfnfi_sample[k];
-         assert(sample_info);
+         const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
+         EQPElement *eqp_elem = bfnfi_sample[k];
+         assert(ir);
+         assert(eqp_elem);
 
-         int prev_be = -1;
-         SampleInfo *sample = sample_info->GetData();
-         for (int i = 0; i < sample_info->Size(); i++, sample++)
+         for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            int be = sample->el;
+            EQPSample *sample = eqp_elem->GetSample(i);
+            int be = sample->info.el;
 
             const int bdr_attr = mesh->GetBdrAttribute(be);
             if (bfnfi_marker[k] &&
@@ -652,7 +663,7 @@ void ROMNonlinearForm::PrecomputeCoefficients()
                // continue;
             }
 
-            bfnfi[k]->AppendPrecomputeBdrFaceCoeffs(fes, *basis, *sample);
+            PrecomputeBdrFaceEQPSample(*ir, *basis, *sample);
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
@@ -1218,9 +1229,9 @@ void ROMNonlinearForm::SetupEQPSystemForBdrFaceIntegrator(
    return;
 }
 
-Array<SampleInfo>* ROMNonlinearForm::GetEQPForIntegrator(const IntegratorType type, const int k)
+EQPElement* ROMNonlinearForm::GetEQPForIntegrator(const IntegratorType type, const int k)
 {
-   Array<SampleInfo> *sample = NULL;
+   EQPElement *sample = NULL;
    switch (type)
    {
       case IntegratorType::DOMAIN:
@@ -1254,43 +1265,42 @@ Array<SampleInfo>* ROMNonlinearForm::GetEQPForIntegrator(const IntegratorType ty
 void ROMNonlinearForm::SaveEQPForIntegrator(
    const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname)
 {
-   Array<SampleInfo> *sample = NULL;
    switch (type)
    {
       case IntegratorType::DOMAIN:
       {
          assert((k >= 0) && (k < dnfi.Size()));
          assert(dnfi.Size() == dnfi_sample.Size());
-         sample = dnfi_sample[k];
+         dnfi_sample[k]->Save(file_id, dsetname, type);
       }
       break;
       case IntegratorType::INTERIORFACE:
       {
          assert((k >= 0) && (k < fnfi.Size()));
          assert(fnfi.Size() == fnfi_sample.Size());
-         sample = fnfi_sample[k];
+         fnfi_sample[k]->Save(file_id, dsetname, type);
       }
       break;
       case IntegratorType::BDRFACE:
       {
          assert((k >= 0) && (k < bfnfi.Size()));
          assert(bfnfi.Size() == bfnfi_sample.Size());
-         sample = bfnfi_sample[k];
+         bfnfi_sample[k]->Save(file_id, dsetname, type);
       }
       break;
       default:
          mfem_error("Unknown Integrator type!\n");
    }
-   assert(sample);
 
-   hdf5_utils::WriteDataset(file_id, dsetname, type, *sample);
    return;
 }
 
 void ROMNonlinearForm::LoadEQPForIntegrator(
    const IntegratorType type, const int k, hid_t file_id, const std::string &dsetname)
 {
-   Array<SampleInfo> *sample = NULL;
+   if (!reference)
+      mfem_error("ROMNonlinearForm::LoadEQPForIntegrator is allowed only for reference!\n");
+
    switch (type)
    {
       case IntegratorType::DOMAIN:
@@ -1300,8 +1310,8 @@ void ROMNonlinearForm::LoadEQPForIntegrator(
          if (dnfi_sample[k])
             delete dnfi_sample[k];
 
-         dnfi_sample[k] = new Array<SampleInfo>(0);
-         sample = dnfi_sample[k];
+         dnfi_sample[k] = new EQPElement;
+         dnfi_sample[k]->Load(file_id, dsetname, type);
       }
       break;
       case IntegratorType::INTERIORFACE:
@@ -1311,8 +1321,8 @@ void ROMNonlinearForm::LoadEQPForIntegrator(
          if (fnfi_sample[k])
             delete fnfi_sample[k];
 
-         fnfi_sample[k] = new Array<SampleInfo>(0);
-         sample = fnfi_sample[k];
+         fnfi_sample[k] = new EQPElement;
+         fnfi_sample[k]->Load(file_id, dsetname, type);
       }
       break;
       case IntegratorType::BDRFACE:
@@ -1322,17 +1332,148 @@ void ROMNonlinearForm::LoadEQPForIntegrator(
          if (bfnfi_sample[k])
             delete bfnfi_sample[k];
             
-         bfnfi_sample[k] = new Array<SampleInfo>(0);
-         sample = bfnfi_sample[k];
+         bfnfi_sample[k] = new EQPElement;
+         bfnfi_sample[k]->Load(file_id, dsetname, type);
       }
       break;
       default:
          mfem_error("Unknown Integrator type!\n");
    }
-   assert(sample);
 
-   hdf5_utils::ReadDataset(file_id, dsetname, type, *sample);
    return;
+}
+
+void ROMNonlinearForm::PrecomputeDomainEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
+{
+   const int nbasis = basis.NumCols();
+   const int el = eqp_sample.info.el;
+
+   const FiniteElement *fe = fes->GetFE(el);
+   Array<int> vdofs;
+   // TODO(kevin): not exactly sure what doftrans impacts.
+   DofTransformation *doftrans = fes->GetElementVDofs(el, vdofs);
+   ElementTransformation *T = fes->GetElementTransformation(el);
+   const IntegrationPoint &ip = ir.IntPoint(eqp_sample.info.qp);
+
+   const int nd = fe->GetDof();
+   int dim = fe->GetDim();
+
+   Vector shape(nd);
+   DenseMatrix dshape(nd, dim), EF;
+
+   T->SetIntPoint(&ip);
+   fe->CalcShape(ip, shape);
+   fe->CalcPhysDShape(*T, dshape);
+
+   Vector basis_i;
+   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
+   eqp_sample.dshape1.SetSize(0);
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i, doftrans);
+      EF.UseExternalData(basis_i.GetData(), nd, dim);
+
+      Vector vec1;
+      vec1s->GetColumnReference(i, vec1);
+      EF.MultTranspose(shape, vec1);
+
+      DenseMatrix *gradEF1 = new DenseMatrix(dim);
+      MultAtB(EF, dshape, *gradEF1);
+      eqp_sample.dshape1.Append(gradEF1);
+   }
+   eqp_sample.shape1 = vec1s;
+}
+
+void ROMNonlinearForm::PrecomputeFaceEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis,
+   FaceElementTransformations *T, EQPSample &eqp_sample)
+{
+   const int nbasis = basis.NumCols();
+
+   const bool el2 = (T->Elem2No >= 0);
+
+   const FiniteElement *fe1 = fes->GetFE(T->Elem1No);
+   const FiniteElement *fe2 = (el2) ? fes->GetFE(T->Elem2No) : fe1;
+
+   Array<int> vdofs, vdofs2;
+   fes->GetElementVDofs(T->Elem1No, vdofs);
+   if (el2)
+   {
+      fes->GetElementVDofs(T->Elem2No, vdofs2);
+      vdofs.Append(vdofs2);
+   }
+
+   int dim = fe1->GetDim();
+   int ndofs1 = fe1->GetDof();
+   int ndofs2 = (el2) ? fe2->GetDof() : 0;
+
+   const IntegrationPoint &ip = ir.IntPoint(eqp_sample.info.qp);
+
+   Vector shape1, shape2;
+
+   shape1.SetSize(ndofs1);
+   if (el2) shape2.SetSize(ndofs2);
+
+   T->SetAllIntPoints(&ip);
+
+   const IntegrationPoint &eip1 = T->GetElement1IntPoint();
+   fe1->CalcShape(eip1, shape1);
+   if (el2)
+   {
+      const IntegrationPoint &eip2 = T->GetElement2IntPoint();
+      fe2->CalcShape(eip2, shape2);
+   }
+
+   Vector basis_i;
+   DenseMatrix *vec1s, *vec2s;
+   vec1s = new DenseMatrix(dim, nbasis);
+   if (el2) vec2s = new DenseMatrix(dim, nbasis);
+
+   Vector vec1, vec2;
+   DenseMatrix elv1, elv2;
+   for (int i = 0; i < nbasis; i++)
+   {
+      GetBasisElement(basis, i, vdofs, basis_i);
+      elv1.UseExternalData(basis_i.GetData(), ndofs1, dim);
+      if (el2) elv2.UseExternalData(basis_i.GetData() + ndofs1 * dim, ndofs2, dim);
+
+      vec1s->GetColumnReference(i, vec1);
+      elv1.MultTranspose(shape1, vec1);
+
+      if (el2)
+      {
+         vec2s->GetColumnReference(i, vec2);
+         elv2.MultTranspose(shape2, vec2);
+      }
+   }
+
+   eqp_sample.shape1 = vec1s;
+   if (el2) eqp_sample.shape2 = vec2s;
+
+   // TODO(kevin): compute dshape1 and dshape2 as well.
+}
+
+void ROMNonlinearForm::PrecomputeInteriorFaceEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
+{
+   const int face = eqp_sample.info.el;
+   FaceElementTransformations *T = fes->GetMesh()->GetInteriorFaceTransformations(face);
+   assert(T != NULL);
+   assert(T->Elem2No >= 0);
+
+   PrecomputeFaceEQPSample(ir, basis, T, eqp_sample);
+}
+
+void ROMNonlinearForm::PrecomputeBdrFaceEQPSample(
+   const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample)
+{
+   const int be = eqp_sample.info.el;
+   FaceElementTransformations *T = fes->GetMesh()->GetBdrFaceTransformations(be);
+   assert(T != NULL);
+   assert(T->Elem2No < 0);
+
+   PrecomputeFaceEQPSample(ir, basis, T, eqp_sample);
 }
 
 }

@@ -11,6 +11,7 @@
 #include "mfem/Utilities.hpp"
 #include "topology_handler.hpp"
 #include "linalg_utils.hpp"
+#include "hdf5_utils.hpp"
 
 namespace mfem
 {
@@ -29,48 +30,6 @@ enum NonlinearHandling
    EQP,
    NUM_NLNHNDL
 };
-
-struct BasisTag
-{
-   /* component mesh name */
-   std::string comp = "";
-   /* variable name, if separate basis is used */
-   std::string var = "";
-
-   BasisTag() {}
-
-   BasisTag(const std::string &comp_, const std::string &var_="")
-      : comp(comp_), var(var_) {}
-
-   const std::string print() const
-   {
-      std::string tag = comp;
-      if (var != "")
-         tag += "_" + var;
-      return tag;
-   }
-
-   bool operator==(const BasisTag &tag) const
-   {
-      return ((comp == tag.comp) && (var == tag.var));
-   }
-
-   bool operator<(const BasisTag &tag) const
-   {
-      if (comp == tag.comp)
-         return (var < tag.var);
-
-      return (comp < tag.comp);
-   }
-
-   BasisTag& operator=(const BasisTag &tag)
-   {
-      comp = tag.comp;
-      var = tag.var;
-      return *this;
-   }
-};
-
 
 const BasisTag GetBasisTagForComponent(const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name="");
 const BasisTag GetBasisTag(const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name="");

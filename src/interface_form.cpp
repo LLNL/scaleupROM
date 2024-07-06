@@ -190,13 +190,15 @@ void InterfaceForm::AssembleInterfaceMatrixAtPort(
 
    int c1, c2;
    topol_handler->GetComponentPair(p, c1, c2);
-   Mesh *comp1 = topol_handler->GetComponentMesh(c1);
-   Mesh *comp2 = topol_handler->GetComponentMesh(c2);
 
    // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
    // Need to use two copied instances.
-   Mesh mesh1(*comp1);
-   Mesh mesh2(*comp2);
+   Mesh *comp1 = topol_handler->GetComponentMesh(c1);
+   Mesh *comp2;
+   if (c1 == c2)
+      comp2 = new Mesh(*comp1);
+   else
+      comp2 = topol_handler->GetComponentMesh(c2);
 
    Array<int> c_idx(2);
    c_idx[0] = c1;
@@ -210,10 +212,13 @@ void InterfaceForm::AssembleInterfaceMatrixAtPort(
 
    // NOTE: If comp1 == comp2, using comp1 and comp2 directly leads to an incorrect penalty matrix.
    // Need to use two copied instances.
-   AssembleInterfaceMatrix(&mesh1, &mesh2, fes_comp[c1], fes_comp[c2], if_infos, mats_p);
+   AssembleInterfaceMatrix(comp1, comp2, fes_comp[c1], fes_comp[c2], if_infos, mats_p);
 
    for (int i = 0; i < 2; i++)
       for (int j = 0; j < 2; j++) mats_p(i, j)->Finalize();
+
+   if (c1 == c2)
+      delete comp2;
 }
 
 void InterfaceForm::AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,

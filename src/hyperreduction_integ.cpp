@@ -10,6 +10,83 @@ using namespace std;
 namespace mfem
 {
 
+void EQPElement::Save(hid_t file_id, const std::string &dsetname, const IntegratorType type)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      case IntegratorType::INTERFACE:     eldset = "itf"; break;
+      default:
+         mfem_error("EQPElement::Save- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   el.SetSize(0);
+   qp.SetSize(0);
+   qw.SetSize(0);
+
+   for (int s = 0; s < samples.Size(); s++)
+   {
+      el.Append(samples[s]->info.el);
+      qp.Append(samples[s]->info.qp);
+      qw.Append(samples[s]->info.qw);
+   }
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::WriteDataset(grp_id, eldset, el);
+   hdf5_utils::WriteDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::WriteDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+}
+
+void EQPElement::Load(hid_t file_id, const std::string &dsetname, const IntegratorType type)
+{
+   std::string eldset;
+   switch (type)
+   {
+      case IntegratorType::DOMAIN:        eldset = "elem"; break;
+      case IntegratorType::INTERIORFACE:  eldset = "face"; break;
+      case IntegratorType::BDRFACE:       eldset = "be"; break;
+      case IntegratorType::INTERFACE:     eldset = "itf"; break;
+      default:
+         mfem_error("EQPElement::Load- Unknown IntegratorType!\n");
+   }
+
+   Array<int> el, qp;
+   Array<double> qw;
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gopen2(file_id, dsetname.c_str(), H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::ReadDataset(grp_id, eldset, el);
+   hdf5_utils::ReadDataset(grp_id, "quad-pt", qp);
+   hdf5_utils::ReadDataset(grp_id, "quad-wt", qw);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
+
+   samples.SetSize(el.Size());
+   for (int k = 0; k < el.Size(); k++)
+      samples[k] = new EQPSample(SampleInfo({.el=el[k], .qp=qp[k], .qw=qw[k]}));
+}
+
 void HyperReductionIntegrator::AssembleQuadratureVector(
    const FiniteElement &el, ElementTransformation &T, const IntegrationPoint &ip,
    const double &iw, const Vector &eltest, Vector &elquad)
@@ -67,7 +144,7 @@ void HyperReductionIntegrator::AppendPrecomputeBdrFaceCoeffs(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -75,7 +152,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -83,7 +160,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -91,7 +168,7 @@ void HyperReductionIntegrator::AddAssembleGrad_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -386,169 +463,72 @@ void VectorConvectionTrilinearFormIntegrator::AssembleQuadratureGrad(
    }
 }
 
-void VectorConvectionTrilinearFormIntegrator::AppendPrecomputeDomainCoeffs(
-   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
-{
-   const int nbasis = basis.NumCols();
-
-   const int el = sample.el;
-   const FiniteElement *fe = fes->GetFE(el);
-   Array<int> vdofs;
-   // TODO(kevin): not exactly sure what doftrans impacts.
-   DofTransformation *doftrans = fes->GetElementVDofs(el, vdofs);
-   ElementTransformation *T = fes->GetElementTransformation(el);
-   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(*fe, *T);
-   const IntegrationPoint &ip = ir->IntPoint(sample.qp);
-
-   const int nd = fe->GetDof();
-   dim = fe->GetDim();
-
-   shape.SetSize(nd);
-   dshape.SetSize(nd, dim);
-
-   T->SetIntPoint(&ip);
-   fe->CalcShape(ip, shape);
-   fe->CalcPhysDShape(*T, dshape);
-
-   if (tensor)
-   {
-      // Not all nonlinear form integrators can have tensors as coefficients.
-      // This is the special case of polynominally nonlinear operator.
-      // For more general nonlinear operators, probably shape/dshape have to be stored.
-      DenseTensor *elten = new DenseTensor(nbasis, nbasis, nbasis);
-
-      gradEF.SetSize(dim);
-      Vector vec1(dim), vec2(dim);
-      Vector vec3(nd * dim);
-      elmat_comp.UseExternalData(vec3.GetData(), nd, dim);
-      Vector basis_i, basis_j, basis_k;
-
-      for (int i = 0; i < nbasis; i++)
-      {
-         GetBasisElement(basis, i, vdofs, basis_i, doftrans);
-         EF.UseExternalData(basis_i.GetData(), nd, dim);
-         EF.MultTranspose(shape, vec1);
-
-         for (int j = 0; j < nbasis; j++)
-         {
-            GetBasisElement(basis, j, vdofs, basis_j, doftrans);
-            ELV.UseExternalData(basis_j.GetData(), nd, dim);
-            MultAtB(ELV, dshape, gradEF);
-            gradEF.Mult(vec1, vec2);
-            MultVWt(shape, vec2, elmat_comp);
-            if (doftrans) { doftrans->TransformDual(vec3); }
-
-            for (int k = 0; k < nbasis; k++)
-            {
-               GetBasisElement(basis, k, vdofs, basis_k);   // doftrans is already applied above for test function.
-
-               (*elten)(i, j, k) = (basis_k * vec3);
-            }  // for (int k = 0; k < nbasis; k++)
-         }  // for (int j = 0; j < nbasis; j++)
-      }  // for (int i = 0; i < nbasis; i++)
-
-      coeffs.Append(elten);
-   }
-   else
-   {
-      Vector basis_i;
-      DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
-      Array<DenseMatrix *> *gradEFs = new Array<DenseMatrix *>(0);
-      for (int i = 0; i < nbasis; i++)
-      {
-         GetBasisElement(basis, i, vdofs, basis_i, doftrans);
-         EF.UseExternalData(basis_i.GetData(), nd, dim);
-
-         Vector vec1;
-         vec1s->GetColumnReference(i, vec1);
-         EF.MultTranspose(shape, vec1);
-
-         DenseMatrix *gradEF1 = new DenseMatrix(dim);
-         MultAtB(EF, dshape, *gradEF1);
-         gradEFs->Append(gradEF1);
-      }
-      shapes.Append(vec1s);
-      dshapes.Append(gradEFs);
-   }
-}
-
 void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shape1 = eqp_sample.shape1;
+   const Array<DenseMatrix *> *gradEFs = &eqp_sample.dshape1;
+
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
       w *= Q->Eval(T, ip);
 
-   if (tensor)
-   {
-      const DenseTensor *tensor = coeffs[s];
-      Vector tmp(tensor->SizeK());
-      y.SetSize(tensor->SizeK());
-      TensorAddScaledContract(*tensor, w, x, x, y);
-   }
-   else
-   {
-      dim = shapes[s]->NumRows();
-      Vector vec1(dim), vec2(dim);
-      shapes[s]->Mult(x, vec1);
-      Array<DenseMatrix *> *gradEFs = dshapes[s];
+   dim = shape1->NumRows();
+   Vector vec1(dim), vec2(dim);
+   shape1->Mult(x, vec1);
 
-      gradEF.SetSize(dim);
-      gradEF = 0.0;
-      for (int k = 0; k < gradEFs->Size(); k++)
-         gradEF.Add(x(k), *((*gradEFs)[k]));
-      gradEF.Mult(vec1, vec2);
+   gradEF.SetSize(dim);
+   gradEF = 0.0;
+   for (int k = 0; k < gradEFs->Size(); k++)
+      gradEF.Add(x(k), *((*gradEFs)[k]));
+   gradEF.Mult(vec1, vec2);
 
-      assert(y.Size() == x.Size());
-      shapes[s]->AddMultTranspose(vec2, y, w);
-   }
+   assert(y.Size() == x.Size());
+   shape1->AddMultTranspose(vec2, y, w);
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shape1 = eqp_sample.shape1;
+   const Array<DenseMatrix *> *gradEFs = &eqp_sample.dshape1;
+   
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
       w *= Q->Eval(T, ip);
 
-   if (tensor)
+   dim = shape1->NumRows();
+   int nbasis = shape1->NumCols();
+   Vector vec1(dim), vec2(dim);
+   shape1->Mult(x, vec1);
+
+   gradEF.SetSize(dim);
+   gradEF = 0.0;
+   for (int k = 0; k < gradEFs->Size(); k++)
+      gradEF.Add(x(k), *((*gradEFs)[k]));
+   gradEF *= w;
+
+   ELV.SetSize(dim, nbasis);
+   Mult(gradEF, *shape1, ELV);
+
+   for (int k = 0; k < nbasis; k++)
    {
-      const DenseTensor *tensor = coeffs[s];
-      TensorAddScaledMultTranspose(*tensor, w, x, 0, jac);
-      TensorAddScaledMultTranspose(*tensor, w, x, 1, jac);
+      ELV.GetColumnReference(k, vec2);
+      (*gradEFs)[k]->AddMult(vec1, vec2, w);
    }
-   else
+
+   Vector jac_col;
+   for (int k = 0; k < nbasis; k++)
    {
-      dim = shapes[s]->NumRows();
-      int nbasis = shapes[s]->NumCols();
-      Vector vec1(dim), vec2(dim);
-      shapes[s]->Mult(x, vec1);
-      Array<DenseMatrix *> *gradEFs = dshapes[s];
-
-      gradEF.SetSize(dim);
-      gradEF = 0.0;
-      for (int k = 0; k < gradEFs->Size(); k++)
-         gradEF.Add(x(k), *((*gradEFs)[k]));
-      gradEF *= w;
-
-      ELV.SetSize(dim, nbasis);
-      Mult(gradEF, *shapes[s], ELV);
-
-      for (int k = 0; k < nbasis; k++)
-      {
-         ELV.GetColumnReference(k, vec2);
-         (*gradEFs)[k]->AddMult(vec1, vec2, w);
-      }
-
-      Vector jac_col;
-      for (int k = 0; k < nbasis; k++)
-      {
-         jac.GetColumnReference(k, jac_col);
-         ELV.GetColumnReference(k, vec2);
-         shapes[s]->AddMultTranspose(vec2, jac_col);
-      }
+      jac.GetColumnReference(k, jac_col);
+      ELV.GetColumnReference(k, vec2);
+      shape1->AddMultTranspose(vec2, jac_col);
    }
 }
 
@@ -746,62 +726,22 @@ void IncompressibleInviscidFluxNLFIntegrator::AssembleQuadratureGrad(
    }
 }
 
-void IncompressibleInviscidFluxNLFIntegrator::AppendPrecomputeDomainCoeffs(
-   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
-{
-   const int nbasis = basis.NumCols();
-
-   const int el = sample.el;
-   const FiniteElement *fe = fes->GetFE(el);
-   Array<int> vdofs;
-   // TODO(kevin): not exactly sure what doftrans impacts.
-   DofTransformation *doftrans = fes->GetElementVDofs(el, vdofs);
-   ElementTransformation *T = fes->GetElementTransformation(el);
-   const IntegrationRule *ir = IntRule ? IntRule : &GetRule(*fe, *T);
-   const IntegrationPoint &ip = ir->IntPoint(sample.qp);
-
-   const int nd = fe->GetDof();
-   dim = fe->GetDim();
-
-   shape.SetSize(nd);
-   dshape.SetSize(nd, dim);
-
-   T->SetIntPoint(&ip);
-   fe->CalcShape(ip, shape);
-   fe->CalcPhysDShape(*T, dshape);
-
-   Vector basis_i;
-   DenseMatrix *vec1s = new DenseMatrix(dim, nbasis);
-   Array<DenseMatrix *> *gradEFs = new Array<DenseMatrix *>(0);
-   for (int i = 0; i < nbasis; i++)
-   {
-      GetBasisElement(basis, i, vdofs, basis_i, doftrans);
-      EF.UseExternalData(basis_i.GetData(), nd, dim);
-
-      Vector vec1;
-      vec1s->GetColumnReference(i, vec1);
-      EF.MultTranspose(shape, vec1);
-
-      DenseMatrix *gradEF1 = new DenseMatrix(dim);
-      MultAtB(EF, dshape, *gradEF1);
-      gradEFs->Append(gradEF1);
-   }
-   shapes.Append(vec1s);
-   dshapes.Append(gradEFs);
-}
-
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shape1 = eqp_sample.shape1;
+   const Array<DenseMatrix *> *dshape = &eqp_sample.dshape1;
+
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
       w *= Q->Eval(T, ip);
 
-   dim = shapes[s]->NumRows();
+   dim = shape1->NumRows();
    Vector u1(dim);
-   shapes[s]->Mult(x, u1);
-   Array<DenseMatrix *> *dshape = dshapes[s];
+   shape1->Mult(x, u1);
 
    Vector vec1(dim);
    assert(y.Size() == dshape->Size());
@@ -813,18 +753,22 @@ void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
 }
 
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, ElementTransformation &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shape1 = eqp_sample.shape1;
+   const Array<DenseMatrix *> *dshape = &eqp_sample.dshape1;
+
    T.SetIntPoint(&ip);
    double w = qw * T.Weight();
    if (Q) 
       w *= Q->Eval(T, ip);
 
-   dim = shapes[s]->NumRows();
-   int nbasis = shapes[s]->NumCols();
+   dim = shape1->NumRows();
+   int nbasis = shape1->NumCols();
    Vector u1(dim), vec1(dim), vec2(nbasis);
-   shapes[s]->Mult(x, u1);
-   Array<DenseMatrix *> *dshape = dshapes[s];
+   shape1->Mult(x, u1);
 
    u1 *= w;
 
@@ -832,7 +776,7 @@ void IncompressibleInviscidFluxNLFIntegrator::AddAssembleGrad_Fast(
    {
       (*dshape)[i]->Mult(u1, vec1);
       (*dshape)[i]->AddMultTranspose(u1, vec1);
-      shapes[s]->MultTranspose(vec1, vec2);
+      shape1->MultTranspose(vec1, vec2);
 
       double *d_jac = jac.GetData() + i;
       for (int j = 0; j < nbasis; j++)

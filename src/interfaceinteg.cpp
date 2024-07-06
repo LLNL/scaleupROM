@@ -65,8 +65,8 @@ void InterfaceNonlinearFormIntegrator::AssembleQuadratureGrad(
 }
 
 void InterfaceNonlinearFormIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &Tr1,
-   FaceElementTransformations &Tr2, const IntegrationPoint &ip,
+   const EQPSample &eqp_sample, FaceElementTransformations &Tr1,
+   FaceElementTransformations &Tr2,
    const Vector &x1, const Vector &x2, Vector &y1, Vector &y2)
 {
    mfem_error("InterfaceNonlinearFormIntegrator::AddAssembleVector_Fast\n"
@@ -74,8 +74,8 @@ void InterfaceNonlinearFormIntegrator::AddAssembleVector_Fast(
 }
 
 void InterfaceNonlinearFormIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &Tr1,
-   FaceElementTransformations &Tr2, const IntegrationPoint &ip,
+   const EQPSample &eqp_sample, FaceElementTransformations &Tr1,
+   FaceElementTransformations &Tr2,
    const Vector &x1, const Vector &x2, Array2D<SparseMatrix *> &jac)
 {
    mfem_error("InterfaceNonlinearFormIntegrator::AddAssembleGrad_Fast\n"
@@ -1709,104 +1709,17 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
    }
 }
 
-void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeInteriorFaceCoeffs(
-   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
-{
-   const int face = sample.el;
-   FaceElementTransformations *T = fes->GetMesh()->GetInteriorFaceTransformations(face);
-   assert(T != NULL);
-   assert(T->Elem2No >= 0);
-
-   AppendPrecomputeFaceCoeffs(fes, T, basis, sample);
-}
-
-void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeBdrFaceCoeffs(
-   const FiniteElementSpace *fes, DenseMatrix &basis, const SampleInfo &sample)
-{
-   const int be = sample.el;
-   FaceElementTransformations *T = fes->GetMesh()->GetBdrFaceTransformations(be);
-   assert(T != NULL);
-   assert(T->Elem2No < 0);
-
-   AppendPrecomputeFaceCoeffs(fes, T, basis, sample);
-}
-
-void DGLaxFriedrichsFluxIntegrator::AppendPrecomputeFaceCoeffs(
-   const FiniteElementSpace *fes, FaceElementTransformations *T,
-   DenseMatrix &basis, const SampleInfo &sample)
-{
-   const int nbasis = basis.NumCols();
-
-   const bool el2 = (T->Elem2No >= 0);
-
-   const FiniteElement *fe1 = fes->GetFE(T->Elem1No);
-   const FiniteElement *fe2 = (el2) ? fes->GetFE(T->Elem2No) : fe1;
-
-   Array<int> vdofs, vdofs2;
-   fes->GetElementVDofs(T->Elem1No, vdofs);
-   if (el2)
-   {
-      fes->GetElementVDofs(T->Elem2No, vdofs2);
-      vdofs.Append(vdofs2);
-   }
-
-   dim = fe1->GetDim();
-   ndofs1 = fe1->GetDof();
-   ndofs2 = (T->Elem2No >= 0) ? fe2->GetDof() : 0;
-
-   const IntegrationRule *ir = IntRule;
-   if (ir == NULL)
-   {
-      // a simple choice for the integration order; is this OK?
-      const int order = (int)(ceil(1.5 * (2 * max(fe1->GetOrder(), ndofs2 ? fe2->GetOrder() : 0) - 1)));
-      ir = &IntRules.Get(T->GetGeometryType(), order);
-   }
-   const IntegrationPoint &ip = ir->IntPoint(sample.qp);
-
-   shape1.SetSize(ndofs1);
-   if (el2) shape2.SetSize(ndofs2);
-
-   T->SetAllIntPoints(&ip);
-
-   const IntegrationPoint &eip1 = T->GetElement1IntPoint();
-   fe1->CalcShape(eip1, shape1);
-   if (el2)
-   {
-      const IntegrationPoint &eip2 = T->GetElement2IntPoint();
-      fe2->CalcShape(eip2, shape2);
-   }
-
-   Vector basis_i;
-   DenseMatrix *vec1s, *vec2s;
-   vec1s = new DenseMatrix(dim, nbasis);
-   if (el2) vec2s = new DenseMatrix(dim, nbasis);
-
-   for (int i = 0; i < nbasis; i++)
-   {
-      GetBasisElement(basis, i, vdofs, basis_i);
-      elv1.UseExternalData(basis_i.GetData(), ndofs1, dim);
-      if (el2) elv2.UseExternalData(basis_i.GetData() + ndofs1 * dim, ndofs2, dim);
-
-      Vector vec1, vec2;
-      vec1s->GetColumnReference(i, vec1);
-      elv1.MultTranspose(shape1, vec1);
-
-      if (el2)
-      {
-         vec2s->GetColumnReference(i, vec2);
-         elv2.MultTranspose(shape2, vec2);
-      }
-   }
-   shapes1.Append(vec1s);
-   if (el2) shapes2.Append(vec2s);
-}
-
 void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shapes1 = eqp_sample.shape1;
+   DenseMatrix *shapes2 = eqp_sample.shape2;
+
    const bool el2 = (T.Elem2No >= 0);
 
-   dim = shapes1[s]->NumRows();
+   dim = shapes1->NumRows();
    nor.SetSize(dim);
    flux.SetSize(dim);
    u1.SetSize(dim);
@@ -1820,9 +1733,9 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    const IntegrationPoint &eip1 = T.GetElement1IntPoint();
    // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
-   shapes1[s]->Mult(x, u1);
+   shapes1->Mult(x, u1);
    if (el2)
-      shapes2[s]->Mult(x, u2);
+      shapes2->Mult(x, u2);
    else if (UD)
       UD->Eval(u2, *(T.Elem1), eip1);
 
@@ -1841,16 +1754,21 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    if (Q) { w *= Q->Eval(T, ip); }
 
    assert(y.Size() == x.Size());
-   shapes1[s]->AddMultTranspose(flux, y, 1.0);
-   if (el2) shapes2[s]->AddMultTranspose(flux, y, -1.0);
+   shapes1->AddMultTranspose(flux, y, -w);
+   if (el2) shapes2->AddMultTranspose(flux, y, w);
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &T, const IntegrationPoint &ip, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
+   const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shapes1 = eqp_sample.shape1;
+   DenseMatrix *shapes2 = eqp_sample.shape2;
+
    const bool el2 = (T.Elem2No >= 0);
 
-   dim = shapes1[s]->NumRows();
+   dim = shapes1->NumRows();
    nor.SetSize(dim);
    flux.SetSize(dim);
    u1.SetSize(dim);
@@ -1866,9 +1784,9 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    const IntegrationPoint &eip1 = T.GetElement1IntPoint();
    // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
-   shapes1[s]->Mult(x, u1);
+   shapes1->Mult(x, u1);
    if (el2)
-      shapes2[s]->Mult(x, u2);
+      shapes2->Mult(x, u2);
    else if (UD)
       UD->Eval(u2, *(T.Elem1), eip1);
 
@@ -1887,12 +1805,12 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    if (Q) 
       w *= Q->Eval(T, ip);
 
-   AddwRtAP(*shapes1[s], gradu1, *shapes1[s], jac, -w);
+   AddwRtAP(*shapes1, gradu1, *shapes1, jac, -w);
    if (el2)
    {
-      AddwRtAP(*shapes2[s], gradu1, *shapes1[s], jac, w);
-      AddwRtAP(*shapes1[s], gradu2, *shapes2[s], jac, -w);
-      AddwRtAP(*shapes2[s], gradu2, *shapes2[s], jac, w);
+      AddwRtAP(*shapes2, gradu1, *shapes1, jac, w);
+      AddwRtAP(*shapes1, gradu2, *shapes2, jac, -w);
+      AddwRtAP(*shapes2, gradu2, *shapes2, jac, w);
    }
 }
 
@@ -2101,11 +2019,17 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
-   const int s, const double qw, FaceElementTransformations &Tr1,
-   FaceElementTransformations &Tr2, const IntegrationPoint &ip,
+   const EQPSample &eqp_sample, FaceElementTransformations &Tr1,
+   FaceElementTransformations &Tr2,
    const Vector &x1, const Vector &x2, Vector &y1, Vector &y2)
 {
-   dim = shapes1[s]->NumRows();
+   const IntegrationRule *ir = GetIntegrationRule();
+   const IntegrationPoint &ip = ir->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shapes1 = eqp_sample.shape1;
+   DenseMatrix *shapes2 = eqp_sample.shape2;
+
+   dim = shapes1->NumRows();
    nor.SetSize(dim);
    flux.SetSize(dim);
    u1.SetSize(dim);
@@ -2117,8 +2041,8 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    const IntegrationPoint &eip1 = Tr1.GetElement1IntPoint();
    // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
-   shapes1[s]->Mult(x1, u1);
-   shapes2[s]->Mult(x2, u2);
+   shapes1->Mult(x1, u1);
+   shapes2->Mult(x2, u2);
 
    if (dim == 1)
    {
@@ -2136,16 +2060,22 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
 
    assert(y1.Size() == x1.Size());
    assert(y2.Size() == x2.Size());
-   shapes1[s]->AddMultTranspose(flux, y1, 1.0);
-   shapes2[s]->AddMultTranspose(flux, y2, -1.0);
+   shapes1->AddMultTranspose(flux, y1, -w);
+   shapes2->AddMultTranspose(flux, y2, w);
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
-   const int s, const double qw, FaceElementTransformations &Tr1,
-   FaceElementTransformations &Tr2, const IntegrationPoint &ip,
+   const EQPSample &eqp_sample, FaceElementTransformations &Tr1,
+   FaceElementTransformations &Tr2,
    const Vector &x1, const Vector &x2, Array2D<SparseMatrix *> &jac)
 {
-   dim = shapes1[s]->NumRows();
+   const IntegrationRule *ir = GetIntegrationRule();
+   const IntegrationPoint &ip = ir->IntPoint(eqp_sample.info.qp);
+   const double qw = eqp_sample.info.qw;
+   DenseMatrix *shapes1 = eqp_sample.shape1;
+   DenseMatrix *shapes2 = eqp_sample.shape2;
+
+   dim = shapes1->NumRows();
    nor.SetSize(dim);
    flux.SetSize(dim);
    u1.SetSize(dim);
@@ -2159,8 +2089,8 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    const IntegrationPoint &eip1 = Tr1.GetElement1IntPoint();
    // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
-   shapes1[s]->Mult(x1, u1);
-   shapes2[s]->Mult(x2, u2);
+   shapes1->Mult(x1, u1);
+   shapes2->Mult(x2, u2);
 
    if (dim == 1)
    {
@@ -2178,10 +2108,10 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    if (Q) 
       w *= Q->Eval(Tr1, ip);
 
-   AddwRtAP(*shapes1[s], gradu1, *shapes1[s], *jac(0, 0), -w);
-   AddwRtAP(*shapes2[s], gradu1, *shapes1[s], *jac(1, 0), w);
-   AddwRtAP(*shapes1[s], gradu2, *shapes2[s], *jac(0, 1), -w);
-   AddwRtAP(*shapes2[s], gradu2, *shapes2[s], *jac(1, 1), w);
+   AddwRtAP(*shapes1, gradu1, *shapes1, *jac(0, 0), -w);
+   AddwRtAP(*shapes2, gradu1, *shapes1, *jac(1, 0), w);
+   AddwRtAP(*shapes1, gradu2, *shapes2, *jac(0, 1), -w);
+   AddwRtAP(*shapes2, gradu2, *shapes2, *jac(1, 1), w);
 }
 
 }

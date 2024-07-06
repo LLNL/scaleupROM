@@ -6,31 +6,70 @@
 #define SCALEUPROM_HYPERREDUCTION_INTEG_HPP
 
 #include "mfem.hpp"
+#include "hdf5_utils.hpp"
+#include "etc.hpp"
 
 namespace mfem
 {
 
-struct SampleInfo {
-   /*
-      - For DomainIntegrator: element index
-      - For BdrFaceIntegrator: boundary element index
-      - For InteriorFaceIntegrator: face index
-      - For InterfaceIntegrator: interface info index
-   */
-   int el;
+struct EQPSample {
+   SampleInfo info;
+   /* shape and gradient of shape function on element 1 */
+   DenseMatrix *shape1 = NULL;
+   Array<DenseMatrix *> dshape1;
+   /* shape and gradient of shape function on element 2 */
+   DenseMatrix *shape2 = NULL;
+   Array<DenseMatrix *> dshape2;
 
-   int qp;         // quadrature point
-   double qw;      // quadrature weight
+   EQPSample(const SampleInfo &info_)
+      : info(info_), shape1(NULL), shape2(NULL), dshape1(0), dshape2(0) {}
+
+   ~EQPSample()
+   {
+      delete shape1;
+      delete shape2;
+      DeletePointers(dshape1);
+      DeletePointers(dshape2);
+   }
+};
+
+class EQPElement
+{
+public:
+   Array<EQPSample *> samples;
+
+public:
+   EQPElement() : samples(0) {}
+
+   EQPElement(const Array<SampleInfo> &samples_)
+   {
+      samples.SetSize(samples_.Size());
+      for (int s = 0; s < samples.Size(); s++)
+         samples[s] = new EQPSample(samples_[s]);
+   }
+
+   ~EQPElement()
+   {
+      DeletePointers(samples);
+   }
+
+   const int Size() { return samples.Size(); }
+
+   EQPSample* GetSample(const int s)
+   {
+      assert((s >= 0) && (s < samples.Size()));
+      return samples[s];
+   }
+
+   void Save(hid_t file_id, const std::string &dsetname, const IntegratorType type);
+   void Load(hid_t file_id, const std::string &dsetname, const IntegratorType type);
 };
 
 class HyperReductionIntegrator : virtual public NonlinearFormIntegrator
 {
-public:
-   const bool precomputable;
-
 protected:
-   HyperReductionIntegrator(const bool precomputable_ = false, const IntegrationRule *ir = NULL)
-      : precomputable(precomputable_), NonlinearFormIntegrator(ir) {}
+   HyperReductionIntegrator(const IntegrationRule *ir = NULL)
+      : NonlinearFormIntegrator(ir) {}
 
    // removed const qualifier for basis in order to use its column view vector.
    void GetBasisElement(DenseMatrix &basis, const int col,
@@ -78,18 +117,14 @@ public:
                                              DenseMatrix &basis,
                                              const SampleInfo &sample);
 
-   virtual void AddAssembleVector_Fast(const int s, const double qw,
-                                       ElementTransformation &T, const IntegrationPoint &ip,
-                                       const Vector &x, Vector &y);
-   virtual void AddAssembleVector_Fast(const int s, const double qw,
-                                       FaceElementTransformations &T, const IntegrationPoint &ip,
-                                       const Vector &x, Vector &y);
-   virtual void AddAssembleGrad_Fast(const int s, const double qw,
-                                     ElementTransformation &T, const IntegrationPoint &ip,
-                                     const Vector &x, DenseMatrix &jac);
-   virtual void AddAssembleGrad_Fast(const int s, const double qw,
-                                     FaceElementTransformations &T, const IntegrationPoint &ip,
-                                     const Vector &x, DenseMatrix &jac);
+   virtual void AddAssembleVector_Fast(const EQPSample &eqp_sample,
+                                       ElementTransformation &T, const Vector &x, Vector &y);
+   virtual void AddAssembleVector_Fast(const EQPSample &eqp_sample,
+                                       FaceElementTransformations &T, const Vector &x, Vector &y);
+   virtual void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
+                                     ElementTransformation &T, const Vector &x, DenseMatrix &jac);
+   virtual void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
+                                     FaceElementTransformations &T, const Vector &x, DenseMatrix &jac);
 };
 
 class VectorConvectionTrilinearFormIntegrator : virtual public HyperReductionIntegrator
@@ -101,33 +136,14 @@ private:
    DenseMatrix dshape, dshapex, elmat_comp, EF, gradEF, ELV;
    Vector shape;
 
-   // // DenseTensor is column major and i is the fastest index. 
-   // // For fast iteration, we set k to be the test function index.
-   Array<DenseTensor *> coeffs;
-   Array<DenseMatrix *> shapes;
-   Array<Array<DenseMatrix *> *> dshapes;
-
-   // Tensor precomputation is more expensive.
-   bool tensor = false;
-
 public:
    VectorConvectionTrilinearFormIntegrator(Coefficient &q, VectorCoefficient *vq = NULL)
       // : HyperReductionIntegrator(true), Q(&q), vQ(vq), coeffs(0) { }
-      : HyperReductionIntegrator(true), Q(&q), vQ(vq), shapes(0), dshapes(0), coeffs(0) { }
+      : HyperReductionIntegrator(), Q(&q), vQ(vq) { }
 
    VectorConvectionTrilinearFormIntegrator() = default;
 
-   ~VectorConvectionTrilinearFormIntegrator()
-   // { for (int k = 0; k < coeffs.Size(); k++) delete coeffs[k]; }
-   {
-      for (int k = 0; k < shapes.Size(); k++) delete shapes[k];
-      for (int k = 0; k < dshapes.Size(); k++)
-      {
-         for (int kk = 0; kk < dshapes[k]->Size(); kk++)
-            delete (*dshapes[k])[kk];
-         delete dshapes[k];
-      }
-   }
+   ~VectorConvectionTrilinearFormIntegrator() {}
 
    static const IntegrationRule &GetRule(const FiniteElement &fe,
                                          ElementTransformation &T);
@@ -156,16 +172,10 @@ public:
                                        const Vector &elfun,
                                        DenseMatrix &elmat) override;
 
-   virtual void AppendPrecomputeDomainCoeffs(const FiniteElementSpace *fes,
-                                             DenseMatrix &basis,
-                                             const SampleInfo &sample) override;
-
-   virtual void AddAssembleVector_Fast(const int s, const double qw,
-                                       ElementTransformation &T, const IntegrationPoint &ip,
-                                       const Vector &x, Vector &y) override;
-   virtual void AddAssembleGrad_Fast(const int s, const double qw,
-                                     ElementTransformation &T, const IntegrationPoint &ip,
-                                     const Vector &x, DenseMatrix &jac) override;
+   void AddAssembleVector_Fast(const EQPSample &eqp_sample, 
+                              ElementTransformation &T, const Vector &x, Vector &y) override;
+   void AddAssembleGrad_Fast(const EQPSample &eqp_sample, 
+                              ElementTransformation &T, const Vector &x, DenseMatrix &jac) override;
 };
 
 /*
@@ -180,12 +190,9 @@ private:
    DenseMatrix dshape, dshapex, EF, uu, ELV, elmat_comp;
    Vector shape;
 
-   // precomputed basis value at the sample point.
-   Array<DenseMatrix *> shapes;
-   Array<Array<DenseMatrix *> *> dshapes;
 public:
    IncompressibleInviscidFluxNLFIntegrator(Coefficient &q)
-      : HyperReductionIntegrator(true), Q(&q) { }
+      : HyperReductionIntegrator(), Q(&q) { }
 
    IncompressibleInviscidFluxNLFIntegrator() = default;
 
@@ -216,16 +223,10 @@ public:
                               const Vector &elfun,
                               DenseMatrix &elmat);
 
-   void AppendPrecomputeDomainCoeffs(const FiniteElementSpace *fes,
-                                    DenseMatrix &basis,
-                                    const SampleInfo &sample) override;
-
-   void AddAssembleVector_Fast(const int s, const double qw,
-                                 ElementTransformation &T, const IntegrationPoint &ip,
-                                 const Vector &x, Vector &y) override;
-   void AddAssembleGrad_Fast(const int s, const double qw,
-                              ElementTransformation &T, const IntegrationPoint &ip,
-                              const Vector &x, DenseMatrix &jac) override;
+   void AddAssembleVector_Fast(const EQPSample &eqp_sample, 
+                                 ElementTransformation &T, const Vector &x, Vector &y);
+   void AddAssembleGrad_Fast(const EQPSample &eqp_sample, 
+                              ElementTransformation &T, const Vector &x, DenseMatrix &jac);
 };
 
 } // namespace mfem

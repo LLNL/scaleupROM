@@ -8,8 +8,6 @@
 #include "mfem.hpp"
 #include "hdf5.h"
 #include "linalg_utils.hpp"
-#include "rom_handler.hpp"
-#include "hyperreduction_integ.hpp"
 
 namespace mfem
 {
@@ -21,6 +19,61 @@ enum IntegratorType
    BDRFACE,
    INTERFACE,
    NUM_INTEG_TYPE
+};
+
+struct SampleInfo
+{
+   /*
+      - For DomainIntegrator: element index
+      - For BdrFaceIntegrator: boundary element index
+      - For InteriorFaceIntegrator: face index
+      - For InterfaceIntegrator: interface info index
+   */
+   int el;
+
+   int qp;         // quadrature point
+   double qw;      // quadrature weight
+};
+
+struct BasisTag
+{
+   /* component mesh name */
+   std::string comp = "";
+   /* variable name, if separate basis is used */
+   std::string var = "";
+
+   BasisTag() {}
+
+   BasisTag(const std::string &comp_, const std::string &var_="")
+      : comp(comp_), var(var_) {}
+
+   const std::string print() const
+   {
+      std::string tag = comp;
+      if (var != "")
+         tag += "_" + var;
+      return tag;
+   }
+
+   bool operator==(const BasisTag &tag) const
+   {
+      return ((comp == tag.comp) && (var == tag.var));
+   }
+
+   bool operator<(const BasisTag &tag) const
+   {
+      if (comp == tag.comp)
+         return (var < tag.var);
+
+      return (comp < tag.comp);
+   }
+
+   BasisTag& operator=(const BasisTag &tag)
+   {
+      comp = tag.comp;
+      var = tag.var;
+      return *this;
+   }
 };
 
 }

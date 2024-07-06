@@ -1031,6 +1031,8 @@ void SteadyNSSolver::AllocateROMEQPElems()
       itf_eqp->SetBasisAtComponent(c, *basis);
    }
    itf_eqp->UpdateBlockOffsets();
+
+   itf_eqp->SetPrecomputeMode(precompute);
 }
 
 void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
@@ -1215,7 +1217,12 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
    assert(errf >= 0);
 
    if (oper_type == OperType::LF)
+   {
       itf_eqp->LoadEQPForIntegrator(0, file_id, "interface_integ0");
+
+      if (itf_eqp->PrecomputeMode())
+         itf_eqp->PrecomputeCoefficients();
+   }
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
@@ -1240,7 +1247,7 @@ void SteadyNSSolver::AssembleROMEQPOper()
       int idx = (separate_variable_basis) ? m * num_var : m;
       rom_handler->GetDomainBasis(idx, basis);
 
-      subdomain_eqps[m] = new ROMNonlinearForm(basis->NumCols(), ufes[m]);
+      subdomain_eqps[m] = new ROMNonlinearForm(basis->NumCols(), ufes[m], false);
 
       switch (oper_type)
       {
@@ -1249,8 +1256,8 @@ void SteadyNSSolver::AssembleROMEQPOper()
          nl_integ_tmp->SetIntRule(ir_nl);
          subdomain_eqps[m]->AddDomainIntegrator(nl_integ_tmp);
 
-         subdomain_eqps[m]->UpdateDomainIntegratorSampling(0,
-            *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::DOMAIN, 0)));
+         subdomain_eqps[m]->SetDomainEQPElems(0,
+            comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::DOMAIN, 0));
          break;
       
       case (OperType::LF):
@@ -1264,11 +1271,11 @@ void SteadyNSSolver::AssembleROMEQPOper()
          if (full_dg)
             subdomain_eqps[m]->AddInteriorFaceIntegrator(lf_integ2);
 
-         subdomain_eqps[m]->UpdateDomainIntegratorSampling(0,
-            *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::DOMAIN, 0)));
+         subdomain_eqps[m]->SetDomainEQPElems(0,
+            comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::DOMAIN, 0));
          if (full_dg)
-            subdomain_eqps[m]->UpdateInteriorFaceIntegratorSampling(0,
-               *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::INTERIORFACE, 0)));
+            subdomain_eqps[m]->SetInteriorEQPElems(0,
+               comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::INTERIORFACE, 0));
 
          Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
          int idx = 0;
@@ -1290,8 +1297,8 @@ void SteadyNSSolver::AssembleROMEQPOper()
             subdomain_eqps[m]->AddBdrFaceIntegrator(lf_integ2, *bdr_markers[global_idx]);
 
             int kind = (bdr_type[global_idx] == BoundaryType::ZERO) ? 1 : 0;
-            subdomain_eqps[m]->UpdateBdrFaceIntegratorSampling(idx,
-               *(comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::BDRFACE, 2 * b + kind)));
+            subdomain_eqps[m]->SetBdrEQPElems(idx,
+               comp_eqps[c_type]->GetEQPForIntegrator(IntegratorType::BDRFACE, 2 * b + kind));
 
             idx++;
          }  // for (int b = 0; b < bdr_c2g->Size(); b++)
@@ -1304,8 +1311,6 @@ void SteadyNSSolver::AssembleROMEQPOper()
       subdomain_eqps[m]->SetBasis(*basis);
       // TODO(kevin): load these coefficients, not re-computing.
       subdomain_eqps[m]->SetPrecomputeMode(comp_eqps[c_type]->PrecomputeMode());
-      if (subdomain_eqps[m]->PrecomputeMode())
-         subdomain_eqps[m]->PrecomputeCoefficients();
    }  // for (int m = 0; m < numSub; m++)
 
    /* ROMInterfaceForm is already loaded */

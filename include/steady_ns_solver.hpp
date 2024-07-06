@@ -7,6 +7,7 @@
 
 #include "stokes_solver.hpp"
 #include "rom_nonlinearform.hpp"
+#include "rom_interfaceform.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
