@@ -719,7 +719,7 @@ void ROMInterfaceForm::PrecomputeCoefficients()
          interface_infos = topol_handler->GetRefInterfaceInfos(p);
          assert(interface_infos);
 
-         eqp_elem = fnfi_sample[p + k * numRefPorts];
+         eqp_elem = fnfi_ref_sample[p + k * numRefPorts];
          assert(eqp_elem);
 
          topol_handler->GetComponentPair(p, c1, c2);
