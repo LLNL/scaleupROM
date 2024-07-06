@@ -144,7 +144,7 @@ void HyperReductionIntegrator::AppendPrecomputeBdrFaceCoeffs(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -152,7 +152,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleVector_Fast(
-   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleVector_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -160,7 +160,7 @@ void HyperReductionIntegrator::AddAssembleVector_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -168,7 +168,7 @@ void HyperReductionIntegrator::AddAssembleGrad_Fast(
 }
 
 void HyperReductionIntegrator::AddAssembleGrad_Fast(
-   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
    mfem_error ("HyperReductionIntegrator::AddAssembleGrad_Fast(...)\n"
                "is not implemented for this class,\n"
@@ -464,7 +464,7 @@ void VectorConvectionTrilinearFormIntegrator::AssembleQuadratureGrad(
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
-   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
@@ -491,7 +491,7 @@ void VectorConvectionTrilinearFormIntegrator::AddAssembleVector_Fast(
 }
 
 void VectorConvectionTrilinearFormIntegrator::AddAssembleGrad_Fast(
-   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
@@ -727,7 +727,7 @@ void IncompressibleInviscidFluxNLFIntegrator::AssembleQuadratureGrad(
 }
 
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
-   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, Vector &y)
 {
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
@@ -753,7 +753,7 @@ void IncompressibleInviscidFluxNLFIntegrator::AddAssembleVector_Fast(
 }
 
 void IncompressibleInviscidFluxNLFIntegrator::AddAssembleGrad_Fast(
-   const int s, const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, ElementTransformation &T, const Vector &x, DenseMatrix &jac)
 {
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;

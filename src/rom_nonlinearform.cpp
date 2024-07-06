@@ -116,7 +116,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
             if (precompute)
             {
-               dnfi[k]->AddAssembleVector_Fast(i, *sample, *T, x, y);
+               dnfi[k]->AddAssembleVector_Fast(*sample, *T, x, y);
                continue;
             }
 
@@ -163,7 +163,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
             if (precompute)
             {
-               fnfi[k]->AddAssembleVector_Fast(i, *sample, *tr, x, y);
+               fnfi[k]->AddAssembleVector_Fast(*sample, *tr, x, y);
                continue;
             }
 
@@ -252,7 +252,7 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
             if (precompute)
             {
-               bfnfi[k]->AddAssembleVector_Fast(i, *sample, *tr, x, y);
+               bfnfi[k]->AddAssembleVector_Fast(*sample, *tr, x, y);
                continue;
             }
 
@@ -376,7 +376,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             jac_timers[3]->Start();
             if (precompute)
             {
-               dnfi[k]->AddAssembleGrad_Fast(i, *sample, *T, x, *Grad);
+               dnfi[k]->AddAssembleGrad_Fast(*sample, *T, x, *Grad);
                continue;
             }
 
@@ -426,7 +426,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
             if (precompute)
             {
-               fnfi[k]->AddAssembleGrad_Fast(i, *sample, *tr, x, *Grad);
+               fnfi[k]->AddAssembleGrad_Fast(*sample, *tr, x, *Grad);
                continue;
             }
 
@@ -516,7 +516,7 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
             if (precompute)
             {
-               bfnfi[k]->AddAssembleGrad_Fast(i, *sample, *tr, x, *Grad);
+               bfnfi[k]->AddAssembleGrad_Fast(*sample, *tr, x, *Grad);
                continue;
             }
 

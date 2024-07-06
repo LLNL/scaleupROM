@@ -330,10 +330,10 @@ public:
                               const Vector &eltest,
                               DenseMatrix &quadmat) override;
 
-   void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample,
+   void AddAssembleVector_Fast(const EQPSample &eqp_sample,
                               FaceElementTransformations &T,
                               const Vector &x, Vector &y) override;
-   void AddAssembleGrad_Fast(const int s, const EQPSample &eqp_sample,
+   void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
                            FaceElementTransformations &T,
                            const Vector &x, DenseMatrix &jac) override;
 

@@ -117,13 +117,13 @@ public:
                                              DenseMatrix &basis,
                                              const SampleInfo &sample);
 
-   virtual void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample,
+   virtual void AddAssembleVector_Fast(const EQPSample &eqp_sample,
                                        ElementTransformation &T, const Vector &x, Vector &y);
-   virtual void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample,
+   virtual void AddAssembleVector_Fast(const EQPSample &eqp_sample,
                                        FaceElementTransformations &T, const Vector &x, Vector &y);
-   virtual void AddAssembleGrad_Fast(const int s, const EQPSample &eqp_sample,
+   virtual void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
                                      ElementTransformation &T, const Vector &x, DenseMatrix &jac);
-   virtual void AddAssembleGrad_Fast(const int s, const EQPSample &eqp_sample,
+   virtual void AddAssembleGrad_Fast(const EQPSample &eqp_sample,
                                      FaceElementTransformations &T, const Vector &x, DenseMatrix &jac);
 };
 
@@ -172,9 +172,9 @@ public:
                                        const Vector &elfun,
                                        DenseMatrix &elmat) override;
 
-   void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample, 
+   void AddAssembleVector_Fast(const EQPSample &eqp_sample, 
                               ElementTransformation &T, const Vector &x, Vector &y) override;
-   void AddAssembleGrad_Fast(const int s, const EQPSample &eqp_sample, 
+   void AddAssembleGrad_Fast(const EQPSample &eqp_sample, 
                               ElementTransformation &T, const Vector &x, DenseMatrix &jac) override;
 };
 
@@ -223,9 +223,9 @@ public:
                               const Vector &elfun,
                               DenseMatrix &elmat);
 
-   void AddAssembleVector_Fast(const int s, const EQPSample &eqp_sample, 
+   void AddAssembleVector_Fast(const EQPSample &eqp_sample, 
                                  ElementTransformation &T, const Vector &x, Vector &y);
-   void AddAssembleGrad_Fast(const int s, const EQPSample &eqp_sample, 
+   void AddAssembleGrad_Fast(const EQPSample &eqp_sample, 
                               ElementTransformation &T, const Vector &x, DenseMatrix &jac);
 };
 

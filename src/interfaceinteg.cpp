@@ -1710,7 +1710,7 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
-   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
@@ -1759,7 +1759,7 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
-   const int s, const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
+   const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
