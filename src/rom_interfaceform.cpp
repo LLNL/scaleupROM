@@ -394,7 +394,11 @@ void ROMInterfaceForm::SetupEQPSystem(
 
    const IntegrationRule *ir = nlfi->GetIntegrationRule();
    Mesh *mesh1 = fes1->GetMesh();
-   Mesh *mesh2 = fes2->GetMesh();
+   Mesh *mesh2;
+   if (mesh1 == fes2->GetMesh())
+      mesh2 = new Mesh(*mesh1);
+   else
+      mesh2 = fes2->GetMesh();
 
    const int vdim1 = fes1->GetVDim();
    const int vdim2 = fes2->GetVDim();
@@ -523,6 +527,9 @@ void ROMInterfaceForm::SetupEQPSystem(
    assert(!rhs_Gw.distributed());
    // rhs = Gw. Note that by using Gt and multTranspose, we do parallel communication.
    Gt.transposeMult(w, rhs_Gw);
+
+   if (mesh1 == fes2->GetMesh())
+      delete mesh2;
 
    return;
 }
@@ -696,6 +703,8 @@ void ROMInterfaceForm::PrecomputeCoefficients()
    Array<InterfaceInfo> *interface_infos = NULL;
    const IntegrationRule *ir = NULL;
    EQPElement *eqp_elem = NULL;
+   Mesh *mesh1, *mesh2;
+   FaceElementTransformations *tr1, *tr2;
    FiniteElementSpace *fes1 = NULL, *fes2 = NULL;
    DenseMatrix *basis1 = NULL, *basis2 = NULL;
    int c1, c2;
@@ -721,30 +730,35 @@ void ROMInterfaceForm::PrecomputeCoefficients()
          fes1 = comp_fes[c1];
          fes2 = comp_fes[c2];
 
+         mesh1 = topol_handler->GetComponentMesh(c1);
+         if (c1 == c2)
+            mesh2 = new Mesh(*mesh1);
+         else
+            mesh2 = topol_handler->GetComponentMesh(c2);
+
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
             EQPSample *sample = eqp_elem->GetSample(i);
             const int itf = sample->info.el;
+            topol_handler->GetInterfaceTransformations(mesh1, mesh2, &(*interface_infos)[itf], tr1, tr2);
 
-            PrecomputeEQPSample(*ir, (*interface_infos)[itf], fes1, fes2,
+            PrecomputeEQPSample(*ir, tr1, tr2, fes1, fes2,
                                 *basis1, *basis2, *sample);
          }  // for (int i = 0; i < eqp_elem->Size(); i++)
+
+         if (c1 == c2)
+            delete mesh2;
       }  // for (int p = 0; p < numRefPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
 }
 
 void ROMInterfaceForm::PrecomputeEQPSample(
-   const IntegrationRule &ir, const InterfaceInfo &it_info, FiniteElementSpace *fes1, FiniteElementSpace *fes2,
+   const IntegrationRule &ir, FaceElementTransformations *tr1, FaceElementTransformations *tr2,
+   FiniteElementSpace *fes1, FiniteElementSpace *fes2,
    const DenseMatrix &basis1, const DenseMatrix &basis2, EQPSample &eqp_sample)
 {
    const int nbasis1 = basis1.NumCols();
    const int nbasis2 = basis2.NumCols();
-
-   Mesh *mesh1 = fes1->GetMesh();
-   Mesh *mesh2 = fes2->GetMesh();
-
-   FaceElementTransformations *tr1, *tr2;
-   topol_handler->GetInterfaceTransformations(mesh1, mesh2, &it_info, tr1, tr2);
 
    const FiniteElement *fe1 = fes1->GetFE(tr1->Elem1No);
    const FiniteElement *fe2 = fes2->GetFE(tr2->Elem1No);
@@ -769,7 +783,7 @@ void ROMInterfaceForm::PrecomputeEQPSample(
 
    const IntegrationPoint &eip1 = tr1->GetElement1IntPoint();
    fe1->CalcShape(eip1, shape1);
-   const IntegrationPoint &eip2 = tr2->GetElement2IntPoint();
+   const IntegrationPoint &eip2 = tr2->GetElement1IntPoint();
    fe2->CalcShape(eip2, shape2);
 
    Vector basis1_i, basis2_i;

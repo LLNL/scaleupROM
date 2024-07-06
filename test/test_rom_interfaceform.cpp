@@ -432,7 +432,7 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    rform->SetBasisAtComponent(midx[0], basis1);
    rform->SetBasisAtComponent(midx[1], basis2);
    rform->UpdateBlockOffsets();
-   // rform->SetPrecomputeMode(false);
+   rform->SetPrecomputeMode(false);
 
    CAROM::Vector rhs1(num_snap * NB, false);
    CAROM::Vector rhs2(num_snap * NB, false);
@@ -517,6 +517,206 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    DeletePointers(bases);
    delete basis1_generator;
    delete basis2_generator;
+}
+
+TEST(ROMInterfaceForm, Precompute)
+{
+   Mesh *pmesh = new Mesh("meshes/test.2x1.mesh");
+   TopologyHandler *topol = new SubMeshTopologyHandler(pmesh);
+
+   const int order = UniformRandom(1, 3);
+
+   Array<Mesh *> meshes;
+   TopologyData topol_data;
+   topol->ExportInfo(meshes, topol_data);
+   const int dim = topol_data.dim;
+   const int numSub = topol_data.numSub;
+   assert(numSub == 2);
+   assert(topol->GetNumRefPorts() == 1);
+
+   FiniteElementCollection *dg_coll(new DG_FECollection(order, dim));
+   Array<FiniteElementSpace *> fes(numSub);
+   for (int m = 0; m < numSub; m++)
+      fes[m] = new FiniteElementSpace(meshes[m], dg_coll, dim);
+
+   const int ndofs1 = fes[0]->GetTrueVSize();
+   const int ndofs2 = fes[1]->GetTrueVSize();
+
+   /* number of snapshots on each domain */
+   const int nsnap1 = UniformRandom(3, 5);
+   const int nsnap2 = UniformRandom(3, 5);
+   /* same number of basis to fully represent snapshots */
+   const int num_basis1 = nsnap1;
+   const int num_basis2 = nsnap2;
+   const int rom_dim = num_basis1 + num_basis2;
+   /* number of snapshot pairs for port EQP training */
+   const int num_snap = UniformRandom(3, 5);
+
+   /* fictitious snapshots */
+   DenseMatrix snapshots1(ndofs1, nsnap1);
+   DenseMatrix snapshots2(ndofs2, nsnap2);
+   for (int i = 0; i < ndofs1; i++)
+      for (int j = 0; j < nsnap1; j++)
+         snapshots1(i, j) = 2.0 * UniformRandom() - 1.0;
+   for (int i = 0; i < ndofs2; i++)
+      for (int j = 0; j < nsnap2; j++)
+         snapshots2(i, j) = 2.0 * UniformRandom() - 1.0;
+
+   /* fictitious pair indices */
+   Array2D<int> snap_pair_idx(num_snap, 2);
+   for (int i = 0; i < num_snap; i++)
+   {
+      snap_pair_idx(i, 0) = UniformRandom(0, nsnap1-1);
+      snap_pair_idx(i, 1) = UniformRandom(0, nsnap2-1);
+   }
+
+   /* bases generated from fictitious snapshots */
+   DenseMatrix basis1(ndofs1, num_basis1);
+   DenseMatrix basis2(ndofs2, num_basis2);
+   const CAROM::Matrix *carom_snapshots1, *carom_snapshots2;
+   CAROM::BasisGenerator *basis1_generator, *basis2_generator;
+   {
+      CAROM::Options options(ndofs1, nsnap1, 1, true);
+      options.static_svd_preserve_snapshot = true;
+      basis1_generator = new CAROM::BasisGenerator(options, false, "test_basis1");
+      Vector snapshot(ndofs1);
+      for (int s = 0; s < nsnap1; s++)
+      {
+         snapshots1.GetColumnReference(s, snapshot);
+         basis1_generator->takeSample(snapshot.GetData());
+      }
+      basis1_generator->endSamples();
+      carom_snapshots1 = basis1_generator->getSnapshotMatrix();
+
+      CAROM::BasisReader basis_reader("test_basis1");
+      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis1);
+      CAROM::CopyMatrix(*carom_basis, basis1);
+   }
+   {
+      CAROM::Options options(ndofs2, nsnap2, 1, true);
+      options.static_svd_preserve_snapshot = true;
+      basis2_generator = new CAROM::BasisGenerator(options, false, "test_basis2");
+      Vector snapshot(ndofs2);
+      for (int s = 0; s < nsnap2; s++)
+      {
+         snapshots2.GetColumnReference(s, snapshot);
+         basis2_generator->takeSample(snapshot.GetData());
+      }
+      basis2_generator->endSamples();
+      carom_snapshots2 = basis2_generator->getSnapshotMatrix();
+
+      CAROM::BasisReader basis_reader("test_basis2");
+      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis2);
+      CAROM::CopyMatrix(*carom_basis, basis2);
+   }
+
+   /* get integration rule for eqp */
+   const IntegrationRule *ir = NULL;
+   for (int be = 0; be < fes[0]->GetNBE(); be++)
+   {
+      FaceElementTransformations *tr = meshes[0]->GetBdrFaceTransformations(be);
+      if (tr != NULL)
+      {
+         ir = &IntRules.Get(tr->GetGeometryType(),
+                            (int)(ceil(1.5 * (2 * fes[0]->GetMaxElementOrder() - 1))));
+         break;
+      }
+   }
+   assert(ir);
+
+   ConstantCoefficient pi(3.141592);
+   auto *integ1 = new DGLaxFriedrichsFluxIntegrator(pi);
+   integ1->SetIntRule(ir);
+
+   /* EQP interface operator */
+   ROMInterfaceForm *rform(new ROMInterfaceForm(meshes, fes, fes, topol));
+   rform->AddInterfaceIntegrator(integ1);
+
+   /* For submesh, mesh index is the same as component index */
+   rform->SetBasisAtComponent(0, basis1);
+   rform->SetBasisAtComponent(1, basis2);
+   rform->UpdateBlockOffsets();
+
+   rform->TrainEQPForRefPort(0, *carom_snapshots1, *carom_snapshots2, snap_pair_idx, 1.0e-11);
+   rform->PrecomputeCoefficients();
+   rform->SetPrecomputeMode(false);
+
+   Vector rom_u(rom_dim);
+   for (int k = 0; k < rom_u.Size(); k++)
+      rom_u(k) = UniformRandom();
+
+   Vector rom_y(rom_dim), rom_yfast(rom_dim);
+   rom_y = 0.0;
+   rform->InterfaceAddMult(rom_u, rom_y);
+
+   rform->SetPrecomputeMode(true);
+   rom_yfast = 0.0;
+   rform->InterfaceAddMult(rom_u, rom_yfast);
+
+   /* compare precompute vs non-precompute */
+   for (int k = 0; k < rom_y.Size(); k++)
+      EXPECT_NEAR(rom_y(k), rom_yfast(k), threshold);
+
+   /* compute precomputed gradient */
+   Array2D<SparseMatrix *> mats(numSub, numSub);
+   Array<int> rom_block(numSub);
+   rom_block[0] = num_basis1;
+   rom_block[1] = num_basis2;
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+         mats(i, j) = new SparseMatrix(rom_block[i], rom_block[j]);
+
+   rform->InterfaceGetGradient(rom_u, mats);
+   
+   rom_block.SetSize(numSub+1);
+   rom_block[0] = 0;
+   rom_block[1] = num_basis1;
+   rom_block[2] = num_basis2;
+   rom_block.PartialSum();
+
+   BlockMatrix jac(rom_block);
+   for (int i = 0; i < numSub; i++)
+      for (int j = 0; j < numSub; j++)
+         jac.SetBlock(i, j, mats(i, j));
+
+   double J0 = 0.5 * (rom_y * rom_y);
+   Vector grad(rom_dim);
+   jac.MultTranspose(rom_y, grad);
+   double gg = sqrt(grad * grad);
+   printf("J0: %.15E\n", J0);
+   printf("grad: %.15E\n", gg);
+
+   Vector du(grad);
+   du /= gg;
+
+   Vector rom_y1(rom_dim);
+   const int Nk = 40;
+   double error1 = 1e100, error;
+   printf("amp\tJ1\tdJdx\terror\n");
+   for (int k = 0; k < Nk; k++)
+   {
+      double amp = pow(10.0, -0.25 * k);
+      Vector rom_u1(rom_u);
+      rom_u1.Add(amp, du);
+
+      rom_y1 = 0.0;
+      rform->InterfaceAddMult(rom_u1, rom_y1);
+      double J1 = 0.5 * (rom_y1 * rom_y1);
+      double dJdx = (J1 - J0) / amp;
+      error = abs(dJdx - gg) / gg;
+
+      printf("%.5E\t%.5E\t%.5E\t%.5E\n", amp, J1, dJdx, error);
+      if (error >= error1)
+         break;
+      error1 = error;
+   }
+   EXPECT_TRUE(min(error, error1) < grad_thre);
+
+   DeletePointers(mats);
+   delete rform;
+   DeletePointers(fes);
+   delete dg_coll;
+   delete topol;
 }
 
 // // TODO(kevin): figure out how to set up interface for self.

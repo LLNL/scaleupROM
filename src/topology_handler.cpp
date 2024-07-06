@@ -54,6 +54,9 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
                                                    FaceElementTransformations* &tr1,
                                                    FaceElementTransformations* &tr2)
 {
+   if (m1 == m2)
+      mfem_error("TopologyHandler::GetInterfaceTransformations- two meshes should not be identical!\n");
+
    // We cannot write a function that replaces this, since only Mesh can access to FaceElemTr.SetConfigurationMask.
    tr1 = m1->GetBdrFaceTransformations(if_info->BE1);
    tr2 = m2->GetBdrFaceTransformations(if_info->BE2);

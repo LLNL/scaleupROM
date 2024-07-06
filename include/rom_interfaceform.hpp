@@ -133,7 +133,8 @@ private:
    using InterfaceForm::AssembleInterfaceVector;
    using InterfaceForm::AssembleInterfaceGrad;
 
-   void PrecomputeEQPSample(const IntegrationRule &ir, const InterfaceInfo &it_info,
+   void PrecomputeEQPSample(const IntegrationRule &ir,
+                            FaceElementTransformations *tr1, FaceElementTransformations *tr2,
                             FiniteElementSpace *fes1, FiniteElementSpace *fes2,
                             const DenseMatrix &basis1, const DenseMatrix &basis2, EQPSample &eqp_sample);
 };
