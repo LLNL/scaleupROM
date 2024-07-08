@@ -259,6 +259,9 @@ public:
    void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
    void ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error);
    void CompareSolution(BlockVector &test_U, Vector &error);
+
+protected:
+   virtual void AssembleROMMat(BlockMatrix &romMat);
 };
 
 #endif

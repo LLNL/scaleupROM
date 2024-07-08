@@ -272,12 +272,20 @@ void MultiBlockSolver::BuildROMLinElems()
 
 void MultiBlockSolver::AssembleROMMat()
 {
-   assert(topol_mode == TopologyHandlerMode::COMPONENT);
-   assert(rom_elems);
-
    const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
    BlockMatrix *romMat = new BlockMatrix(*rom_block_offsets);
    romMat->owns_blocks = true;
+
+   AssembleROMMat(*romMat);  
+
+   romMat->Finalize();
+   rom_handler->SetRomMat(romMat);
+}
+
+void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+   assert(rom_elems);
 
    // component domain matrix.
    for (int m = 0; m < numSub; m++)
@@ -290,7 +298,7 @@ void MultiBlockSolver::AssembleROMMat()
          midx[v] = rom_handler->GetBlockIndex(m, v);
 
       MatrixBlocks *comp_mat = rom_elems->comp[c_type];
-      AddToBlockMatrix(midx, midx, *comp_mat, *romMat);
+      AddToBlockMatrix(midx, midx, *comp_mat, romMat);
 
       // boundary matrices of each component.
       Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
@@ -306,7 +314,7 @@ void MultiBlockSolver::AssembleROMMat()
             continue;
 
          MatrixBlocks *bdr_mat = (*(rom_elems->bdr[c_type]))[b];
-         AddToBlockMatrix(midx, midx, *bdr_mat, *romMat);
+         AddToBlockMatrix(midx, midx, *bdr_mat, romMat);
       }  // for (int b = 0; b < bdr_c2g->Size(); b++)
    }  // for (int m = 0; m < numSub; m++)
 
@@ -330,11 +338,8 @@ void MultiBlockSolver::AssembleROMMat()
       for (int v = 0; v < num_block; v++)
          midx.Append(rom_handler->GetBlockIndex(m2, v));
 
-      AddToBlockMatrix(midx, midx, *port_mat, *romMat);
+      AddToBlockMatrix(midx, midx, *port_mat, romMat);
    }
-
-   romMat->Finalize();
-   rom_handler->SetRomMat(romMat);
 }
 
 void MultiBlockSolver::InitVisualization(const std::string& output_path)
