@@ -280,6 +280,40 @@ TEST(Stokes_Workflow, ComponentSeparateVariable)
    return;
 }
 
+TEST(Stokes_Workflow, ROM_OrderingByVariable)
+{
+   config = InputParser("inputs/stokes.component.yml");
+
+   config.dict_["model_reduction"]["ordering"] = "variable";
+
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["solver"]["direct_solve"] = true;
+   config.dict_["model_reduction"]["linear_solver_type"] = "direct";
+   config.dict_["model_reduction"]["linear_system_type"] = "us";
+
+   printf("\nSample Generation \n\n");
+
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD);
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
 TEST(SteadyNS_Workflow, SubmeshTest)
 {
    config = InputParser("inputs/steady_ns.base.yml");
@@ -444,6 +478,45 @@ TEST(SteadyNS_Workflow, ComponentSeparateVariable)
 TEST(SteadyNS_Workflow, ComponentSeparateVariable_EQP)
 {
    config = InputParser("inputs/steady_ns.component.yml");
+   config.dict_["model_reduction"]["separate_variable_basis"] = true;
+   config.dict_["model_reduction"]["linear_solver_type"] = "direct";
+   config.dict_["model_reduction"]["linear_system_type"] = "us";
+   config.dict_["model_reduction"]["nonlinear_handling"] = "eqp";
+   config.dict_["model_reduction"]["eqp"]["relative_tolerance"] = 1.0e-11;
+   config.dict_["model_reduction"]["eqp"]["precompute"] = true;
+
+   printf("\nSample Generation \n\n");
+   
+   config.dict_["main"]["mode"] = "sample_generation";
+   GenerateSamples(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_rom";
+   TrainROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "train_eqp";
+   TrainEQP(MPI_COMM_WORLD);
+
+   printf("\nBuild ROM \n\n");
+
+   config.dict_["main"]["mode"] = "build_rom";
+   BuildROM(MPI_COMM_WORLD);
+
+   config.dict_["main"]["mode"] = "single_run";
+   double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
+
+   // This reproductive case must have a very small error at the level of finite-precision.
+   printf("Error: %.15E\n", error);
+   EXPECT_TRUE(error < stokes_threshold);
+
+   return;
+}
+
+TEST(SteadyNS_Workflow, ROM_OrderingByVariable)
+{
+   config = InputParser("inputs/steady_ns.component.yml");
+
+   config.dict_["model_reduction"]["ordering"] = "variable";
+
    config.dict_["model_reduction"]["separate_variable_basis"] = true;
    config.dict_["model_reduction"]["linear_solver_type"] = "direct";
    config.dict_["model_reduction"]["linear_system_type"] = "us";

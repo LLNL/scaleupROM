@@ -60,7 +60,10 @@ protected:
    const int num_var = 2;
    int numSub = -1;
 
+   /* block offsets of velocity */
    Array<int> block_offsets;
+   /* block index of velocity on FOM variable */
+   Array<int> midxs;
    Array<Array<int> *> block_idxs;
    SparseMatrix *linearOp = NULL;
 
@@ -71,7 +74,7 @@ protected:
    HYPRE_BigInt sys_glob_size;
    mutable HYPRE_BigInt sys_row_starts[2];
 public:
-   SteadyNSROM(SparseMatrix *linearOp_, const int numSub_, const Array<int> &block_offsets_, const bool direct_solve_=true);
+   SteadyNSROM(const int numSub_, ROMHandlerBase *rom_handler, const bool direct_solve_=true);
 
    virtual ~SteadyNSROM();
 
@@ -85,8 +88,8 @@ protected:
    Array<DenseTensor *> hs; // not owned by SteadyNSTensorROM.
 
 public:
-   SteadyNSTensorROM(SparseMatrix *linearOp_, Array<DenseTensor *> &hs_, const Array<int> &block_offsets_, const bool direct_solve_=true)
-      : SteadyNSROM(linearOp_, hs_.Size(), block_offsets_, direct_solve_), hs(hs_) {}
+   SteadyNSTensorROM(ROMHandlerBase *rom_handler, Array<DenseTensor *> &hs_, const bool direct_solve_=true)
+      : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_) {}
 
    virtual ~SteadyNSTensorROM() {}
 
@@ -101,13 +104,12 @@ protected:
    ROMInterfaceForm *itf = NULL; // not owned by SteadyNSEQPROM.
 
    Array<int> u_offsets;
-   Array<int> u_idxs;
 
    mutable Vector x_u, y_u;
 
 public:
-   SteadyNSEQPROM(SparseMatrix *linearOp_, Array<ROMNonlinearForm *> &hs_, ROMInterfaceForm *itf_,
-                  const Array<int> &block_offsets_, const bool direct_solve_=true);
+   SteadyNSEQPROM(ROMHandlerBase *rom_handler, Array<ROMNonlinearForm *> &hs_,
+                  ROMInterfaceForm *itf_, const bool direct_solve_=true);
 
    virtual ~SteadyNSEQPROM() {}
 

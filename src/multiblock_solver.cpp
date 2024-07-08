@@ -283,17 +283,11 @@ void MultiBlockSolver::AssembleROMMat()
    for (int m = 0; m < numSub; m++)
    {
       int c_type = topol_handler->GetMeshType(m);
-      int num_block = 1;
-      int midx0 = m;
-      if (separate_variable_basis)
-      {
-         num_block *= num_var;
-         midx0 *= num_var;
-      }
+      int num_block = (separate_variable_basis) ? num_var : 1;
 
       Array<int> midx(num_block);
-      for (int k = 0; k < num_block; k++)
-         midx[k] = midx0 + k;
+      for (int v = 0; v < num_block; v++)
+         midx[v] = rom_handler->GetBlockIndex(m, v);
 
       MatrixBlocks *comp_mat = rom_elems->comp[c_type];
       AddToBlockMatrix(midx, midx, *comp_mat, *romMat);
@@ -325,32 +319,16 @@ void MultiBlockSolver::AssembleROMMat()
 
       const int m1 = pInfo->Mesh1;
       const int m2 = pInfo->Mesh2;
-      const int c1 = topol_handler->GetMeshType(m1);
-      const int c2 = topol_handler->GetMeshType(m2);
 
-      int num_block = 2;
-      int c1idx0 = c1, c2idx0 = c2;
-      int m1idx0 = m1, m2idx0 = m2;
-      if (separate_variable_basis)
-      {
-         num_block *= num_var;
-         c1idx0 *= num_var;
-         c2idx0 *= num_var;
-         m1idx0 *= num_var;
-         m2idx0 *= num_var;
-      }
+      int num_block = (separate_variable_basis) ? num_var : 1;
 
-      Array<int> midx(num_block), num_basis(num_block);
-      for (int k = 0, cidx = c1idx0, m = m1idx0; k < num_block/2; k++, cidx++, m++)
-      {
-         num_basis[k] = rom_handler->GetRefNumBasis(cidx);
-         midx[k] = m;
-      }
-      for (int k = num_block/2, cidx = c2idx0, m = m2idx0; k < num_block; k++, cidx++, m++)
-      {
-         num_basis[k] = rom_handler->GetRefNumBasis(cidx);
-         midx[k] = m;
-      }
+      Array<int> midx(0);
+
+      for (int v = 0; v < num_block; v++)
+         midx.Append(rom_handler->GetBlockIndex(m1, v));
+
+      for (int v = 0; v < num_block; v++)
+         midx.Append(rom_handler->GetBlockIndex(m2, v));
 
       AddToBlockMatrix(midx, midx, *port_mat, *romMat);
    }

@@ -31,6 +31,12 @@ enum NonlinearHandling
    NUM_NLNHNDL
 };
 
+enum class ROMOrderBy
+{
+   VARIABLE,
+   DOMAIN
+};
+
 const BasisTag GetBasisTagForComponent(const int &comp_idx, const TopologyHandler *topol_handler, const std::string var_name="");
 const BasisTag GetBasisTag(const int &subdomain_index, const TopologyHandler *topol_handler, const std::string var_name="");
 
@@ -90,16 +96,11 @@ protected:
    /*
       offset for the global domain ROM blocks.
       For i-th subdomain and j-th variable,
-         index = i * num_var + j
+         ROMOrderBy::DOMAIN:   index = i * num_var + j
+         ROMOrderBy::VARIABLE:     index = j * numSub + i
    */
    Array<int> num_basis;
    Array<int> rom_block_offsets;
-   /*
-      the global domain ROM blocks with index order switched.
-      For i-th subdomain and j-th variable,
-         index = j * num_var + i
-   */
-   Array<int> rom_varblock_offsets;
    
    CAROM::Options* rom_options;
    CAROM::BasisGenerator *basis_generator;
@@ -108,6 +109,8 @@ protected:
    int max_num_snapshots = 100;
    bool update_right_SV = false;
    bool incremental = false;
+
+   ROMOrderBy ordering = ROMOrderBy::DOMAIN;
 
    void ParseInputs();
 public:
@@ -129,7 +132,6 @@ public:
    const std::string GetBasisPrefix() { return basis_prefix; }
    const BasisTag GetRefBasisTag(const int ref_idx) { return basis_tags[ref_idx]; }
    const Array<int>* GetBlockOffsets() { return &rom_block_offsets; }
-   const Array<int>* GetVarBlockOffsets() { return &rom_varblock_offsets; }
    virtual SparseMatrix* GetOperator() = 0;
    const bool GetNonlinearMode() { return nonlinear_mode; }
    void SetNonlinearMode(const bool nl_mode)
@@ -139,6 +141,9 @@ public:
       nonlinear_mode = nl_mode;
    }
    const NonlinearHandling GetNonlinearHandling() { return nlin_handle; }
+   const ROMOrderBy GetOrdering() { return ordering; }
+   const int GetBlockIndex(const int m, const int v=-1);
+   void GetDomainAndVariableIndex(const int &rom_block_index, int &m, int &v);
 
    /* parse inputs for supremizer. only for Stokes/SteadyNS Solver. */
    void ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme);
@@ -157,9 +162,9 @@ public:
    virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
 
    virtual void ProjectComponentToRefBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
-   virtual void ProjectComponentToDomainBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectComponentToDomainBasis(const int &m, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectInterfaceToRefBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
-   virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
+   virtual void ProjectInterfaceToDomainBasis(const int &m1, const int &m2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats) = 0;
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats) = 0;
@@ -241,9 +246,9 @@ public:
    virtual void ProjectToDomainBasis(const Array<int> &idx_i, const Array<int> &idx_j, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
 
    virtual void ProjectComponentToRefBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
-   virtual void ProjectComponentToDomainBasis(const int &c, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectComponentToDomainBasis(const int &m, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectInterfaceToRefBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
-   virtual void ProjectInterfaceToDomainBasis(const int &c1, const int &c2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
+   virtual void ProjectInterfaceToDomainBasis(const int &m1, const int &m2, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectVariableToDomainBasis(const int &vi, const int &vj, const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectGlobalToDomainBasis(const Array2D<Operator*> &mats, Array2D<SparseMatrix *> &rom_mats);
    virtual void ProjectOperatorOnReducedBasis(const Array2D<Operator*> &mats);
