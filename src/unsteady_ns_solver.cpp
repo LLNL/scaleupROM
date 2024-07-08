@@ -31,6 +31,9 @@ UnsteadyNSSolver::UnsteadyNSSolver()
 
    if (time_order != 1)
       mfem_error("UnsteadyNSSolver supports only first-order time integration for now!\n");
+
+   if (!separate_variable_basis)
+      mfem_error("UnsteadyNSSolver does not allow unified basis for all variables!\n");
 }
 
 UnsteadyNSSolver::~UnsteadyNSSolver()
@@ -43,6 +46,7 @@ UnsteadyNSSolver::~UnsteadyNSSolver()
    delete U_stepview;
    delete RHS_stepview;
    delete Hop;
+   delete rom_mass;
 }
 
 void UnsteadyNSSolver::BuildDomainOperators()
@@ -149,6 +153,8 @@ void UnsteadyNSSolver::InitializeTimeIntegration()
    for (int m = 0; m < numSub; m++)
       Hop->SetDiagonalBlock(m, hs[m]);
 
+   /* the routines above can be merged to AssembleOperator */
+
    offsets_byvar.SetSize(num_var * numSub + 1);
    offsets_byvar = 0;
    for (int k = 0; k < numSub; k++)
@@ -251,6 +257,14 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    delete p_ic;
 }
 
+BlockVector* UnsteadyNSSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tags)
+{
+   /* copy to original solution variable */
+   SortBySubdomains(*U_step, *U);
+
+   return MultiBlockSolver::PrepareSnapshots(basis_tags);
+}
+
 double UnsteadyNSSolver::ComputeCFL(const double dt_)
 {
    Vector ux, uy, uz;
@@ -314,4 +328,71 @@ void UnsteadyNSSolver::SetTime(const double time)
       if (ud_coeffs[k]) ud_coeffs[k]->SetTime(time);
    for (int k = 0; k < sn_coeffs.Size(); k++)
       if (sn_coeffs[k]) sn_coeffs[k]->SetTime(time);
+}
+
+void UnsteadyNSSolver::InitROMHandler()
+{
+   SteadyNSSolver::InitROMHandler();
+
+   if (rom_handler->GetOrdering() != ROMOrderBy::VARIABLE)
+      mfem_error("UnsteadyNSSolver::InitROMHandler- unsteady NS solver only allows ROM ordering by variable!\n");
+}
+
+void UnsteadyNSSolver::BuildCompROMLinElems()
+{
+   SteadyNSSolver::BuildCompROMLinElems();
+
+   if (!separate_variable_basis)
+      mfem_error("UnsteadyNSSolver::BuildCompROMLinElems- unified basis is not supported!\n");
+
+   /* We only need velocity mass matrix */
+   const int num_comp = topol_handler->GetNumComponents();
+   for (int c = 0; c < num_comp; c++)
+   {
+      const int fidx = c * num_var;
+      Mesh *comp = topol_handler->GetComponentMesh(c);
+
+      BilinearForm m_comp(comp_fes[fidx]);
+
+      m_comp.AddDomainIntegrator(new VectorMassIntegrator);
+      m_comp.Assemble();
+      m_comp.Finalize();      
+
+      SparseMatrix *m_mat = &(m_comp.SpMat());
+
+      assert(rom_elems->mass[c]->nrows > 0);
+      assert(rom_elems->mass[c]->ncols > 0);
+
+      if (separate_variable_basis)
+         (*rom_elems->mass[c])(0, 0) = rom_handler->ProjectToRefBasis(fidx, fidx, m_mat);
+   }
+}
+
+void UnsteadyNSSolver::AssembleROMMat(BlockMatrix &romMat)
+{
+   SteadyNSSolver::AssembleROMMat(romMat);
+
+   assert(rom_handler->GetOrdering() == ROMOrderBy::VARIABLE);
+
+   rom_handler->GetBlockOffsets()->GetSubArray(0, numSub+1, rom_u_offsets);
+   rom_mass = new BlockMatrix(rom_u_offsets);
+   rom_mass->owns_blocks = true;
+
+   for (int m = 0; m < numSub; m++)
+   {
+      int c_type = topol_handler->GetMeshType(m);
+
+      Array<int> midx(1);
+      midx[0] = rom_handler->GetBlockIndex(m, 0);
+
+      MatrixBlocks mass_mat(1, 1);
+      mass_mat(0, 0) = new SparseMatrix(*(*rom_elems->mass[c_type])(0,0));
+
+      /* mass matrix itself for RHS */
+      AddToBlockMatrix(midx, midx, mass_mat, *rom_mass);
+
+      /* add mass matrices on LHS */
+      *mass_mat(0, 0) *= bd0 / dt;
+      AddToBlockMatrix(midx, midx, mass_mat, romMat);
+   }  // for (int m = 0; m < numSub; m++)
 }

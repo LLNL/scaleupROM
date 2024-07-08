@@ -12,6 +12,7 @@ file(COPY test.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY stokes.component.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY steadyns.lf.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 file(COPY steadyns.interface_eqp.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
+file(COPY usns.periodic.yml DESTINATION ${CMAKE_BINARY_DIR}/test/gmsh/)
 
 ADD_CUSTOM_COMMAND(
     OUTPUT ${CMAKE_BINARY_DIR}/test/gmsh/square-circle.msh

@@ -50,6 +50,8 @@ public:
    Array<Array<MatrixBlocks *> *> bdr;
    Array<MatrixBlocks *> port;   // reference ports.
 
+   Array<MatrixBlocks *> mass;     // Size(num_components);
+
 public:
    ROMLinearElement(TopologyHandler *topol_handler_,
                     const Array<FiniteElementSpace *> &fes_,

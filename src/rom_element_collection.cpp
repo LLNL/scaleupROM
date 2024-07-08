@@ -12,9 +12,13 @@ ROMLinearElement::ROMLinearElement(
    : ROMElementCollection(topol_handler_, fes_, separate_variable_)
 {
    comp.SetSize(num_comp);
+   mass.SetSize(num_comp);
    const int block_size = (separate_variable) ? num_var : 1;
    for (int c = 0; c < num_comp; c++)
+   {
       comp[c] = new MatrixBlocks(block_size, block_size);
+      mass[c] = new MatrixBlocks(block_size, block_size);
+   }
 
    bdr.SetSize(num_comp);
    for (int c = 0; c < num_comp; c++)
@@ -79,6 +83,8 @@ void ROMLinearElement::SaveCompBdrElems(hid_t &file_id)
       assert(comp_grp_id >= 0);
 
       hdf5_utils::WriteDataset(comp_grp_id, "domain", *comp[c]);
+
+      hdf5_utils::WriteDataset(comp_grp_id, "mass", *mass[c]);
 
       // boundaries are saved for each component group.
       SaveBdrElems(comp_grp_id, c);
@@ -181,6 +187,8 @@ void ROMLinearElement::LoadCompBdrElems(hid_t &file_id)
       assert(comp_grp_id >= 0);
 
       hdf5_utils::ReadDataset(comp_grp_id, "domain", *comp[c]);
+
+      hdf5_utils::ReadDataset(comp_grp_id, "mass", *mass[c]);
 
       // boundary
       LoadBdrElems(comp_grp_id, c);
