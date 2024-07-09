@@ -31,6 +31,11 @@ time-integration:
   timestep_size: 0.01
   number_of_timesteps: 3
 
+save_solution:
+  enabled: true
+  file_path:
+    prefix: usns_restart
+
 visualization:
   enable: false
   output_dir: dd_mms_output
@@ -87,4 +92,4 @@ model_reduction:
   compare_solution:
     enabled: true
   linear_solver_type: direct
-  linear_system_type: us
+  linear_system_type: sid

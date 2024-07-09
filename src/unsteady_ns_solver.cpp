@@ -98,6 +98,11 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
 
    SortByVariables(*U, *U_step);
 
+   if ((!use_restart) && save_sol)
+   {
+      restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), initial_step);
+      SaveSolutionWithTime(restart_file, initial_step, time);
+   }
    SaveVisualization(0, time);
 
    double cfl = 0.0;
@@ -395,4 +400,106 @@ void UnsteadyNSSolver::AssembleROMMat(BlockMatrix &romMat)
       *mass_mat(0, 0) *= bd0 / dt;
       AddToBlockMatrix(midx, midx, mass_mat, romMat);
    }  // for (int m = 0; m < numSub; m++)
+}
+
+void UnsteadyNSSolver::SolveROM()
+{
+   assert(rom_handler->GetOrdering() == ROMOrderBy::VARIABLE);
+
+   int initial_step = 0;
+   double time = 0.0;
+
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file, file_fmt;
+   file_fmt = "%s/%s_%08d.h5";
+   if (use_restart)
+   {
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+      LoadSolutionWithTime(restart_file, initial_step, time);
+   }
+
+   const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
+
+   Array<int> rom_u_offsets(numSub + 1);
+   Array<int> rom_p_offsets(numSub + 1);
+   rom_block_offsets->GetSubArray(0, numSub + 1, rom_u_offsets);
+   rom_block_offsets->GetSubArray(numSub, numSub + 1, rom_p_offsets);
+   for (int k = numSub; k >= 0; k--)
+      rom_p_offsets[k] -= rom_p_offsets[0];
+
+   Array<int> rom_var_offsets(num_var + 1);
+   rom_var_offsets[0] = 0;
+   rom_var_offsets[1] = (*rom_block_offsets)[numSub];
+   rom_var_offsets[2] = (*rom_block_offsets)[2 * numSub];
+
+   BlockVector *reduced_sol = NULL;
+   rom_handler->ProjectGlobalToDomainBasis(U, reduced_sol);
+   BlockVector reduced_rhs(*rom_handler->GetReducedRHS());
+
+   BlockVector *rsol_view = new BlockVector(reduced_sol->GetData(), rom_var_offsets);
+   BlockVector *rrhs_view = new BlockVector(reduced_rhs.GetData(), rom_var_offsets);
+
+   u1.SetSize(rsol_view->BlockSize(0));
+   Cu1.SetSize(rsol_view->BlockSize(0));
+
+   Hop = new BlockOperator(rom_u_offsets);
+   for (int m = 0; m < numSub; m++)
+      Hop->SetDiagonalBlock(m, subdomain_eqps[m]);
+
+   int pN = -1;
+   BlockVector rom_ones(rom_p_offsets);
+   rom_ones = 0.0;
+   if (!pres_dbc)
+   {
+      pN = p_offsets.Last();
+      BlockVector fom_ones(p_offsets);
+      fom_ones = 1.0;
+      for (int m = 0; m < numSub; m++)
+      {
+         int idx = rom_handler->GetBlockIndex(m, 1);
+         rom_handler->ProjectToDomainBasis(idx, fom_ones.GetBlock(m), rom_ones.GetBlock(m));
+      }
+   }
+
+   for (int step = initial_step; step < nt; step++)
+   {
+      /* set time for forcing/boundary. At this point, time remains at the previous timestep. */
+      SetTime(time);
+
+      /* copy velocity */
+      u1 = rsol_view->GetBlock(0);
+
+      /* evaluate nonlinear advection at previous time step */
+      Hop->Mult(u1, Cu1);
+      itf_eqp->InterfaceAddMult(u1, Cu1);
+
+      /* Base right-hand side for boundary conditions and forcing */
+      reduced_rhs = *(rom_handler->GetReducedRHS());
+
+      /* Add nonlinear convection */
+      rrhs_view->GetBlock(0).Add(-ab1, Cu1);
+
+      /* Add time derivative term */
+      // TODO: extend for high order bdf schemes
+      rom_mass->AddMult(u1, rrhs_view->GetBlock(0), -bd1 / dt);
+
+      /* Solve for the next step */
+      rom_handler->Solve(reduced_rhs, *reduced_sol);
+
+      /* remove pressure scalar if all dirichlet bc */
+      if (!pres_dbc)
+      {
+         double p_const = (rom_ones * (rsol_view->GetBlock(1))) / pN;
+
+         rsol_view->GetBlock(1).Add(-p_const, rom_ones);
+      }
+
+      time += dt;
+   }
+
+   rom_handler->LiftUpGlobal(*reduced_sol, *U);
+
+   delete rsol_view;
+   delete reduced_sol;
+   return;
 }

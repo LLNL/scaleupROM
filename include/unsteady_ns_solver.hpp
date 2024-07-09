@@ -92,8 +92,7 @@ public:
 
    void BuildCompROMLinElems() override;
 
-   void SolveROM() override
-   { mfem_error("UnsteadyNSSolver::SolveROM is not implemented yet!\n"); }
+   void SolveROM() override;
 
    void InitROMHandler() override;
 

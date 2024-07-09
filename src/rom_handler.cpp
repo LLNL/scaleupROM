@@ -63,6 +63,8 @@ ROMHandlerBase::ROMHandlerBase(
 ROMHandlerBase::~ROMHandlerBase()
 {
    DeletePointers(carom_ref_basis);
+   delete reduced_rhs;
+   delete reduced_sol;
 }
 
 void ROMHandlerBase::ParseInputs()
@@ -360,8 +362,6 @@ MFEMROMHandler::~MFEMROMHandler()
    DeletePointers(ref_basis);
    delete romMat;
    delete romMat_mono;
-   delete reduced_rhs;
-   delete reduced_sol;
    delete romMat_hypre;
    delete mumps;
 }
@@ -528,14 +528,9 @@ void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
    }
 }
 
-void MFEMROMHandler::Solve(BlockVector* U)
+void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
 {
-   assert(U->NumBlocks() == num_rom_blocks);
    assert(operator_loaded);
-
-   printf("Solve ROM.\n");
-   reduced_sol = new BlockVector(rom_block_offsets);
-   (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
@@ -547,7 +542,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
    {
       assert(mumps);
       mumps->SetPrintLevel(print_level);
-      mumps->Mult(*reduced_rhs, *reduced_sol);
+      mumps->Mult(rhs, sol);
    }
    else
    {
@@ -605,7 +600,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
       // StopWatch solveTimer;
       // solveTimer.Start();
-      solver->Mult(*reduced_rhs, *reduced_sol);
+      solver->Mult(rhs, sol);
       // solveTimer.Stop();
       // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
 
@@ -615,6 +610,18 @@ void MFEMROMHandler::Solve(BlockVector* U)
       delete M;
       delete solver;
    }
+}
+
+void MFEMROMHandler::Solve(BlockVector* U)
+{
+   assert(U->NumBlocks() == num_rom_blocks);
+   assert(reduced_rhs);
+
+   printf("Solve ROM.\n");
+   reduced_sol = new BlockVector(rom_block_offsets);
+   (*reduced_sol) = 0.0;
+
+   Solve(*reduced_rhs, *reduced_sol);
 
    // 23. reconstruct FOM state
    LiftUpGlobal(*reduced_sol, *U);
@@ -904,7 +911,7 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string filename)
    assert(errf >= 0);
 }
 
-void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
+void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat, const bool init_direct_solver)
 {
    if (romMat != input_mat)
    {
@@ -915,7 +922,8 @@ void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
    delete romMat_mono;
    romMat_mono = romMat->CreateMonolithic();
 
-   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
+   if ((linsol_type == SolverType::DIRECT) && (init_direct_solver))
+      SetupDirectSolver();
    operator_loaded = true;
 }
 
@@ -1033,7 +1041,7 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
 void MFEMROMHandler::SetupDirectSolver()
 {
    // If nonlinear mode, Jacobian will keep changing within Solve, thus no need of initial LU factorization.
-   if ((linsol_type != MFEMROMHandler::SolverType::DIRECT) || nonlinear_mode)
+   if ((linsol_type != MFEMROMHandler::SolverType::DIRECT))
       return;
 
    assert(romMat_mono);

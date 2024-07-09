@@ -112,6 +112,9 @@ protected:
 
    ROMOrderBy ordering = ROMOrderBy::DOMAIN;
 
+   mfem::BlockVector *reduced_rhs = NULL;
+   mfem::BlockVector *reduced_sol = NULL;
+
    void ParseInputs();
 public:
    ROMHandlerBase(TopologyHandler *input_topol, const Array<int> &input_var_offsets,
@@ -144,6 +147,9 @@ public:
    const ROMOrderBy GetOrdering() { return ordering; }
    const int GetBlockIndex(const int m, const int v=-1);
    void GetDomainAndVariableIndex(const int &rom_block_index, int &m, int &v);
+
+   mfem::BlockVector* GetReducedSolution() { return reduced_sol; }
+   mfem::BlockVector* GetReducedRHS() { return reduced_rhs; }
 
    /* parse inputs for supremizer. only for Stokes/SteadyNS Solver. */
    void ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme);
@@ -178,12 +184,13 @@ public:
    virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec) = 0;
    virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec) = 0;
 
+   virtual void Solve(BlockVector &rhs, BlockVector &sol) = 0;
    virtual void Solve(BlockVector* U) = 0;
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
 
    virtual void SaveOperator(const std::string filename) = 0;
    virtual void LoadOperatorFromFile(const std::string filename) = 0;
-   virtual void SetRomMat(BlockMatrix *input_mat) = 0;
+   virtual void SetRomMat(BlockMatrix *input_mat, const bool init_direct_solver=true) = 0;
    virtual void SaveRomSystem(const std::string &input_prefix, const std::string type="mm") = 0;
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names) = 0;
@@ -222,9 +229,6 @@ protected:
    HYPRE_BigInt sys_row_starts[2];
    HypreParMatrix *romMat_hypre = NULL;
    MUMPSSolver *mumps = NULL;
-   
-   mfem::BlockVector *reduced_rhs = NULL;
-   mfem::BlockVector *reduced_sol = NULL;
 
 public:
    MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_var_offsets,
@@ -263,12 +267,13 @@ public:
    virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec);
    virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec);
    
-   virtual void Solve(BlockVector* U);
-   virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
+   void Solve(BlockVector &rhs, BlockVector &sol) override;
+   void Solve(BlockVector* U) override;
+   void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
 
    virtual void SaveOperator(const std::string input_prefix="");
    virtual void LoadOperatorFromFile(const std::string input_prefix="");
-   virtual void SetRomMat(BlockMatrix *input_mat);
+   virtual void SetRomMat(BlockMatrix *input_mat, const bool init_direct_solver=true);
    virtual void SaveRomSystem(const std::string &input_prefix, const std::string type="mm");
 
    virtual void SaveBasisVisualization(const Array<FiniteElementSpace *> &fes, const std::vector<std::string> &var_names);
