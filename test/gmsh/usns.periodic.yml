@@ -32,7 +32,7 @@ time-integration:
   number_of_timesteps: 3
 
 save_solution:
-  enabled: true
+  enabled: false
   file_path:
     prefix: usns_restart
 

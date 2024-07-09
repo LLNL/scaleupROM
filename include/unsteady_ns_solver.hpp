@@ -59,6 +59,10 @@ protected:
 
    BlockOperator *Hop = NULL;
 
+   /* function coefficients for initial condition */
+   VectorCoefficient *u_ic = NULL;
+   VectorCoefficient *p_ic = NULL;
+
    /* mass matrix operator for ROM */
    Array<int> rom_u_offsets;
    BlockMatrix *rom_mass = NULL;
@@ -101,6 +105,7 @@ public:
 
 private:
    void InitializeTimeIntegration();
+   void SetupInitialCondition(int &initial_step, double &time);
    void Step(double &time, int step);
 
    void SanityCheck(const int step)

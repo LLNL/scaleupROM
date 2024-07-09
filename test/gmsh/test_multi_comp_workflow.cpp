@@ -441,8 +441,8 @@ TEST(UnsteadyNS_Workflow, Periodic)
    BuildROM(MPI_COMM_WORLD);
 
    config.dict_["main"]["mode"] = "single_run";
-   config.dict_["solver"]["use_restart"] = true;
-   config.dict_["solver"]["restart_file"] = "usns_restart_00000000.h5";
+   // config.dict_["solver"]["use_restart"] = true;
+   // config.dict_["solver"]["restart_file"] = "usns_restart_00000000.h5";
    double error = SingleRun(MPI_COMM_WORLD, "test_output.h5");
 
    // This reproductive case must have a very small error at the level of finite-precision.

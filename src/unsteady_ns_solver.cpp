@@ -47,6 +47,9 @@ UnsteadyNSSolver::~UnsteadyNSSolver()
    delete RHS_stepview;
    delete Hop;
    delete rom_mass;
+
+   delete u_ic;
+   delete p_ic;
 }
 
 void UnsteadyNSSolver::BuildDomainOperators()
@@ -82,14 +85,10 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
    int initial_step = 0;
    double time = 0.0;
 
-   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    std::string restart_file, file_fmt;
    file_fmt = "%s/%s_%08d.h5";
-   if (use_restart)
-   {
-      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
-      LoadSolutionWithTime(restart_file, initial_step, time);
-   }
+
+   SetupInitialCondition(initial_step, time);
 
    int sample_interval = config.GetOption<int>("sample_generation/time-integration/sample_interval", 0);
    int bootstrap = config.GetOption<int>("sample_generation/time-integration/bootstrap", 0);
@@ -98,11 +97,6 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
 
    SortByVariables(*U, *U_step);
 
-   if ((!use_restart) && save_sol)
-   {
-      restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), initial_step);
-      SaveSolutionWithTime(restart_file, initial_step, time);
-   }
    SaveVisualization(0, time);
 
    double cfl = 0.0;
@@ -177,6 +171,38 @@ void UnsteadyNSSolver::InitializeTimeIntegration()
    Cu1.SetSize(U_stepview->BlockSize(0));
 }
 
+void UnsteadyNSSolver::SetupInitialCondition(int &initial_step, double &time)
+{
+   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   std::string restart_file, file_fmt;
+   file_fmt = "%s/%s_%08d.h5";
+
+   if (use_restart)
+   {
+      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
+      LoadSolutionWithTime(restart_file, initial_step, time);
+   }
+   else
+   {
+      assert(u_ic && p_ic);
+
+      for (int m = 0; m < numSub; m++)
+      {
+         vels[m]->ProjectCoefficient(*u_ic);
+         ps[m]->ProjectCoefficient(*p_ic);
+      }
+
+      initial_step = 0;
+      time = 0.0;
+   }
+
+   if ((!use_restart) && save_sol)
+   {
+      restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), initial_step);
+      SaveSolutionWithTime(restart_file, initial_step, time);
+   }
+}
+
 void UnsteadyNSSolver::Step(double &time, int step)
 {
    /* set time for forcing/boundary. At this point, time remains at the previous timestep. */
@@ -232,15 +258,20 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       *ps[m] = 0.0;
    }
 
-   /* set up initial condition */
-   bool ic_setup = (problem->ic_ptr.Size() >= 2);
-   if (!ic_setup)
-      return;
-
    Vector zero_vel(dim), zero_pres(1);
    zero_vel = 0.0; zero_pres = 0.0;
 
-   VectorCoefficient *u_ic, *p_ic;
+   if (u_ic) delete u_ic;
+   if (p_ic) delete p_ic;
+
+   /* set up initial condition */
+   bool ic_setup = (problem->ic_ptr.Size() >= 2);
+   if (!ic_setup)
+   {
+      u_ic = new VectorConstantCoefficient(zero_vel);
+      p_ic = new VectorConstantCoefficient(zero_pres);
+      return;
+   }
 
    if (problem->ic_ptr[0])
       u_ic = new VectorFunctionCoefficient(vdim[0], problem->ic_ptr[0]);
@@ -251,15 +282,6 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       p_ic = new VectorFunctionCoefficient(1, problem->ic_ptr[1]);
    else
       p_ic = new VectorConstantCoefficient(zero_pres);
-
-   for (int m = 0; m < numSub; m++)
-   {
-      vels[m]->ProjectCoefficient(*u_ic);
-      ps[m]->ProjectCoefficient(*p_ic);
-   }
-
-   delete u_ic;
-   delete p_ic;
 }
 
 BlockVector* UnsteadyNSSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tags)
@@ -409,14 +431,10 @@ void UnsteadyNSSolver::SolveROM()
    int initial_step = 0;
    double time = 0.0;
 
-   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
    std::string restart_file, file_fmt;
    file_fmt = "%s/%s_%08d.h5";
-   if (use_restart)
-   {
-      restart_file = config.GetRequiredOption<std::string>("solver/restart_file");
-      LoadSolutionWithTime(restart_file, initial_step, time);
-   }
+   
+   SetupInitialCondition(initial_step, time);   
 
    const Array<int> *rom_block_offsets = rom_handler->GetBlockOffsets();
 
