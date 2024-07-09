@@ -32,7 +32,7 @@ UnsteadyNSSolver::UnsteadyNSSolver()
    if (time_order != 1)
       mfem_error("UnsteadyNSSolver supports only first-order time integration for now!\n");
 
-   if (!separate_variable_basis)
+   if (use_rom && !separate_variable_basis)
       mfem_error("UnsteadyNSSolver does not allow unified basis for all variables!\n");
 }
 
