@@ -106,20 +106,24 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
 
       cfl = ComputeCFL(dt);
       SanityCheck(step);
-      if (((step+1) % report_interval) == 0)
+      if (report_interval &&
+          ((step+1) % report_interval) == 0)
          printf("Time step: %05d, CFL: %.3e\n", step+1, cfl);
 
-      if (((step+1) % visual.time_interval) == 0)
+      if (visual.time_interval &&
+          ((step+1) % visual.time_interval) == 0)
          SaveVisualization(step+1, time);
 
-      if ((save_sol) && (((step+1) % restart_interval) == 0))
+      if (save_sol && restart_interval &&
+          (((step+1) % restart_interval) == 0))
       {
          restart_file = string_format(file_fmt, sol_dir.c_str(), sol_prefix.c_str(), step+1);
          SaveSolutionWithTime(restart_file, step+1, time);
       }
 
       /* save solution if sample generator is provided */
-      if (sample_generator && ((step+1) > bootstrap) && (((step+1) % sample_interval) == 0))
+      if (sample_generator && sample_interval &&
+          ((step+1) > bootstrap) && (((step+1) % sample_interval) == 0))
          SaveSnapshots(sample_generator);
    }
 
