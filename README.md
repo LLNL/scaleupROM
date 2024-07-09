@@ -43,10 +43,10 @@ scaleupROM is mainly built upon [MFEM](https://mfem.org/) and [libROM](https://w
 
 See the [wiki page](https://github.com/LLNL/scaleupROM/wiki/Installation) for the detailed instruction.
 
-For LC quartz, the installation script is provided. You can simply run:
+For LC dane, the installation script is provided. You can simply run:
 
 ```
-./script/install_quartz.bash
+./script/install_dane.bash
 ```
 
 # Using Docker container
