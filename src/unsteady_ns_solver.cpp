@@ -184,13 +184,12 @@ void UnsteadyNSSolver::SetupInitialCondition(int &initial_step, double &time)
    }
    else
    {
-      assert(u_ic && p_ic);
-
-      for (int m = 0; m < numSub; m++)
-      {
-         vels[m]->ProjectCoefficient(*u_ic);
-         ps[m]->ProjectCoefficient(*p_ic);
-      }
+      if (u_ic && p_ic)
+         for (int m = 0; m < numSub; m++)
+         {
+            vels[m]->ProjectCoefficient(*u_ic);
+            ps[m]->ProjectCoefficient(*p_ic);
+         }
 
       initial_step = 0;
       time = 0.0;
