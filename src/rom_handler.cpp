@@ -63,6 +63,8 @@ ROMHandlerBase::ROMHandlerBase(
 ROMHandlerBase::~ROMHandlerBase()
 {
    DeletePointers(carom_ref_basis);
+   delete reduced_rhs;
+   delete reduced_sol;
 }
 
 void ROMHandlerBase::ParseInputs()
@@ -156,6 +158,12 @@ void ROMHandlerBase::ParseInputs()
    if (nlin_handle_str == "tensor")    nlin_handle = NonlinearHandling::TENSOR;
    else if (nlin_handle_str == "eqp")  nlin_handle = NonlinearHandling::EQP;
    assert((!nonlinear_mode) || (nlin_handle != NonlinearHandling::NUM_NLNHNDL));
+
+   std::string ordering_str = config.GetOption<std::string>("model_reduction/ordering", "domain");
+   if (ordering_str == "domain")    ordering = ROMOrderBy::DOMAIN;
+   else if (ordering_str == "variable")  ordering = ROMOrderBy::VARIABLE;
+   else
+      mfem_error("ROMHandlerBase: unknown ordering!\n");
 }
 
 void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int> &num_supreme)
@@ -180,6 +188,46 @@ void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int
    {
       int c = topol_handler->GetMeshType(m);
       num_supreme[m] = num_ref_supreme[c];
+   }
+}
+
+const int ROMHandlerBase::GetBlockIndex(const int m, const int v)
+{
+   if (v < 0)
+   {
+      assert(separate_variable);
+      return m;
+   }
+
+   if (!separate_variable)
+      return m;
+   
+   if (ordering == ROMOrderBy::DOMAIN)
+      return v + m * num_var;
+   else if (ordering == ROMOrderBy::VARIABLE)
+      return m + v * numSub;
+
+   return -1;
+}
+
+void ROMHandlerBase::GetDomainAndVariableIndex(const int &rom_block_index, int &m, int &v)
+{
+   if (!separate_variable)
+   {
+      m = rom_block_index;
+      v = -1;
+      return;
+   }
+
+   if (ordering == ROMOrderBy::DOMAIN)
+   {
+      m = rom_block_index / num_var;
+      v = rom_block_index % num_var;
+   }
+   else if (ordering == ROMOrderBy::VARIABLE)
+   {
+      m = rom_block_index % numSub;
+      v = rom_block_index / numSub;
    }
 }
 
@@ -231,11 +279,9 @@ int ROMHandlerBase::GetRefIndexForSubdomain(const int &subdomain_index)
 void ROMHandlerBase::SetBlockSizes()
 {
    rom_block_offsets.SetSize(num_rom_blocks+1);
-   rom_varblock_offsets.SetSize(num_rom_blocks+1);
    rom_comp_block_offsets.SetSize(num_rom_ref_blocks+1);
    
    rom_block_offsets = 0;
-   rom_varblock_offsets = 0;
    rom_comp_block_offsets = 0;
 
    if (separate_variable)
@@ -244,15 +290,17 @@ void ROMHandlerBase::SetBlockSizes()
          for (int v = 0; v < num_var; v++, idx++)
             rom_comp_block_offsets[idx+1] = num_ref_basis[idx];
 
-      for (int k = 0, idx = 0; k < numSub; k++)
+      int idx;
+      for (int k = 0; k < numSub; k++)
       {
          int c = topol_handler->GetMeshType(k);
-         for (int v = 0; v < num_var; v++, idx++)
+         for (int v = 0; v < num_var; v++)
          {
+            idx = GetBlockIndex(k, v);
+
             rom_block_offsets[idx+1] = num_ref_basis[c * num_var + v];
-            rom_varblock_offsets[1 + k + v * numSub] = num_ref_basis[c * num_var + v];
-         }
-      }
+         }  // for (int v = 0; v < num_var; v++)
+      }  // for (int k = 0; k < numSub; k++)
    }
    else
    {
@@ -264,14 +312,12 @@ void ROMHandlerBase::SetBlockSizes()
          int c = topol_handler->GetMeshType(k);
          rom_block_offsets[k+1] = num_ref_basis[c];
       }
-      rom_varblock_offsets = rom_block_offsets;
    }
 
    rom_block_offsets.GetSubArray(1, num_rom_blocks, num_basis);
 
    rom_block_offsets.PartialSum();
    rom_comp_block_offsets.PartialSum();
-   rom_varblock_offsets.PartialSum();
 }
 
 /*
@@ -316,8 +362,6 @@ MFEMROMHandler::~MFEMROMHandler()
    DeletePointers(ref_basis);
    delete romMat;
    delete romMat_mono;
-   delete reduced_rhs;
-   delete reduced_sol;
    delete romMat_hypre;
    delete mumps;
 }
@@ -336,12 +380,13 @@ void MFEMROMHandler::LoadReducedBasis()
    }
 
    dom_basis.SetSize(num_rom_blocks);
+   int m, c, v, idx;
    for (int k = 0; k < num_rom_blocks; k++)
    {
-      int m = (separate_variable) ? k / num_var : k;
-      int c = topol_handler->GetMeshType(m);
-      int v = (separate_variable) ? k % num_var : 0;
-      int idx = (separate_variable) ? c * num_var + v : c;
+      GetDomainAndVariableIndex(k, m, v);
+      
+      c = topol_handler->GetMeshType(m);
+      idx = (separate_variable) ? c * num_var + v : c;
       dom_basis[k] = ref_basis[idx];
    }
 
@@ -432,8 +477,14 @@ void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVec
 
    rom_vec = new BlockVector(rom_block_offsets);
 
+   int m, v, fom_idx;
    for (int i = 0; i < num_rom_blocks; i++)
-      ProjectToDomainBasis(i, vec->GetBlock(i), rom_vec->GetBlock(i));
+   {
+      GetDomainAndVariableIndex(i, m, v);
+      fom_idx = (separate_variable)? v + m * num_var : m;
+      
+      ProjectToDomainBasis(i, vec->GetBlock(fom_idx), rom_vec->GetBlock(i));
+   }
 }
 
 void MFEMROMHandler::LiftUpFromRefBasis(const int &i, const Vector &rom_vec, Vector &vec)
@@ -467,18 +518,19 @@ void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
    assert(rom_vec.NumBlocks() == num_rom_blocks);
    assert(vec.NumBlocks() == num_rom_blocks);
 
+   int m, v, fom_idx;
    for (int i = 0; i < num_rom_blocks; i++)
-      LiftUpFromDomainBasis(i, rom_vec.GetBlock(i), vec.GetBlock(i));
+   {
+      GetDomainAndVariableIndex(i, m, v);
+      fom_idx = (separate_variable)? v + m * num_var : m;
+
+      LiftUpFromDomainBasis(i, rom_vec.GetBlock(i), vec.GetBlock(fom_idx));
+   }
 }
 
-void MFEMROMHandler::Solve(BlockVector* U)
+void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
 {
-   assert(U->NumBlocks() == num_rom_blocks);
    assert(operator_loaded);
-
-   printf("Solve ROM.\n");
-   reduced_sol = new BlockVector(rom_block_offsets);
-   (*reduced_sol) = 0.0;
 
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
@@ -490,7 +542,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
    {
       assert(mumps);
       mumps->SetPrintLevel(print_level);
-      mumps->Mult(*reduced_rhs, *reduced_sol);
+      mumps->Mult(rhs, sol);
    }
    else
    {
@@ -548,7 +600,7 @@ void MFEMROMHandler::Solve(BlockVector* U)
 
       // StopWatch solveTimer;
       // solveTimer.Start();
-      solver->Mult(*reduced_rhs, *reduced_sol);
+      solver->Mult(rhs, sol);
       // solveTimer.Stop();
       // printf("ROM-solve-only time: %f seconds.\n", solveTimer.RealTime());
 
@@ -558,6 +610,18 @@ void MFEMROMHandler::Solve(BlockVector* U)
       delete M;
       delete solver;
    }
+}
+
+void MFEMROMHandler::Solve(BlockVector* U)
+{
+   assert(U->NumBlocks() == num_rom_blocks);
+   assert(reduced_rhs);
+
+   printf("Solve ROM.\n");
+   reduced_sol = new BlockVector(rom_block_offsets);
+   (*reduced_sol) = 0.0;
+
+   Solve(*reduced_rhs, *reduced_sol);
 
    // 23. reconstruct FOM state
    LiftUpGlobal(*reduced_sol, *U);
@@ -847,7 +911,7 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string filename)
    assert(errf >= 0);
 }
 
-void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
+void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat, const bool init_direct_solver)
 {
    if (romMat != input_mat)
    {
@@ -858,7 +922,8 @@ void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat)
    delete romMat_mono;
    romMat_mono = romMat->CreateMonolithic();
 
-   if (linsol_type == SolverType::DIRECT) SetupDirectSolver();
+   if ((linsol_type == SolverType::DIRECT) && (init_direct_solver))
+      SetupDirectSolver();
    operator_loaded = true;
 }
 
@@ -976,7 +1041,7 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
 void MFEMROMHandler::SetupDirectSolver()
 {
    // If nonlinear mode, Jacobian will keep changing within Solve, thus no need of initial LU factorization.
-   if ((linsol_type != MFEMROMHandler::SolverType::DIRECT) || nonlinear_mode)
+   if ((linsol_type != MFEMROMHandler::SolverType::DIRECT))
       return;
 
    assert(romMat_mono);

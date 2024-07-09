@@ -288,12 +288,14 @@ void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
 
    /* Supremizer enrichment */
-   if ((separate_variable_basis) && ((solver_type == "stokes") || (solver_type == "steady-ns")))
+   if ((separate_variable_basis) &&
+       ((solver_type == "stokes") || (solver_type == "steady-ns") || (solver_type == "unsteady-ns")))
    {
       ParameterizedProblem *problem = InitParameterizedProblem();
       StokesSolver *solver = NULL;
       if (solver_type == "stokes")           { solver = new StokesSolver; }
       else if (solver_type == "steady-ns")   { solver = new SteadyNSSolver; }
+      else if (solver_type == "unsteady-ns")   { solver = new UnsteadyNSSolver; }
 
       if (!solver->UseRom()) mfem_error("ROM must be enabled for supremizer enrichment!\n");
 

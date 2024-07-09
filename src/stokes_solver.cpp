@@ -1018,6 +1018,7 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
    Array2D<Array<int> *> ioffsets(numSub, numSub), joffsets(numSub, numSub);
    tmp = NULL; ioffsets = NULL; joffsets = NULL;
 
+   int ui, pi, uj, pj;
    for (int i = 0; i < numSub; i++)
       for (int j = 0; j < numSub; j++)
       {
@@ -1026,9 +1027,14 @@ void StokesSolver::ProjectOperatorOnReducedBasis()
 
          if (separate_variable_basis)
          {
-            tmp(i * num_var, j * num_var) = m_mats(i, j);
-            tmp(i * num_var + 1, j * num_var) = b_mats(i, j);
-            tmp(i * num_var, j * num_var + 1) = bt_mats(i, j);
+            ui = rom_handler->GetBlockIndex(i, 0);
+            pi = rom_handler->GetBlockIndex(i, 1);
+            uj = rom_handler->GetBlockIndex(j, 0);
+            pj = rom_handler->GetBlockIndex(j, 1);
+
+            tmp(ui, uj) = m_mats(i, j);
+            tmp(pi, uj) = b_mats(i, j);
+            tmp(ui, pj) = bt_mats(i, j);
          }
          else
          {

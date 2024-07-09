@@ -1,0 +1,95 @@
+main:
+#mode: run_example/sample_generation/build_rom/single_run
+  mode: single_run
+  use_rom: true
+  solver: unsteady-ns
+
+navier-stokes:
+  operator-type: lf
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "box-channel.2x2.periodic.h5"
+    components:
+      - name: "empty"
+        file: "square.tri.mesh"
+      - name: "square-circle"
+        file: "square-circle.msh.mfem"
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+solver:
+  direct_solve: true
+
+time-integration:
+  timestep_size: 0.01
+  number_of_timesteps: 3
+
+save_solution:
+  enabled: false
+  file_path:
+    prefix: usns_restart
+
+visualization:
+  enable: false
+  output_dir: dd_mms_output
+
+parameterized_problem:
+  name: periodic_flow_past_array
+
+single_run:
+  periodic_flow_past_array:
+    nu: 1.1
+    fx: 0.5
+    fy: -0.5
+
+sample_generation:
+  maximum_number_of_snapshots: 400
+  file_path:
+    prefix: "usns0"
+  parameters:
+    - key: single_run/periodic_flow_past_array/nu
+      type: double
+      sample_size: 1
+      minimum: 1.1
+      maximum: 1.1
+  time-integration:
+    sample_interval: 1
+    bootstrap: 0
+
+sample_collection:
+  mode: port
+  port_fileformat:
+    format: usns%d_sample.port.h5
+    minimum: 0
+    maximum: 0
+
+basis:
+  prefix: "usns"
+  number_of_basis: 6
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  separate_variable_basis: true
+  ordering: variable
+  nonlinear_handling: eqp
+  eqp:
+    relative_tolerance: 1.0e-11
+    precompute: true
+  save_operator:
+    level: component
+    prefix: "test.rom_elem"
+  compare_solution:
+    enabled: true
+  linear_solver_type: direct
+  linear_system_type: sid

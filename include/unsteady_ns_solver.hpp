@@ -59,6 +59,14 @@ protected:
 
    BlockOperator *Hop = NULL;
 
+   /* function coefficients for initial condition */
+   VectorCoefficient *u_ic = NULL;
+   VectorCoefficient *p_ic = NULL;
+
+   /* mass matrix operator for ROM */
+   Array<int> rom_u_offsets;
+   BlockMatrix *rom_mass = NULL;
+
 public:
    UnsteadyNSSolver();
 
@@ -81,25 +89,23 @@ public:
 
    void SetParameterizedProblem(ParameterizedProblem *problem) override;
 
+   BlockVector* PrepareSnapshots(std::vector<BasisTag> &basis_tags) override;
+
    void ProjectOperatorOnReducedBasis() override
    { mfem_error("UnsteadyNSSolver::ProjectOperatorOnReducedBasis is not implemented yet!\n"); }
 
-   void SolveROM() override
-   { mfem_error("UnsteadyNSSolver::SolveROM is not implemented yet!\n"); }
+   void BuildCompROMLinElems() override;
+
+   void SolveROM() override;
+
+   void InitROMHandler() override;
 
    void BuildROMTensorElems() override
    { mfem_error("UnsteadyNSSolver::BuildROMTensorElems is not implemented yet!\n"); }
-   void TrainROMEQPElems(SampleGenerator *sample_generator) override
-   { mfem_error("UnsteadyNSSolver::TrainROMEQPElems is not implemented yet!\n"); }
-   void SaveROMNlinElems(const std::string &input_prefix) override
-   { mfem_error("UnsteadyNSSolver::SaveROMNlinElems is not implemented yet!\n"); }
-   void LoadROMNlinElems(const std::string &input_prefix) override
-   { mfem_error("UnsteadyNSSolver::LoadROMNlinElems is not implemented yet!\n"); }
-   void AssembleROMNlinOper() override
-   { mfem_error("UnsteadyNSSolver::AssembleROMNlinOper is not implemented yet!\n"); }
 
 private:
    void InitializeTimeIntegration();
+   void SetupInitialCondition(int &initial_step, double &time);
    void Step(double &time, int step);
 
    void SanityCheck(const int step)
@@ -112,6 +118,8 @@ private:
    }
    double ComputeCFL(const double dt);
    void SetTime(const double time);
+
+   void AssembleROMMat(BlockMatrix &romMat) override;
 
 };
 

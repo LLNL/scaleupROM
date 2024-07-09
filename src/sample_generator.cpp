@@ -198,7 +198,8 @@ void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<BasisTa
       assert(addSample);
 
       /* save the column index in each snapshot matrix, for port data. */
-      col_idxs[s] = snapshot_generators[index]->getNumSamples();
+      /* 0-based index */
+      col_idxs[s] = snapshot_generators[index]->getNumSamples() - 1;
    }
 }
 
