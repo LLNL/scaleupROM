@@ -89,6 +89,7 @@ fi
 cd $LIB_DIR
 if [ ! -d "mumps" ]; then
     git clone https://github.com/scivision/mumps.git
+    check_result $? mumps-clone
     cd ./mumps
     git checkout v5.6.2.1
     export tempMKLROOT=$MKLROOT
@@ -106,6 +107,7 @@ fi
 cd $LIB_DIR
 if [ ! -d "mfem" ]; then
     git clone https://github.com/mfem/mfem.git
+    check_result $? mfem-clone
     cd mfem
     git checkout v4.6
     mkdir -p ./build && cd ./build
@@ -121,6 +123,7 @@ fi
 cd $LIB_DIR
 if [ ! -d "yaml-cpp" ]; then
     git clone https://github.com/jbeder/yaml-cpp.git
+    check_result $? yaml-cpp-clone
     mkdir -p ./yaml-cpp/lib && cd ./yaml-cpp/lib
     cmake .. -DYAML_BUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=$LIB_DIR
     check_result $? yaml-config
@@ -133,6 +136,7 @@ fi
 cd $LIB_DIR
 if [ ! -d "googletest" ]; then
     git clone https://github.com/google/googletest
+    check_result $? googletest-clone
     cd ./googletest
     git checkout tags/release-1.12.1 -b v1.12.1
     mkdir ./build && cd ./build
