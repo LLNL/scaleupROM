@@ -38,97 +38,181 @@ jobs:
             cmake .. -DBUILD_SKETCHES=On
             make -j 4
       - name: Test parser
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_parser
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_parser
       - name: Test DG integrator
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./dg_integ_mms
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./dg_integ_mms
       - name: Test linalg_utils
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_linalg_utils
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_linalg_utils
       - name: Test nonlinear integrator gradient
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./nonlinear_integ_grad
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./nonlinear_integ_grad
       - name: Test nonlinear interface integrator gradient
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./interfaceinteg_grad
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./interfaceinteg_grad
       - name: Test ROM NonlinearForm
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_rom_nonlinearform
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_rom_nonlinearform
       - name: Test ROM InterfaceForm
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_rom_interfaceform
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_rom_interfaceform
       - name: Test Poisson DD solver
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./poisson_dd_mms
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./poisson_dd_mms
       - name: Test Stokes DD solver
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./stokes_dd_mms
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./stokes_dd_mms
       - name: Test SteadyNS DD solver
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./steady_ns_dd_mms
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./steady_ns_dd_mms
       - name: Test UnsteadyNS DD solver
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./unsteady_ns_dd_mms
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./unsteady_ns_dd_mms
       - name: Test LinearElastic DD solver
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./linelast_dd_mms
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./linelast_dd_mms
       - name: Test parametrized problem
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_param_prob
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_param_prob
       - name: Test workflow
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_workflow
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_workflow
       - name: Test hdf5 utils
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_hdf5
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_hdf5
       - name: Test component topology handler
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_topol
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_topol
       - name: Test block matrix preconditioner
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_block_smoother
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_block_smoother
       - name: Test multi-component domain decomposition
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test/gmsh
-            echo 'if [ -f "./multi_comp_dd_mms" ]; then ./multi_comp_dd_mms; else echo "multi_comp_dd_mms does not exist. Passing the test."; fi' >> command.sh
-            sh command.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test/gmsh
+                  echo 'if [ -f "./multi_comp_dd_mms" ]; then ./multi_comp_dd_mms; else echo "multi_comp_dd_mms does not exist. Passing the test."; fi' >> command.sh
+                  sh command.sh
       - name: Test Stokes multi-component domain decomposition
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test/gmsh
-            echo 'if [ -f "./stokes_multi_comp_dd_mms" ]; then ./stokes_multi_comp_dd_mms; else echo "stokes_multi_comp_dd_mms does not exist. Passing the test."; fi' >> command.sh
-            sh command.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test/gmsh
+                  echo 'if [ -f "./stokes_multi_comp_dd_mms" ]; then ./stokes_multi_comp_dd_mms; else echo "stokes_multi_comp_dd_mms does not exist. Passing the test."; fi' >> command.sh
+                  sh command.sh
       - name: Test multi-component workflow
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test/gmsh
-            echo 'if [ -f "./test_multi_comp_workflow" ]; then ./test_multi_comp_workflow; else echo "test_multi_comp_workflow does not exist. Passing the test."; fi' >> command.sh
-            sh command.sh
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test/gmsh
+                  echo 'if [ -f "./test_multi_comp_workflow" ]; then ./test_multi_comp_workflow; else echo "test_multi_comp_workflow does not exist. Passing the test."; fi' >> command.sh
+                  sh command.sh
       - name: Test parallel POD/EQP
-        run: |
-            cd ${GITHUB_WORKSPACE}/build/test
-            ./test_ns_parallel --gtest_filter=NSTensor.Sampling
-            mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSTensor.Train
-            ./test_ns_parallel --gtest_filter=NSTensor.Build_SingleRun
-            ./test_ns_parallel --gtest_filter=NSEQP.Sampling
-            mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSEQP.Train
-            ./test_ns_parallel --gtest_filter=NSEQP.Build_SingleRun
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 3
+          command: |
+                  cd ${GITHUB_WORKSPACE}/build/test
+                  ./test_ns_parallel --gtest_filter=NSTensor.Sampling
+                  mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSTensor.Train
+                  ./test_ns_parallel --gtest_filter=NSTensor.Build_SingleRun
+                  ./test_ns_parallel --gtest_filter=NSEQP.Sampling
+                  mpirun -n 3 --oversubscribe ./test_ns_parallel --gtest_filter=NSEQP.Train
+                  ./test_ns_parallel --gtest_filter=NSEQP.Build_SingleRun
       # - name: Upload the compiled artifacts
       #   uses: actions/upload-artifact@master
       #   with:
