@@ -44,6 +44,9 @@ protected:
    /// @brief Flag for precomputing necessary coefficients for fast computation.
    bool precompute = false;
 
+   /// @brief Energy norm criterion for NNLS.
+   CAROM::NNLS_termination nnls_criterion = CAROM::NNLS_termination::L2;
+
    /*
       Flag for being reference ROMNonlinearForm.
       If not reference, all EQPElement arrays are view arrays, not owning them.

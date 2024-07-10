@@ -13,7 +13,7 @@ WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/scivision/mumps.git
 WORKDIR ./mumps
 RUN sudo git checkout v5.6.2.1
-RUN sudo wget -O cmake/FindMETIS.cmake https://github.com/LLNL/scaleupROM/raw/install/dependencies/FindMETIS.cmake
+RUN sudo wget -O cmake/FindMETIS.cmake "https://raw.githubusercontent.com/LLNL/scaleupROM/main/install-helper/mumps/FindMETIS.cmake"
 # RUN sudo sed -i 's/if(parallel IN_LIST METIS_FIND_COMPONENTS)/if("parallel" IN_LIST METIS_FIND_COMPONENTS)/g' cmake/FindMETIS.cmake
 
 # RUN sudo sed -i 's/option(CMAKE_TLS_VERIFY "Verify TLS certificates" ON)/option(CMAKE_TLS_VERIFY "Verify TLS certificates" OFF)/g' options.cmake
@@ -52,9 +52,7 @@ ENV YAML_DIR=$LIB_DIR/yaml-cpp
 # install libROM for scaleupROM
 WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/LLNL/libROM.git
-WORKDIR ./libROM
-RUN sudo git pull && sudo git checkout mpi-io
-WORKDIR ./build
+WORKDIR ./libROM/build
 # libROM is using the MFEM without MUMPS right now.
 RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=OFF -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
 RUN sudo make -j 16
