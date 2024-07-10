@@ -5,7 +5,6 @@
 #include "rom_interfaceform.hpp"
 #include "etc.hpp"
 #include "utils/mpi_utils.h"  // this is from libROM/utils.
-#include "linalg/NNLS.h"
 
 using namespace std;
 
@@ -27,6 +26,12 @@ ROMInterfaceForm::ROMInterfaceForm(
 
    // block_offsets should be updated according to the number of basis vectors.
    block_offsets = -1;
+
+   std::string nnls_str = config.GetOption<std::string>("model_reduction/eqp/criterion", "l2");
+   if (nnls_str == "l2")            nnls_criterion = CAROM::NNLS_termination::L2;
+   else if (nnls_str == "linf")     nnls_criterion = CAROM::NNLS_termination::LINF;
+   else
+      mfem_error("ROMNonlinearForm: unknown NNLS criterion!\n");
 }
 
 ROMInterfaceForm::~ROMInterfaceForm()
@@ -546,7 +551,8 @@ void ROMInterfaceForm::TrainEQPForIntegrator(
    CAROM::Vector eqpSol(Gt.numRows(), true);
    int nnz = 0;
    {
-      CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2);
+      CAROM::NNLSSolver nnls(nnls_tol, 0, maxNNLSnnz, 2, 1.0e-4, 1.0e-14,
+                             100000, 100000, nnls_criterion);
 
       CAROM::Vector rhs_ub(rhs_Gw);
       CAROM::Vector rhs_lb(rhs_Gw);

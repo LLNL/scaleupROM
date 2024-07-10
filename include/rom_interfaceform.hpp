@@ -9,6 +9,7 @@
 #include "rom_handler.hpp"
 #include "hdf5_utils.hpp"
 #include "hyperreduction_integ.hpp"
+#include "linalg/NNLS.h"
 
 namespace mfem
 {
@@ -54,6 +55,9 @@ protected:
 
    /// @brief Flag for precomputing necessary coefficients for fast computation.
    bool precompute = false;
+
+   /// @brief Energy norm criterion for NNLS.
+   CAROM::NNLS_termination nnls_criterion = CAROM::NNLS_termination::L2;
 
 public:
    ROMInterfaceForm(Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_,
