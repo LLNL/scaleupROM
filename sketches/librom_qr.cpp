@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
    }
    printf("\n");
 
-   CAROM::Matrix* Q = rand_proj->qr_factorize();
+   CAROM::Matrix* Q = rand_proj->qr_factorize().get();
    printf("Q (%d x %d) in RandomizedSVD::computeSVD.\n", Q->numRows(), Q->numColumns());
    for (int i = 0; i < Q->numRows(); i++) {
       for (int j = 0; j < Q->numColumns(); j++) {
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
    printf("\n");
 
    rand_proj = snapshot_matrix->mult(rand_mat);
-   Q = rand_proj->qr_factorize();
+   Q = rand_proj->qr_factorize().get();
    printf("After perturbation, 2nd/3rd columns of Q totally changed.\n");
    for (int i = 0; i < Q->numRows(); i++) {
       for (int j = 0; j < Q->numColumns(); j++) {
