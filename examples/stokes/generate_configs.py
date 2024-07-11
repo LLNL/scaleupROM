@@ -17,3 +17,8 @@ if __name__ == "__main__":
         example.addComponent(comp)
 
     example.GenerateAllConfigs(0)
+
+    test = BoxChannelConfig(8,8)
+    for name, comp in comp_list.items():
+        test.addComponent(comp)
+    test.CreateRandomConfig('test.box-channel.8x8.h5')

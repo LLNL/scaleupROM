@@ -15,6 +15,7 @@ python3 generate_configs.py
 
 mkdir configs/
 mv box-channel.comp.h5 configs/
+mv test.box-channel.8x8.h5 configs/
 
 mkdir configs/samples/
 mv *.h5 configs/samples/
