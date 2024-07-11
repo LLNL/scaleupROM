@@ -1,0 +1,139 @@
+main:
+  mode: sample_generation
+  use_rom: false
+  solver: stokes
+
+mesh:
+  uniform_refinement: 0
+  type: component-wise
+  component-wise:
+    global_config: "configs/box-channel.comp.h5"
+    components:
+      - name: "empty"
+        file: "meshes/square.o3.mesh"
+      - name: "square-circle"
+        file: "meshes/square-circle.msh.mfem"
+      - name: "square-square"
+        file: "meshes/square-square.msh.mfem"
+      - name: "square-triangle"
+        file: "meshes/square-triangle.msh.mfem"
+      - name: "square-star"
+        file: "meshes/square-star.msh.mfem"
+
+domain-decomposition:
+  type: interior_penalty
+
+discretization:
+  order: 2
+  full-discrete-galerkin: false
+
+solver:
+  direct_solve: true
+  use_amg: true # used only for iterative solver
+
+visualization:
+  enabled: false
+  unified_paraview: false
+  file_path:
+    prefix: stokes_channel_output
+
+parameterized_problem:
+  name: flow_past_array
+
+single_run:
+  flow_past_array:
+    nu: 1.1
+    u0_x: 1.5
+    u0_y: -0.8
+    du_x: 0.
+    du_y: 0.
+
+sample_generation:
+  maximum_number_of_snapshots: 4000
+  type: "random"
+  random_sample_generator:
+    number_of_samples: 1400
+  report_frequency: 10
+  file_path:
+    prefix: "./snapshots/stokes_array"
+  parameters:
+    - key: mesh/component-wise/global_config
+      type: filename
+      minimum: 0
+      maximum: 624
+      format: "./configs/samples/box-channel.config-%05d.h5"
+    - key: single_run/flow_past_array/u0_x
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/flow_past_array/u0_y
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/flow_past_array/du_x
+      type: double
+      minimum: -0.1
+      maximum: 0.1
+    - key: single_run/flow_past_array/du_y
+      type: double
+      minimum: -0.1
+      maximum: 0.1
+    - key: single_run/flow_past_array/offsets_x
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/flow_past_array/offsets_y
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/flow_past_array/k_u_x
+      type: double
+      minimum: -0.5
+      maximum: 0.5
+    - key: single_run/flow_past_array/k_u_y
+      type: double
+      minimum: -0.5
+      maximum: 0.5
+    - key: single_run/flow_past_array/k_v_x
+      type: double
+      minimum: -0.5
+      maximum: 0.5
+    - key: single_run/flow_past_array/k_v_y
+      type: double
+      minimum: -0.5
+      maximum: 0.5
+
+basis:
+  prefix: "basis/stokes_basis"
+  number_of_basis: 36
+  tags:
+    - name: empty
+      snapshot_files: ["./snapshots/stokes_array_sample_empty_snapshot"]
+    - name: square-circle
+      snapshot_files: ["./snapshots/stokes_array_sample_square-circle_snapshot"]
+    - name: square-square
+      snapshot_files: ["./snapshots/stokes_array_sample_square-square_snapshot"]
+    - name: square-star
+      snapshot_files: ["./snapshots/stokes_array_sample_square-star_snapshot"]
+    - name: square-triangle
+      snapshot_files: ["./snapshots/stokes_array_sample_square-triangle_snapshot"]
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+    prefix: stokes_comp
+
+model_reduction:
+  separate_variable_basis: false # true for vel/pres separate basis
+  rom_handler_type: mfem
+  linear_solver_type: direct
+  linear_system_type: spd
+  # individual/universal
+  subdomain_training: universal
+  save_operator:
+    level: component
+    prefix: "stokes_comp"
+  compare_solution:
+    enabled: false
+
