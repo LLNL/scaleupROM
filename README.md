@@ -72,3 +72,4 @@ LLNL-CODE-857975
 - Tiras Y. Lin (LLNL)
 - Sarah E. Baker (LLNL)
 - Axel Larsson (Princeton)
+- Cole Kendrick (LLNL)
