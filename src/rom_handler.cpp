@@ -639,7 +639,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    else
    {
       for (int k = 0; k < reduced_sol->Size(); k++)
-         (*reduced_sol)(k) = 1.0e-1 * UniformRandom();
+         (*reduced_sol)(k) = 1.0e-5 * UniformRandom();
    }
 
    int maxIter = config.GetOption<int>("solver/max_iter", 100);

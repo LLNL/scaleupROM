@@ -625,7 +625,7 @@ bool SteadyNSSolver::Solve(SampleGenerator *sample_generator)
    else
    {
       for (int k = 0; k < sol_byvar.Size(); k++)
-         sol_byvar(k) = UniformRandom();
+         sol_byvar(k) = 1.0e-5 * UniformRandom();
    }
 
    SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);

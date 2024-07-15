@@ -121,6 +121,7 @@ std::vector<BasisTag> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mod
       else if (solver_type == "stokes")      var_list = StokesSolver::GetVariableNames();
       else if (solver_type == "steady-ns")   var_list = SteadyNSSolver::GetVariableNames();
       else if (solver_type == "linelast")   var_list = LinElastSolver::GetVariableNames();
+      else if (solver_type == "unsteady-ns")   var_list = UnsteadyNSSolver::GetVariableNames();
       else
       {
          printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
