@@ -278,12 +278,12 @@ void TrainROM(MPI_Comm comm)
 
    sample_generator->FormReducedBasis(basis_prefix);
 
-   AuxiliaryTrainROM(comm, sample_generator);
+   AuxiliaryTrainROM(comm);
 
    delete sample_generator;
 }
 
-void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
+void AuxiliaryTrainROM(MPI_Comm comm)
 {
    std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);

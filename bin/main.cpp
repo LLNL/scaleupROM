@@ -28,11 +28,12 @@ int main(int argc, char *argv[])
    { if (rank == 0) RunExample(); }
    else 
    {
-      if (mode == "sample_generation") GenerateSamples(MPI_COMM_WORLD);
-      else if (mode == "build_rom")    BuildROM(MPI_COMM_WORLD);
-      else if (mode == "train_rom")    TrainROM(MPI_COMM_WORLD);
-      else if (mode == "train_eqp")    TrainEQP(MPI_COMM_WORLD);
-      else if (mode == "single_run")   double dump = SingleRun(MPI_COMM_WORLD, output_file);
+      if (mode == "sample_generation")    GenerateSamples(MPI_COMM_WORLD);
+      else if (mode == "build_rom")       BuildROM(MPI_COMM_WORLD);
+      else if (mode == "train_rom")       TrainROM(MPI_COMM_WORLD);
+      else if (mode == "aux_train_rom")   AuxiliaryTrainROM(MPI_COMM_WORLD);
+      else if (mode == "train_eqp")       TrainEQP(MPI_COMM_WORLD);
+      else if (mode == "single_run")      double dump = SingleRun(MPI_COMM_WORLD, output_file);
       else
       {
          if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());
