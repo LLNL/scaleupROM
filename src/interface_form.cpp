@@ -12,7 +12,7 @@ namespace mfem
 
 InterfaceForm::InterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, TopologyHandler *topol_)
-   : meshes(meshes_), fes(fes_), topol_handler(topol_), numSub(meshes_.Size())
+   : meshes(meshes_), fes(fes_), topol_handler(topol_), numSub(meshes_.Size()), topol_call(0), assemble_call(0)
 {
    assert(fes_.Size() == numSub);
 
@@ -21,11 +21,31 @@ InterfaceForm::InterfaceForm(
    for (int i = 1; i < numSub + 1; i++)
       block_offsets[i] = fes[i-1]->GetTrueVSize();
    block_offsets.PartialSum();
+
+   for (int k = 0; k < Ntimer; k++)
+      timers[k] = new StopWatch;
 }
 
 InterfaceForm::~InterfaceForm()
 {
    DeletePointers(fnfi);
+
+   printf("InterfaceForm::InterfaceAddMult\n");
+   printf("topol call: %d\n", topol_call);
+   printf("assemble call: %d\n", assemble_call);
+   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
+   "init", "port-init", "topol", "assemble", "final", "sum", "total");
+   double sum = 0.0;
+   for (int k = 0; k < Ntimer-1; k++)
+   {
+      printf("%.3E\t", timers[k]->RealTime());
+      sum += timers[k]->RealTime();
+   }
+   printf("%.3E\t", sum);
+   printf("%.3E\n", timers[Ntimer-1]->RealTime());
+   
+   for (int k = 0; k < Ntimer; k++)
+      delete timers[k];
 }
 
 void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const
@@ -65,6 +85,10 @@ void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) con
 
 void InterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 {
+printf("InterfaceForm::InterfaceAddMult\n");
+   timers[5]->Start();
+   timers[0]->Start();
+
    x_tmp.Update(const_cast<Vector&>(x), block_offsets);
    y_tmp.Update(y, block_offsets);
 
@@ -72,8 +96,12 @@ void InterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    Mesh *mesh1, *mesh2;
    FiniteElementSpace *fes1, *fes2;
 
+   timers[0]->Stop();
+
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
+      timers[1]->Start();
+
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
       midx[0] = pInfo->Mesh1;
@@ -86,13 +114,22 @@ void InterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
       fes2 = fes[midx[1]];
 
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
+
+      timers[1]->Stop();
+
       AssembleInterfaceVector(mesh1, mesh2, fes1, fes2, interface_infos,
                               x_tmp.GetBlock(midx[0]), x_tmp.GetBlock(midx[1]),
                               y_tmp.GetBlock(midx[0]), y_tmp.GetBlock(midx[1]));
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 
+   timers[4]->Start();
+
    for (int i=0; i < y_tmp.NumBlocks(); ++i)
       y_tmp.GetBlock(i).SyncAliasMemory(y);
+
+   timers[4]->Stop();
+
+   timers[5]->Stop();
 }
 
 void InterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
@@ -237,9 +274,16 @@ void InterfaceForm::AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,
 
    for (int bn = 0; bn < interface_infos->Size(); bn++)
    {
+      timers[2]->Start();
+
       InterfaceInfo *if_info = &((*interface_infos)[bn]);
 
       topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+      topol_call++;
+
+      timers[2]->Stop();
+
+      timers[3]->Start();
 
       if ((tr1 != NULL) && (tr2 != NULL))
       {
@@ -258,11 +302,14 @@ void InterfaceForm::AssembleInterfaceVector(Mesh *mesh1, Mesh *mesh2,
             assert(fnfi[itg]);
 
             fnfi[itg]->AssembleInterfaceVector(*fe1, *fe2, *tr1, *tr2, el_x1, el_x2, el_y1, el_y2);
+            assemble_call += fnfi[itg]->GetIntegrationRule()->GetNPoints();
 
             y1.AddElementVector(vdofs1, el_y1);
             y2.AddElementVector(vdofs2, el_y2);
          }
       }  // if ((tr1 != NULL) && (tr2 != NULL))
+
+      timers[3]->Stop();
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 }
 

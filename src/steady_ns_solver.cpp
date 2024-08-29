@@ -1032,6 +1032,8 @@ void SteadyNSSolver::AllocateROMEQPElems()
    itf_eqp->UpdateBlockOffsets();
 
    itf_eqp->SetPrecomputeMode(precompute);
+printf("precompute: %d\n", precompute);
+printf("itf_eqp PrecomputeMode: %d\n", itf_eqp->PrecomputeMode());
 }
 
 void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
@@ -1220,7 +1222,10 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
       itf_eqp->LoadEQPForIntegrator(0, file_id, "interface_integ0");
 
       if (itf_eqp->PrecomputeMode())
+{
+printf("\n\nI AM PRECOMPUTING!!\n\n");
          itf_eqp->PrecomputeCoefficients();
+}
    }
 
    errf = H5Fclose(file_id);

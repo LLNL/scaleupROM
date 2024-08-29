@@ -15,6 +15,12 @@ namespace mfem
 // TODO(kevin): inherits or cherry-pick ROMNonlinearForm for hyper-reduction.
 class InterfaceForm
 {
+private:
+   static const int Ntimer = 6;
+   mutable StopWatch *timers[Ntimer];
+   mutable int topol_call = 0;
+   mutable int assemble_call = 0;
+
 protected:
    int numSub = -1;
    int skip_zeros = 1;

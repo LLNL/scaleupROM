@@ -181,7 +181,8 @@ void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int
    {
       basis_tag = GetBasisTagForComponent(b, topol_handler, fom_var_names[1]);
 
-      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
+      // By default the same number of velocity basis.
+      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_supremizer", num_ref_basis[b * num_var], basis_list);
    }
 
    for (int m = 0; m < numSub; m++)
