@@ -1184,7 +1184,7 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
    int num_comp;
    hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
    assert(num_comp >= topol_handler->GetNumComponents());
-   assert(comp_eqps.Size() == num_comp);
+   assert(comp_eqps.Size() == topol_handler->GetNumComponents());
 
    std::string dset_name;
    for (int c = 0; c < topol_handler->GetNumComponents(); c++)
