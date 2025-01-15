@@ -1062,6 +1062,8 @@ void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
 
    if (oper_type != OperType::LF) return;
 
+   eqp_tol = config.GetOption<double>("model_reduction/eqp/interface/relative_tolerance", eqp_tol);
+
    /* EQP NNLS for interface ROM, for each reference port */
    for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
    {
