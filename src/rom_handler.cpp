@@ -183,7 +183,7 @@ void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int
       basis_tag = GetBasisTagForComponent(b, topol_handler, fom_var_names[1]);
 
       // By default the same number of pressure basis.
-      const int nsup0 = (nsup_default > 0) ? nsup_default : num_ref_basis[b * num_var] + 1;
+      const int nsup0 = (nsup_default > 0) ? nsup_default : num_ref_basis[b * num_var + 1];
 
       num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_supremizer", nsup0, basis_list);
    }
