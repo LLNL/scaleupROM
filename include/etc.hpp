@@ -38,4 +38,81 @@ std::string string_format( const std::string& format, Args ... args )
     return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
 }
 
+class TimeProfiler
+{
+private:
+    Array<StopWatch *> timers;
+
+    Array<int> calls;
+    std::vector<std::string> names;
+    std::unordered_map<std::string, int> indices;
+
+    const MPI_Comm comm;
+    int rank;
+
+public:
+    TimeProfiler(MPI_Comm comm_=MPI_COMM_WORLD)
+        : comm(comm_), timers(0)
+    {
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        calls.SetSize(0);
+        names.clear();
+        indices.clear();
+    }
+
+    virtual ~TimeProfiler()
+    {
+        DeletePointers(timers);
+    }
+
+    void Start(const std::string &name)
+    {
+        if (!indices.count(name))
+        {
+            indices[name] = timers.Size();
+            timers.Append(new StopWatch);
+            names.push_back(name);
+            calls.Append(0);
+        }
+
+        assert(indices.count(name));
+        int idx = indices[name];
+        timers[idx]->Start();
+    }
+
+    void Stop(const std::string &name)
+    {
+        assert(indices.count(name));
+        int idx = indices[name];
+        timers[idx]->Stop();
+        calls[idx] += 1;
+    }
+
+    void Print(const std::string &title)
+    {
+        int nfunc = timers.Size();
+        Array<double> times(nfunc);
+        for (int k = 0; k < nfunc; k++)
+            times[k] = timers[k]->RealTime();
+
+        MPI_Reduce(MPI_IN_PLACE, times.GetData(), nfunc, MPI_DOUBLE, MPI_SUM, 0, comm);
+        MPI_Reduce(MPI_IN_PLACE, calls.GetData(), nfunc, MPI_INT, MPI_SUM, 0, comm);
+
+        if (rank == 0)
+        {
+            printf((title + "\n").c_str());
+
+            std::string line = std::string(100, '=');
+            line += "\n";
+            printf(line.c_str());
+            printf("%20s\t%20s\t%20s\t%20s\n", "Function", "Total time", "Calls", "Time per call");
+            for (int k = 0; k < nfunc; k++)
+            {
+                printf("%20s\t%20.5e\t%20d\t%20.5e\n", names[k].c_str(), times[k], calls[k], times[k] / calls[k]);
+            }
+            printf(line.c_str());
+        }
+    }
+};
+
 #endif

@@ -10,6 +10,7 @@
 #include "hdf5_utils.hpp"
 #include "hyperreduction_integ.hpp"
 #include "linalg/NNLS.h"
+#include "etc.hpp"
 
 namespace mfem
 {
@@ -21,6 +22,7 @@ private:
    mutable StopWatch *timers[Ntimer];
    mutable int topol_call = 0;
    mutable int assemble_call = 0;
+   mutable TimeProfiler timer;
 
 protected:
    const int numPorts;

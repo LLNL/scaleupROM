@@ -14,7 +14,7 @@ namespace mfem
 ROMInterfaceForm::ROMInterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, Array<FiniteElementSpace *> &comp_fes_, TopologyHandler *topol_)
    : InterfaceForm(meshes_, fes_, topol_), numPorts(topol_->GetNumPorts()), numRefPorts(topol_->GetNumRefPorts()),
-     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_), topol_call(0), assemble_call(0)
+     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_), topol_call(0), assemble_call(0), timer()
 {
    comp_basis.SetSize(num_comp);
    comp_basis = NULL;
@@ -40,6 +40,8 @@ ROMInterfaceForm::ROMInterfaceForm(
 ROMInterfaceForm::~ROMInterfaceForm()
 {
    DeletePointers(fnfi_ref_sample);
+
+   timer.Print("ROMInterfaceForm::InterfaceAddMult");
 
    printf("ROMInterfaceForm::InterfaceAddMult\n");
    printf("topol call: %d\n", topol_call);
@@ -96,6 +98,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    timers[7]->Start();
 
    timers[0]->Start();
+   timer.Start("init");
 
    assert(block_offsets.Min() >= 0);
    assert(x.Size() == block_offsets.Last());
@@ -121,6 +124,7 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    Vector el_x1, el_x2, el_y1, el_y2;
 
    timers[0]->Stop();
+   timer.Stop("init");
 
    for (int k = 0; k < fnfi.Size(); k++)
    {
