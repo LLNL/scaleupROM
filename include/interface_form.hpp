@@ -16,10 +16,7 @@ namespace mfem
 class InterfaceForm
 {
 private:
-   static const int Ntimer = 6;
-   mutable StopWatch *timers[Ntimer];
-   mutable int topol_call = 0;
-   mutable int assemble_call = 0;
+   mutable TimeProfiler timer;
 
 protected:
    int numSub = -1;
