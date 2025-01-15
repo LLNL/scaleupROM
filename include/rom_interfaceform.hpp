@@ -18,10 +18,6 @@ namespace mfem
 class ROMInterfaceForm : public InterfaceForm
 {
 private:
-   static const int Ntimer = 9;
-   mutable StopWatch *timers[Ntimer];
-   mutable int topol_call = 0;
-   mutable int assemble_call = 0;
    mutable TimeProfiler timer;
 
 protected:

@@ -44,6 +44,7 @@ private:
     Array<StopWatch *> timers;
 
     Array<int> calls;
+    Array<bool> starts;
     std::vector<std::string> names;
     std::unordered_map<std::string, int> indices;
 
@@ -52,7 +53,7 @@ private:
 
 public:
     TimeProfiler(MPI_Comm comm_=MPI_COMM_WORLD)
-        : comm(comm_), timers(0)
+        : comm(comm_), timers(0), starts(0)
     {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         calls.SetSize(0);
@@ -73,27 +74,40 @@ public:
             timers.Append(new StopWatch);
             names.push_back(name);
             calls.Append(0);
+            starts.Append(false);
         }
 
         assert(indices.count(name));
+
         int idx = indices[name];
+        assert(!starts[idx]);
+
         timers[idx]->Start();
+        starts[idx] = true;
     }
 
     void Stop(const std::string &name)
     {
         assert(indices.count(name));
+        
         int idx = indices[name];
+        assert(starts[idx]);
+
         timers[idx]->Stop();
         calls[idx] += 1;
+        starts[idx] = false;
     }
 
-    void Print(const std::string &title)
+    void Print(const std::string &title, const bool compute_sum=false)
     {
         int nfunc = timers.Size();
+        for (int k = 0; k < nfunc; k++)
+            assert(!starts[k]);
+
         Array<double> times(nfunc);
         for (int k = 0; k < nfunc; k++)
             times[k] = timers[k]->RealTime();
+        double total = times.Sum();
 
         MPI_Reduce(MPI_IN_PLACE, times.GetData(), nfunc, MPI_DOUBLE, MPI_SUM, 0, comm);
         MPI_Reduce(MPI_IN_PLACE, calls.GetData(), nfunc, MPI_INT, MPI_SUM, 0, comm);
@@ -110,6 +124,8 @@ public:
             {
                 printf("%20s\t%20.5e\t%20d\t%20.5e\n", names[k].c_str(), times[k], calls[k], times[k] / calls[k]);
             }
+            if (compute_sum)
+                printf("%20s\t%20.5e\t%20d\t%20.5e\n", "Total time", total, 1, total);
             printf(line.c_str());
         }
     }

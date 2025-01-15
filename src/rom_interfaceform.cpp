@@ -14,7 +14,7 @@ namespace mfem
 ROMInterfaceForm::ROMInterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, Array<FiniteElementSpace *> &comp_fes_, TopologyHandler *topol_)
    : InterfaceForm(meshes_, fes_, topol_), numPorts(topol_->GetNumPorts()), numRefPorts(topol_->GetNumRefPorts()),
-     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_), topol_call(0), assemble_call(0), timer()
+     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_), timer()
 {
    comp_basis.SetSize(num_comp);
    comp_basis = NULL;
@@ -32,9 +32,6 @@ ROMInterfaceForm::ROMInterfaceForm(
    else if (nnls_str == "linf")     nnls_criterion = CAROM::NNLS_termination::LINF;
    else
       mfem_error("ROMNonlinearForm: unknown NNLS criterion!\n");
-
-   for (int k = 0; k < Ntimer; k++)
-      timers[k] = new StopWatch;
 }
 
 ROMInterfaceForm::~ROMInterfaceForm()
@@ -42,23 +39,6 @@ ROMInterfaceForm::~ROMInterfaceForm()
    DeletePointers(fnfi_ref_sample);
 
    timer.Print("ROMInterfaceForm::InterfaceAddMult");
-
-   printf("ROMInterfaceForm::InterfaceAddMult\n");
-   printf("topol call: %d\n", topol_call);
-   printf("assemble call: %d\n", assemble_call);
-   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
-   "init", "itg-init", "port-init", "elem-init", "fast-eqp", "slow-eqp", "final", "sum", "total", "topol");
-   double sum = 0.0;
-   for (int k = 0; k < Ntimer-1; k++)
-   {
-      printf("%.3E\t", timers[k]->RealTime());
-      sum += timers[k]->RealTime();
-   }
-   printf("%.3E\t", sum);
-   printf("%.3E\n", timers[Ntimer-1]->RealTime());
-   
-   for (int k = 0; k < Ntimer; k++)
-      delete timers[k];
 }
 
 void ROMInterfaceForm::SetBasisAtComponent(const int c, DenseMatrix &basis_, const int offset)
@@ -95,9 +75,8 @@ void ROMInterfaceForm::UpdateBlockOffsets()
 
 void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 {
-   timers[7]->Start();
+   timer.Start("Total");
 
-   timers[0]->Start();
    timer.Start("init");
 
    assert(block_offsets.Min() >= 0);
@@ -123,23 +102,22 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    Array<int> vdofs1, vdofs2;
    Vector el_x1, el_x2, el_y1, el_y2;
 
-   timers[0]->Stop();
    timer.Stop("init");
 
    for (int k = 0; k < fnfi.Size(); k++)
    {
-      timers[1]->Start();
+      timer.Start("itg-init");
 
       assert(fnfi[k]);
 
       const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
       assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-      timers[1]->Stop();
+      timer.Stop("itg-init");
 
       for (int p = 0; p < numPorts; p++)
       {
-         timers[2]->Start();
+         timer.Start("port-init");
 
          const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
@@ -168,14 +146,14 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 
          eqp_elem = fnfi_sample[p + k * numPorts];
 
-         timers[2]->Stop();
+         timer.Stop("port-init");
 
          if (!eqp_elem) continue;
 
          int prev_itf = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            timers[3]->Start();
+            timer.Start("elem-init");
 
             EQPSample *sample = eqp_elem->GetSample(i);
 
@@ -183,11 +161,9 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             if (itf != prev_itf)
             {
                InterfaceInfo *if_info = &((*interface_infos)[itf]);
-               timers[8]->Start();
+               timer.Start("topol");
                topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-               topol_call++;
-               assemble_call++;
-               timers[8]->Stop();
+               timer.Stop("topol");
 
                if (!precompute)
                {
@@ -218,17 +194,17 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
-            timers[3]->Stop();
+            timer.Stop("elem-init");
 
             if (precompute)
             {
-               timers[4]->Start();
+               timer.Start("fast-eqp");
                fnfi[k]->AddAssembleVector_Fast(*sample, *tr1, *tr2, x1, x2, y1, y2);
-               timers[4]->Stop();
+               timer.Stop("fast-eqp");
                continue;
             }
 
-            timers[5]->Start();
+            timer.Start("slow-eqp");
 
             fnfi[k]->AssembleQuadratureVector(
                *fe1, *fe2, *tr1, *tr2, ip, sample->info.qw, el_x1, el_x2, el_y1, el_y2);
@@ -236,19 +212,19 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             AddMultTransposeSubMatrix(*basis1, vdofs1, el_y1, y1);
             AddMultTransposeSubMatrix(*basis2, vdofs2, el_y2, y2);
 
-            timers[5]->Stop();
+            timer.Stop("slow-eqp");
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
 
-   timers[6]->Start();
+   timer.Start("final");
 
    for (int i=0; i < y_tmp.NumBlocks(); ++i)
       y_tmp.GetBlock(i).SyncAliasMemory(y);
 
-   timers[6]->Stop();
+   timer.Stop("final");
 
-   timers[7]->Stop();
+   timer.Stop("Total");
 }
 
 void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
