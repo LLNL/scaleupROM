@@ -80,7 +80,11 @@ public:
         assert(indices.count(name));
 
         int idx = indices[name];
-        assert(!starts[idx]);
+        if (starts[idx])
+        {
+            printf("TimeProfiler: %s is already started!\n", name.c_str());
+            assert(!starts[idx]);
+        }
 
         timers[idx]->Start();
         starts[idx] = true;
@@ -91,7 +95,11 @@ public:
         assert(indices.count(name));
         
         int idx = indices[name];
-        assert(starts[idx]);
+        if (!starts[idx])
+        {
+            printf("TimeProfiler: %s is not started!\n", name.c_str());
+            assert(starts[idx]);
+        }
 
         timers[idx]->Stop();
         calls[idx] += 1;

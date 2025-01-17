@@ -12,7 +12,7 @@ namespace mfem
 {
 
 ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, const bool reference_)
-   : NonlinearForm(f), reference(reference_)
+   : NonlinearForm(f), reference(reference_), timer()
 {
    height = width = num_basis;
 
@@ -21,8 +21,6 @@ ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, c
    else if (nnls_str == "linf")     nnls_criterion = CAROM::NNLS_termination::LINF;
    else
       mfem_error("ROMNonlinearForm: unknown NNLS criterion!\n");
-
-   for (int k = 0; k < Nt; k++) jac_timers[k] = new StopWatch;
 }
 
 ROMNonlinearForm::~ROMNonlinearForm()
@@ -44,18 +42,7 @@ ROMNonlinearForm::~ROMNonlinearForm()
       DeletePointers(bfnfi_sample);
    }
 
-   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
-   "init", "sample-load", "elem-load", "assem-grad", "others", "sum", "total");
-   double sum = 0.0;
-   for (int k = 0; k < Nt-1; k++)
-   {
-      printf("%.3E\t", jac_timers[k]->RealTime());
-      sum += jac_timers[k]->RealTime();
-   }
-   printf("%.3E\t", sum);
-   printf("%.3E\n", jac_timers[Nt-1]->RealTime());
-
-   for (int k = 0; k < Nt; k++) delete jac_timers[k];
+   timer.Print("ROMNonlinearForm::GetGradient");
 }
 
 void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
@@ -312,9 +299,10 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
 Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 {
-   jac_timers[5]->Start();
+   timer.Start("Total");
 
-   jac_timers[0]->Start();
+   // jac_timers[0]->Start();
+   timer.Start("init");
    assert(x.Size() == width);
    // if (ext)
    // {
@@ -356,13 +344,13 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
    {
       *Grad = 0.0;
    }
-   jac_timers[0]->Stop();
+   timer.Stop("init");
 
    if (dnfi.Size())
    {
       for (int k = 0; k < dnfi.Size(); k++)
       {
-         jac_timers[1]->Start();
+         timer.Start("sample-load");
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
@@ -370,19 +358,20 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          assert(eqp_elem);
 
          int prev_el = -1;
-         jac_timers[1]->Stop();
+         timer.Stop("sample-load");
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            jac_timers[2]->Start();
+            timer.Start("elem-load");
             EQPSample *sample = eqp_elem->GetSample(i);
             int el = sample->info.el;
             T = fes->GetElementTransformation(el);
-            jac_timers[2]->Stop();
+            timer.Stop("elem-load");
 
-            jac_timers[3]->Start();
+            timer.Start("assem-grad");
             if (precompute)
             {
                dnfi[k]->AddAssembleGrad_Fast(*sample, *T, x, *Grad);
+               timer.Stop("assem-grad");
                continue;
             }
 
@@ -403,12 +392,12 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
             // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
 
-            jac_timers[3]->Stop();
+            timer.Stop("assem-grad");
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
 
-   jac_timers[4]->Start();
+   timer.Start("other-integ");
    if (fnfi.Size())
    {
       FaceElementTransformations *tr = NULL;
@@ -566,8 +555,8 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
    DenseMatrix *mGrad = Grad;
    
-   jac_timers[4]->Stop();
-   jac_timers[5]->Stop();
+   timer.Stop("other-integ");
+   timer.Stop("Total");
    // TODO(kevin): will need to consider how we should address this case.
    //              do we really need prolongation when we lift up from ROM?
    //              we might need a similar operation on the ROM basis DenseMatrix.

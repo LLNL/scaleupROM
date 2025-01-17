@@ -16,9 +16,11 @@ namespace mfem
 
 class ROMNonlinearForm : public NonlinearForm
 {
+// private:
+//    static const int Nt = 6;
+//    mutable StopWatch *jac_timers[Nt];
 private:
-   static const int Nt = 6;
-   mutable StopWatch *jac_timers[Nt];
+   mutable TimeProfiler timer;
 
 protected:
    /// ROM basis for projection.
