@@ -165,34 +165,8 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
                topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
                timer.Stop("topol");
 
-               if (!precompute)
-               {
-                  if ((tr1 == NULL) || (tr2 == NULL))
-                     mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
-                              "   indicating that an empty quadrature point is sampled.\n");
-
-                  fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
-                  fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
-
-                  if (basis1_offset > 0)
-                     for (int v = 0; v < vdofs1.Size(); v++)
-                        vdofs1[v] += basis1_offset;
-                  if (basis2_offset > 0)
-                     for (int v = 0; v < vdofs2.Size(); v++)
-                        vdofs2[v] += basis2_offset;
-
-                  // Both domains will have the adjacent element as Elem1.
-                  fe1 = fes1->GetFE(tr1->Elem1No);
-                  fe2 = fes2->GetFE(tr2->Elem1No);
-
-                  MultSubMatrix(*basis1, vdofs1, x1, el_x1);
-                  MultSubMatrix(*basis2, vdofs2, x2, el_x2);
-               }  // if (!precompute)
-
                prev_itf = itf;
             }  // if (itf != prev_itf)
-
-            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
             timer.Stop("elem-init");
 
@@ -205,6 +179,29 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             }
 
             timer.Start("slow-eqp");
+
+            if ((tr1 == NULL) || (tr2 == NULL))
+               mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
+                        "   indicating that an empty quadrature point is sampled.\n");
+
+            fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
+            fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
+
+            if (basis1_offset > 0)
+               for (int v = 0; v < vdofs1.Size(); v++)
+                  vdofs1[v] += basis1_offset;
+            if (basis2_offset > 0)
+               for (int v = 0; v < vdofs2.Size(); v++)
+                  vdofs2[v] += basis2_offset;
+
+            // Both domains will have the adjacent element as Elem1.
+            fe1 = fes1->GetFE(tr1->Elem1No);
+            fe2 = fes2->GetFE(tr2->Elem1No);
+
+            MultSubMatrix(*basis1, vdofs1, x1, el_x1);
+            MultSubMatrix(*basis2, vdofs2, x2, el_x2);
+
+            const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
             fnfi[k]->AssembleQuadratureVector(
                *fe1, *fe2, *tr1, *tr2, ip, sample->info.qw, el_x1, el_x2, el_y1, el_y2);

@@ -8,6 +8,7 @@
 #include "stokes_solver.hpp"
 #include "rom_nonlinearform.hpp"
 #include "rom_interfaceform.hpp"
+#include "etc.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -99,6 +100,9 @@ public:
 
 class SteadyNSEQPROM : public SteadyNSROM
 {
+private:
+   mutable TimeProfiler timer;
+
 protected:
    Array<ROMNonlinearForm *> hs; // not owned by SteadyNSEQPROM.
    ROMInterfaceForm *itf = NULL; // not owned by SteadyNSEQPROM.
@@ -111,7 +115,10 @@ public:
    SteadyNSEQPROM(ROMHandlerBase *rom_handler, Array<ROMNonlinearForm *> &hs_,
                   ROMInterfaceForm *itf_, const bool direct_solve_=true);
 
-   virtual ~SteadyNSEQPROM() {}
+   virtual ~SteadyNSEQPROM()
+   {
+      // timer.Print("SteadyNSEQPROM");
+   }
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;

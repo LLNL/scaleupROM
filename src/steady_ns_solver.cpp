@@ -222,7 +222,7 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 SteadyNSEQPROM::SteadyNSEQPROM(
    ROMHandlerBase *rom_handler, Array<ROMNonlinearForm *> &hs_,
    ROMInterfaceForm *itf_, const bool direct_solve_)
-   : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_), itf(itf_)
+   : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_), itf(itf_), timer()
 {
    if (!separate_variable)
    {
@@ -246,6 +246,8 @@ SteadyNSEQPROM::SteadyNSEQPROM(
 
 void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
 {
+   timer.Start("Mult");
+
    y = 0.0;
    linearOp->Mult(x, y);
 
@@ -255,19 +257,29 @@ void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
       x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
       y_comp.MakeRef(y, block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
 
+      timer.Start("Mult_nlin_domain");
       hs[m]->AddMult(x_comp, y_comp);
+      timer.Stop("Mult_nlin_domain");
    }
 
    if (!itf) return;
 
    GetVel(x, x_u);
    y_u = 0.0;
+
+   timer.Start("Mult_nlin_itf");
    itf->InterfaceAddMult(x_u, y_u);
+   timer.Stop("Mult_nlin_itf");
+
    AddVel(y_u, y);
+
+   timer.Stop("Mult");
 }
 
 Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
 {
+   timer.Start("GetGradient");
+
    delete jac_mono;
    delete jac_hypre;
    jac_mono = new SparseMatrix(*linearOp);
@@ -288,7 +300,10 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
          }
 
       GetVel(x, x_u);
+
+      timer.Start("Grad_nlin_itf");
       itf->InterfaceGetGradient(x_u, mats);
+      timer.Stop("Grad_nlin_itf");
 
       MatrixBlocks u_mats(mats);
 
@@ -307,10 +322,14 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
       x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
 
       // NOTE(kevin): jac_comp is owned by hs[m]. No need of deleting it.
+      timer.Start("Grad_nlin_domain");
       jac_comp = dynamic_cast<DenseMatrix *>(&hs[m]->GetGradient(x_comp));
+      timer.Stop("Grad_nlin_domain");
       jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], *jac_comp);
    }
    jac_mono->Finalize();
+
+   timer.Stop("GetGradient");
    
    if (direct_solve)
    {
@@ -424,6 +443,7 @@ SteadyNSSolver::~SteadyNSSolver()
       else if (rom_handler->GetNonlinearHandling() == NonlinearHandling::EQP)
       {
          DeletePointers(comp_eqps);
+         DeletePointers(subdomain_eqps);
          delete itf_eqp;
       }
    }
