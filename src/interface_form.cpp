@@ -27,7 +27,8 @@ InterfaceForm::~InterfaceForm()
 {
    DeletePointers(fnfi);
 
-   timer.Print("InterfaceForm::InterfaceAddMult");
+   if (config.GetOption<bool>("time_profile/enabled", false))
+      timer.Print("InterfaceForm::InterfaceAddMult");
 }
 
 void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const

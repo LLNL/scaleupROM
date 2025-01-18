@@ -38,7 +38,8 @@ ROMInterfaceForm::~ROMInterfaceForm()
 {
    DeletePointers(fnfi_ref_sample);
 
-   timer.Print("ROMInterfaceForm::InterfaceAddMult");
+   if (config.GetOption<bool>("time_profile/enabled", false))
+      timer.Print("ROMInterfaceForm");
 }
 
 void ROMInterfaceForm::SetBasisAtComponent(const int c, DenseMatrix &basis_, const int offset)
@@ -75,9 +76,9 @@ void ROMInterfaceForm::UpdateBlockOffsets()
 
 void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 {
-   timer.Start("Total");
+   timer.Start("Mult");
 
-   timer.Start("init");
+   timer.Start("Mult/init");
 
    assert(block_offsets.Min() >= 0);
    assert(x.Size() == block_offsets.Last());
@@ -102,22 +103,22 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    Array<int> vdofs1, vdofs2;
    Vector el_x1, el_x2, el_y1, el_y2;
 
-   timer.Stop("init");
+   timer.Stop("Mult/init");
 
    for (int k = 0; k < fnfi.Size(); k++)
    {
-      timer.Start("itg-init");
+      timer.Start("Mult/itg-init");
 
       assert(fnfi[k]);
 
       const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
       assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
-      timer.Stop("itg-init");
+      timer.Stop("Mult/itg-init");
 
       for (int p = 0; p < numPorts; p++)
       {
-         timer.Start("port-init");
+         timer.Start("Mult/port-init");
 
          const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
@@ -146,14 +147,14 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 
          eqp_elem = fnfi_sample[p + k * numPorts];
 
-         timer.Stop("port-init");
+         timer.Stop("Mult/port-init");
 
          if (!eqp_elem) continue;
 
          int prev_itf = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            timer.Start("elem-init");
+            timer.Start("Mult/elem-init");
 
             EQPSample *sample = eqp_elem->GetSample(i);
 
@@ -161,24 +162,24 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             if (itf != prev_itf)
             {
                InterfaceInfo *if_info = &((*interface_infos)[itf]);
-               timer.Start("topol");
+               timer.Start("Mult/topol");
                topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
-               timer.Stop("topol");
+               timer.Stop("Mult/topol");
 
                prev_itf = itf;
             }  // if (itf != prev_itf)
 
-            timer.Stop("elem-init");
+            timer.Stop("Mult/elem-init");
 
             if (precompute)
             {
-               timer.Start("fast-eqp");
+               timer.Start("Mult/fast-eqp");
                fnfi[k]->AddAssembleVector_Fast(*sample, *tr1, *tr2, x1, x2, y1, y2);
-               timer.Stop("fast-eqp");
+               timer.Stop("Mult/fast-eqp");
                continue;
             }
 
-            timer.Start("slow-eqp");
+            timer.Start("Mult/slow-eqp");
 
             if ((tr1 == NULL) || (tr2 == NULL))
                mfem_error("InterfaceTransformation of the sampled face is NULL,\n"
@@ -209,23 +210,27 @@ void ROMInterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
             AddMultTransposeSubMatrix(*basis1, vdofs1, el_y1, y1);
             AddMultTransposeSubMatrix(*basis2, vdofs2, el_y2, y2);
 
-            timer.Stop("slow-eqp");
+            timer.Stop("Mult/slow-eqp");
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
 
-   timer.Start("final");
+   timer.Start("Mult/final");
 
    for (int i=0; i < y_tmp.NumBlocks(); ++i)
       y_tmp.GetBlock(i).SyncAliasMemory(y);
 
-   timer.Stop("final");
+   timer.Stop("Mult/final");
 
-   timer.Stop("Total");
+   timer.Stop("Mult");
 }
 
 void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
 {
+   timer.Start("GetGradient");
+
+   timer.Start("Grad/init");
+
    assert(mats.NumRows() == numSub);
    assert(mats.NumCols() == numSub);
    for (int i = 0; i < numSub; i++)
@@ -255,15 +260,23 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
       for (int j = 0; j < 2; j++)
          quadmats(i, j) = new DenseMatrix;
 
+   timer.Stop("Grad/init");
+
    for (int k = 0; k < fnfi.Size(); k++)
    {
+      timer.Start("Grad/fnfi-init");
+
       assert(fnfi[k]);
 
       const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
       assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
+      timer.Stop("Grad/fnfi-init");
+
       for (int p = 0; p < numPorts; p++)
       {
+         timer.Start("Grad/port-init");
+
          const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
          midx[0] = pInfo->Mesh1;
@@ -292,23 +305,34 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
          assert(interface_infos);
 
          eqp_elem = fnfi_sample[p + k * numPorts];
+         timer.Stop("Grad/port-init");
          if (!eqp_elem) continue;
 
          int prev_itf = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
+            timer.Start("Grad/elem-init");
+
             EQPSample *sample = eqp_elem->GetSample(i);
 
             int itf = sample->info.el;
             InterfaceInfo *if_info = &((*interface_infos)[itf]);
+            timer.Start("Grad/topol");
             topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
+            timer.Stop("Grad/topol");
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
+
+            timer.Stop("Grad/elem-init");
 
             if (precompute)
             {
+               timer.Start("Grad/fast-eqp");
                fnfi[k]->AddAssembleGrad_Fast(*sample, *tr1, *tr2, x1, x2, mats_p);
+               timer.Stop("Grad/fast-eqp");
                continue;
             }
+
+            timer.Start("Grad/slow-eqp");
 
             if (itf != prev_itf)
             {
@@ -343,11 +367,15 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
             AddSubMatrixRtAP(*basis1, vdofs1, *quadmats(0, 1), *basis2, vdofs2, *mats_p(0, 1));
             AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 0), *basis1, vdofs1, *mats_p(1, 0));
             AddSubMatrixRtAP(*basis2, vdofs2, *quadmats(1, 1), *basis2, vdofs2, *mats_p(1, 1));
+
+            timer.Stop("Grad/slow-eqp");
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int p = 0; p < numPorts; p++)
    }  // for (int k = 0; k < fnfi.Size(); k++)
 
    DeletePointers(quadmats);
+
+   timer.Stop("GetGradient");
 }
 
 void ROMInterfaceForm::TrainEQPForRefPort(const int p,

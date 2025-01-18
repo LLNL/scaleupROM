@@ -42,7 +42,8 @@ ROMNonlinearForm::~ROMNonlinearForm()
       DeletePointers(bfnfi_sample);
    }
 
-   timer.Print("ROMNonlinearForm");
+   if (config.GetOption<bool>("time_profile/enabled", false))
+      timer.Print("ROMNonlinearForm");
 }
 
 void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
