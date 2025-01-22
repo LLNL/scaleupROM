@@ -27,7 +27,7 @@ InterfaceForm::~InterfaceForm()
 {
    DeletePointers(fnfi);
 
-   if (config.GetOption<bool>("time_profile/enabled", false))
+   if (config.GetOption<bool>("time_profile/InterfaceForm", false))
       timer.Print("InterfaceForm::InterfaceAddMult");
 }
 
@@ -68,8 +68,8 @@ void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) con
 
 void InterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 {
-   timer.Start("Total");
-   timer.Start("init");
+   timer.Start("Mult");
+   timer.Start("Mult/init");
 
    x_tmp.Update(const_cast<Vector&>(x), block_offsets);
    y_tmp.Update(y, block_offsets);
@@ -78,11 +78,11 @@ void InterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
    Mesh *mesh1, *mesh2;
    FiniteElementSpace *fes1, *fes2;
 
-   timer.Stop("init");
+   timer.Stop("Mult/init");
 
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
-      timer.Start("port-init");
+      timer.Start("Mult/port-init");
 
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
 
@@ -97,24 +97,28 @@ void InterfaceForm::InterfaceAddMult(const Vector &x, Vector &y) const
 
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
 
-      timer.Stop("port-init");
+      timer.Stop("Mult/port-init");
 
       AssembleInterfaceVector(mesh1, mesh2, fes1, fes2, interface_infos,
                               x_tmp.GetBlock(midx[0]), x_tmp.GetBlock(midx[1]),
                               y_tmp.GetBlock(midx[0]), y_tmp.GetBlock(midx[1]));
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
 
-   timer.Start("final");
+   timer.Start("Mult/final");
 
    for (int i=0; i < y_tmp.NumBlocks(); ++i)
       y_tmp.GetBlock(i).SyncAliasMemory(y);
 
-   timer.Stop("final");
-   timer.Stop("Total");
+   timer.Stop("Mult/final");
+   timer.Stop("Mult");
 }
 
 void InterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *> &mats) const
 {
+   timer.Start("GetGradient");
+
+   timer.Start("Grad/init");
+
    assert(mats.NumRows() == numSub);
    assert(mats.NumCols() == numSub);
    for (int i = 0; i < numSub; i++)
@@ -128,8 +132,12 @@ void InterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *
    Mesh *mesh1, *mesh2;
    FiniteElementSpace *fes1, *fes2;
 
+   timer.Stop("Grad/init");
+
    for (int p = 0; p < topol_handler->GetNumPorts(); p++)
    {
+      timer.Start("Grad/port-init");
+
       const PortInfo *pInfo = topol_handler->GetPortInfo(p);
       
       midx[0] = pInfo->Mesh1;
@@ -146,9 +154,12 @@ void InterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatrix *
       fes2 = fes[midx[1]];
 
       Array<InterfaceInfo>* const interface_infos = topol_handler->GetInterfaceInfos(p);
+      timer.Stop("Grad/port-init");
       AssembleInterfaceGrad(mesh1, mesh2, fes1, fes2, interface_infos,
                             x_tmp.GetBlock(midx[0]), x_tmp.GetBlock(midx[1]), mats_p);
    }  // for (int p = 0; p < topol_handler->GetNumPorts(); p++)
+
+   timer.Stop("GetGradient");
 }
 
 void InterfaceForm::AssembleInterfaceMatrix(
@@ -298,6 +309,8 @@ void InterfaceForm::AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
    FiniteElementSpace *fes1, FiniteElementSpace *fes2, Array<InterfaceInfo> *interface_infos,
    const Vector &x1, const Vector &x2, Array2D<SparseMatrix*> &mats) const
 {
+   timer.Start("Grad/assemble-init");
+
    assert(x1.Size() == fes1->GetTrueVSize());
    assert(x2.Size() == fes2->GetTrueVSize());
 
@@ -309,14 +322,22 @@ void InterfaceForm::AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
    Array<int> vdofs1, vdofs2;
    Vector el_x1, el_x2, el_y1, el_y2;
 
+   timer.Stop("Grad/assemble-init");
+
    for (int bn = 0; bn < interface_infos->Size(); bn++)
    {
+      timer.Start("Grad/topol");
+
       InterfaceInfo *if_info = &((*interface_infos)[bn]);
 
       topol_handler->GetInterfaceTransformations(mesh1, mesh2, if_info, tr1, tr2);
 
+      timer.Stop("Grad/topol");
+
       if ((tr1 != NULL) && (tr2 != NULL))
       {
+         timer.Start("Grad/assemble");
+
          fes1->GetElementVDofs(tr1->Elem1No, vdofs1);
          fes2->GetElementVDofs(tr2->Elem1No, vdofs2);
 
@@ -338,6 +359,8 @@ void InterfaceForm::AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
             mats(1, 0)->AddSubMatrix(vdofs2, vdofs1, *elemmats(1, 0), skip_zeros);
             mats(1, 1)->AddSubMatrix(vdofs2, vdofs2, *elemmats(1, 1), skip_zeros);
          }
+
+         timer.Stop("Grad/assemble");
       }  // if ((tr1 != NULL) && (tr2 != NULL))
    }  // for (int bn = 0; bn < interface_infos.Size(); bn++)
 

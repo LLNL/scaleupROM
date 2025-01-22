@@ -38,7 +38,7 @@ ROMInterfaceForm::~ROMInterfaceForm()
 {
    DeletePointers(fnfi_ref_sample);
 
-   if (config.GetOption<bool>("time_profile/enabled", false))
+   if (config.GetOption<bool>("time_profile/ROMInterfaceForm", false))
       timer.Print("ROMInterfaceForm");
 }
 
@@ -307,6 +307,8 @@ void ROMInterfaceForm::InterfaceGetGradient(const Vector &x, Array2D<SparseMatri
          eqp_elem = fnfi_sample[p + k * numPorts];
          timer.Stop("Grad/port-init");
          if (!eqp_elem) continue;
+
+printf("port %d, itf_info: %d, eqp_elem: %d\n", p, interface_infos->Size(), eqp_elem->Size());
 
          int prev_itf = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)

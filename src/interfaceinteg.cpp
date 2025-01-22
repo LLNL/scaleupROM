@@ -5,6 +5,7 @@
 #include "interfaceinteg.hpp"
 #include "etc.hpp"
 #include "linalg_utils.hpp"
+#include "input_parser.hpp"
 // #include <cmath>
 // #include <algorithm>
 
@@ -1307,6 +1308,12 @@ void InterfaceDGElasticityIntegrator::AssembleBlock(
    DGLaxFriedrichsFluxIntegrator
 */
 
+DGLaxFriedrichsFluxIntegrator::~DGLaxFriedrichsFluxIntegrator()
+{
+   if (config.GetOption<bool>("time_profile/DGLaxFriedrichsFluxIntegrator", false))
+      timer.Print("DGLaxFriedrichsFluxIntegrator");
+}
+
 void DGLaxFriedrichsFluxIntegrator::ComputeFluxDotN(
    const Vector &u1, const Vector &u2, const Vector &nor,
    const bool &eval2, Vector &flux)
@@ -1527,6 +1534,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(
    const FiniteElement &el1, const FiniteElement &el2,
    FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect)
 {
+   timer.Start("AssembleFaceVector_interior");
+
    dim = el1.GetDim();
    ndofs1 = el1.GetDof();
    ndofs2 = (Tr.Elem2No >= 0) ? el2.GetDof() : 0;
@@ -1564,12 +1573,16 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceVector(
 
       AssembleQuadVectorBase(el1, el2, &Tr, NULL, ip, ip.weight, ndofs2, udof1, udof2, elv1, elv2);
    }
+
+   timer.Stop("AssembleFaceVector_interior");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(
    const FiniteElement &el1, const FiniteElement &el2,
    FaceElementTransformations &Tr, const Vector &elfun, DenseMatrix &elmat)
 {
+   timer.Start("AssembleFaceGrad_interior");
+
    dim = el1.GetDim();
    ndofs1 = el1.GetDof();
    ndofs2 = (Tr.Elem2No >= 0) ? el2.GetDof() : 0;
@@ -1627,6 +1640,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleFaceGrad(
          }
       }
    }  // for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+
+   timer.Stop("AssembleFaceGrad_interior");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureVector(
@@ -1712,6 +1727,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureGrad(
 void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, Vector &y)
 {
+   timer.Start("eqpvec_Fast_interior");
+
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
    DenseMatrix *shapes1 = eqp_sample.shape1;
@@ -1756,11 +1773,15 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    assert(y.Size() == x.Size());
    shapes1->AddMultTranspose(flux, y, -w);
    if (el2) shapes2->AddMultTranspose(flux, y, w);
+
+   timer.Stop("eqpvec_Fast_interior");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    const EQPSample &eqp_sample, FaceElementTransformations &T, const Vector &x, DenseMatrix &jac)
 {
+   timer.Start("eqpgrad_Fast_interior");
+
    const IntegrationPoint &ip = GetIntegrationRule()->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
    DenseMatrix *shapes1 = eqp_sample.shape1;
@@ -1812,6 +1833,8 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
       AddwRtAP(*shapes1, gradu2, *shapes2, jac, -w);
       AddwRtAP(*shapes2, gradu2, *shapes2, jac, w);
    }
+
+   timer.Stop("eqpgrad_Fast_interior");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceVector(
@@ -1820,6 +1843,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceVector(
    const Vector &elfun1, const Vector &elfun2,
    Vector &elvect1, Vector &elvect2)
 {
+   timer.Start("fomvec_interface");
+
    dim = el1.GetDim();
    ndofs1 = el1.GetDof();
    ndofs2 = el2.GetDof();
@@ -1855,6 +1880,8 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceVector(
 
       AssembleQuadVectorBase(el1, el2, &Tr1, &Tr2, ip, ip.weight, ndofs2, udof1, udof2, elv1, elv2);
    }
+
+   timer.Stop("fomvec_interface");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
@@ -1862,6 +1889,10 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
    FaceElementTransformations &Tr1, FaceElementTransformations &Tr2,
    const Vector &elfun1, const Vector &elfun2, Array2D<DenseMatrix *> &elmats)
 {
+   timer.Start("fomgrad_interface");
+
+   timer.Start("fomgrad_interface/init");
+
    assert(elmats.NumRows() == 2);
    assert(elmats.NumCols() == 2);
    for (int i = 0; i < 2; i++)
@@ -1905,12 +1936,19 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
    for (int i = 0; i < 2; i++)
       for (int j = 0; j < 2; j++) *(elmats(i, j)) = 0.0;
 
+   timer.Stop("fomgrad_interface/init");
+
    for (int pind = 0; pind < ir->GetNPoints(); ++pind)
    {
+      timer.Start("fomgrad_interface/eval");
+
       const IntegrationPoint &ip = ir->IntPoint(pind);
 
       AssembleQuadGradBase(el1, el2, &Tr1, &Tr2, ip, ip.weight, ndofs2, udof1, udof2,
          w, gradu1, gradu2, elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22);
+
+      timer.Stop("fomgrad_interface/eval");
+      timer.Start("fomgrad_interface/assemble");
 
       for (int di = 0; di < dim; di++)
       {
@@ -1925,7 +1963,11 @@ void DGLaxFriedrichsFluxIntegrator::AssembleInterfaceGrad(
             }
          }
       }
+
+      timer.Stop("fomgrad_interface/assemble");
    }  // for (int pind = 0; pind < ir->GetNPoints(); ++pind)
+
+   timer.Stop("fomgrad_interface");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AssembleQuadratureVector(
@@ -2023,6 +2065,8 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    FaceElementTransformations &Tr2,
    const Vector &x1, const Vector &x2, Vector &y1, Vector &y2)
 {
+   timer.Start("eqpvec_Fast_interface");
+
    const IntegrationRule *ir = GetIntegrationRule();
    const IntegrationPoint &ip = ir->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
@@ -2062,6 +2106,8 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleVector_Fast(
    assert(y2.Size() == x2.Size());
    shapes1->AddMultTranspose(flux, y1, -w);
    shapes2->AddMultTranspose(flux, y2, w);
+
+   timer.Stop("eqpvec_Fast_interface");
 }
 
 void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
@@ -2069,6 +2115,9 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    FaceElementTransformations &Tr2,
    const Vector &x1, const Vector &x2, Array2D<SparseMatrix *> &jac)
 {
+   timer.Start("eqpgrad_Fast_interface");
+   timer.Start("eqpgrad_Fast_interface/init");
+
    const IntegrationRule *ir = GetIntegrationRule();
    const IntegrationPoint &ip = ir->IntPoint(eqp_sample.info.qp);
    const double qw = eqp_sample.info.qw;
@@ -2089,6 +2138,9 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    const IntegrationPoint &eip1 = Tr1.GetElement1IntPoint();
    // const IntegrationPoint &eip2 = T.GetElement2IntPoint();
 
+   timer.Stop("eqpgrad_Fast_interface/init");
+   timer.Start("eqpgrad_Fast_interface/eval");
+
    shapes1->Mult(x1, u1);
    shapes2->Mult(x2, u2);
 
@@ -2108,10 +2160,32 @@ void DGLaxFriedrichsFluxIntegrator::AddAssembleGrad_Fast(
    if (Q) 
       w *= Q->Eval(Tr1, ip);
 
+   timer.Stop("eqpgrad_Fast_interface/eval");
+{
+   Array2D<DenseMatrix *> test_jac(2, 2);
+   for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 2; j++)
+         test_jac(i, j) = new DenseMatrix(jac(i, j)->Height(), jac(i, j)->Width());
+
+   timer.Start("eqpgrad_Fast_interface/assemble_test");
+   AddwRtAP(*shapes1, gradu1, *shapes1, *test_jac(0, 0), -w);
+   AddwRtAP(*shapes2, gradu1, *shapes1, *test_jac(1, 0), w);
+   AddwRtAP(*shapes1, gradu2, *shapes2, *test_jac(0, 1), -w);
+   AddwRtAP(*shapes2, gradu2, *shapes2, *test_jac(1, 1), w);
+   timer.Stop("eqpgrad_Fast_interface/assemble_test");
+
+   DeletePointers(test_jac);
+}
+   timer.Start("eqpgrad_Fast_interface/assemble");
+
    AddwRtAP(*shapes1, gradu1, *shapes1, *jac(0, 0), -w);
    AddwRtAP(*shapes2, gradu1, *shapes1, *jac(1, 0), w);
    AddwRtAP(*shapes1, gradu2, *shapes2, *jac(0, 1), -w);
    AddwRtAP(*shapes2, gradu2, *shapes2, *jac(1, 1), w);
+
+   timer.Stop("eqpgrad_Fast_interface/assemble");
+
+   timer.Stop("eqpgrad_Fast_interface");
 }
 
 }
