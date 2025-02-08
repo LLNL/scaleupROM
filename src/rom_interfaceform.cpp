@@ -696,7 +696,7 @@ void ROMInterfaceForm::TrainEQPForIntegrator(
          samples.Append({.el = i / nqe, .qp = i % nqe, .qw = eqpSol_global(i)});
       }
    }
-   printf("Size of sampled qp: %d\n", samples.Size());
+   printf("Size of sampled qp: %d/%d\n", samples.Size(), eqpSol_global.dim());
    if (nnz != samples.Size())
       printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 }

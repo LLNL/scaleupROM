@@ -891,7 +891,7 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
          samples.Append({.el = i / nqe, .qp = i % nqe, .qw = eqpSol_global(i)});
       }
    }
-   printf("Size of sampled qp: %d\n", samples.Size());
+   printf("Size of sampled qp: %d/%d\n", samples.Size(), eqpSol_global.dim());
    if (nnz != samples.Size())
       printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 }
@@ -1519,6 +1519,49 @@ void ROMNonlinearForm::PrecomputeBdrFaceEQPSample(
    assert(T->Elem2No < 0);
 
    PrecomputeFaceEQPSample(ir, basis, T, eqp_sample);
+}
+
+void ROMNonlinearForm::SaveDomainEQPCoords(const int k, hid_t file_id, const std::string &dsetname)
+{
+   if (!dnfi.Size())
+      return;
+
+   assert((k >= 0) && (k < dnfi.Size()));
+
+   const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
+   EQPElement *eqp_elem = dnfi_sample[k];
+   assert(ir);
+   assert(eqp_elem);
+
+   DenseMatrix eqp_coords(eqp_elem->Size(), 3);
+
+   EQPSample *eqp_sample;
+   for (int i = 0; i < eqp_elem->Size(); i++)
+   {
+      eqp_sample = eqp_elem->GetSample(i);
+      const int el = eqp_sample->info.el;
+      const FiniteElement *fe = fes->GetFE(el);
+      ElementTransformation *T = fes->GetElementTransformation(el);
+      const IntegrationPoint &ip = ir->IntPoint(eqp_sample->info.qp);
+
+      double x[3];
+      Vector transip(x, 3);
+      T->Transform(ip, transip);
+
+      eqp_coords.SetRow(i, transip);
+   }  // for (int i = 0; i < eqp_elem->Size(); i++)
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::WriteDataset(grp_id, "coords", eqp_coords);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
 }
 
 }

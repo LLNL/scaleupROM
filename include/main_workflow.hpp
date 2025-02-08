@@ -32,4 +32,7 @@ void FindSnapshotFilesForBasis(const BasisTag &basis_tag, const std::string &def
 // return relative error if comparing solution.
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
 
+// Auxiliary function to print out EQP point coordinates
+void PrintEQPCoords(MPI_Comm comm);
+
 #endif

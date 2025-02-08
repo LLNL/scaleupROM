@@ -233,6 +233,8 @@ public:
        The state @a x must be a true-dof vector. */
    virtual Operator &GetGradient(const Vector &x) const;
 
+   void SaveDomainEQPCoords(const int k, hid_t file_id, const std::string &dsetname);
+
 private:
    void PrecomputeDomainEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);
    void PrecomputeFaceEQPSample(const IntegrationRule &ir, const DenseMatrix &basis,

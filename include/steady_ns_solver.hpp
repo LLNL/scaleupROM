@@ -196,6 +196,8 @@ public:
    virtual void LoadROMNlinElems(const std::string &input_prefix) override;
    virtual void AssembleROMNlinOper() override;
 
+   void SaveEQPCoords(const std::string &filename) override;
+
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
    

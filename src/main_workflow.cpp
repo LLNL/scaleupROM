@@ -702,3 +702,52 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    // return the maximum error over all variables.
    return error.Max();
 }
+
+void PrintEQPCoords(MPI_Comm comm)
+{
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   MultiBlockSolver *test = InitSolver();
+   test->InitVariables();
+
+   assert(test->UseRom());
+   if (!test->IsNonlinear())
+   {
+      printf("PrintEQPPoints: given solver is not nonlinear. Exiting\n");
+      return;
+   }
+
+   test->InitROMHandler();
+
+   StopWatch solveTimer;
+
+   problem->SetSingleRun();
+   test->SetParameterizedProblem(problem);
+
+   // TODO: there are skippable operations depending on rom/fom mode.
+   test->BuildRHSOperators();
+   test->SetupRHSBCOperators();
+   test->AssembleRHS();
+
+   const int num_var = test->GetNumVar();
+
+   ROMHandlerBase *rom = test->GetROMHandler();
+   test->LoadReducedBasis();
+   test->AllocateROMNlinElems();
+
+   ROMBuildingLevel save_operator = rom->GetBuildingLevel();
+   TopologyHandlerMode topol_mode = test->GetTopologyMode();
+   assert(save_operator == ROMBuildingLevel::COMPONENT);
+   assert(topol_mode != TopologyHandlerMode::SUBMESH);
+   assert(rom->GetNonlinearHandling() == NonlinearHandling::EQP);
+
+   test->LoadROMNlinElems(rom->GetOperatorPrefix());
+
+   const std::string filename = config.GetRequiredOption<std::string>("model_reduction/eqp/save_coords");
+   test->SaveEQPCoords(filename);
+   
+   delete test;
+   delete problem;
+
+   // return the maximum error over all variables.
+   return;
+}

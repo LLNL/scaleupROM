@@ -1388,3 +1388,52 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
 
    return tensor;
 }
+
+void SteadyNSSolver::SaveEQPCoords(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will save EQ points/weights in a parallel way.
+   */
+   if (rank == 0)
+   {
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hid_t grp_id;
+
+      grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      const int num_comp = topol_handler->GetNumComponents();
+      assert(comp_eqps.Size() == num_comp);
+
+      hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
+
+      std::string dset_name;
+      for (int c = 0; c < num_comp; c++)
+      {
+         assert(comp_eqps[c]);
+         dset_name = topol_handler->GetComponentName(c);
+
+         comp_eqps[c]->SaveDomainEQPCoords(0, grp_id, dset_name + "_integ0");
+         if (oper_type == OperType::LF)
+         {
+            assert(!full_dg);
+               // comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::INTERIORFACE, 0, grp_id, dset_name + "_integ1");
+         }  // if (oper_type == OperType::LF)
+      }  // for (int c = 0; c < num_comp; c++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
+   }
+   MPI_Barrier(MPI_COMM_WORLD);
+   return;
+}

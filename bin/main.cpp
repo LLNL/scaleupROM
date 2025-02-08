@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
       else if (mode == "aux_train_rom")   AuxiliaryTrainROM(MPI_COMM_WORLD);
       else if (mode == "train_eqp")       TrainEQP(MPI_COMM_WORLD);
       else if (mode == "single_run")      double dump = SingleRun(MPI_COMM_WORLD, output_file);
+      else if (mode == "print_eqp")       PrintEQPCoords(MPI_COMM_WORLD);
       else
       {
          if (rank == 0) printf("Unknown mode %s!\n", mode.c_str());
