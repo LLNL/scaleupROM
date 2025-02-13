@@ -153,7 +153,10 @@ void GenerateSamples(MPI_Comm comm)
    int s = 0;
    while (s < sample_generator->GetTotalSampleSize())
    {
-      if (!sample_generator->IsMyJob(s)) continue;
+      if (!sample_generator->IsMyJob(s)) {
+	s++;
+	continue;
+      }
 
       // NOTE: this will change config.dict_
       sample_generator->SetSampleParams(s);

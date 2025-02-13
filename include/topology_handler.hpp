@@ -57,7 +57,7 @@ class TopologyHandler
 {
 protected:
    int numSub = -1;   // number of subdomains.
-   int num_comp = -1;  // number of components. Submesh - only one component / Component - multiple compoenents allowed, not yet implemented.
+   int num_comp = -1;  // number of components. Submesh - only one component / Component - multiple components allowed, not yet implemented.
    Array<int> sub_composition;  // number of subdomains per each component index.
    std::vector<std::string> comp_names;
 

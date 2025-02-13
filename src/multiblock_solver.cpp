@@ -276,10 +276,11 @@ void MultiBlockSolver::AssembleROMMat()
    BlockMatrix *romMat = new BlockMatrix(*rom_block_offsets);
    romMat->owns_blocks = true;
 
-   AssembleROMMat(*romMat);  
+   AssembleROMMat(*romMat);
 
    romMat->Finalize();
    rom_handler->SetRomMat(romMat);
+   rom_handler->CreateHypreParMatrix(romMat, rank, nproc);
 }
 
 void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
@@ -608,6 +609,7 @@ void MultiBlockSolver::CopySolution(BlockVector *input_sol)
 void MultiBlockSolver::InitROMHandler()
 {
    rom_handler = new MFEMROMHandler(topol_handler, var_offsets, var_names, separate_variable_basis);
+   rom_handler->LoadBalanceROMBlocks(rank, nproc);
 
    if (!(topol_mode == TopologyHandlerMode::COMPONENT))
       return;

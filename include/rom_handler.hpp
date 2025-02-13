@@ -92,6 +92,11 @@ protected:
    bool basis_loaded;
    bool operator_loaded;
 
+   // MPI partitioning data
+   Array<int> localSizes;
+   Array<int> localNumBlocks;
+   std::array<int,2> localBlocks;
+
    // domain rom variables.
    /*
       offset for the global domain ROM blocks.
@@ -148,6 +153,8 @@ public:
    const int GetBlockIndex(const int m, const int v=-1);
    void GetDomainAndVariableIndex(const int &rom_block_index, int &m, int &v);
 
+   std::array<int,2> GetLocalBlocks() { return localBlocks; }
+
    mfem::BlockVector* GetReducedSolution() { return reduced_sol; }
    mfem::BlockVector* GetReducedRHS() { return reduced_rhs; }
 
@@ -184,7 +191,7 @@ public:
    virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec) = 0;
    virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec) = 0;
 
-   virtual void Solve(BlockVector &rhs, BlockVector &sol) = 0;
+   virtual void Solve(Vector &rhs, Vector &sol) = 0;
    virtual void Solve(BlockVector* U) = 0;
    virtual void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) = 0;   
 
@@ -199,6 +206,9 @@ public:
    virtual void SaveReducedRHS(const std::string &filename) = 0;
 
    virtual void AppendReferenceBasis(const int &idx, const DenseMatrix &mat) = 0;
+
+   virtual void CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int nproc) = 0;
+   virtual void LoadBalanceROMBlocks(int rank, int nproc) = 0;
 };
 
 class MFEMROMHandler : public ROMHandlerBase
@@ -229,6 +239,9 @@ protected:
    HYPRE_BigInt sys_row_starts[2];
    HypreParMatrix *romMat_hypre = NULL;
    MUMPSSolver *mumps = NULL;
+
+   Vector reduced_rhs_hypre;
+   HYPRE_BigInt hypre_start;
 
 public:
    MFEMROMHandler(TopologyHandler *input_topol, const Array<int> &input_var_offsets,
@@ -267,7 +280,7 @@ public:
    virtual void LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, Vector &vec);
    virtual void LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec);
    
-   void Solve(BlockVector &rhs, BlockVector &sol) override;
+   void Solve(Vector &rhs, Vector &sol) override;
    void Solve(BlockVector* U) override;
    void NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec=NULL) override;
 
@@ -284,6 +297,9 @@ public:
    { PrintVector(*reduced_rhs, filename); }
 
    virtual void AppendReferenceBasis(const int &idx, const DenseMatrix &mat);
+
+   void CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int nproc) override;
+   void LoadBalanceROMBlocks(int rank, int nproc) override;
 
 private:
    IterativeSolver* SetIterativeSolver(const MFEMROMHandler::SolverType &linsol_type_, const std::string &prec_type);
