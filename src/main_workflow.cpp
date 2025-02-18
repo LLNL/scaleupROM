@@ -121,6 +121,7 @@ std::vector<BasisTag> GetGlobalBasisTagList(const TopologyHandlerMode &topol_mod
       else if (solver_type == "stokes")      var_list = StokesSolver::GetVariableNames();
       else if (solver_type == "steady-ns")   var_list = SteadyNSSolver::GetVariableNames();
       else if (solver_type == "linelast")   var_list = LinElastSolver::GetVariableNames();
+      else if (solver_type == "unsteady-ns")   var_list = UnsteadyNSSolver::GetVariableNames();
       else
       {
          printf("Unknown MultiBlockSolver %s!\n", solver_type.c_str());
@@ -277,12 +278,12 @@ void TrainROM(MPI_Comm comm)
 
    sample_generator->FormReducedBasis(basis_prefix);
 
-   AuxiliaryTrainROM(comm, sample_generator);
+   AuxiliaryTrainROM(comm);
 
    delete sample_generator;
 }
 
-void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator)
+void AuxiliaryTrainROM(MPI_Comm comm)
 {
    std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    bool separate_variable_basis = config.GetOption<bool>("model_reduction/separate_variable_basis", false);
@@ -700,4 +701,53 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 
    // return the maximum error over all variables.
    return error.Max();
+}
+
+void PrintEQPCoords(MPI_Comm comm)
+{
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   MultiBlockSolver *test = InitSolver();
+   test->InitVariables();
+
+   assert(test->UseRom());
+   if (!test->IsNonlinear())
+   {
+      printf("PrintEQPPoints: given solver is not nonlinear. Exiting\n");
+      return;
+   }
+
+   test->InitROMHandler();
+
+   StopWatch solveTimer;
+
+   problem->SetSingleRun();
+   test->SetParameterizedProblem(problem);
+
+   // TODO: there are skippable operations depending on rom/fom mode.
+   test->BuildRHSOperators();
+   test->SetupRHSBCOperators();
+   test->AssembleRHS();
+
+   const int num_var = test->GetNumVar();
+
+   ROMHandlerBase *rom = test->GetROMHandler();
+   test->LoadReducedBasis();
+   test->AllocateROMNlinElems();
+
+   ROMBuildingLevel save_operator = rom->GetBuildingLevel();
+   TopologyHandlerMode topol_mode = test->GetTopologyMode();
+   assert(save_operator == ROMBuildingLevel::COMPONENT);
+   assert(topol_mode != TopologyHandlerMode::SUBMESH);
+   assert(rom->GetNonlinearHandling() == NonlinearHandling::EQP);
+
+   test->LoadROMNlinElems(rom->GetOperatorPrefix());
+
+   const std::string filename = config.GetRequiredOption<std::string>("model_reduction/eqp/save_coords");
+   test->SaveEQPCoords(filename);
+   
+   delete test;
+   delete problem;
+
+   // return the maximum error over all variables.
+   return;
 }

@@ -67,6 +67,9 @@ protected:
    Array<int> rom_u_offsets;
    BlockMatrix *rom_mass = NULL;
 
+private:
+   double times[10];
+
 public:
    UnsteadyNSSolver();
 

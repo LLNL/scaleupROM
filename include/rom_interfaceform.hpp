@@ -10,12 +10,16 @@
 #include "hdf5_utils.hpp"
 #include "hyperreduction_integ.hpp"
 #include "linalg/NNLS.h"
+#include "etc.hpp"
 
 namespace mfem
 {
 
 class ROMInterfaceForm : public InterfaceForm
 {
+private:
+   mutable TimeProfiler timer;
+
 protected:
    const int numPorts;
    const int numRefPorts;

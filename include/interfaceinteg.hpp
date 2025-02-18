@@ -7,6 +7,7 @@
 
 #include "mfem.hpp"
 #include "hyperreduction_integ.hpp"
+#include "etc.hpp"
 
 namespace mfem
 {
@@ -298,9 +299,13 @@ private:
    DenseMatrix udof1, udof2, elv1, elv2;
    DenseMatrix elmat_comp11, elmat_comp12, elmat_comp21, elmat_comp22;
 
+   mutable TimeProfiler timer;
+
 public:
    DGLaxFriedrichsFluxIntegrator(Coefficient &q, VectorCoefficient *ud = NULL, const IntegrationRule *ir = NULL)
       : InterfaceNonlinearFormIntegrator(ir), Q(&q), UD(ud) {}
+
+   virtual ~DGLaxFriedrichsFluxIntegrator();
 
    void AssembleFaceVector(const FiniteElement &el1,
                            const FiniteElement &el2,

@@ -24,12 +24,15 @@ void CollectSamplesByBasis(SampleGenerator *sample_generator, const std::string 
 void BuildROM(MPI_Comm comm);
 void TrainROM(MPI_Comm comm);
 // supremizer-enrichment etc..
-void AuxiliaryTrainROM(MPI_Comm comm, SampleGenerator *sample_generator);
+void AuxiliaryTrainROM(MPI_Comm comm);
 // EQP training, could include hypre-reduction optimization.
 void TrainEQP(MPI_Comm comm);
 // Input parsing routine to list out all snapshot files for training a basis.
 void FindSnapshotFilesForBasis(const BasisTag &basis_tag, const std::string &default_filename, std::vector<std::string> &file_list);
 // return relative error if comparing solution.
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
+
+// Auxiliary function to print out EQP point coordinates
+void PrintEQPCoords(MPI_Comm comm);
 
 #endif

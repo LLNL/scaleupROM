@@ -15,6 +15,9 @@ namespace mfem
 // TODO(kevin): inherits or cherry-pick ROMNonlinearForm for hyper-reduction.
 class InterfaceForm
 {
+private:
+   mutable TimeProfiler timer;
+
 protected:
    int numSub = -1;
    int skip_zeros = 1;
