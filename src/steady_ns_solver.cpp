@@ -57,23 +57,41 @@ SteadyNSOperator::~SteadyNSOperator()
    delete uu_mono;
    delete mono_jac;
    delete jac_hypre;
+
+   if (config.GetOption<bool>("time_profile/SteadyNSOperator", false))
+      timer.Print("SteadyNSOperator");
 }
 
 void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
 {
+   timer.Start("Mult");
+
    assert(linearOp);
    x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
    y_u.MakeRef(y, 0, u_offsets.Last());
 
    y = 0.0;
 
+   timer.Start("Mult/nlin_domain");
    Hop->Mult(x_u, y_u);
-   if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u);
+   timer.Stop("Mult/nlin_domain");
+   if (nl_itf)
+   {
+      timer.Start("Mult/itf");
+      nl_itf->InterfaceAddMult(x_u, y_u);
+      timer.Stop("Mult/itf");
+   }
+   timer.Start("Mult/lin");
    linearOp->AddMult(x, y);
+   timer.Stop("Mult/lin");
+
+   timer.Stop("Mult");
 }
 
 Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 {
+   timer.Start("GetGradient");
+
    // NonlinearForm owns the gradient operator.
    // DeletePointers(hs_mats);
    delete hs_jac;
@@ -82,6 +100,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    delete mono_jac;
    delete jac_hypre;
 
+   timer.Start("GetGradient/nlin-jac");
    hs_jac = new BlockMatrix(u_offsets);
    for (int i = 0; i < hs.Size(); i++)
       for (int j = 0; j < hs.Size(); j++)
@@ -97,9 +116,12 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
             hs_mats(i, j) = new SparseMatrix(u_offsets[i+1] - u_offsets[i], u_offsets[j+1] - u_offsets[j]);
          }
       }
+   timer.Stop("GetGradient/nlin-jac");
 
+   timer.Start("GetGradient/itf-jac");
    x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
    if (nl_itf) nl_itf->InterfaceGetGradient(x_u, hs_mats);
+   timer.Stop("GetGradient/itf-jac");
 
    for (int i = 0; i < hs.Size(); i++)
       for (int j = 0; j < hs.Size(); j++)
@@ -108,9 +130,11 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
          hs_jac->SetBlock(i, j, hs_mats(i, j));
       }
 
+   timer.Start("GetGradient/lin-jac");
    SparseMatrix *hs_jac_mono = hs_jac->CreateMonolithic();
    uu_mono = Add(*M, *hs_jac_mono);
    delete hs_jac_mono;
+   timer.Stop("GetGradient/lin-jac");
 
    assert(B && Bt);
 
@@ -123,10 +147,14 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    if (direct_solve)
    {
       jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
+      timer.Stop("GetGradient");
       return *jac_hypre;
    }  
    else
+   {
+      timer.Stop("GetGradient");
       return *mono_jac;
+   }
 }
 
 /*
@@ -249,27 +277,33 @@ void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
    timer.Start("Mult");
 
    y = 0.0;
+   timer.Start("Mult/lin");
    linearOp->Mult(x, y);
+   timer.Stop("Mult/lin");
 
+   timer.Start("Mult/nlin");
    for (int m = 0; m < numSub; m++)
    {
       int midx = midxs[m];
       x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
       y_comp.MakeRef(y, block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
 
-      timer.Start("Mult_nlin_domain");
       hs[m]->AddMult(x_comp, y_comp);
-      timer.Stop("Mult_nlin_domain");
    }
+   timer.Stop("Mult/nlin");
 
-   if (!itf) return;
+   if (!itf)
+   {
+      timer.Stop("Mult");
+      return;
+   }
 
    GetVel(x, x_u);
    y_u = 0.0;
 
-   timer.Start("Mult_nlin_itf");
+   timer.Start("Mult/itf");
    itf->InterfaceAddMult(x_u, y_u);
-   timer.Stop("Mult_nlin_itf");
+   timer.Stop("Mult/itf");
 
    AddVel(y_u, y);
 
@@ -282,10 +316,13 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
 
    delete jac_mono;
    delete jac_hypre;
+   timer.Start("GetGradient/lin");
    jac_mono = new SparseMatrix(*linearOp);
+   timer.Stop("GetGradient/lin");
 
    if (itf)
    {
+      timer.Start("GetGradient/itf");
       BlockMatrix jac(block_offsets);
       jac.owns_blocks = true;
    
@@ -301,9 +338,7 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
 
       GetVel(x, x_u);
 
-      timer.Start("Grad_nlin_itf");
       itf->InterfaceGetGradient(x_u, mats);
-      timer.Stop("Grad_nlin_itf");
 
       MatrixBlocks u_mats(mats);
 
@@ -313,8 +348,10 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
       (*jac_mono) += *tmp;
       
       delete tmp;
+      timer.Stop("GetGradient/itf");
    }
 
+   timer.Start("GetGradient/nlin");
    DenseMatrix *jac_comp;
    for (int m = 0; m < numSub; m++)
    {
@@ -322,11 +359,10 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
       x_comp.MakeRef(const_cast<Vector &>(x), block_offsets[midx], block_offsets[midx+1] - block_offsets[midx]);
 
       // NOTE(kevin): jac_comp is owned by hs[m]. No need of deleting it.
-      timer.Start("Grad_nlin_domain");
       jac_comp = dynamic_cast<DenseMatrix *>(&hs[m]->GetGradient(x_comp));
-      timer.Stop("Grad_nlin_domain");
       jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], *jac_comp);
    }
+   timer.Stop("GetGradient/nlin");
    jac_mono->Finalize();
 
    timer.Stop("GetGradient");

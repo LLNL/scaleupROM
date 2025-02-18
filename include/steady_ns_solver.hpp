@@ -18,6 +18,9 @@ using namespace mfem;
 // Ultimately, we should implement InterfaceForm to pass, not the MultiBlockSolver itself.
 class SteadyNSOperator : public Operator
 {
+private:
+   mutable TimeProfiler timer;
+
 protected:
    bool direct_solve;
 
@@ -117,7 +120,8 @@ public:
 
    virtual ~SteadyNSEQPROM()
    {
-      // timer.Print("SteadyNSEQPROM");
+      if (config.GetOption<bool>("time_profile/SteadyNSEQPROM", false))
+         timer.Print("SteadyNSEQPROM");
    }
 
    virtual void Mult(const Vector &x, Vector &y) const;

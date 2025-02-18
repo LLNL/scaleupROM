@@ -42,7 +42,7 @@ ROMNonlinearForm::~ROMNonlinearForm()
       DeletePointers(bfnfi_sample);
    }
 
-   if (config.GetOption<bool>("time_profile/enabled", false))
+   if (config.GetOption<bool>("time_profile/ROMNonlinearForm", false))
       timer.Print("ROMNonlinearForm");
 }
 
