@@ -21,6 +21,7 @@ file(COPY config/linelast.3dcw_train2.h5 DESTINATION ${CMAKE_BINARY_DIR}/example
 file(COPY config/linelast.3dcw_train3.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY linelast.3dcw_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY linelast.3dcw_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
+file(COPY linelast.octet_truss_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
