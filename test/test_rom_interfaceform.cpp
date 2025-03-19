@@ -356,7 +356,7 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
    /* bases generated from fictitious snapshots */
    DenseMatrix basis1(ndofs1, num_basis1);
    DenseMatrix basis2(ndofs2, num_basis2);
-   const CAROM::Matrix *carom_snapshots1, *carom_snapshots2;
+   std::shared_ptr<const CAROM::Matrix> carom_snapshots1, carom_snapshots2;
    CAROM::BasisGenerator *basis1_generator, *basis2_generator;
    {
       CAROM::Options options(ndofs1, nsnap1, 1, true);
@@ -372,7 +372,7 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
       carom_snapshots1 = basis1_generator->getSnapshotMatrix();
 
       CAROM::BasisReader basis_reader("test_basis1");
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis1);
+      std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis1);
       CAROM::CopyMatrix(*carom_basis, basis1);
    }
    {
@@ -389,7 +389,7 @@ TEST(ROMInterfaceForm, SetupEQPSystem_for_a_port)
       carom_snapshots2 = basis2_generator->getSnapshotMatrix();
 
       CAROM::BasisReader basis_reader("test_basis2");
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis2);
+      std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis2);
       CAROM::CopyMatrix(*carom_basis, basis2);
    }
 
@@ -573,7 +573,7 @@ TEST(ROMInterfaceForm, Precompute)
    /* bases generated from fictitious snapshots */
    DenseMatrix basis1(ndofs1, num_basis1);
    DenseMatrix basis2(ndofs2, num_basis2);
-   const CAROM::Matrix *carom_snapshots1, *carom_snapshots2;
+   std::shared_ptr<const CAROM::Matrix> carom_snapshots1, carom_snapshots2;
    CAROM::BasisGenerator *basis1_generator, *basis2_generator;
    {
       CAROM::Options options(ndofs1, nsnap1, 1, true);
@@ -589,7 +589,7 @@ TEST(ROMInterfaceForm, Precompute)
       carom_snapshots1 = basis1_generator->getSnapshotMatrix();
 
       CAROM::BasisReader basis_reader("test_basis1");
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis1);
+      std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis1);
       CAROM::CopyMatrix(*carom_basis, basis1);
    }
    {
@@ -606,7 +606,7 @@ TEST(ROMInterfaceForm, Precompute)
       carom_snapshots2 = basis2_generator->getSnapshotMatrix();
 
       CAROM::BasisReader basis_reader("test_basis2");
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis2);
+      std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis2);
       CAROM::CopyMatrix(*carom_basis, basis2);
    }
 
@@ -800,7 +800,7 @@ TEST(ROMInterfaceForm, Precompute)
 //       carom_snapshots = basis_generator->getSnapshotMatrix();
 
 //       CAROM::BasisReader basis_reader("test_basis");
-//       const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
+//       std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis);
 //       CAROM::CopyMatrix(*carom_basis, basis);
 //    }
 
