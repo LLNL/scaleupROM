@@ -195,6 +195,8 @@ void left_disp(const Vector &x, double t, Vector &u);
 void up_disp(const Vector &x, double t, Vector &u);
 void down_disp(const Vector &x, double t, Vector &u);
 void right_disp(const Vector &x, double t, Vector &u);
+void in_disp(const Vector &x, double t, Vector &u);
+void out_disp(const Vector &x, double t, Vector &u);
 void body_force(const Vector &x, double t, Vector &u);
 }
 
@@ -491,10 +493,10 @@ public:
    LinElastComponentWiseTrain();
 };
 
-class LinElastComponentWiseTrain3D : public LinElastComponentWiseTrain
+class LinElastComponentWiseTrain3D : public LinElastProblem
 {
 public:
-   LinElastComponentWiseTrain3D();
+LinElastComponentWiseTrain3D();
 };
 
 ParameterizedProblem* InitParameterizedProblem();
