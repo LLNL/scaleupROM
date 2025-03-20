@@ -22,7 +22,12 @@ file(COPY config/linelast.3dcw_train3.h5 DESTINATION ${CMAKE_BINARY_DIR}/example
 file(COPY linelast.3dcw_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY linelast.3dcw_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 file(COPY linelast.octet_truss_comp_train.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
-
+file(COPY config/linelast.octet_truss_train0.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_train1.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_train2.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_train3.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_train4.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_train5.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
