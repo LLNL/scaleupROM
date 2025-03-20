@@ -1770,7 +1770,7 @@ LinElastComponentWiseTrain3D::LinElastComponentWiseTrain3D()
    // z
    battr[5] = 6;
    bdr_type[5] = BoundaryType::NEUMANN;
-   vector_bdr_ptr[2] = &(function_factory::linelast_cwtrain::out_disp);
+   vector_bdr_ptr[5] = &(function_factory::linelast_cwtrain::out_disp);
 
    // None
    battr[6] = 7;
