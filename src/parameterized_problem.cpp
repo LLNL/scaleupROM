@@ -330,6 +330,44 @@ void dirichlet(const Vector &x, Vector &u)
 
 } //namespace linelast_lattice_roof
 
+namespace linelast_octet
+{
+
+double disp_z;
+double force_z;
+double density;
+double g;
+
+void fixed_bc(const Vector &x, Vector &u) // Fixed positions - Global attribute 1
+{
+   u = 0.0;
+}
+
+void disp_z_bc(const Vector &x, Vector &u) // Prescribed vertical displacements - Global attribute 2
+{
+   u = 0.0;
+   u(2) = -disp_z;
+}
+
+void force_z_bc(const Vector &x, Vector &f) // External vertical force - Global attribute 3
+{
+   f = 0.0;
+   f(2) = -force_z;
+}
+
+void fixed_yz_bc(const Vector &x, Vector &u) // Fixed y and z positions - Global attribute 4
+{
+   u(1) = 0.0;
+   u(2) = 0.0;
+}
+
+void gravity_load(const Vector &x, Vector &f) // Gravity load - Global attribute 5
+{
+   f = 0.0;
+   f(2) = -density * g;
+}
+
+}  // namespace linelast_octet
 
 namespace advdiff_problem
 {
@@ -662,6 +700,18 @@ ParameterizedProblem* InitParameterizedProblem()
    else if (problem_name == "advdiff_flow_past_array")
    {
       problem = new AdvDiffFlowPastArray();
+   }
+   else if (problem_name == "linelast_octet_cube")
+   {
+      problem = new LinElastOctetCube();
+   }
+   else if (problem_name == "linelast_octet_beam")
+   {
+      problem = new LinElastOctetBeam();
+   }
+   else if (problem_name == "linelast_octet_top")
+   {
+      problem = new LinElastOctetTop();
    }
    else
    {
@@ -1449,6 +1499,159 @@ LinElastLatticeRoof::LinElastLatticeRoof()
 
    vector_rhs_ptr = &(function_factory::linelast_lattice_roof::gravity_load);
 }
+
+/* 
+   LinElast Octet Truss classes 
+*/
+
+
+LinElastOctetCube::LinElastOctetCube()
+    : LinElastProblem()
+{
+// Applied BCs: 1 fixed end (glob attr 1), prescribed displacements in end point (glob attr 2)
+// Gravity not significant
+bdr_type.SetSize(2);
+battr.SetSize(2);
+vector_bdr_ptr.SetSize(2);
+
+// Fixed end
+battr[0] = 1;
+bdr_type[0] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[0] = &(function_factory::linelast_octet::fixed_bc);
+
+// Prescribed displacements
+battr[1] = 2;
+bdr_type[1] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[1] = &(function_factory::linelast_octet::disp_z_bc);
+
+// Set materials
+general_scalar_ptr.SetSize(2);
+general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+// Default values.
+function_factory::linelast_octet::disp_z = 0.5;
+function_factory::linelast_problem::_lambda = 5.711538461538462;
+function_factory::linelast_problem::_mu = 3.8076923076923075;
+
+param_map["disp_z"] = 0;
+param_map["lambda"] = 1;
+param_map["mu"] = 2;
+
+param_ptr.SetSize(3);
+param_ptr[0] = &(function_factory::linelast_octet::disp_z);
+param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+param_ptr[1] = &(function_factory::linelast_problem::_mu);
+
+general_vector_ptr.SetSize(1);
+general_vector_ptr[0] = NULL;
+};
+
+LinElastOctetBeam::LinElastOctetBeam()
+    : LinElastProblem()
+{
+// Applied BCs: 1 fixed end (glob attr 1), fixed yz in other end (glob attr 4)
+// applied force in middle unit (glob attr 3)
+// Gravity applied
+bdr_type.SetSize(3);
+battr.SetSize(3);
+vector_bdr_ptr.SetSize(3);
+
+// Fixed end
+battr[0] = 1;
+bdr_type[0] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[0] = &(function_factory::linelast_octet::fixed_bc);
+
+// Fixed yz
+battr[1] = 2;
+bdr_type[1] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[1] = &(function_factory::linelast_octet::fixed_yz_bc);
+
+// Applied force
+battr[2] = 3;
+bdr_type[2] = BoundaryType::NEUMANN;
+vector_bdr_ptr[2] = &(function_factory::linelast_octet::force_z_bc);
+
+// Set materials
+general_scalar_ptr.SetSize(2);
+general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+// Default values.
+function_factory::linelast_octet::force_z = 0.05;
+function_factory::linelast_problem::_lambda = 5.711538461538462;
+function_factory::linelast_problem::_mu = 3.8076923076923075;
+function_factory::linelast_octet::density = 9.3 * 1e-4;
+function_factory::linelast_octet::g = 9.81 * 1e-4; 
+
+param_map["force_z"] = 0;
+param_map["lambda"] = 1;
+param_map["mu"] = 2;
+param_map["density"] = 3;
+param_map["g"] = 4;
+
+param_ptr.SetSize(5);
+param_ptr[0] = &(function_factory::linelast_octet::force_z);
+param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+param_ptr[2] = &(function_factory::linelast_problem::_mu);
+param_ptr[3] = &(function_factory::linelast_octet::density);
+param_ptr[4] = &(function_factory::linelast_octet::g);
+
+general_vector_ptr.SetSize(1);
+general_vector_ptr[0] = NULL;
+vector_rhs_ptr = &(function_factory::linelast_octet::gravity_load);
+};
+
+
+LinElastOctetTop::LinElastOctetTop()
+    : LinElastProblem()
+{
+// Applied BCs: 1 fixed end (glob attr 1), applied force in end point (glob attr 3)
+// Gravity applied
+bdr_type.SetSize(2);
+battr.SetSize(2);
+vector_bdr_ptr.SetSize(2);
+
+// Fixed end
+battr[0] = 1;
+bdr_type[0] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[0] = &(function_factory::linelast_octet::fixed_bc);
+
+// Applied force
+battr[1] = 3;
+bdr_type[1] = BoundaryType::NEUMANN;
+vector_bdr_ptr[1] = &(function_factory::linelast_octet::force_z_bc);
+
+// Set materials
+general_scalar_ptr.SetSize(2);
+general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+// Default values.
+function_factory::linelast_octet::force_z = 0.05;
+function_factory::linelast_problem::_lambda = 5.711538461538462;
+function_factory::linelast_problem::_mu = 3.8076923076923075;
+function_factory::linelast_octet::density = 9.3 * 1e-4;
+function_factory::linelast_octet::g = 9.81 * 1e-4; 
+
+param_map["force_z"] = 0;
+param_map["lambda"] = 1;
+param_map["mu"] = 2;
+param_map["density"] = 3;
+param_map["g"] = 4;
+
+param_ptr.SetSize(3);
+param_ptr[0] = &(function_factory::linelast_octet::force_z);
+param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+param_ptr[2] = &(function_factory::linelast_problem::_mu);
+param_ptr[3] = &(function_factory::linelast_octet::density);
+param_ptr[4] = &(function_factory::linelast_octet::g);
+
+general_vector_ptr.SetSize(1);
+general_vector_ptr[0] = NULL;
+
+vector_rhs_ptr = &(function_factory::linelast_octet::gravity_load);
+};
 
 /*
    AdvDiffFlowPastArray

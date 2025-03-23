@@ -121,6 +121,27 @@ extern double rforce_f;
 void tip_force(const Vector &x, double t, Vector &u);
 }
 
+
+namespace linelast_octet
+{
+
+extern double disp_z;
+extern double force_z;
+extern double density;
+extern double g;
+
+void fixed_bc(const Vector &x, Vector &u);
+
+void disp_z_bc(const Vector &x, Vector &u);
+
+void force_z_bc(const Vector &x, Vector &f);
+
+void fixed_yz_bc(const Vector &x, Vector &u);
+
+void gravity_load(const Vector &x, Vector &f);
+
+}  // namespace linelast_octet
+
 namespace linelast_cwtrain
 {
    // Probabilities
@@ -497,6 +518,24 @@ class LinElastComponentWiseTrain3D : public LinElastProblem
 {
 public:
 LinElastComponentWiseTrain3D();
+};
+
+class LinElastOctetCube : public LinElastProblem
+{
+public:
+LinElastOctetCube();
+};
+
+class LinElastOctetBeam : public LinElastProblem
+{
+public:
+LinElastOctetBeam();
+};
+
+class LinElastOctetTop : public LinElastProblem
+{
+public:
+LinElastOctetTop();
 };
 
 ParameterizedProblem* InitParameterizedProblem();
