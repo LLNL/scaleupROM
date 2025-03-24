@@ -28,6 +28,7 @@ file(COPY config/linelast.octet_truss_train2.h5 DESTINATION ${CMAKE_BINARY_DIR}/
 file(COPY config/linelast.octet_truss_train3.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY config/linelast.octet_truss_train4.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY config/linelast.octet_truss_train5.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY linelast.octet_truss_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/beam-tet.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
@@ -43,3 +44,4 @@ file(COPY meshes/3d_col.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/m
 file(COPY meshes/3dcw_joint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/3dcw_beamH.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/3dcw_beamV.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/octet_truss.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
