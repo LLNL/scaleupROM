@@ -1546,11 +1546,11 @@ general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
 // Default values.
 function_factory::linelast_octet::disp_z = 0.5;
-function_factory::linelast_octet::force_z = 0.05;
+function_factory::linelast_octet::force_z = 0.0;
 function_factory::linelast_problem::_lambda = 5.711538461538462;
 function_factory::linelast_problem::_mu = 3.8076923076923075;
-function_factory::linelast_octet::density = 9.3 * 1e-4;
-function_factory::linelast_octet::g = 9.81 * 1e-4; 
+function_factory::linelast_octet::density = 0.0;
+function_factory::linelast_octet::g = 0.0; 
 
 param_map["force_z"] = 0;
 param_map["lambda"] = 1;
@@ -1612,8 +1612,8 @@ general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
 general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
 // Default values.
-function_factory::linelast_octet::disp_z = 0.5;
-function_factory::linelast_octet::force_z = 0.05;
+function_factory::linelast_octet::disp_z = 0.0;
+function_factory::linelast_octet::force_z = 0.005; // 50 N
 function_factory::linelast_problem::_lambda = 5.711538461538462;
 function_factory::linelast_problem::_mu = 3.8076923076923075;
 function_factory::linelast_octet::density = 9.3 * 1e-4;
@@ -1681,7 +1681,7 @@ general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
 // Default values.
 function_factory::linelast_octet::disp_z = 0.5;
-function_factory::linelast_octet::force_z = 0.05;
+function_factory::linelast_octet::force_z = 0.005;
 function_factory::linelast_problem::_lambda = 5.711538461538462;
 function_factory::linelast_problem::_mu = 3.8076923076923075;
 function_factory::linelast_octet::density = 9.3 * 1e-4;

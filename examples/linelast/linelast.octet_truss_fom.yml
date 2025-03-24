@@ -34,7 +34,7 @@ parameterized_problem:
 single_run:
   linelast_octet_cube:
     disp_z: 0.5
-    force_z: 0.050
+    force_z: 0.0050
     density: 9.3e-4
     g: 9.81e-4
     lambda: 5.711538461538462
