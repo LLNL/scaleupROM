@@ -1510,9 +1510,9 @@ LinElastOctetCube::LinElastOctetCube()
 {
 // Applied BCs: 1 fixed end (glob attr 1), prescribed displacements in end point (glob attr 2)
 // Gravity not significant
-bdr_type.SetSize(2);
-battr.SetSize(2);
-vector_bdr_ptr.SetSize(2);
+bdr_type.SetSize(5);
+battr.SetSize(5);
+vector_bdr_ptr.SetSize(5);
 
 // Fixed end
 battr[0] = 1;
@@ -1524,6 +1524,21 @@ battr[1] = 2;
 bdr_type[1] = BoundaryType::DIRICHLET;
 vector_bdr_ptr[1] = &(function_factory::linelast_octet::disp_z_bc);
 
+// Applied force (unused)
+battr[2] = 3;
+bdr_type[2] = BoundaryType::NEUMANN;
+vector_bdr_ptr[2] = NULL;
+
+// Fixed yz (unused)
+battr[3] = 4;
+bdr_type[3] = BoundaryType::NEUMANN;
+vector_bdr_ptr[3] = NULL;
+
+// Unloaded
+battr[4] = 5; 
+bdr_type[4] = BoundaryType::NEUMANN;
+vector_bdr_ptr[4] = NULL;
+
 // Set materials
 general_scalar_ptr.SetSize(2);
 general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
@@ -1531,53 +1546,6 @@ general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
 // Default values.
 function_factory::linelast_octet::disp_z = 0.5;
-function_factory::linelast_problem::_lambda = 5.711538461538462;
-function_factory::linelast_problem::_mu = 3.8076923076923075;
-
-param_map["disp_z"] = 0;
-param_map["lambda"] = 1;
-param_map["mu"] = 2;
-
-param_ptr.SetSize(3);
-param_ptr[0] = &(function_factory::linelast_octet::disp_z);
-param_ptr[1] = &(function_factory::linelast_problem::_lambda);
-param_ptr[1] = &(function_factory::linelast_problem::_mu);
-
-general_vector_ptr.SetSize(1);
-general_vector_ptr[0] = NULL;
-};
-
-LinElastOctetBeam::LinElastOctetBeam()
-    : LinElastProblem()
-{
-// Applied BCs: 1 fixed end (glob attr 1), fixed yz in other end (glob attr 4)
-// applied force in middle unit (glob attr 3)
-// Gravity applied
-bdr_type.SetSize(3);
-battr.SetSize(3);
-vector_bdr_ptr.SetSize(3);
-
-// Fixed end
-battr[0] = 1;
-bdr_type[0] = BoundaryType::DIRICHLET;
-vector_bdr_ptr[0] = &(function_factory::linelast_octet::fixed_bc);
-
-// Fixed yz
-battr[1] = 2;
-bdr_type[1] = BoundaryType::DIRICHLET;
-vector_bdr_ptr[1] = &(function_factory::linelast_octet::fixed_yz_bc);
-
-// Applied force
-battr[2] = 3;
-bdr_type[2] = BoundaryType::NEUMANN;
-vector_bdr_ptr[2] = &(function_factory::linelast_octet::force_z_bc);
-
-// Set materials
-general_scalar_ptr.SetSize(2);
-general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
-general_scalar_ptr[1] = function_factory::linelast_problem::mu;
-
-// Default values.
 function_factory::linelast_octet::force_z = 0.05;
 function_factory::linelast_problem::_lambda = 5.711538461538462;
 function_factory::linelast_problem::_mu = 3.8076923076923075;
@@ -1589,13 +1557,82 @@ param_map["lambda"] = 1;
 param_map["mu"] = 2;
 param_map["density"] = 3;
 param_map["g"] = 4;
+param_map["disp_z"] = 5;
 
-param_ptr.SetSize(5);
+param_ptr.SetSize(6);
 param_ptr[0] = &(function_factory::linelast_octet::force_z);
 param_ptr[1] = &(function_factory::linelast_problem::_lambda);
 param_ptr[2] = &(function_factory::linelast_problem::_mu);
 param_ptr[3] = &(function_factory::linelast_octet::density);
 param_ptr[4] = &(function_factory::linelast_octet::g);
+param_ptr[5] = &(function_factory::linelast_octet::disp_z);
+
+general_vector_ptr.SetSize(1);
+general_vector_ptr[0] = NULL;
+};
+
+LinElastOctetBeam::LinElastOctetBeam()
+    : LinElastProblem()
+{
+// Applied BCs: 1 fixed end (glob attr 1), fixed yz in other end (glob attr 4)
+// applied force in middle unit (glob attr 3)
+// Gravity applied
+bdr_type.SetSize(5);
+battr.SetSize(5);
+vector_bdr_ptr.SetSize(5);
+
+// Fixed end
+battr[0] = 1;
+bdr_type[0] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[0] = &(function_factory::linelast_octet::fixed_bc);
+
+// Prescribed displacements (unused)
+battr[1] = 2;
+bdr_type[1] = BoundaryType::NEUMANN;
+vector_bdr_ptr[1] = NULL;
+
+// Applied force
+battr[2] = 3;
+bdr_type[2] = BoundaryType::NEUMANN;
+vector_bdr_ptr[2] = &(function_factory::linelast_octet::force_z_bc);
+
+// Fixed yz
+battr[3] = 4;
+bdr_type[3] = BoundaryType::DIRICHLET;
+vector_bdr_ptr[3] = &(function_factory::linelast_octet::fixed_yz_bc);
+
+// Unloaded
+battr[4] = 5; 
+bdr_type[4] = BoundaryType::NEUMANN;
+vector_bdr_ptr[4] = NULL;
+
+// Set materials
+general_scalar_ptr.SetSize(2);
+general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
+general_scalar_ptr[1] = function_factory::linelast_problem::mu;
+
+// Default values.
+function_factory::linelast_octet::disp_z = 0.5;
+function_factory::linelast_octet::force_z = 0.05;
+function_factory::linelast_problem::_lambda = 5.711538461538462;
+function_factory::linelast_problem::_mu = 3.8076923076923075;
+function_factory::linelast_octet::density = 9.3 * 1e-4;
+function_factory::linelast_octet::g = 9.81 * 1e-4; 
+
+param_map["force_z"] = 0;
+param_map["lambda"] = 1;
+param_map["mu"] = 2;
+param_map["density"] = 3;
+param_map["g"] = 4;
+param_map["disp_z"] = 5;
+
+param_ptr.SetSize(6);
+param_ptr[0] = &(function_factory::linelast_octet::force_z);
+param_ptr[1] = &(function_factory::linelast_problem::_lambda);
+param_ptr[2] = &(function_factory::linelast_problem::_mu);
+param_ptr[3] = &(function_factory::linelast_octet::density);
+param_ptr[4] = &(function_factory::linelast_octet::g);
+param_ptr[5] = &(function_factory::linelast_octet::disp_z);
 
 general_vector_ptr.SetSize(1);
 general_vector_ptr[0] = NULL;
@@ -1608,19 +1645,34 @@ LinElastOctetTop::LinElastOctetTop()
 {
 // Applied BCs: 1 fixed end (glob attr 1), applied force in end point (glob attr 3)
 // Gravity applied
-bdr_type.SetSize(2);
-battr.SetSize(2);
-vector_bdr_ptr.SetSize(2);
+bdr_type.SetSize(5);
+battr.SetSize(5);
+vector_bdr_ptr.SetSize(5);
 
 // Fixed end
 battr[0] = 1;
 bdr_type[0] = BoundaryType::DIRICHLET;
 vector_bdr_ptr[0] = &(function_factory::linelast_octet::fixed_bc);
 
-// Applied force
-battr[1] = 3;
+// Prescribed displacements (unused)
+battr[1] = 2;
 bdr_type[1] = BoundaryType::NEUMANN;
-vector_bdr_ptr[1] = &(function_factory::linelast_octet::force_z_bc);
+vector_bdr_ptr[1] = NULL;
+
+// Applied force
+battr[2] = 3;
+bdr_type[2] = BoundaryType::NEUMANN;
+vector_bdr_ptr[2] = &(function_factory::linelast_octet::force_z_bc);
+
+// Fixed yz (unused)
+battr[3] = 4;
+bdr_type[3] = BoundaryType::NEUMANN;
+vector_bdr_ptr[3] = NULL;
+
+// Unloaded
+battr[4] = 5; 
+bdr_type[4] = BoundaryType::NEUMANN;
+vector_bdr_ptr[4] = NULL;
 
 // Set materials
 general_scalar_ptr.SetSize(2);
@@ -1628,6 +1680,7 @@ general_scalar_ptr[0] = function_factory::linelast_problem::lambda;
 general_scalar_ptr[1] = function_factory::linelast_problem::mu;
 
 // Default values.
+function_factory::linelast_octet::disp_z = 0.5;
 function_factory::linelast_octet::force_z = 0.05;
 function_factory::linelast_problem::_lambda = 5.711538461538462;
 function_factory::linelast_problem::_mu = 3.8076923076923075;
@@ -1639,13 +1692,15 @@ param_map["lambda"] = 1;
 param_map["mu"] = 2;
 param_map["density"] = 3;
 param_map["g"] = 4;
+param_map["disp_z"] = 5;
 
-param_ptr.SetSize(3);
+param_ptr.SetSize(6);
 param_ptr[0] = &(function_factory::linelast_octet::force_z);
 param_ptr[1] = &(function_factory::linelast_problem::_lambda);
 param_ptr[2] = &(function_factory::linelast_problem::_mu);
 param_ptr[3] = &(function_factory::linelast_octet::density);
 param_ptr[4] = &(function_factory::linelast_octet::g);
+param_ptr[5] = &(function_factory::linelast_octet::disp_z);
 
 general_vector_ptr.SetSize(1);
 general_vector_ptr[0] = NULL;

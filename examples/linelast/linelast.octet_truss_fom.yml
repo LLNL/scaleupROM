@@ -1,0 +1,67 @@
+main:
+  mode: single_run
+  use_rom: true
+  solver: linelast
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "config/linelast.octet_truss_cube.h5"
+    components:
+      - name: "octet_truss_unitcell"
+        file: "meshes/octet_truss.mesh"
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: octet_output
+
+parameterized_problem:
+  name: linelast_octet_cube
+
+single_run:
+  linelast_octet_cube:
+    disp_z: 0.5
+    force_z: 0.050
+    density: 9.3e-4
+    g: 9.81e-4
+    lambda: 5.711538461538462
+    mu: 3.8076923076923075
+
+basis:
+  prefix: "linelast_cwtrain3d"
+  number_of_basis: 16
+  tags:
+    - name: "octet_truss_unitcell"
+      number_of_basis: 16
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_octet_truss_snapshot%01d"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  subdomain_training: universal
+  linear_solver_type: direct
+  save_operator:
+    level: component
+    prefix: "linelast3d_cw.rom_elem"
+  compare_solution:
+    enabled: true
