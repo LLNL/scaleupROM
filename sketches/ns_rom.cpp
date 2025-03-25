@@ -1038,7 +1038,7 @@ int main(int argc, char *argv[])
       p_snapshot_generator.writeSnapshot();
 
       snapshot_generator.endSamples();
-      const CAROM::Vector *rom_sv = snapshot_generator.getSingularValues();
+      std::shared_ptr<const CAROM::Vector> rom_sv = snapshot_generator.getSingularValues();
       printf("Singular values: ");
       for (int d = 0; d < rom_sv->dim(); d++)
          printf("%.3E\t", rom_sv->item(d));
@@ -1101,7 +1101,7 @@ int main(int argc, char *argv[])
 
       DenseMatrix basis;
       CAROM::BasisReader basis_reader(filename);
-      const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
+      std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis);
       CAROM::CopyMatrix(*carom_basis, basis);
 
       const int fom_vdofs = oper.Height();
@@ -1243,7 +1243,7 @@ int main(int argc, char *argv[])
             CAROM::Options option(fom_vdofs, nsample, 1, false);
             CAROM::BasisGenerator snapshot_reader(option, false, filename);
             snapshot_reader.loadSamples(filename + "_snapshot", "snapshot");
-            const CAROM::Matrix *snapshots = snapshot_reader.getSnapshotMatrix();
+            std::shared_ptr<const CAROM::Matrix> snapshots = snapshot_reader.getSnapshotMatrix();
             DenseMatrix wgted_snapshots;
             CAROM::CopyMatrix(*snapshots, wgted_snapshots);
             for (int i = ufes->GetTrueVSize(); i < wgted_snapshots.NumRows(); i++)
@@ -1255,7 +1255,7 @@ int main(int argc, char *argv[])
                basis_generator.takeSample(wgted_snapshots.GetColumn(j));
             basis_generator.endSamples();
 
-            const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
+            std::shared_ptr<const CAROM::Matrix> carom_basis = basis_generator.getSpatialBasis();
             CAROM::CopyMatrix(*carom_basis, basis);
             for (int i = ufes->GetTrueVSize(); i < basis.NumRows(); i++)
                for (int j = 0; j < basis.NumCols(); j++)
@@ -1283,7 +1283,7 @@ int main(int argc, char *argv[])
       else
       {
          CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_basis, basis);
       }
 
@@ -1311,7 +1311,7 @@ int main(int argc, char *argv[])
       {
          DenseMatrix ubasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
 
          DenseTensor *nlin_rom = oper.GetReducedTensor(ubasis, ubasis);
@@ -1337,8 +1337,8 @@ int main(int argc, char *argv[])
          DenseMatrix ubasis, pbasis;
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
+         std::shared_ptr<const CAROM::Matrix> carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1421,7 +1421,7 @@ int main(int argc, char *argv[])
          // std::string snapshot_filename = filename + "_snapshot";
          snapshot_generator.loadSamples(filename + "_snapshot", "snapshot");
          // TODO: what happen if we do not deep-copy?
-         const CAROM::Matrix *snapshots = snapshot_generator.getSnapshotMatrix();
+         std::shared_ptr<const CAROM::Matrix> snapshots = snapshot_generator.getSnapshotMatrix();
 
          DenseMatrix u_basis;
          u_basis.CopyRows(basis, 0, ufes->GetTrueVSize() - 1); // indexes are inclusive.
@@ -1534,8 +1534,8 @@ int main(int argc, char *argv[])
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
+         std::shared_ptr<const CAROM::Matrix> carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1552,7 +1552,7 @@ int main(int argc, char *argv[])
       else if (rom_mode == RomMode::TENSOR3)
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
 
          basis.SetSize(ubasis.NumRows() + pdim, ubasis.NumCols());
@@ -1581,7 +1581,7 @@ int main(int argc, char *argv[])
          }
 
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
+         std::shared_ptr<const CAROM::Matrix> carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
          basis.SetSize(ubasis.NumRows() + pbasis.NumRows(), ubasis.NumCols() + pbasis.NumCols());
@@ -1598,8 +1598,8 @@ int main(int argc, char *argv[])
       {
          CAROM::BasisReader ubasis_reader(filename + "_vel");
          CAROM::BasisReader pbasis_reader(filename + "_pres");
-         const CAROM::Matrix *carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
-         const CAROM::Matrix *carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
+         std::shared_ptr<const CAROM::Matrix> carom_ubasis = ubasis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_pbasis = pbasis_reader.getSpatialBasis(num_pbasis);
          CAROM::CopyMatrix(*carom_ubasis, ubasis);
          CAROM::CopyMatrix(*carom_pbasis, pbasis);
 
@@ -1645,7 +1645,7 @@ int main(int argc, char *argv[])
       else
       {
          CAROM::BasisReader basis_reader(filename);
-         const CAROM::Matrix *carom_basis = basis_reader.getSpatialBasis(num_basis);
+         std::shared_ptr<const CAROM::Matrix> carom_basis = basis_reader.getSpatialBasis(num_basis);
          CAROM::CopyMatrix(*carom_basis, basis);
       }
 

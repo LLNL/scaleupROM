@@ -115,7 +115,7 @@ public:
    void AddSnapshotGenerator(const int &fom_vdofs, const std::string &prefix, const BasisTag &basis_tag);
    void WriteSnapshots();
    void WriteSnapshotPorts();
-   const CAROM::Matrix* LookUpSnapshot(const BasisTag &basis_tag);
+   std::shared_ptr<const CAROM::Matrix> LookUpSnapshot(const BasisTag &basis_tag);
    Array2D<int>* LookUpSnapshotPortColOffsets(const PortTag &port_tag);
 
    void ReportStatus(const int &sample_idx);

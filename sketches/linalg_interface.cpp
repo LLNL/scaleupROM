@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
    }
 
    // librom snapshot matrix.
-   const CAROM::Matrix *carom_mat = generator->getSnapshotMatrix();
+   std::shared_ptr<const CAROM::Matrix> carom_mat = generator->getSnapshotMatrix();
    printf("carom_mat (%d x %d)\n", carom_mat->numRows(), carom_mat->numColumns());
    for (int i = 0; i < carom_mat->numRows(); i++)
    {
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
    printf("\n");
 
    // librom pod basis.
-   const CAROM::Matrix *basis = generator->getSpatialBasis();
+   std::shared_ptr<const CAROM::Matrix> basis = generator->getSpatialBasis();
    printf("basis (%d x %d)\n", basis->numRows(), basis->numColumns());
    for (int i = 0; i < basis->numRows(); i++)
    {
@@ -73,14 +73,14 @@ int main(int argc, char *argv[])
    printf("\n");
 
    // librom singular value;
-   const CAROM::Vector *sv = generator->getSingularValues();
+   std::shared_ptr<const CAROM::Vector> sv = generator->getSingularValues();
    printf("singular values (%d)\n", sv->dim());
    for (int i = 0; i < sv->dim(); i++)
       printf("%.3E\t", sv->item(i));
    printf("\n\n");
 
    // librom right singular vector.
-   const CAROM::Matrix *right_basis = generator->getTemporalBasis();
+   std::shared_ptr<const CAROM::Matrix> right_basis = generator->getTemporalBasis();
    printf("right_basis (%d x %d)\n", right_basis->numRows(), right_basis->numColumns());
    for (int i = 0; i < right_basis->numRows(); i++)
    {
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
    CAROM::Matrix carom_lmat_inv(lmat_inv.GetData(), fes->GetTrueVSize(), fes->GetTrueVSize(), false, false);
    // for linear algebra, need an undistributed proxy.
    CAROM::Matrix basis_tmp(basis->getData(), basis->numRows(), basis->numColumns(), false, false);
-   CAROM::Matrix *tmp_basis = carom_lmat_inv.mult(basis_tmp);
+   std::unique_ptr<CAROM::Matrix> tmp_basis = carom_lmat_inv.mult(basis_tmp);
    // for linear algebra, need a distributed proxy.
    CAROM::Matrix transformed_basis(tmp_basis->getData(), tmp_basis->numRows(), tmp_basis->numColumns(), true, false);
 

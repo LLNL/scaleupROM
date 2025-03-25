@@ -14,8 +14,8 @@ mesh:
         file: "meshes/square-circle.mesh"
       - name: "square-square"
         file: "meshes/square-square.mesh"
-      - name: "square-triangle"
-        file: "meshes/square-triangle.mesh"
+      # - name: "square-triangle"
+      #   file: "meshes/square-triangle.mesh"
       - name: "square-star"
         file: "meshes/square-star.mesh"
 

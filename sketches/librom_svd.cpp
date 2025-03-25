@@ -41,13 +41,13 @@ int main(int argc, char *argv[])
       // basis_generator->writeSnapshot();
 
       basis_generator->endSamples();
-      const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+      std::shared_ptr<const CAROM::Vector> rom_sv = basis_generator->getSingularValues();
       printf("Singular values: ");
       for (int d = 0; d < rom_sv->dim(); d++)
          printf("%.3f\t", rom_sv->item(d));
       printf("\n");
 
-      const CAROM::Matrix* spatialbasis;
+      std::shared_ptr<const CAROM::Matrix> spatialbasis;
       spatialbasis = basis_generator->getSpatialBasis();
       printf("Basis.\n");
       for (int i = 0; i < spatialbasis->numRows(); i++) {
