@@ -28,6 +28,12 @@ file(COPY config/linelast.octet_truss_train2.h5 DESTINATION ${CMAKE_BINARY_DIR}/
 file(COPY config/linelast.octet_truss_train3.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY config/linelast.octet_truss_train4.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY config/linelast.octet_truss_train5.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_cube.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_beam1.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_beam2.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_beam3.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_beam4.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
+file(COPY config/linelast.octet_truss_top.h5 DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/config)
 file(COPY linelast.octet_truss_fom.yml DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast)
 
 file(COPY meshes/beam-tri.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
