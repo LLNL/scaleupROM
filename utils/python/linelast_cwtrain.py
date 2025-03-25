@@ -218,9 +218,9 @@ def get_nrs(txts, split_txt = 'comparison'):
 def get_sorted_nrs(txts, split_txt = 'comparison'):
     return sorted(zip(get_nrs(txts, split_txt),txts))
 
-def basis_scaling_plot(prefix, plot_path, result_path = "basis_scaling"):
+def basis_scaling_plot(prefix, plot_path):
     cwd = os.getcwd()
-    abs_scaling_folder = os.path.join(cwd,result_path)
+    abs_scaling_folder = os.path.join(cwd,prefix)
     os.chdir(abs_scaling_folder)
     txts = os.listdir()
     samples = [i for i,_ in get_sorted_nrs(txts, split_txt = 'comparison')]
