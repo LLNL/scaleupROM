@@ -68,6 +68,7 @@ SampleGenerator::SampleGenerator(MPI_Comm comm)
    // BasisGenerator options.
    update_right_SV = config.GetOption<bool>("basis/svd/update_right_sv", false);
    save_sv = config.GetOption<bool>("basis/svd/save_spectrum", false);
+   square_sv = config.GetOption<bool>("basis/svd/square_sv", true);
 }
 
 SampleGenerator::~SampleGenerator()
@@ -573,7 +574,8 @@ void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::
    for (int d = 0; d < rom_sv->dim(); d++)
    {
       if (d == ref_num_basis) coverage = total;
-      total += rom_sv->item(d);
+      const double s = rom_sv->item(d);
+      total += square_sv ? s * s : s;
    }
    if (rom_sv->dim() == ref_num_basis) coverage = total;
    coverage /= total;
