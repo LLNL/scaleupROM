@@ -130,15 +130,15 @@ extern double force_z;
 extern double density;
 extern double g;
 
-void fixed_bc(const Vector &x, Vector &u);
+void fixed_bc(const Vector &x, double t, Vector &u);
 
-void disp_z_bc(const Vector &x, Vector &u);
+void disp_z_bc(const Vector &x, double t, Vector &u);
 
-void force_z_bc(const Vector &x, Vector &f);
+void force_z_bc(const Vector &x, double t, Vector &f);
 
-void fixed_yz_bc(const Vector &x, Vector &u);
+void fixed_yz_bc(const Vector &x, double t, Vector &u);
 
-void gravity_load(const Vector &x, Vector &f);
+void gravity_load(const Vector &x, double t, Vector &f);
 
 }  // namespace linelast_octet
 
@@ -242,13 +242,13 @@ extern double qpoint_f;
 extern double density;
 extern double g;
 
-void snow_load(const Vector &x, Vector &f);
+void snow_load(const Vector &x, double t, Vector &f);
 
-void gravity_load(const Vector &x, Vector &f);
+void gravity_load(const Vector &x, double t, Vector &f);
 
-void point_load(const Vector &x, Vector &f);
+void point_load(const Vector &x, double t, Vector &f);
 
-void dirichlet(const Vector &x, Vector &u);
+void dirichlet(const Vector &x, double t, Vector &u);
 
 }
 

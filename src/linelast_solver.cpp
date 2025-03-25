@@ -467,14 +467,15 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    mu_c = NULL;
 
    Vector _x(1);
+   double _t = 0.0;
 
    for (size_t i = 0; i < numSub; i++)
    {
-      double lambda_i = (problem->general_scalar_ptr[0])(_x);
+      double lambda_i = (problem->general_scalar_ptr[0])(_x,_t);
       lambda = lambda_i;
       lambda_c[i] = new ConstantCoefficient(lambda_i);
 
-      double mu_i = (problem->general_scalar_ptr[1])(_x);
+      double mu_i = (problem->general_scalar_ptr[1])(_x,_t);
       mu = mu_i;
       mu_c[i] = new ConstantCoefficient(mu_i);
  

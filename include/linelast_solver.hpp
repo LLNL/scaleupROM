@@ -40,8 +40,8 @@ protected:
    Array<BilinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
-   Array<Coefficient *> lambda_c;
-   Array<Coefficient *> mu_c;
+   Array<ConstantCoefficient *> lambda_c;
+   Array<ConstantCoefficient *> mu_c;
    Array<VectorCoefficient *> bdr_coeffs;
    Array<VectorCoefficient *> rhs_coeffs;
 

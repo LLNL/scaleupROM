@@ -305,25 +305,25 @@ double qpoint_f;
 double density;
 double g;
 
-void gravity_load(const Vector &x, Vector &f)
+void gravity_load(const Vector &x, double t, Vector &f)
 {
    f = 0.0;
    f(f.Size()-1) = -density * g;
 }
 
-void snow_load(const Vector &x, Vector &f)
+void snow_load(const Vector &x, double t, Vector &f)
 {
    f = 0.0;
    f(f.Size()-1) = qsnow_f;
 }
 
-void point_load(const Vector &x, Vector &f)
+void point_load(const Vector &x, double t, Vector &f)
 {
    f = 0.0;
    f(f.Size()-1) = qpoint_f;
 }
 
-void dirichlet(const Vector &x, Vector &u)
+void dirichlet(const Vector &x, double t, Vector &u)
 {
    u = 0.0;
 }
@@ -338,30 +338,30 @@ double force_z;
 double density;
 double g;
 
-void fixed_bc(const Vector &x, Vector &u) // Fixed positions - Global attribute 1
+void fixed_bc(const Vector &x, double t, Vector &u) // Fixed positions - Global attribute 1
 {
    u = 0.0;
 }
 
-void disp_z_bc(const Vector &x, Vector &u) // Prescribed vertical displacements - Global attribute 2
+void disp_z_bc(const Vector &x, double t, Vector &u) // Prescribed vertical displacements - Global attribute 2
 {
    u = 0.0;
    u(2) = -disp_z;
 }
 
-void force_z_bc(const Vector &x, Vector &f) // External vertical force - Global attribute 3
+void force_z_bc(const Vector &x, double t, Vector &f) // External vertical force - Global attribute 3
 {
    f = 0.0;
    f(2) = -force_z;
 }
 
-void fixed_yz_bc(const Vector &x, Vector &u) // Fixed y and z positions - Global attribute 4
+void fixed_yz_bc(const Vector &x, double t, Vector &u) // Fixed y and z positions - Global attribute 4
 {
    u(1) = 0.0;
    u(2) = 0.0;
 }
 
-void gravity_load(const Vector &x, Vector &f) // Gravity load - Global attribute 5
+void gravity_load(const Vector &x, double t, Vector &f) // Gravity load - Global attribute 5
 {
    f = 0.0;
    f(2) = -density * g;
@@ -527,7 +527,7 @@ void down_disp(const Vector &x, double t, Vector &u)
          u(2) = d_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
-void in_disp(const Vector &x, Vector &u)
+void in_disp(const Vector &x, double t, Vector &u)
 {
    if (ix >= 0.5)
       u(0) = i_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
@@ -538,7 +538,7 @@ void in_disp(const Vector &x, Vector &u)
          u(2) = i_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
-void out_disp(const Vector &x, Vector &u)
+void out_disp(const Vector &x, double t, Vector &u)
 {
    if (ox >= 0.5)
       u(0) = o_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
