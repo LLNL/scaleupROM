@@ -234,14 +234,14 @@ def get_svs(filename):
             return [float(line.strip()) for line in file]
 
 def sv_plot(jointname, h_name, v_name, legend_names, plt_name = "sv_plot.png"):
-    svs_j = get_svs(jointname)
-    svs_b = get_svs(h_name)
-    svs_c = get_svs(v_name)
-
     plt.rc('axes', labelsize=18)
+    svs_j = get_svs(jointname)
     plt.plot(range(len(svs_j)), svs_j, label=legend_names[0])
-    plt.plot(range(len(svs_b)), svs_b, label=legend_names[1])
-    plt.plot(range(len(svs_c)), svs_c, label=legend_names[2])
+    if len(legend_names) > 1:
+        svs_b = get_svs(h_name)
+        svs_c = get_svs(v_name)
+        plt.plot(range(len(svs_b)), svs_b, label=legend_names[1])
+        plt.plot(range(len(svs_c)), svs_c, label=legend_names[2])
     plt.xscale('log')
     plt.xlabel('$n$')
     plt.ylabel('$\sigma$')
@@ -277,16 +277,22 @@ if __name__ == "__main__":
             v_name = sys.argv[5]
             legend_type = sys.argv[6]
 
-            if legend_type == 'A':
-                legend_names = ["Joint", "Beam", "Column"]
+            if legend_type == 'B':
+                legend_names = ["Unit Cell"]
+                jointname_file = prefix + "_" + jointname + "_sv.txt"
+
+                sv_plot(jointname_file, "", "", legend_names)     
             else:
-                legend_names = ["Joint", "Beam, X", "Beam, Y"]
+                if legend_type == 'A':
+                    legend_names = ["Joint", "Beam", "Column"]
+                else:
+                    legend_names = ["Joint", "Beam, X", "Beam, Y"]
 
-            jointname_file = prefix + "_" + jointname + "_sv.txt"
-            h_name_file = prefix + "_" + h_name + "_sv.txt"
-            v_name_file = prefix + "_" + v_name + "_sv.txt"
+                jointname_file = prefix + "_" + jointname + "_sv.txt"
+                h_name_file = prefix + "_" + h_name + "_sv.txt"
+                v_name_file = prefix + "_" + v_name + "_sv.txt"
 
-            sv_plot(jointname_file, h_name_file, v_name_file, legend_names)        
+                sv_plot(jointname_file, h_name_file, v_name_file, legend_names)        
         elif name == "cwtrain_mesh":
             prefix = sys.argv[2]
             create_training_meshes(prefix)
