@@ -51,6 +51,53 @@ struct TopologyData {
    Array<int> *global_bdr_attributes = NULL;
 };
 
+struct DofTag
+{
+   Array<int> battr;
+
+   DofTag(const Array<int> &battrs)
+      : battr(battrs)
+   { battr.Sort(); }
+
+   bool operator==(const DofTag &dtag) const
+   {
+      if (battr.Size() != dtag.battr.Size())
+         return false;
+
+      for (int k = 0; k < battr.Size(); k++)
+         if (battr[k] != dtag.battr[k])
+            return false;
+
+      return true;
+   }
+
+   bool operator<(const DofTag &dtag) const
+   {
+      if (battr.Size() == dtag.battr.Size())
+      {
+         for (int k = 0; k < battr.Size(); k++)
+            if (battr[k] != dtag.battr[k])
+               return (battr[k] < dtag.battr[k]);
+         
+         return false;
+      }
+      else
+         return (battr.Size() < dtag.battr.Size());
+   }
+
+   std::string print() const
+   {
+      std::string tag = "(";
+      for (int k = 0 ; k < battr.Size(); k++)
+      {
+         tag += std::to_string(battr[k]) + ",";
+      }
+      tag += ")";
+      
+      return tag;
+   }
+};
+
 const TopologyHandlerMode SetTopologyHandlerMode();
 
 class TopologyHandler
@@ -97,6 +144,8 @@ public:
    Array<InterfaceInfo>* const GetInterfaceInfos(const int &k) { return interface_infos[k]; }
    virtual Mesh* GetMesh(const int k) = 0;
    virtual Mesh* GetGlobalMesh() = 0;
+
+   std::map<DofTag, Array<int>> SplitBoundaryDofs(Mesh* const mesh, const FiniteElementSpace *fes) const;
 
    /*
       Methods only for ComponentTopologyHandler 

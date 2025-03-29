@@ -50,6 +50,56 @@ TopologyHandler::TopologyHandler(const TopologyHandlerMode &input_type)
    }
 }
 
+std::map<DofTag, Array<int>> TopologyHandler::SplitBoundaryDofs(
+   Mesh* const mesh, const FiniteElementSpace *fes) const
+{
+   std::map<DofTag, Array<int>> battr2dofs;
+
+   // get max boundary attribute.
+   int max_battr = -1;
+   for (int i = 0; i < fes->GetNBE(); i++)
+      max_battr = max(max_battr, mesh->GetBdrAttribute(i));
+
+   // 2d array to store boundary attributes that each dof belongs to.
+   Array2D<int> dof_battr(fes->GetVSize(), max_battr);
+   dof_battr = 0;
+
+   Array<int> vdofs;
+   FaceElementTransformations *tr;
+   for (int i = 0; i < fes->GetNBE(); i++)
+   {
+      const int bdr_attr = mesh->GetBdrAttribute(i);
+
+      tr = mesh->GetBdrFaceTransformations(i);
+      if (tr != NULL)
+      {
+         fes->GetElementVDofs(tr->Elem1No, vdofs);
+         for (int k = 0 ; k < vdofs.Size(); k++)
+            dof_battr(vdofs[k], bdr_attr-1) = 1;
+      }
+   }
+
+   for (int k = 0; k < fes->GetVSize(); k++)
+   {
+      Array<int> battrs(0);
+      for (int d = 0; d < max_battr; d++)
+      {
+         if (dof_battr(k, d) > 0)
+         // boundary attribute starts from 1.
+            battrs.Append(d+1);
+      }
+      battrs.Sort();
+
+      DofTag pdtag(battrs);
+      if (!battr2dofs.count(pdtag))
+         battr2dofs[pdtag] = Array<int>(0);
+
+      battr2dofs[pdtag].Append(k);
+   }
+
+   return battr2dofs;
+}
+
 void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
                                                    FaceElementTransformations* &tr1,
                                                    FaceElementTransformations* &tr2)
