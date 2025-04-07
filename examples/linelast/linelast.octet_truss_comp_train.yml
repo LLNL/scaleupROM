@@ -200,112 +200,112 @@ sample_generation:
       maximum: 1.0
     - key: single_run/linelast_cwtrain3d/r_fx
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/r_fy
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/r_fz
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/u_fx
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/u_fy
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/u_fz
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/d_fx
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/d_fy
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/d_fz
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/i_fx
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/i_fy
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/i_fz
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/o_fx
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/o_fy
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/o_fz
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/b_fx
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/b_fy
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/b_fz
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/xu_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/yu_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/zu_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/xf_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/yf_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/zf_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/bxf_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/byf_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/bzf_amp
       type: double
-      minimum: -0.1
-      maximum: 0.1
+      minimum: -1.0
+      maximum: 1.0
     - key: single_run/linelast_cwtrain3d/xu_freq
       type: double
       minimum: 0.1
