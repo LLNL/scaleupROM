@@ -303,6 +303,47 @@ void LinElastSolver::AssembleInterfaceMatrices()
    a_itf->AssembleInterfaceMatrices(mats);
 }
 
+void LinElastSolver::SolveROM()
+{
+   // View vector for U.
+   BlockVector *U_domain = NULL;
+   if (separate_variable_basis)
+      U_domain = new BlockVector(U->GetData(), var_offsets); 
+   else
+      U_domain = new BlockVector(U->GetData(), domain_offsets);
+   
+   rom_handler->Solve(U_domain);
+   if (scale_output)
+   {
+      cout<<"previous norm is: "<<U->Norml2()<<endl;
+      *U *= fnorm;
+      *RHS *= fnorm;
+      cout<<"ROM output is scaled with norm: "<<fnorm<<", new norm is: "<<U->Norml2()<<endl;
+   }   
+}
+
+void LinElastSolver::ProjectRHSOnReducedBasis()
+{
+   scale_output = config.GetOption<bool>("solver/scale_output_ROM", false);
+   fnorm = RHS->Norml2();
+   if (scale_output)
+   {
+      *RHS /= fnorm;
+      cout<<"ROM input is scaled with norm: "<<fnorm<<", new norm is: "<<RHS->Norml2()<<endl;
+
+   }  
+   // View vector for RHS.
+   BlockVector *RHS_domain = NULL;
+   if (separate_variable_basis)
+      RHS_domain = new BlockVector(RHS->GetData(), var_offsets); 
+   else
+      RHS_domain = new BlockVector(RHS->GetData(), domain_offsets);
+      
+   rom_handler->ProjectRHSOnReducedBasis(RHS_domain);
+
+   delete RHS_domain;
+}
+
 bool LinElastSolver::Solve(SampleGenerator *sample_generator)
 {
    // If using direct solver, returns always true.
@@ -315,16 +356,17 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
-   bool scale_output = config.GetOption<bool>("solver/scale_output", false);
-   bool scale_input = config.GetOption<bool>("solver/scale_input", false);
+   scale_output = config.GetOption<bool>("solver/scale_output_FOM", false);
+   bool scale_input = config.GetOption<bool>("solver/scale_input_FOM", false);
 
    if (scale_output == true)
    {scale_input = true;}
 
-   double fnorm = RHS->Norml2();
+   fnorm = RHS->Norml2();
    if (scale_input)
    {
       *RHS /= fnorm;
+      cout<<"FOM input is scaled with norm: "<<fnorm<<", new norm is: "<<RHS->Norml2()<<endl;
    }   
 
    // TODO: need to change when the actual parallelization is implemented.
@@ -395,8 +437,9 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
 
    if (scale_output)
    {
-      cout<<"output is scaled"<<endl;
+      cout<<"FOM output is scaled with norm: "<<fnorm<<endl;
       *U *= fnorm;
+      *RHS *= fnorm;
    }   
 
    if (std::isnan(U->Norml2()) || U->Norml2() > 1e16) // Check for NaN or divergent solutions

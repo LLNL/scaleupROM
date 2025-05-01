@@ -56,6 +56,10 @@ protected:
    // Initial positions
    VectorCoefficient *init_x = NULL;
 
+   // For unitizing load vector
+   bool scale_output = false;
+   double fnorm;
+
 public:
    LinElastSolver();
 
@@ -82,6 +86,8 @@ public:
    virtual void AssembleInterfaceMatrices();
 
    bool Solve(SampleGenerator *sample_generator = NULL) override;
+   virtual void SolveROM() override;
+   virtual void ProjectRHSOnReducedBasis() override;
 
    virtual void SetupBCVariables() override;
    virtual void SetupIC(std::function<void(const Vector &, double, Vector &)> F);
