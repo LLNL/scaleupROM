@@ -315,6 +315,17 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
+   bool scale_output = config.GetOption<bool>("solver/scale_output", false);
+   bool scale_input = config.GetOption<bool>("solver/scale_input", false);
+
+   if (scale_output == true)
+   {scale_input = true;}
+
+   double fnorm = RHS->Norml2();
+   if (scale_input)
+   {
+      *RHS /= fnorm;
+   }   
 
    // TODO: need to change when the actual parallelization is implemented.
    cout << "direct_solve is: " << direct_solve << endl;
@@ -381,6 +392,12 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
       }
       delete solver;
    }
+
+   if (scale_output)
+   {
+      cout<<"output is scaled"<<endl;
+      *U *= fnorm;
+   }   
 
    if (std::isnan(U->Norml2()) || U->Norml2() > 1e16) // Check for NaN or divergent solutions
    {
