@@ -188,15 +188,15 @@ sample_generation:
       maximum: 1.0
     - key: single_run/linelast_cwtrain3d/l_ux
       type: double
-      minimum: 0.0
+      minimum: -1.0
       maximum: 1.0
     - key: single_run/linelast_cwtrain3d/l_uy
       type: double
-      minimum: 0.0
+      minimum: -1.0
       maximum: 1.0
     - key: single_run/linelast_cwtrain3d/l_uz
       type: double
-      minimum: 0.0
+      minimum: -1.0
       maximum: 1.0
     - key: single_run/linelast_cwtrain3d/r_fx
       type: double
