@@ -483,81 +483,81 @@ double perturb_func(const double x, const double amp, const double freq, const d
 
 void left_disp(const Vector &x, double t, Vector &u)
 {
-   if (lx >= 0.5)
-      u(0) = l_ux + perturb_func(x(0), xu_amp, xu_freq, xu_offset);
-   if (ly >= 0.5)
-      u(1) = l_uy + perturb_func(x(1), yu_amp, yu_freq, yu_offset);
+   if (lx >= 0.0)
+      u(0) = l_ux; //+ perturb_func(x(0), xu_amp, xu_freq, xu_offset);
+   if (ly >= 0.0)
+      u(1) = l_uy; //+ perturb_func(x(1), yu_amp, yu_freq, yu_offset);
    if (x.Size() == 3)
-      if (lz >= 0.5)
-         u(2) = l_uz + perturb_func(x(2), zu_amp, zu_freq, zu_offset);
+      if (lz >= 0.0)
+         u(2) = l_uz; //+ perturb_func(x(2), zu_amp, zu_freq, zu_offset);
 
    
 }
 
 void right_disp(const Vector &x, double t, Vector &u)
 {
-   if (rx >= 0.5)
-      u(0) = r_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
-   if (ry >= 0.5)
-      u(1) = r_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+   if (rx >= 0.0)
+      u(0) = r_fx; //+ perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+   if (ry >= 0.0)
+      u(1) = r_fy; //+ perturb_func(x(1), yf_amp, yf_freq, yf_offset);
    if (x.Size() == 3)
-      if (rz >= 0.5)
-         u(2) = r_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
+      if (rz >= 0.0)
+         u(2) = r_fz; //+ perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
 void up_disp(const Vector &x, double t, Vector &u)
 {
-   if (ux >= 0.5)
-      u(0) = u_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
-   if (uy >= 0.5)
-      u(1) = u_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+   if (ux >= 0.0)
+      u(0) = u_fx; //+ perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+   if (uy >= 0.0)
+      u(1) = u_fy; //+ perturb_func(x(1), yf_amp, yf_freq, yf_offset);
    if (x.Size() == 3)
-      if (uz >= 0.5)
-         u(2) = u_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
+      if (uz >= 0.0)
+         u(2) = u_fz; //+ perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
 void down_disp(const Vector &x, double t, Vector &u)
 {
-   if (dx >= 0.5)
-      u(0) = d_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
-   if (dy >= 0.5)
-      u(1) = d_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+   if (dx >= 0.0)
+      u(0) = d_fx; //+ perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+   if (dy >= 0.0)
+      u(1) = d_fy; //+ perturb_func(x(1), yf_amp, yf_freq, yf_offset);
    if (x.Size() == 3)
-      if (dz >= 0.5)
-         u(2) = d_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
+      if (dz >= 0.0)
+         u(2) = d_fz; //+ perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
 void in_disp(const Vector &x, double t, Vector &u)
 {
-   if (ix >= 0.5)
-      u(0) = i_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
-   if (iy >= 0.5)
-      u(1) = i_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+   if (ix >= 0.0)
+      u(0) = i_fx; //+ perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+   if (iy >= 0.0)
+      u(1) = i_fy; //+ perturb_func(x(1), yf_amp, yf_freq, yf_offset);
    if (x.Size() == 3)
-      if (iz >= 0.5)
-         u(2) = i_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
+      if (iz >= 0.0)
+         u(2) = i_fz; //+ perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
 void out_disp(const Vector &x, double t, Vector &u)
 {
-   if (ox >= 0.5)
-      u(0) = o_fx + perturb_func(x(0), xf_amp, xf_freq, xf_offset);
-   if (dy >= 0.5)
-      u(1) = o_fy + perturb_func(x(1), yf_amp, yf_freq, yf_offset);
+   if (ox >= 0.0)
+      u(0) = o_fx; //+ perturb_func(x(0), xf_amp, xf_freq, xf_offset);
+   if (dy >= 0.0)
+      u(1) = o_fy; //+ perturb_func(x(1), yf_amp, yf_freq, yf_offset);
    if (x.Size() == 3)
-      if (oz >= 0.5)
-         u(2) = o_fz + perturb_func(x(2), zf_amp, zf_freq, zf_offset);
+      if (oz >= 0.0)
+         u(2) = o_fz; //+ perturb_func(x(2), zf_amp, zf_freq, zf_offset);
 }
 
 void body_force(const Vector &x, double t, Vector &u)
 {
-   if (bx >= 0.5)
-      u(0) = b_fx + perturb_func(x(0), bxf_amp, bxf_freq, bxf_offset);
-   if (by >= 0.5)
-      u(1) = b_fy + perturb_func(x(1), byf_amp, byf_freq, byf_offset);
+   if (bx >= 0.0)
+      u(0) = b_fx;// + perturb_func(x(0), bxf_amp, bxf_freq, bxf_offset);
+   if (by >= 0.0)
+      u(1) = b_fy;// + perturb_func(x(1), byf_amp, byf_freq, byf_offset);
    if (x.Size() == 3)
-      if (bz >= 0.5)
-         u(2) = b_fz + perturb_func(x(2), bzf_amp, bzf_freq, bzf_offset);
+      if (bz >= 0.0)
+         u(2) = b_fz;// + perturb_func(x(2), bzf_amp, bzf_freq, bzf_offset);
 }
 
 }  // namespace linelast_cwtrain
