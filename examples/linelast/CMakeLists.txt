@@ -51,3 +51,4 @@ file(COPY meshes/3dcw_joint.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linela
 file(COPY meshes/3dcw_beamH.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/3dcw_beamV.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
 file(COPY meshes/octet_truss.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
+file(COPY meshes/octet_truss_hd.mesh DESTINATION ${CMAKE_BINARY_DIR}/examples/linelast/meshes)
