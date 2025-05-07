@@ -174,7 +174,7 @@ void GenerateSamples(MPI_Comm comm)
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
-
+      cout<<"up to assemble is fine"<<endl;
       bool converged = test->Solve(sample_generator);
       if (!converged)
       {
