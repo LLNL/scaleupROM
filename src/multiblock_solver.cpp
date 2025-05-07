@@ -660,6 +660,9 @@ void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
    cout<<2<<endl;
 
    Array<int> col_idxs;
+
+   cout<<"U_snapshots: "<<U_snapshots<<endl;
+   cout<<"basis_tags: "<<basis_tags<<endl;
    sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
    cout<<3<<endl;
 
