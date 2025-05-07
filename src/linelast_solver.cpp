@@ -454,6 +454,8 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    }
 
    /* save solution if sample generator is provided */
+   cout<<"converged: "<<converged<<endl;
+   cout<<"sample_generator: "<<sample_generator<<endl;
    if (converged && sample_generator)
       SaveSnapshots(sample_generator);
 
