@@ -651,15 +651,20 @@ BlockVector* MultiBlockSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tag
 
 void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
 {
+   cout<<1<<endl;
    assert(sample_generator);
 
    /* split the solution into each component with the corresponding tag */
    std::vector<BasisTag> basis_tags;
    BlockVector *U_snapshots = PrepareSnapshots(basis_tags);
+   cout<<2<<endl;
 
    Array<int> col_idxs;
    sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
+   cout<<3<<endl;
+
    sample_generator->SaveSnapshotPorts(topol_handler, col_idxs);
+   cout<<4<<endl;
 
    /* delete only the view vector, not the data itself. */
    delete U_snapshots;

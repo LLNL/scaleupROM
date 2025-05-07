@@ -176,6 +176,7 @@ void GenerateSamples(MPI_Comm comm)
       test->Assemble();
       cout<<"up to assemble is fine"<<endl;
       bool converged = test->Solve(sample_generator);
+      cout<<"converged: "<<converged<<endl;
       if (!converged)
       {
          // If deterministic, terminate the sampling here.
