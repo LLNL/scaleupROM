@@ -222,11 +222,30 @@ assert(block.Size() > 0);  // Size should be positive
 double *data = block.GetData();
 assert(data != nullptr);  // Check data pointer is not null
 
+// Parameters
+double fraction = 0.1;  // e.g., use 10% of the data
+mfem::Vector &block = U_snapshots->GetBlock(s);
+int full_size = block.Size();
+int partial_size = static_cast<int>(fraction * full_size);
+
+// Clamp in case full_size is small
+partial_size = std::max(1, partial_size);
+
+// Copy the first partial_size elements into a new vector
+mfem::Vector partial_vec(partial_size);
+for (int i = 0; i < partial_size; ++i)
+{
+    partial_vec[i] = block[i];
+}
+
+// Pass the reduced vector to takeSample()
+bool addSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
+
 // Optional: print values for deeper debugging
 std::cout << "Block " << s << " size: " << block.Size() << std::endl;
 std::cout << "Data pointer: " << static_cast<void*>(data) << std::endl;
 
-      bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
+bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
 cout<<18<<endl;
       
       assert(addSample);
