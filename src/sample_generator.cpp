@@ -204,8 +204,13 @@ cout<<16<<endl;
 
       /* add the snapshot into the corresponding snapshot generator */
       int index = basis_tag2idx[snapshot_basis_tags[s]];
-cout<<17<<endl;
+      cout<<17<<endl;
 
+      assert(snapshot_generators != nullptr);
+assert(index >= 0 && index < snapshot_generators.size());
+assert(snapshot_generators[index] != nullptr);
+assert(U_snapshots != nullptr);
+assert(s >= 0 && s < U_snapshots->NumBlocks());
       bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
 cout<<18<<endl;
       
