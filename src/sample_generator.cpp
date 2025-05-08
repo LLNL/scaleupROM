@@ -178,59 +178,26 @@ const std::string SampleGenerator::GetSamplePath(const int &idx, const std::stri
 }
 
 void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<BasisTag> &snapshot_basis_tags, Array<int> &col_idxs)
-{ cout<<11<<endl;
+{
    assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
-cout<<12<<endl;
 
    col_idxs.SetSize(U_snapshots->NumBlocks());
-   cout<<13<<endl;
 
    /* add snapshots according to their tags */
    for (int s = 0; s < snapshot_basis_tags.size(); s++)
    {
-cout<<s<<endl;
-cout<<14<<endl;
 
       /* if the tag was never seen before, create a new snapshot generator */
       if (!basis_tag2idx.count(snapshot_basis_tags[s]))
       {
-cout<<15<<endl;
-
          const int fom_vdofs = U_snapshots->BlockSize(s);
-cout<<16<<endl;
 
          AddSnapshotGenerator(fom_vdofs, GetSamplePrefix(), snapshot_basis_tags[s]);
       }
 
       /* add the snapshot into the corresponding snapshot generator */
       int index = basis_tag2idx[snapshot_basis_tags[s]];
-      cout<<17<<endl;
-
-assert(snapshot_generators != nullptr);
-assert(snapshot_generators[index] != nullptr);
-assert(U_snapshots != nullptr);
-assert(s >= 0 && s < U_snapshots->NumBlocks());
-
-assert(U_snapshots != nullptr);
-assert(s >= 0 && s < U_snapshots->NumBlocks());
-
-mfem::Vector &block = U_snapshots->GetBlock(s);
-assert(block.Size() > 0);  // Size should be positive
-
-double *data = block.GetData();
-assert(data != nullptr);  // Check data pointer is not null
-
-cout<<"snapshot_generators[index] "<<snapshot_generators[index]<<endl;
-cout<<"testing with try catch "<<endl;
-
-// Optional: print values for deeper debugging
-std::cout << "Block " << s << " size: " << block.Size() << std::endl;
-std::cout << "Data pointer: " << static_cast<void*>(data) << std::endl;
-
-bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
-cout<<18<<endl;
-      assert(addSample);
-      cout<<19<<endl;
+      bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
       /* save the column index in each snapshot matrix, for port data. */
       /* 0-based index */
       col_idxs[s] = snapshot_generators[index]->getNumSamples() - 1;

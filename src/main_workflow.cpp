@@ -190,11 +190,8 @@ void GenerateSamples(MPI_Comm comm)
             continue;
          }
       }
-      cout<<"up to solve is fine"<<endl;
       test->SaveSolution(sol_file);
-      cout<<"up to save sol is fine"<<endl;
       test->SaveVisualization();
-      cout<<"up to save viz is fine"<<endl;
 
       sample_generator->ReportStatus(s);
 
