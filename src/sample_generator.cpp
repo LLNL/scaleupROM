@@ -247,10 +247,6 @@ for (int i = 0; i < partial_size; ++i) {
    }
 }
 
-mfem::Vector test_vec(10);
-for (int i = 0; i < 10; ++i) test_vec[i] = i;
-cout<<"testing with good vector "<<endl;
-bool goodaddSample = snapshot_generators[index]->takeSample(test_vec.GetData());
 
 cout<<"testing with try catch "<<endl;
 
@@ -259,6 +255,10 @@ try {
 } catch (const std::exception &e) {
    std::cerr << "Exception in takeSample: " << e.what() << std::endl;
 }
+mfem::Vector test_vec(10);
+for (int i = 0; i < 10; ++i) test_vec[i] = i;
+cout<<"testing with good vector "<<endl;
+bool goodaddSample = snapshot_generators[index]->takeSample(test_vec.GetData());
 
 bool testaddSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
 
