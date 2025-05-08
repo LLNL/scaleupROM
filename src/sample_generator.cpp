@@ -212,6 +212,20 @@ assert(index >= 0 && index < num_generators);
 assert(snapshot_generators[index] != nullptr);
 assert(U_snapshots != nullptr);
 assert(s >= 0 && s < U_snapshots->NumBlocks());
+
+assert(U_snapshots != nullptr);
+assert(s >= 0 && s < U_snapshots->NumBlocks());
+
+mfem::Vector &block = U_snapshots->GetBlock(s);
+assert(block.Size() > 0);  // Size should be positive
+
+double *data = block.GetData();
+assert(data != nullptr);  // Check data pointer is not null
+
+// Optional: print values for deeper debugging
+std::cout << "Block " << s << " size: " << block.Size() << std::endl;
+std::cout << "Data pointer: " << static_cast<void*>(data) << std::endl;
+
       bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
 cout<<18<<endl;
       
