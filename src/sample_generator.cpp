@@ -238,9 +238,10 @@ for (int i = 0; i < partial_size; ++i)
 }
 
 // Pass the reduced vector to takeSample()
-bool addSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
+bool testaddSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
 
 // Optional: print values for deeper debugging
+std::cout << "testaddSample " << testaddSample<< std::endl;
 std::cout << "Block " << s << " size: " << block.Size() << std::endl;
 std::cout << "Data pointer: " << static_cast<void*>(data) << std::endl;
 
