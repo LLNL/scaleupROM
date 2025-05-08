@@ -207,7 +207,6 @@ cout<<16<<endl;
       cout<<17<<endl;
 
 assert(snapshot_generators != nullptr);
-assert(index >= 0 && index < num_generators);
 assert(snapshot_generators[index] != nullptr);
 assert(U_snapshots != nullptr);
 assert(s >= 0 && s < U_snapshots->NumBlocks());
@@ -221,25 +220,17 @@ assert(block.Size() > 0);  // Size should be positive
 double *data = block.GetData();
 assert(data != nullptr);  // Check data pointer is not null
 
-// Pass the reduced vector to takeSample()
-cout<<"ready to test with fraction: "<<fraction<<endl;
-cout<<"length of test vector: "<<partial_size<<endl;
-
-
 cout<<"snapshot_generators[index] "<<snapshot_generators[index]<<endl;
 cout<<"testing with try catch "<<endl;
 
 // Optional: print values for deeper debugging
-std::cout << "testaddSample " << testaddSample<< std::endl;
 std::cout << "Block " << s << " size: " << block.Size() << std::endl;
 std::cout << "Data pointer: " << static_cast<void*>(data) << std::endl;
 
 bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
 cout<<18<<endl;
-      
       assert(addSample);
       cout<<19<<endl;
-
       /* save the column index in each snapshot matrix, for port data. */
       /* 0-based index */
       col_idxs[s] = snapshot_generators[index]->getNumSamples() - 1;
