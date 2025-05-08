@@ -223,7 +223,7 @@ double *data = block.GetData();
 assert(data != nullptr);  // Check data pointer is not null
 
 // Parameters
-double fraction = 0.01;  // e.g., use 10% of the data
+double fraction = 0.001;  // e.g., use 10% of the data
 int full_size = block.Size();
 int partial_size = static_cast<int>(fraction * full_size);
 
@@ -239,6 +239,7 @@ for (int i = 0; i < partial_size; ++i)
 
 // Pass the reduced vector to takeSample()
 cout<<"ready to test with fraction: "<<fraction<<endl;
+cout<<"length of test vector: "<<partial_size<<endl;
 bool testaddSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
 
 // Optional: print values for deeper debugging
