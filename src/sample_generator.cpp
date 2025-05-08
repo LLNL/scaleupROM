@@ -240,6 +240,26 @@ for (int i = 0; i < partial_size; ++i)
 // Pass the reduced vector to takeSample()
 cout<<"ready to test with fraction: "<<fraction<<endl;
 cout<<"length of test vector: "<<partial_size<<endl;
+
+for (int i = 0; i < partial_size; ++i) {
+   if (!std::isfinite(partial_vec[i])) {
+       std::cerr << "Non-finite value at " << i << ": " << partial_vec[i] << std::endl;
+   }
+}
+
+mfem::Vector test_vec(10);
+for (int i = 0; i < 10; ++i) test_vec[i] = i;
+cout<<"testing with good vector "<<endl;
+bool goodaddSample = snapshot_generators[index]->takeSample(test_vec.GetData());
+
+cout<<"testing with try catch "<<endl;
+
+try {
+   bool addSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
+} catch (const std::exception &e) {
+   std::cerr << "Exception in takeSample: " << e.what() << std::endl;
+}
+
 bool testaddSample = snapshot_generators[index]->takeSample(partial_vec.GetData());
 
 // Optional: print values for deeper debugging
