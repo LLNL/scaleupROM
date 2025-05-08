@@ -207,7 +207,8 @@ cout<<16<<endl;
       cout<<17<<endl;
 
       assert(snapshot_generators != nullptr);
-assert(index >= 0 && index < snapshot_generators.size());
+size_t num_generators = sizeof(snapshot_generators) / sizeof(snapshot_generators[0]);
+assert(index >= 0 && index < num_generators);
 assert(snapshot_generators[index] != nullptr);
 assert(U_snapshots != nullptr);
 assert(s >= 0 && s < U_snapshots->NumBlocks());
