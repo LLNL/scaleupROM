@@ -224,7 +224,6 @@ assert(data != nullptr);  // Check data pointer is not null
 
 // Parameters
 double fraction = 0.1;  // e.g., use 10% of the data
-mfem::Vector &block = U_snapshots->GetBlock(s);
 int full_size = block.Size();
 int partial_size = static_cast<int>(fraction * full_size);
 
