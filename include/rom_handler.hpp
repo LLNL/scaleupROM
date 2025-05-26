@@ -45,8 +45,10 @@ class ROMHandlerBase
 protected:
 // public:
    int numSub = -1;          // number of subdomains.
+   int numSubLoc = -1;       // number of local subdomains.
    int num_var = -1;         // number of variables for which POD is performed.
    int num_rom_blocks = -1;  // number of ROM blocks for the global domain.
+   int num_rom_blocks_local = -1;  // number of ROM blocks for the local domain.
    int num_rom_ref_blocks = -1;  // number of ROM reference component blocks.
    int num_rom_comp = -1;     // number of ROM reference components.
    std::vector<std::string> fom_var_names;          // dimension of each variable.
@@ -154,6 +156,7 @@ public:
    void GetDomainAndVariableIndex(const int &rom_block_index, int &m, int &v);
 
    std::array<int,2> GetLocalBlocks() { return localBlocks; }
+   void GetLocalNumBlocks(Array<int> &lnb) { lnb = localNumBlocks; }
 
    mfem::BlockVector* GetReducedSolution() { return reduced_sol; }
    mfem::BlockVector* GetReducedRHS() { return reduced_rhs; }
@@ -233,6 +236,10 @@ protected:
 
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;
+
+   SparseMatrix *hdiag = NULL;
+   SparseMatrix *hoffd = NULL;
+   Array<HYPRE_BigInt> cmap;
 
    // variables needed for direct solve
    HYPRE_BigInt sys_glob_size;

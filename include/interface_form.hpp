@@ -17,6 +17,7 @@ class InterfaceForm
 {
 protected:
    int numSub = -1;
+   int numSubStored = -1;
    int skip_zeros = 1;
 
    Array<Mesh *> meshes;                  // not owned
@@ -93,6 +94,7 @@ class MixedInterfaceForm
 {
 protected:
    int numSub = -1;
+   int numSubStored = -1;
    int skip_zeros = 1;
 
    Array<Mesh *> meshes;   // not owned

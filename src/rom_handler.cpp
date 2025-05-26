@@ -38,6 +38,7 @@ ROMHandlerBase::ROMHandlerBase(
    const std::vector<std::string> &var_names, const bool separate_variable_basis)
    : topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
+     numSubLoc(input_topol->GetNumLocalSubdomains()),
      fom_var_names(var_names),
      fom_var_offsets(input_var_offsets),
      basis_tags(0),
@@ -47,8 +48,8 @@ ROMHandlerBase::ROMHandlerBase(
 {
    num_var = fom_var_names.size();
 
-   fom_num_vdofs.SetSize(numSub);
-   for (int m = 0, idx = 0; m < numSub; m++)
+   fom_num_vdofs.SetSize(numSubLoc);
+   for (int m = 0, idx = 0; m < numSubLoc; m++)
    {
       fom_num_vdofs[m] = 0;
       for (int v = 0; v < num_var; v++, idx++)
@@ -253,11 +254,10 @@ void ROMHandlerBase::LoadReducedBasis()
          Once fully parallelized, each process will load only local part of the basis.
       */
       {
-         int local_dim = CAROM::split_dimension(dim_ref_basis[k], MPI_COMM_WORLD);
-         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k].print(), CAROM::Database::formats::HDF5_MPIO, local_dim);
+         int local_dim = dim_ref_basis[k];
+         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k].print() + ".000000", CAROM::Database::formats::HDF5, local_dim, MPI_COMM_NULL);
 
          carom_ref_basis[k] = new CAROM::Matrix(*basis_reader->getSpatialBasis(num_ref_basis[k]));
-         carom_ref_basis[k]->gather();
       }
       numRowRB = carom_ref_basis[k]->numRows();
       numColumnRB = carom_ref_basis[k]->numColumns();
@@ -363,7 +363,7 @@ MFEMROMHandler::~MFEMROMHandler()
    delete romMat;
    delete romMat_mono;
    delete romMat_hypre;
-   delete mumps;
+   //delete mumps; // TODO: memory bug!
 }
 
 void MFEMROMHandler::LoadReducedBasis()
@@ -471,17 +471,19 @@ void MFEMROMHandler::ProjectToDomainBasis(const int &i, const Vector &vec, Vecto
 
 void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVector*& rom_vec)
 {
-   assert(vec->NumBlocks() == num_rom_blocks);
+   assert(vec->NumBlocks() == num_rom_blocks_local);
    // reset rom_vec if initiated a priori.
    if (rom_vec) delete rom_vec;
 
+   // TODO: distribute this!
    rom_vec = new BlockVector(rom_block_offsets);
 
    int m, v, fom_idx;
    for (int i = localBlocks[0]; i < localBlocks[1]; ++i)
    {
       GetDomainAndVariableIndex(i, m, v);
-      fom_idx = (separate_variable)? v + m * num_var : m;
+      const int mloc = topol_handler->LocalSubdomainIndex(m);
+      fom_idx = (separate_variable)? v + mloc * num_var : mloc;
       
       ProjectToDomainBasis(i, vec->GetBlock(fom_idx), rom_vec->GetBlock(i));
    }
@@ -516,13 +518,14 @@ void MFEMROMHandler::LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, 
 void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
 {
    assert(rom_vec.NumBlocks() == num_rom_blocks);
-   assert(vec.NumBlocks() == num_rom_blocks);
+   assert(vec.NumBlocks() == num_rom_blocks_local);
 
    int m, v, fom_idx;
-   for (int i = 0; i < num_rom_blocks; i++)
+   for (int i = localBlocks[0]; i < localBlocks[1]; ++i)
    {
       GetDomainAndVariableIndex(i, m, v);
-      fom_idx = (separate_variable)? v + m * num_var : m;
+      const int mloc = topol_handler->LocalSubdomainIndex(m);
+      fom_idx = (separate_variable)? v + mloc * num_var : mloc;
 
       LiftUpFromDomainBasis(i, rom_vec.GetBlock(i), vec.GetBlock(fom_idx));
    }
@@ -537,6 +540,7 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);   
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
+   prec_str = "none"; // TODO: remove!
 
    if (linsol_type == SolverType::DIRECT)
    {
@@ -558,7 +562,7 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
          // TODO: need to change when the actual parallelization is implemented.
          HYPRE_BigInt glob_size = rom_block_offsets.Last();
          HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-         parRomMat = new HypreParMatrix(MPI_COMM_SELF, glob_size, row_starts, romMat_mono);
+         parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
          K = parRomMat;
       }
       else if ((prec_str == "gs") || (prec_str == "none"))
@@ -591,8 +595,8 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 
       if (prec_str != "none")
          solver->SetPreconditioner(*M);
-      solver->SetOperator(*K);
-      
+      solver->SetOperator(*romMat_hypre);
+
       solver->SetAbsTol(atol);
       solver->SetRelTol(rtol);
       solver->SetMaxIter(maxIter);
@@ -614,11 +618,11 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 
 void MFEMROMHandler::Solve(BlockVector* U)
 {
-   assert(U->NumBlocks() == num_rom_blocks);
+   assert(U->NumBlocks() == num_rom_blocks_local);
    assert(reduced_rhs);
 
    printf("Solve ROM.\n");
-   reduced_sol = new BlockVector(rom_block_offsets);
+   reduced_sol = new BlockVector(rom_block_offsets);  // TODO: distribute this in parallel.
    (*reduced_sol) = 0.0;
 
    Vector reduced_sol_hypre(reduced_rhs_hypre.Size());
@@ -676,7 +680,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    Solver *J_solver = NULL;
    if (linsol_type == SolverType::DIRECT)
    {
-      mumps = new MUMPSSolver(MPI_COMM_SELF);
+      mumps = new MUMPSSolver(MPI_COMM_WORLD);
       mumps->SetMatrixSymType(mat_type);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;
@@ -997,6 +1001,7 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
   std::set<int> offd_cols;
 
   const int nblocks = localNumBlocks[rank];
+  num_rom_blocks_local = nblocks;
 
   for (int b=0; b<nblocks; ++b)
     {
@@ -1022,10 +1027,16 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
       offd_size += bsize_j;
     }
 
-  SparseMatrix diag(localSizes[rank], localSizes[rank]);
-  SparseMatrix offd(localSizes[rank], gsize);
+  // The following construction of a HypreParMatrix, by using a SparseMatrix
+  // for diag and offd, follows the example of
+  // ParFiniteElementSpace::ParallelDerefinementMatrix
+  hdiag = new SparseMatrix(localSizes[rank], localSizes[rank]);
+  SparseMatrix &diag = *hdiag;
+  hoffd = new SparseMatrix(localSizes[rank], gsize);
+  SparseMatrix &offd = *hoffd;
 
   // Set diag and offd
+
   int localOffset = 0;
   for (int b=0; b<nblocks; ++b)
     {
@@ -1060,6 +1071,9 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
 		{
 		  cols[i] = rom_block_offsets[j] + i;
 
+		  // TODO: simplify
+		  MFEM_VERIFY((cols[i] < loc0 || cols[i] >= loc1) == !diagBlock, "");
+
 		  if (cols[i] < loc0 || cols[i] >= loc1)  // Off-diagonal
 		    {
 		      offd_cols.insert(cols[i]);
@@ -1088,7 +1102,7 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
 
   const int num_offd_cols = offd_cols.size();
   MFEM_VERIFY(num_offd_cols == offd_size, "");
-  Array<HYPRE_BigInt> cmap(num_offd_cols);
+  cmap.SetSize(num_offd_cols);
   std::map<int, int> cmap_inv;
 
   int cnt = 0;
@@ -1118,6 +1132,8 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
 	  const int c = cmap_inv[offJ[i]];
 	  offJ[i] = c;
 	}
+
+      offd.SortColumnIndices();
     }
 
   offd.SetWidth(offd_size);
@@ -1125,6 +1141,8 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
   Array<HYPRE_BigInt> starts(2);
   starts[0] = offset[rank];
   starts[1] = offset[rank + 1];
+
+  MFEM_VERIFY(HYPRE_AssumedPartitionCheck(), "");
 
   if (nproc == 1) // Serial case
     {
@@ -1134,8 +1152,12 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
     }
   else
     {
+
+      // constructor with 8+1 arguments
       romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, gsize, gsize,
-					starts.GetData(), starts.GetData(), &diag, &offd, cmap.GetData());
+					starts.GetData(), starts.GetData(), hdiag, hoffd, cmap.GetData(), true);
+
+      romMat_hypre->SetOwnerFlags(romMat_hypre->OwnsDiag(), romMat_hypre->OwnsOffd(), 1);
     }
 
   hypre_start = starts[0];
@@ -1166,6 +1188,8 @@ void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat, const bool init_direct_so
 
 void MFEMROMHandler::SaveRomSystem(const std::string &input_prefix, const std::string type)
 {
+   if (topol_handler->GetRank() != 0) return; // Only the root process writes files.
+
    if (!romMat_mono)
    {
       assert(romMat);
@@ -1249,19 +1273,19 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
    {
       case (SolverType::CG):
       {
-         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_SELF);
-         else                    solver = new CGSolver();
+         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+         else                    solver = new CGSolver(MPI_COMM_WORLD);
          break;
       }
       case (SolverType::MINRES):
       {
-         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_SELF);
+         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
          else                    solver = new MINRESSolver();
          break;
       }
       case (SolverType::GMRES):
       {
-         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_SELF);
+         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_WORLD);
          else                    solver = new GMRESSolver();
          break;
       }
@@ -1283,16 +1307,8 @@ void MFEMROMHandler::SetupDirectSolver()
 
    assert(romMat_mono);
    delete romMat_hypre, mumps;
-
-   // TODO: need to change when the actual parallelization is implemented.
-   sys_glob_size = romMat_mono->NumRows();
-   sys_row_starts[0] = 0;
-   sys_row_starts[1] = romMat_mono->NumRows();
-   romMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, romMat_mono);
-
-   mumps = new MUMPSSolver(MPI_COMM_SELF);
-   mumps->SetMatrixSymType(mat_type);
-   mumps->SetOperator(*romMat_hypre);
+   romMat_hypre = NULL;
+   mumps = NULL;
 }
 
 void MFEMROMHandler::AppendReferenceBasis(const int &idx, const DenseMatrix &mat)

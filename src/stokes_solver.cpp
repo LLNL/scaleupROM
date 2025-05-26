@@ -47,10 +47,13 @@ StokesSolver::StokesSolver()
       fec[1] = new H1_FECollection(porder, dim);
    }
 
-   fes.SetSize(num_var * numSub);
-   ufes.SetSize(numSub);
-   pfes.SetSize(numSub);
-   for (int m = 0; m < numSub; m++) {
+   fes.SetSize(num_var * numSubStored);
+   ufes.SetSize(numSubStored);
+   pfes.SetSize(numSubStored);
+   // TODO: just construct one fes per mesh type, not all subdomains?
+   // There are pros and cons to both approaches.
+
+   for (int m = 0; m < numSubStored; m++) {
       ufes[m] = new FiniteElementSpace(meshes[m], fec[0], dim);
       pfes[m] = new FiniteElementSpace(meshes[m], fec[1]);
       // NOTE: ownership is in fes, not ufes and pfes!
@@ -143,22 +146,22 @@ void StokesSolver::AddBCFunction(const Vector &F, const int battr)
 
 void StokesSolver::InitVariables()
 {
-   // number of blocks = solution dimension * number of subdomain;
-   block_offsets.SetSize(udim * numSub + 1);
-   var_offsets.SetSize(num_var * numSub + 1);
-   num_vdofs.SetSize(numSub);
-   u_offsets.SetSize(numSub + 1);
-   p_offsets.SetSize(numSub + 1);
+   // number of blocks = solution dimension * number of subdomains;
+   block_offsets.SetSize(udim * numSubLoc + 1);
+   var_offsets.SetSize(num_var * numSubLoc + 1);
+   num_vdofs.SetSize(numSubLoc);
+   u_offsets.SetSize(numSubLoc + 1);
+   p_offsets.SetSize(numSubLoc + 1);
 
    block_offsets[0] = 0;
    var_offsets[0] = 0;
    u_offsets[0] = 0;
    p_offsets[0] = 0;
 
-   domain_offsets.SetSize(numSub + 1);
+   domain_offsets.SetSize(numSubLoc + 1);
    domain_offsets = 0;
 
-   for (int m = 0, block_idx = 1, var_idx=1; m < numSub; m++)
+   for (int m = 0, block_idx = 1, var_idx=1; m < numSubLoc; m++)
    {
       for (int v = 0; v < num_var; v++, var_idx++)
       {
@@ -174,7 +177,7 @@ void StokesSolver::InitVariables()
       p_offsets[m + 1] = pfes[m]->GetVSize();
    }
    block_offsets.PartialSum();
-   domain_offsets.GetSubArray(1, numSub, num_vdofs);
+   domain_offsets.GetSubArray(1, numSubLoc, num_vdofs);
    var_offsets.PartialSum();
    domain_offsets.PartialSum();
    u_offsets.PartialSum();
@@ -201,10 +204,10 @@ void StokesSolver::InitVariables()
       These are system-specific, therefore not defining it now.
    */
 
-   us.SetSize(num_var * numSub);
-   vels.SetSize(numSub);
-   ps.SetSize(numSub);
-   for (int m = 0; m < numSub; m++)
+   us.SetSize(num_var * numSubLoc);
+   vels.SetSize(numSubLoc);
+   ps.SetSize(numSubLoc);
+   for (int m = 0; m < numSubLoc; m++)
    {
       vels[m] = new GridFunction(ufes[m], U->GetBlock(num_var * m), 0);
       ps[m] = new GridFunction(pfes[m], U->GetBlock(num_var * m + 1), 0);
@@ -217,6 +220,13 @@ void StokesSolver::InitVariables()
    }
 
    f_coeffs.SetSize(0);
+
+   global_offsets.SetSize(nproc + 1);
+   global_offsets[0] = 0;
+   MPI_Allgather(&vblock_offsets[2], 1, MPI_INT,
+		 &global_offsets[1], 1, MPI_INT, MPI_COMM_WORLD);
+
+   global_offsets.PartialSum();
 }
 
 void StokesSolver::DeterminePressureDirichlet()
@@ -240,12 +250,12 @@ void StokesSolver::BuildRHSOperators()
 {
    SanityCheckOnCoeffs();
 
-   fs.SetSize(numSub);
-   gs.SetSize(numSub);
+   fs.SetSize(numSubLoc);
+   gs.SetSize(numSubLoc);
 
    // These are heavily system-dependent.
    // Based on scalar/vector system, different integrators/coefficients will be used.
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
    {
       fs[m] = new LinearForm;
       fs[m]->Update(ufes[m], RHS->GetBlock(num_var * m), 0);
@@ -263,10 +273,10 @@ void StokesSolver::BuildDomainOperators()
 {
    SanityCheckOnCoeffs();
 
-   ms.SetSize(numSub);
-   bs.SetSize(numSub);
+   ms.SetSize(numSubStored);
+   bs.SetSize(numSubStored);
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubStored; m++)
    {
       ms[m] = new BilinearForm(ufes[m]);
       bs[m] = new MixedBilinearFormDGExtension(ufes[m], pfes[m]);
@@ -286,8 +296,8 @@ void StokesSolver::BuildDomainOperators()
    b_itf->AddInterfaceIntegrator(new InterfaceDGNormalFluxIntegrator);
 
    // pressure mass matrix for preconditioner.
-   pms.SetSize(numSub);
-   for (int m = 0; m < numSub; m++)
+   pms.SetSize(numSubStored);
+   for (int m = 0; m < numSubStored; m++)
    {
       pms[m] = new BilinearForm(pfes[m]);
       pms[m]->AddDomainIntegrator(new MassIntegrator);
@@ -312,10 +322,10 @@ void StokesSolver::SetupRHSBCOperators()
 {
    SanityCheckOnCoeffs();
 
-   assert(fs.Size() == numSub);
-   assert(gs.Size() == numSub);
+   assert(fs.Size() == numSubLoc);
+   assert(gs.Size() == numSubLoc);
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
    {
       assert(fs[m] && gs[m]);
       for (int b = 0; b < global_bdr_attributes.Size(); b++) 
@@ -345,10 +355,10 @@ void StokesSolver::SetupDomainBCOperators()
 {
    SanityCheckOnCoeffs();
 
-   assert(ms.Size() == numSub);
-   assert(bs.Size() == numSub);
+   assert(ms.Size() == numSubStored);
+   assert(bs.Size() == numSubStored);
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubStored; m++)
    {
       assert(ms[m] && bs[m]);
       for (int b = 0; b < global_bdr_attributes.Size(); b++) 
@@ -378,10 +388,10 @@ void StokesSolver::AssembleRHS()
 {
    SanityCheckOnCoeffs();
 
-   assert(fs.Size() == numSub);
-   assert(gs.Size() == numSub);
+   assert(fs.Size() == numSubLoc);
+   assert(gs.Size() == numSubLoc);
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
    {
       assert(fs[m] && gs[m]);
       fs[m]->Assemble();
@@ -407,20 +417,21 @@ void StokesSolver::AssembleOperatorBase()
 {
    SanityCheckOnCoeffs();
 
-   assert(ms.Size() == numSub);
-   assert(bs.Size() == numSub);
+   assert(ms.Size() == numSubStored);
+   assert(bs.Size() == numSubStored);
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubStored; m++)
    {
       assert(ms[m] && bs[m]);
       ms[m]->Assemble();
       bs[m]->Assemble();
    }
 
-   m_mats.SetSize(numSub, numSub);
-   b_mats.SetSize(numSub, numSub);
-   for (int i = 0; i < numSub; i++)
-      for (int j = 0; j < numSub; j++)
+   // TODO: do we only need numSubLoc diagonal blocks?
+   m_mats.SetSize(numSubStored, numSubStored);
+   b_mats.SetSize(numSubStored, numSubStored);
+   for (int i = 0; i < numSubStored; i++)
+      for (int j = 0; j < numSubStored; j++)
       {
          if (i == j)
          {
@@ -436,7 +447,7 @@ void StokesSolver::AssembleOperatorBase()
 
    AssembleInterfaceMatrices();
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubStored; m++)
    {
       ms[m]->Finalize();
       bs[m]->Finalize();
@@ -447,11 +458,13 @@ void StokesSolver::AssembleOperatorBase()
    // This is especially true for vector solution, where ordering of component is changed.
    // This is quite inevitable, but is it desirable?
    // globalMat = new BlockMatrix(domain_offsets);
+
    mMat = new BlockMatrix(u_offsets);
    bMat = new BlockMatrix(p_offsets, u_offsets);
-   for (int i = 0; i < numSub; i++)
+
+   for (int i = 0; i < numSubStored; i++)
    {
-      for (int j = 0; j < numSub; j++)
+      for (int j = 0; j < numSubStored; j++)
       {
          if (i != j)
          {
@@ -459,23 +472,257 @@ void StokesSolver::AssembleOperatorBase()
             b_mats(i, j)->Finalize();
          }
 
-         mMat->SetBlock(i, j, m_mats(i, j));
-         bMat->SetBlock(i, j, b_mats(i, j));
+	 if (nproc == 1)
+	   {
+	     mMat->SetBlock(i, j, m_mats(i, j));
+	     bMat->SetBlock(i, j, b_mats(i, j));
+	   }
       }
    }
 
-   // global block matrix.
-   M = mMat->CreateMonolithic();
-   B = bMat->CreateMonolithic();
-   Bt = Transpose(*B);
+   // TODO: use HypreParMatrix even if nproc == 1?
+   if (nproc == 1)
+     {
+       // global block matrix.
+       M = mMat->CreateMonolithic();
+       B = bMat->CreateMonolithic();
+       Bt = Transpose(*B);
 
-   systemOp = new BlockMatrix(vblock_offsets);
-   systemOp->SetBlock(0,0, M);
-   systemOp->SetBlock(0,1, Bt);
-   systemOp->SetBlock(1,0, B);
+       systemOp = new BlockMatrix(vblock_offsets);
+       systemOp->SetBlock(0,0, M);
+       systemOp->SetBlock(0,1, Bt);
+       systemOp->SetBlock(1,0, B);
+     }
+   else
+     {
+       CreateHypreParMatrix();
+     }
+}
+
+void StokesSolver::SetGlobalOffsets()
+{
+  // TODO: use point-to-point communication instead of global communication, for better scalability.
+
+  Array<int> allNumSub, disp;
+  topol_handler->GetAllNumSub(allNumSub);
+
+  disp.SetSize(nproc);
+  disp[0] = 0;
+  for (int i=1; i<nproc; ++i)
+    disp[i] = disp[i - 1] + allNumSub[i - 1];
+
+  global_u_offsets.SetSize(numSub);
+  global_p_offsets.SetSize(numSub);
+
+  MPI_Allgatherv(u_offsets.GetData(), numSubLoc, MPI_INT, global_u_offsets.GetData(), allNumSub.GetData(), disp.GetData(), MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgatherv(p_offsets.GetData(), numSubLoc, MPI_INT, global_p_offsets.GetData(), allNumSub.GetData(), disp.GetData(), MPI_INT, MPI_COMM_WORLD);
+
+  const int os_u = u_offsets[numSubLoc];
+  global_os_u.SetSize(nproc);
+  MPI_Allgather(&os_u, 1, MPI_INT, global_os_u.GetData(), 1, MPI_INT, MPI_COMM_WORLD);
+}
+
+void StokesSolver::CreateHypreParMatrix()
+{
+  const HYPRE_BigInt gsize = global_offsets[nproc];
+  Array<HYPRE_BigInt> starts(2);
+  starts[0] = global_offsets[rank];
+  starts[1] = global_offsets[rank + 1];
+
+  SetGlobalOffsets();
+
+  const int localSize = starts[1] - starts[0];
+  hdiag = new SparseMatrix(localSize, localSize); // Owned by systemOp_hypre
+  hoffd = new SparseMatrix(localSize, gsize); // Owned by systemOp_hypre
+
+  std::set<int> offd_cols;
+
+  // Blocks are ordered with all u-blocks followed by all p-blocks, for each rank.
+  const int os_u = u_offsets[numSubLoc];
+
+  for (int i = 0; i < numSubLoc; i++)
+    {
+      for (int j = 0; j < numSubLoc; j++)
+	{
+	  if (m_mats(i, j))
+	    {
+	      const int oscol = u_offsets[j];
+	      for (int r=0; r<m_mats(i, j)->NumRows(); ++r)
+		{
+		  Array<int> cols;
+		  Vector srow;
+		  m_mats(i, j)->GetRow(r, cols, srow);
+
+		  MFEM_VERIFY(cols.Size() == srow.Size(), "");
+
+		  const int row = u_offsets[i] + r;
+		  for (int l=0; l<cols.Size(); ++l)
+		    {
+		      hdiag->Set(row, cols[l] + oscol, srow[l]);
+		    }
+		}
+	    }
+
+	  if (b_mats(i, j))
+	    {
+	      const int oscol_p = os_u + p_offsets[i];
+	      for (int r=0; r<b_mats(i, j)->NumRows(); ++r)
+		{
+		  Array<int> cols;
+		  Vector srow;
+		  b_mats(i, j)->GetRow(r, cols, srow);
+
+		  MFEM_VERIFY(cols.Size() == srow.Size(), "");
+
+		  for (int l=0; l<cols.Size(); ++l)
+		    {
+		      // Block (0, 1, Bt)
+		      hdiag->Set(u_offsets[j] + cols[l], r + oscol_p, srow[l]);
+
+		      // Block (1, 0, B)
+		      hdiag->Set(os_u + p_offsets[i] + r, u_offsets[j] + cols[l], srow[l]);
+		    }
+		}
+	    }
+	}
+
+      for (int j = numSubLoc; j < numSubStored; j++)
+	{
+	  const int globalSub = neighbors[j - numSubLoc];
+	  const int rank_j = topol_handler->GlobalSubdomainRank(globalSub);
+	  const int gos_j = global_offsets[rank_j];
+
+	  if (m_mats(i, j))
+	    {
+	      const int oscol = gos_j + global_u_offsets[globalSub];
+	      for (int r=0; r<m_mats(i, j)->NumRows(); ++r)
+		{
+		  Array<int> cols;
+		  Vector srow;
+		  m_mats(i, j)->GetRow(r, cols, srow);
+
+		  MFEM_VERIFY(cols.Size() == srow.Size(), "");
+
+		  const int row = u_offsets[i] + r;
+		  for (int l=0; l<cols.Size(); ++l)
+		    {
+		      hoffd->Set(row, cols[l] + oscol, srow[l]);
+		      offd_cols.insert(cols[l] + oscol);
+		    }
+		}
+	    }
+
+	  if (b_mats(i, j))
+	    {
+	      MFEM_VERIFY(b_mats(j, i), "Assuming symmetry w.r.t. components");
+
+	      for (int r=0; r<b_mats(i, j)->NumRows(); ++r) // B_{i,j}
+		{
+		  Array<int> cols;
+		  Vector srow;
+		  b_mats(i, j)->GetRow(r, cols, srow);
+		  MFEM_VERIFY(cols.Size() == srow.Size(), "");
+
+		  for (int l=0; l<cols.Size(); ++l)
+		    {
+		      // Block (1, 0, B)
+		      hoffd->Set(r + os_u + p_offsets[i],
+				 cols[l] + gos_j + global_u_offsets[globalSub],
+				 srow[l]);
+
+		      offd_cols.insert(cols[l] + gos_j + global_u_offsets[globalSub]);
+		    }
+		}
+
+	      // TODO: can this be optimized by using symmetry, so that B_{i,j} can be used instead of assembling B_{j,i}?
+	      for (int r=0; r<b_mats(j, i)->NumRows(); ++r) // B_{j,i}
+		{
+		  Array<int> cols;
+		  Vector srow;
+		  b_mats(j, i)->GetRow(r, cols, srow);
+		  MFEM_VERIFY(cols.Size() == srow.Size(), "");
+
+		  for (int l=0; l<cols.Size(); ++l)
+		    {
+		      // Block (0, 1, Bt)
+		      hoffd->Set(u_offsets[i] + cols[l],
+				 r + gos_j + global_os_u[rank_j] + global_p_offsets[globalSub],
+				 srow[l]);
+
+		      offd_cols.insert(r + gos_j + global_os_u[rank_j] + global_p_offsets[globalSub]);
+		    }
+		}
+	    }
+	}
+    }
+
+  // TODO: avoid making so many copies of the same matrices.
+
+  const int num_offd_cols = offd_cols.size();
+
+  hdiag->Finalize();
+  hoffd->Finalize();
+
+  cmap.SetSize(num_offd_cols);
+  std::map<int, int> cmap_inv;
+
+  int cnt = 0;
+  for (auto col : offd_cols)
+    {
+      cmap[cnt] = col;
+      cmap_inv[col] = cnt;
+
+      cnt++;
+    }
+
+  MFEM_VERIFY(cnt == num_offd_cols, "");
+
+  if (num_offd_cols > 0)
+    {
+      // Map column indices in hoffd
+      int *offI = hoffd->GetI();
+      int *offJ = hoffd->GetJ();
+
+      const int ne = offI[localSize];  // Total number of entries in hoffd
+
+      for (int i=0; i<ne; ++i)
+	{
+	  const int c = cmap_inv[offJ[i]];
+	  offJ[i] = c;
+	}
+
+      hoffd->SortColumnIndices();
+    }
+
+  hoffd->SetWidth(num_offd_cols);
+
+  // See rom_handler.cpp for another case of using this constructor with 8+1 arguments.
+  // constructor with 8+1 arguments
+  systemOp_hypre = new HypreParMatrix(MPI_COMM_WORLD, gsize, gsize,
+				      starts.GetData(), starts.GetData(),
+				      hdiag, hoffd, cmap.GetData(), true);
+
+  systemOp_hypre->SetOwnerFlags(systemOp_hypre->OwnsDiag(), systemOp_hypre->OwnsOffd(), 1);
 }
 
 void StokesSolver::SetupMUMPSSolver(bool set_oper, const MUMPSSolver::MatType mat_type)
+{
+  if (nproc == 1)
+    SetupMUMPSSolverSerial();
+  else
+    SetupMUMPSSolverParallel();
+
+  mumps->SetMatrixSymType(mat_type);
+  if (set_oper) mumps->SetOperator(*systemOp_hypre);
+}
+
+// TODO: no need to make a function for this? Just put it in SetupMUMPSSolver?
+void StokesSolver::SetupMUMPSSolverParallel()
+{
+  mumps = new MUMPSSolver(MPI_COMM_WORLD);
+}
+
+void StokesSolver::SetupMUMPSSolverSerial()
 {
    assert(systemOp);
    delete systemOp_mono;
@@ -491,18 +738,16 @@ void StokesSolver::SetupMUMPSSolver(bool set_oper, const MUMPSSolver::MatType ma
    systemOp_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, systemOp_mono);
 
    mumps = new MUMPSSolver(MPI_COMM_SELF);
-   mumps->SetMatrixSymType(mat_type);
-   if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 
 void StokesSolver::SetupPressureMassMatrix()
 {
-   assert(pms.Size() == numSub);
+   assert(pms.Size() == numSubStored);
    delete pmMat;
    delete pM;
 
    pmMat = new BlockMatrix(p_offsets);
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubStored; m++)
    {
       assert(pms[m]);
       pms[m]->Assemble();
@@ -715,12 +960,12 @@ bool StokesSolver::Solve(SampleGenerator *sample_generator)
    int print_level = config.GetOption<int>("solver/print_level", 0);
 
    // same size as var_offsets, but sorted by variables first (then by subdomain).
-   Array<int> offsets_byvar(num_var * numSub + 1);
+   Array<int> offsets_byvar(num_var * numSubLoc + 1);
    offsets_byvar = 0;
-   for (int k = 0; k < numSub; k++)
+   for (int k = 0; k < numSubLoc; k++)
    {
       offsets_byvar[k+1] = u_offsets[k+1];
-      offsets_byvar[k+1 + numSub] = p_offsets[k+1] + u_offsets.Last();
+      offsets_byvar[k+1 + numSubLoc] = p_offsets[k+1] + u_offsets.Last();
    }
 
    // sort out solution/rhs by variables.

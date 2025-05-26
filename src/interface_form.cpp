@@ -12,9 +12,11 @@ namespace mfem
 
 InterfaceForm::InterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, TopologyHandler *topol_)
-   : meshes(meshes_), fes(fes_), topol_handler(topol_), numSub(meshes_.Size())
+   : meshes(meshes_), fes(fes_), topol_handler(topol_),
+     numSub(topol_->GetNumLocalSubdomains()),
+     numSubStored(meshes_.Size())
 {
-   assert(fes_.Size() == numSub);
+   assert(fes_.Size() == numSubStored);
 
    block_offsets.SetSize(numSub + 1);
    block_offsets = 0;
@@ -28,12 +30,13 @@ InterfaceForm::~InterfaceForm()
    DeletePointers(fnfi);
 }
 
+// TODO: use a sparse array of SparseMatrix pointers, rather than a dense Array2D.
 void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const
 {
-   assert(mats.NumRows() == numSub);
-   assert(mats.NumCols() == numSub);
-   for (int i = 0; i < numSub; i++)
-      for (int j = 0; j < numSub; j++) assert(mats(i, j));
+   assert(mats.NumRows() == numSubStored);
+   assert(mats.NumCols() == numSubStored);
+   for (int i = 0; i < numSubStored; i++)
+      for (int j = 0; j < numSubStored; j++) assert(mats(i, j));
 
    const PortInfo *pInfo;
    Array<int> midx(2);
@@ -48,7 +51,13 @@ void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) con
 
       midx[0] = pInfo->Mesh1;
       midx[1] = pInfo->Mesh2;
-      
+
+      for (int i = 0; i < 2; i++)
+	midx[i] = topol_handler->LocalSubdomainIndex(midx[i]);
+
+      if (midx[0] < 0 || midx[1] < 0)
+	continue;
+
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++) mats_p(i, j) = mats(midx[i], midx[j]);
 
@@ -323,10 +332,12 @@ void InterfaceForm::AssembleInterfaceGrad(Mesh *mesh1, Mesh *mesh2,
 MixedInterfaceForm::MixedInterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &trial_fes_, 
    Array<FiniteElementSpace *> &test_fes_, TopologyHandler *topol_)
-   : meshes(meshes_), trial_fes(trial_fes_), test_fes(test_fes_), topol_handler(topol_), numSub(meshes_.Size())
+   : meshes(meshes_), trial_fes(trial_fes_), test_fes(test_fes_), topol_handler(topol_),
+     numSub(topol_->GetNumLocalSubdomains()),
+     numSubStored(meshes_.Size())
 {
-   assert(trial_fes_.Size() == numSub);
-   assert(test_fes_.Size() == numSub);
+   assert(trial_fes_.Size() == numSubStored);
+   assert(test_fes_.Size() == numSubStored);
 
    trial_block_offsets.SetSize(numSub + 1);
    test_block_offsets.SetSize(numSub + 1);
@@ -361,7 +372,13 @@ void MixedInterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats
 
       midx[0] = pInfo->Mesh1;
       midx[1] = pInfo->Mesh2;
-      
+
+      for (int i = 0; i < 2; i++)
+	midx[i] = topol_handler->LocalSubdomainIndex(midx[i]);
+
+      if (midx[0] < 0 || midx[1] < 0)
+	continue;
+
       for (int i = 0; i < 2; i++)
          for (int j = 0; j < 2; j++)
             b_mats_p(i, j) = mats(midx[i], midx[j]);

@@ -44,6 +44,8 @@ MultiBlockSolver::MultiBlockSolver()
    
    // Receive topology info
    numSub = topol_data.numSub;
+   numSubLoc = topol_handler->GetNumLocalSubdomains();
+   numSubStored = meshes.Size();
    dim = topol_data.dim;
    global_bdr_attributes = *(topol_data.global_bdr_attributes);
    numBdr = global_bdr_attributes.Size();
@@ -168,13 +170,13 @@ void MultiBlockSolver::SetVariableVector(const int &var_idx, BlockVector &var, B
 
 void MultiBlockSolver::SortBySubdomains(BlockVector &by_var, BlockVector &by_sub)
 {
-   assert(by_var.NumBlocks() == (num_var * numSub));
-   assert(by_sub.NumBlocks() == (num_var * numSub));
+   assert(by_var.NumBlocks() == (num_var * numSubLoc));
+   assert(by_sub.NumBlocks() == (num_var * numSubLoc));
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
       for (int v = 0; v < num_var; v++)
       {
-         int by_var_idx = numSub * v + m;
+         int by_var_idx = numSubLoc * v + m;
          int by_sub_idx = num_var * m + v;
          assert(by_var.BlockSize(by_var_idx) == by_sub.BlockSize(by_sub_idx));
 
@@ -186,13 +188,13 @@ void MultiBlockSolver::SortBySubdomains(BlockVector &by_var, BlockVector &by_sub
 
 void MultiBlockSolver::SortByVariables(BlockVector &by_sub, BlockVector &by_var)
 {
-   assert(by_var.NumBlocks() == (num_var * numSub));
-   assert(by_sub.NumBlocks() == (num_var * numSub));
+   assert(by_var.NumBlocks() == (num_var * numSubLoc));
+   assert(by_sub.NumBlocks() == (num_var * numSubLoc));
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
       for (int v = 0; v < num_var; v++)
       {
-         int by_var_idx = numSub * v + m;
+         int by_var_idx = numSubLoc * v + m;
          int by_sub_idx = num_var * m + v;
          assert(by_var.BlockSize(by_var_idx) == by_sub.BlockSize(by_sub_idx));
 
@@ -206,9 +208,13 @@ void MultiBlockSolver::SetupBCVariables()
 {
    // Set up boundary markers.
    int max_bdr_attr = -1;
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
    {
       max_bdr_attr = max(max_bdr_attr, meshes[m]->bdr_attributes.Max());
+   }
+   {
+     const int local_max = max_bdr_attr;
+     MPI_Allreduce(&local_max, &max_bdr_attr, 1, MPI_INT, MPI_MAX, topol_handler->GetComm());
    }
 
    // TODO: technically this should be Array<Array2D<int>*> for each meshes.
@@ -281,6 +287,11 @@ void MultiBlockSolver::AssembleROMMat()
    romMat->Finalize();
    rom_handler->SetRomMat(romMat);
    rom_handler->CreateHypreParMatrix(romMat, rank, nproc);
+
+   localBlocks = rom_handler->GetLocalBlocks(); // TODO: get this for FOM without depending on ROM?
+   rom_handler->GetLocalNumBlocks(localNumBlocks); // TODO: get this for FOM without depending on ROM?
+
+   topol_handler->GetNeighbors(neighbors);
 }
 
 void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
@@ -288,11 +299,15 @@ void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(rom_elems);
 
+   const int ossub = rank * numSubLoc; // TODO: this is wrong in general. Get this correctly!
+
    // component domain matrix.
-   for (int m = 0; m < numSub; m++)
-   {
-      int c_type = topol_handler->GetMeshType(m);
-      int num_block = (separate_variable_basis) ? num_var : 1;
+   for (int mm = 0; mm < numSubLoc; mm++)
+     {
+      const int m = mm + ossub;
+      const int m_global = topol_handler->GlobalSubdomainIndex(mm);
+      const int c_type = topol_handler->GetMeshType(m_global);
+      const int num_block = (separate_variable_basis) ? num_var : 1;
 
       Array<int> midx(num_block);
       for (int v = 0; v < num_block; v++)
@@ -302,7 +317,7 @@ void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
       AddToBlockMatrix(midx, midx, *comp_mat, romMat);
 
       // boundary matrices of each component.
-      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(mm); //??
 
       for (int b = 0; b < bdr_c2g->Size(); b++)
       {
@@ -366,15 +381,15 @@ void MultiBlockSolver::InitVisualization(const std::string& output_path)
 void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
 {
    assert(var_names.size() == num_var);
-   assert((visual.domain_offset >= 0) && (visual.domain_offset < numSub));
-   assert((visual.domain_interval > 0) && (visual.domain_interval <= numSub));
-   paraviewColls.SetSize(numSub);
+   assert((visual.domain_offset >= 0) && (visual.domain_offset < numSubLoc));
+   assert((visual.domain_interval > 0) && (visual.domain_interval <= numSubLoc));
+   paraviewColls.SetSize(numSubLoc);
    paraviewColls = NULL;
 
    std::string error_type, tmp;
    if (visual.save_error)
    {
-      error_visual.SetSize(num_var * numSub);
+      error_visual.SetSize(num_var * numSubLoc);
       error_visual = NULL;
       for (int k = 0; k < error_visual.Size(); k++)
          error_visual[k] = new GridFunction(fes[k]);
@@ -382,7 +397,7 @@ void MultiBlockSolver::InitIndividualParaview(const std::string& file_prefix)
       error_type = "_abs_error";
    }
 
-   for (int m = 0; m < numSub; m++) {
+   for (int m = 0; m < numSubLoc; m++) {
       if ((m < visual.domain_offset) || (m % visual.domain_interval != 0)) continue;
 
       ostringstream oss;
@@ -721,13 +736,13 @@ void MultiBlockSolver::ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridF
 
 void MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error)
 {
-   assert(fom_sols.Size() == (num_var * numSub));
-   assert(rom_sols.Size() == (num_var * numSub));
+   assert(fom_sols.Size() == (num_var * numSubLoc));
+   assert(rom_sols.Size() == (num_var * numSubLoc));
 
    Vector norm(num_var);
    error.SetSize(num_var);
    norm = 0.0; error = 0.0;
-   for (int m = 0, idx = 0; m < numSub; m++)
+   for (int m = 0, idx = 0; m < numSubLoc; m++)
    {
       for (int v = 0; v < num_var; v++, idx++)
       {
@@ -755,7 +770,7 @@ void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
       assert(test_U.BlockSize(b) == U->BlockSize(b));
 
    Array<GridFunction *> test_us;
-   test_us.SetSize(num_var * numSub);
+   test_us.SetSize(num_var * numSubLoc);
    for (int k = 0; k < test_us.Size(); k++)
    {
       test_us[k] = new GridFunction(fes[k], test_U.GetBlock(k), 0);

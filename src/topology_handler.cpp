@@ -31,6 +31,10 @@ const TopologyHandlerMode SetTopologyHandlerMode()
 TopologyHandler::TopologyHandler(const TopologyHandlerMode &input_type)
    : type(input_type)
 {
+   comm = MPI_COMM_WORLD;
+   MPI_Comm_size(comm, &nprocs);
+   MPI_Comm_rank(comm, &rank);
+
    std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
    if (dd_mode_str == "interior_penalty")
    {
@@ -161,6 +165,103 @@ void TopologyHandler::PrintInterfaceInfo(const int k)
                info_j->Inf1 % 64, info_j->Inf2 % 64);
       }
    }
+}
+
+void TopologyHandler::LoadBalance()
+{
+  // TODO: balance the number of DOFs per rank, rather than the number of subdomains.
+  const int nloc = numSub / nprocs; // Number of subdomains per rank (may be low due to integer division)
+  const int ne = numSub - (nloc * nprocs); // Number of ranks assigned an extra subdomain
+
+  subdomain_rank.SetSize(numSub);
+  allNumSub.SetSize(nprocs);
+
+  int os = 0;
+  for (int j=0; j<nprocs; ++j)
+    {
+      const int ns = j < ne ? nloc + 1 : nloc; // Number of subdomains for rank j
+      allNumSub[j] = ns;
+
+      if (j == rank)
+	{
+	  local_subs.SetSize(ns);
+	  for (int i=0; i<ns; ++i)
+	    {
+	      local_subs[i] = os + i;
+	      g2l_sub[os + i] = i;
+	    }
+
+	  numSubLoc = ns;
+	}
+
+      for (int i=0; i<ns; ++i)
+	subdomain_rank[os + i] = j;
+
+      os += ns;
+    }
+}
+
+void TopologyHandler::GetAllNumSub(Array<int> &ns)
+{
+  ns = allNumSub;
+}
+
+int TopologyHandler::GlobalSubdomainRank(int global_subdomain)
+{
+  return subdomain_rank[global_subdomain];
+}
+
+int TopologyHandler::LocalSubdomainIndex(int global_subdomain)
+{
+  if (g2l_sub.count(global_subdomain))
+    return g2l_sub.at(global_subdomain);
+  if (nghb2loc.count(global_subdomain))
+    return nghb2loc.at(global_subdomain);
+
+  return -1;
+}
+
+int TopologyHandler::GlobalSubdomainIndex(int local_subdomain)
+{
+  return local_subs[local_subdomain];
+}
+
+void TopologyHandler::FindPortNeighborSubdomains()
+{
+  MFEM_VERIFY(port_infos.Size() == num_ports, "");
+
+  subNeighbors.clear();
+  for (auto pi : port_infos)
+    {
+      std::array<int, 2> meshIndex = {pi.Mesh1, pi.Mesh2};
+      bool localPort = false;
+      for (auto m : meshIndex)
+	{
+	  if (LocalSubdomainIndex(m) >= 0) // if subdomain is local
+	    localPort = true;
+	}
+
+      if (!localPort) continue;
+
+      for (auto m : meshIndex)
+	{
+	  if (LocalSubdomainIndex(m) == -1)
+	    subNeighbors.insert(m);
+	}
+    }
+}
+
+void TopologyHandler::GetNeighbors(Array<int> &neighbors)
+{
+  neighbors.SetSize(subNeighbors.size());
+
+  int cnt = 0;
+  for (auto n : subNeighbors)
+    {
+      neighbors[cnt++] = n;
+    }
+
+  MFEM_VERIFY(cnt == neighbors.Size(), "");
 }
 
 /*

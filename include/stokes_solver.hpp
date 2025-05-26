@@ -96,6 +96,7 @@ protected:
 
    // System matrix for Bilinear case.
    Array<int> u_offsets, p_offsets, vblock_offsets;
+   Array<int> global_u_offsets, global_p_offsets, global_os_u;
    Array2D<SparseMatrix *> m_mats, b_mats;
    BlockMatrix *mMat = NULL, *bMat = NULL;
    SparseMatrix *M = NULL, *B = NULL;
@@ -108,6 +109,12 @@ protected:
    SparseMatrix *systemOp_mono = NULL;
    HypreParMatrix *systemOp_hypre = NULL;
    MUMPSSolver *mumps = NULL;
+
+   // Data for HypreParMatrix construction
+   Array<int> global_offsets;
+   SparseMatrix *hdiag = NULL;
+   SparseMatrix *hoffd = NULL;
+   Array<HYPRE_BigInt> cmap;
 
    // operators
    Array<LinearForm *> fs, gs;
@@ -183,6 +190,9 @@ public:
       const MUMPSSolver::MatType mat_type=MUMPSSolver::MatType::SYMMETRIC_INDEFINITE);
    virtual void SetupPressureMassMatrix();
 
+   void SetupMUMPSSolverSerial();
+   void SetupMUMPSSolverParallel();
+
    // Component-wise assembly
    void BuildCompROMLinElems() override;
    void BuildBdrROMLinElems() override;
@@ -216,6 +226,10 @@ private:
    double ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr, Coefficient &Q);
    void ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr,
                            VectorCoefficient &Q, Vector &result);
+
+  void CreateHypreParMatrix();
+
+  void SetGlobalOffsets();
 };
 
 #endif

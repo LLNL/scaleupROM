@@ -269,7 +269,7 @@ void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::stri
 
    snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
    snapshot_options.Last()->static_svd_preserve_snapshot = true;
-   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename, CAROM::Database::formats::HDF5_MPIO));
+   snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename, CAROM::Database::formats::HDF5));
 
    basis_tag2idx[basis_tag] = basis_tags.size();
    basis_tags.push_back(basis_tag);
@@ -405,7 +405,7 @@ void SampleGenerator::CollectSnapshotsByBasis(const std::string &basis_prefix,
    CAROM::BasisGenerator *basis_generator = snapshot_generators[index];
 
    for (int s = 0; s < file_list.size(); s++)
-      basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5_MPIO);
+      basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5);
 }
 
 void SampleGenerator::CollectSnapshotsByPort(

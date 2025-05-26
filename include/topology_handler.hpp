@@ -57,9 +57,19 @@ class TopologyHandler
 {
 protected:
    int numSub = -1;   // number of subdomains.
+   int numSubLoc = -1;  // number of local subdomains on this rank
+   Array<int> local_subs;  // local subdomains
+   std::map<int, int> g2l_sub;  // map from global to local subdomains
    int num_comp = -1;  // number of components. Submesh - only one component / Component - multiple components allowed, not yet implemented.
    Array<int> sub_composition;  // number of subdomains per each component index.
    std::vector<std::string> comp_names;
+
+   // Global data about all subdomains or all ranks. TODO: eliminate this for better scalability.
+   Array<int> subdomain_rank, allNumSub;
+
+   // MPI data
+   MPI_Comm comm;
+   int rank, nprocs;
 
    // Spatial dimension.
    int dim = -1;
@@ -77,6 +87,10 @@ protected:
    Array<PortInfo> port_infos;
    Array<Array<InterfaceInfo>*> interface_infos;
 
+   std::set<int> subNeighbors;
+
+   std::map<int, int> nghb2loc; // Global subdomain index to locally stored (for non-local neighboring subdomains)
+
 public:
    TopologyHandler(const TopologyHandlerMode &input_type);
 
@@ -87,6 +101,7 @@ public:
    // access
    const TopologyHandlerMode GetType() { return type; }
    const int GetNumSubdomains() { return numSub; }
+   const int GetNumLocalSubdomains() { return numSubLoc; }
    const int GetNumSubdomains(const int &c) { return sub_composition[c]; }
    const int GetNumComponents() { return num_comp; }
    const int GetNumPorts() { return num_ports; }
@@ -138,9 +153,19 @@ public:
    virtual void PrintPortInfo(const int k = -1);
    virtual void PrintInterfaceInfo(const int k = -1);
 
+   MPI_Comm GetComm() { return comm; }
+   int LocalSubdomainIndex(int global_subdomain);
+   int GlobalSubdomainIndex(int local_subdomain);
+   int GetRank() const { return rank; }
+   int GlobalSubdomainRank(int global_subdomain);
+   void FindPortNeighborSubdomains();
+   void GetAllNumSub(Array<int> &ns);
+   void GetNeighbors(Array<int> &neighbors);
+
 protected:
    virtual void UpdateAttributes(Mesh& m);
    virtual void UpdateBdrAttributes(Mesh& m);
+   void LoadBalance();
 };
 
 class SubMeshTopologyHandler : public TopologyHandler
