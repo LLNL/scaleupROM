@@ -375,6 +375,8 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    // Temp to try completely random RHS
    RHS->Randomize();
    fnorm = RHS->Norml2();
+   *RHS /= fnorm;
+   fnorm = RHS->Norml2();
    cout << "norm post random is: " << fnorm << endl;
    }
 
