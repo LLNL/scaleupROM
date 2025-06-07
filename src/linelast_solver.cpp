@@ -363,11 +363,20 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    {scale_input = true;} */
 
    fnorm = RHS->Norml2();
+   std::string mode = config.GetOption<std::string>("main/mode", "run_example");
+   if (mode == "sample_generation"){
+   cout << "norm pre random is: " << fnorm << endl;
    /* if (scale_input)
    {
       *RHS /= fnorm;
       cout<<"FOM input is scaled with norm: "<<fnorm<<", new norm is: "<<RHS->Norml2()<<endl;
    }    */
+
+   // Temp to try completely random RHS
+   RHS->Randomize();
+   fnorm = RHS->Norml2();
+   cout << "norm post random is: " << fnorm << endl;
+   }
 
    // TODO: need to change when the actual parallelization is implemented.
    cout << "direct_solve is: " << direct_solve << endl;

@@ -174,8 +174,7 @@ void GenerateSamples(MPI_Comm comm)
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
-      // Temp to try completely random RHS
-      test->RHS->Randomize();
+      
       bool converged = test->Solve(sample_generator);
       cout<<"converged: "<<converged<<endl;
       if (!converged)
