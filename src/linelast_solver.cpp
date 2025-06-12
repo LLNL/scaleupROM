@@ -378,7 +378,7 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    fnorm = RHS->Norml2();
    noise -= 0.5;
    noise *= fnorm*0.1;
-   *RHS += noise;
+   *RHS *= noise;
    fnorm = RHS->Norml2();
    cout << "norm post random is: " << fnorm << endl;
    }
