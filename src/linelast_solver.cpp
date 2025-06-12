@@ -374,7 +374,7 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
 
    // Temp to try completely random RHS
    BlockVector noise(*RHS);
-   noise->Randomize();
+   noise.Randomize();
    fnorm = RHS->Norml2();
    noise -= 0.5;
    noise *= fnorm*0.1;
