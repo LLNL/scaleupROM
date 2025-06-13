@@ -1112,7 +1112,7 @@ void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
       int idx = (separate_variable_basis) ? c * num_var : c;
       basis_tag = rom_handler->GetRefBasisTag(idx);
 
-      const CAROM::Matrix *snapshots = sample_generator->LookUpSnapshot(basis_tag);
+      std::shared_ptr<const CAROM::Matrix> snapshots = sample_generator->LookUpSnapshot(basis_tag);
       comp_eqps[c]->TrainEQP(*snapshots, eqp_tol);
    }
 
@@ -1144,8 +1144,8 @@ void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
          If LookUpSnapshot happens to find the same basis twice,
          it will nullify the first pointer.
        */
-      const CAROM::Matrix *snapshots1 = sample_generator->LookUpSnapshot(basis_tag1);
-      const CAROM::Matrix *snapshots2 = NULL;
+      std::shared_ptr<const CAROM::Matrix> snapshots1 = sample_generator->LookUpSnapshot(basis_tag1);
+      std::shared_ptr<const CAROM::Matrix> snapshots2;
       if (basis_tag1 == basis_tag2)
          snapshots2 = snapshots1;
       else

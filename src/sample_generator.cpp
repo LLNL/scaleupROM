@@ -332,7 +332,7 @@ void SampleGenerator::WriteSnapshotPorts()
    return;
 }
 
-const CAROM::Matrix* SampleGenerator::LookUpSnapshot(const BasisTag &basis_tag)
+std::shared_ptr<const CAROM::Matrix> SampleGenerator::LookUpSnapshot(const BasisTag &basis_tag)
 {
    assert(snapshot_generators.Size() > 0);
    assert(snapshot_generators.Size() == basis_tags.size());
@@ -561,7 +561,7 @@ void SampleGenerator::SaveSV(CAROM::BasisGenerator *basis_generator, const std::
    if (!save_sv) return;
    assert(basis_generator != NULL);
 
-   const CAROM::Vector *rom_sv = basis_generator->getSingularValues();
+   std::shared_ptr<const CAROM::Vector> rom_sv = basis_generator->getSingularValues();
    printf("Singular values: ");
    for (int d = 0; d < rom_sv->dim(); d++)
       printf("%.3E\t", rom_sv->item(d));

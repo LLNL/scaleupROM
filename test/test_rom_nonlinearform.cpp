@@ -870,8 +870,8 @@ TEST(ROMNonlinearForm, SetupEQPSystemForDomainIntegrator)
       basis_generator.takeSample(snapshot.GetData());
    }
    basis_generator.endSamples();
-   const CAROM::Matrix *carom_snapshots = basis_generator.getSnapshotMatrix();
-   const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
+   std::shared_ptr<const CAROM::Matrix> carom_snapshots = basis_generator.getSnapshotMatrix();
+   std::shared_ptr<const CAROM::Matrix> carom_basis = basis_generator.getSpatialBasis();
    DenseMatrix basis(ndofs, num_basis);
    CAROM::CopyMatrix(*carom_basis, basis);
 
@@ -980,8 +980,8 @@ TEST(ROMNonlinearForm, SetupEQPSystemForInteriorFaceIntegrator)
       basis_generator.takeSample(snapshot.GetData());
    }
    basis_generator.endSamples();
-   const CAROM::Matrix *carom_snapshots = basis_generator.getSnapshotMatrix();
-   const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
+   std::shared_ptr<const CAROM::Matrix> carom_snapshots = basis_generator.getSnapshotMatrix();
+   std::shared_ptr<const CAROM::Matrix> carom_basis = basis_generator.getSpatialBasis();
    DenseMatrix basis(ndofs, num_basis);
    CAROM::CopyMatrix(*carom_basis, basis);
 
@@ -1091,8 +1091,8 @@ TEST(ROMNonlinearForm, SetupEQPSystemForBdrFaceIntegrator)
       basis_generator.takeSample(snapshot.GetData());
    }
    basis_generator.endSamples();
-   const CAROM::Matrix *carom_snapshots = basis_generator.getSnapshotMatrix();
-   const CAROM::Matrix *carom_basis = basis_generator.getSpatialBasis();
+   std::shared_ptr<const CAROM::Matrix> carom_snapshots = basis_generator.getSnapshotMatrix();
+   std::shared_ptr<const CAROM::Matrix> carom_basis = basis_generator.getSpatialBasis();
    DenseMatrix basis(ndofs, num_basis);
    CAROM::CopyMatrix(*carom_basis, basis);
 

@@ -4,3 +4,4 @@
 
 add_subdirectory(poisson)
 add_subdirectory(linelast)
+add_subdirectory(stokes)
