@@ -13,7 +13,7 @@ using namespace mfem;
 */
 
 UnsteadyNSSolver::UnsteadyNSSolver()
-   : SteadyNSSolver(), timer()
+   : SteadyNSSolver(), timer("UnsteadyNSSolver")
 {
    nonlinear_mode = true;
 

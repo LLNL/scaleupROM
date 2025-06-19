@@ -118,11 +118,7 @@ public:
    SteadyNSEQPROM(ROMHandlerBase *rom_handler, Array<ROMNonlinearForm *> &hs_,
                   ROMInterfaceForm *itf_, const bool direct_solve_=true);
 
-   virtual ~SteadyNSEQPROM()
-   {
-      if (config.GetOption<bool>("time_profile/SteadyNSEQPROM", false))
-         timer.Print("SteadyNSEQPROM");
-   }
+   virtual ~SteadyNSEQPROM() {}
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;

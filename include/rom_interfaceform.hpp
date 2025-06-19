@@ -17,9 +17,6 @@ namespace mfem
 
 class ROMInterfaceForm : public InterfaceForm
 {
-private:
-   mutable TimeProfiler timer;
-
 protected:
    const int numPorts;
    const int numRefPorts;

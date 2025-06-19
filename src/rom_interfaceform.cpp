@@ -14,7 +14,7 @@ namespace mfem
 ROMInterfaceForm::ROMInterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, Array<FiniteElementSpace *> &comp_fes_, TopologyHandler *topol_)
    : InterfaceForm(meshes_, fes_, topol_), numPorts(topol_->GetNumPorts()), numRefPorts(topol_->GetNumRefPorts()),
-     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_), timer()
+     num_comp(topol_->GetNumComponents()), comp_fes(comp_fes_)
 {
    comp_basis.SetSize(num_comp);
    comp_basis = NULL;
@@ -32,14 +32,13 @@ ROMInterfaceForm::ROMInterfaceForm(
    else if (nnls_str == "linf")     nnls_criterion = CAROM::NNLS_termination::LINF;
    else
       mfem_error("ROMNonlinearForm: unknown NNLS criterion!\n");
+
+   timer.SetTitle("ROMInterfaceForm");
 }
 
 ROMInterfaceForm::~ROMInterfaceForm()
 {
    DeletePointers(fnfi_ref_sample);
-
-   if (config.GetOption<bool>("time_profile/ROMInterfaceForm", false))
-      timer.Print("ROMInterfaceForm");
 }
 
 void ROMInterfaceForm::SetBasisAtComponent(const int c, DenseMatrix &basis_, const int offset)

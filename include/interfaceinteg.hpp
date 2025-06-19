@@ -303,9 +303,9 @@ private:
 
 public:
    DGLaxFriedrichsFluxIntegrator(Coefficient &q, VectorCoefficient *ud = NULL, const IntegrationRule *ir = NULL)
-      : InterfaceNonlinearFormIntegrator(ir), Q(&q), UD(ud) {}
+      : InterfaceNonlinearFormIntegrator(ir), Q(&q), UD(ud), timer("DGLaxFriedrichsFluxIntegrator") {}
 
-   virtual ~DGLaxFriedrichsFluxIntegrator();
+   virtual ~DGLaxFriedrichsFluxIntegrator() {};
 
    void AssembleFaceVector(const FiniteElement &el1,
                            const FiniteElement &el2,

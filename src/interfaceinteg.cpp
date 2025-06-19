@@ -1308,12 +1308,6 @@ void InterfaceDGElasticityIntegrator::AssembleBlock(
    DGLaxFriedrichsFluxIntegrator
 */
 
-DGLaxFriedrichsFluxIntegrator::~DGLaxFriedrichsFluxIntegrator()
-{
-   if (config.GetOption<bool>("time_profile/DGLaxFriedrichsFluxIntegrator", false))
-      timer.Print("DGLaxFriedrichsFluxIntegrator");
-}
-
 void DGLaxFriedrichsFluxIntegrator::ComputeFluxDotN(
    const Vector &u1, const Vector &u2, const Vector &nor,
    const bool &eval2, Vector &flux)

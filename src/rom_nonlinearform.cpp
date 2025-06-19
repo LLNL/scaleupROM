@@ -12,7 +12,7 @@ namespace mfem
 {
 
 ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, const bool reference_)
-   : NonlinearForm(f), reference(reference_), timer()
+   : NonlinearForm(f), reference(reference_), timer("ROMNonlinearForm")
 {
    height = width = num_basis;
 
@@ -41,9 +41,6 @@ ROMNonlinearForm::~ROMNonlinearForm()
       DeletePointers(fnfi_sample);
       DeletePointers(bfnfi_sample);
    }
-
-   if (config.GetOption<bool>("time_profile/ROMNonlinearForm", false))
-      timer.Print("ROMNonlinearForm");
 }
 
 void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const

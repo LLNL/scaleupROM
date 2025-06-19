@@ -24,7 +24,8 @@ SteadyNSOperator::SteadyNSOperator(
    Array<int> &u_offsets_, const bool direct_solve_)
    : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), nl_itf(nl_itf_),
      u_offsets(u_offsets_), direct_solve(direct_solve_),
-     M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0)))
+     M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0))),
+     timer("SteadyNSOperator")
 {
    vblock_offsets.SetSize(3);
    vblock_offsets[0] = 0;
@@ -57,9 +58,6 @@ SteadyNSOperator::~SteadyNSOperator()
    delete uu_mono;
    delete mono_jac;
    delete jac_hypre;
-
-   if (config.GetOption<bool>("time_profile/SteadyNSOperator", false))
-      timer.Print("SteadyNSOperator");
 }
 
 void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
@@ -250,7 +248,8 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 SteadyNSEQPROM::SteadyNSEQPROM(
    ROMHandlerBase *rom_handler, Array<ROMNonlinearForm *> &hs_,
    ROMInterfaceForm *itf_, const bool direct_solve_)
-   : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_), itf(itf_), timer()
+   : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_), itf(itf_),
+     timer("SteadyNSEQPROM")
 {
    if (!separate_variable)
    {

@@ -6,6 +6,7 @@
 #define ETC_HPP
 
 #include "mfem.hpp"
+#include "input_parser.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -41,6 +42,8 @@ std::string string_format( const std::string& format, Args ... args )
 class TimeProfiler
 {
 private:
+    std::string title = "";
+
     Array<StopWatch *> timers;
 
     Array<int> calls;
@@ -52,8 +55,8 @@ private:
     int rank;
 
 public:
-    TimeProfiler(MPI_Comm comm_=MPI_COMM_WORLD)
-        : comm(comm_)
+    TimeProfiler(const std::string &title_, MPI_Comm comm_=MPI_COMM_WORLD)
+        : title(title_), comm(comm_)
     {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         calls.SetSize(0);
@@ -63,8 +66,14 @@ public:
 
     virtual ~TimeProfiler()
     {
+        std::string option = "time_profile/" + title;
+        if (config.GetOption<bool>(option, false))
+            Print(title);
         DeletePointers(timers);
     }
+
+    void SetTitle(const std::string &title_)
+    { title = title_; }
 
     void Start(const std::string &name)
     {
@@ -106,7 +115,7 @@ public:
         starts[idx] = false;
     }
 
-    void Print(const std::string &title, const bool compute_sum=false)
+    void Print(const std::string &title_, const bool compute_sum=false)
     {
         int nfunc = timers.Size();
         for (int k = 0; k < nfunc; k++)
@@ -122,7 +131,7 @@ public:
 
         if (rank == 0)
         {
-            printf("%s", (title + "\n").c_str());
+            printf("%s", (title_ + "\n").c_str());
 
             std::string line = std::string(100, '=');
             line += "\n";

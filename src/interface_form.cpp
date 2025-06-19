@@ -12,7 +12,8 @@ namespace mfem
 
 InterfaceForm::InterfaceForm(
    Array<Mesh *> &meshes_, Array<FiniteElementSpace *> &fes_, TopologyHandler *topol_)
-   : meshes(meshes_), fes(fes_), topol_handler(topol_), numSub(meshes_.Size()), timer()
+   : meshes(meshes_), fes(fes_), topol_handler(topol_),
+     numSub(meshes_.Size()), timer("InterfaceForm")
 {
    assert(fes_.Size() == numSub);
 
@@ -26,9 +27,6 @@ InterfaceForm::InterfaceForm(
 InterfaceForm::~InterfaceForm()
 {
    DeletePointers(fnfi);
-
-   if (config.GetOption<bool>("time_profile/InterfaceForm", false))
-      timer.Print("InterfaceForm::InterfaceAddMult");
 }
 
 void InterfaceForm::AssembleInterfaceMatrices(Array2D<SparseMatrix *> &mats) const
