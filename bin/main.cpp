@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
       else if (mode == "train_rom")       TrainROM(MPI_COMM_WORLD);
       else if (mode == "aux_train_rom")   AuxiliaryTrainROM(MPI_COMM_WORLD);
       else if (mode == "train_eqp")       TrainEQP(MPI_COMM_WORLD);
-      else if (mode == "single_run")      double dump = SingleRun(MPI_COMM_WORLD, output_file);
+      else if (mode == "single_run")      SingleRun(MPI_COMM_WORLD, output_file);
       else if (mode == "print_eqp")       PrintEQPCoords(MPI_COMM_WORLD);
       else
       {

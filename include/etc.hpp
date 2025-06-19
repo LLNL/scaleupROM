@@ -53,7 +53,7 @@ private:
 
 public:
     TimeProfiler(MPI_Comm comm_=MPI_COMM_WORLD)
-        : comm(comm_), timers(0), starts(0)
+        : comm(comm_)
     {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         calls.SetSize(0);

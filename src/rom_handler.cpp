@@ -638,12 +638,13 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   double amp = config.GetOption<int>("solver/initial_random_perturbation", 1.0e-5);
    if (use_restart)
       ProjectGlobalToDomainBasis(U, reduced_sol);
    else
    {
       for (int k = 0; k < reduced_sol->Size(); k++)
-         (*reduced_sol)(k) = 1.0e-5 * UniformRandom();
+         (*reduced_sol)(k) = amp * UniformRandom();
    }
 
    int maxIter = config.GetOption<int>("solver/max_iter", 100);

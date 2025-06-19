@@ -16,6 +16,9 @@ class UnsteadyNSSolver : public SteadyNSSolver
 friend class ParameterizedProblem;
 friend class SteadyNSOperator;
 
+private:
+   mutable TimeProfiler timer;
+
 protected:
 
    // number of timesteps
