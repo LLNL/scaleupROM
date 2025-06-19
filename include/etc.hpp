@@ -122,11 +122,11 @@ public:
 
         if (rank == 0)
         {
-            printf((title + "\n").c_str());
+            printf("%s", (title + "\n").c_str());
 
             std::string line = std::string(100, '=');
             line += "\n";
-            printf(line.c_str());
+            printf("%s", line.c_str());
             printf("%20s\t%20s\t%20s\t%20s\n", "Function", "Total time", "Calls", "Time per call");
             for (int k = 0; k < nfunc; k++)
             {
@@ -134,7 +134,7 @@ public:
             }
             if (compute_sum)
                 printf("%20s\t%20.5e\t%20d\t%20.5e\n", "Total time", total, 1, total);
-            printf(line.c_str());
+            printf("%s", line.c_str());
         }
     }
 };
