@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 
    FiniteElementSpace fes(&mesh, &h1_coll);
    FiniteElementSpace ufes(&mesh, &l2_coll, dim);
-   FiniteElementSpace pfes(&mesh, &pl2_coll);
+   FiniteElementSpace pfes(&mesh, &ph1_coll);
 
    // 6. Define the BlockStructure of the problem, i.e. define the array of
    //    offsets for each variable. The last component of the Array is the sum

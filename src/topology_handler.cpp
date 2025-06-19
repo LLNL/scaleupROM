@@ -113,7 +113,7 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
 
    // Correcting the local face1 transformation if orientation needs correction.
    int faceInf1, faceInf2;
-   int face1 = m1->GetBdrFace(if_info->BE1);
+   int face1 = m1->GetBdrElementFaceIndex(if_info->BE1);
    m1->GetFaceInfos(face1, &faceInf1, &faceInf2);
    if (faceInf1 != if_info->Inf1)
    {
@@ -130,7 +130,7 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
    }
 
    // Correcting the local face1 transformation if orientation needs correction.
-   int face2 = m2->GetBdrFace(if_info->BE2);
+   int face2 = m2->GetBdrElementFaceIndex(if_info->BE2);
    m2->GetFaceInfos(face2, &faceInf2, &faceInf1);
    if (faceInf2 != if_info->Inf2)
    {
@@ -382,11 +382,11 @@ void SubMeshTopologyHandler::BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm,
    parent_face_to_be = -1;
    for (int i = 0; i < pm.GetNBE(); i++)
    {
-      parent_face_to_be[pm.GetBdrElementEdgeIndex(i)] = i;
+      parent_face_to_be[pm.GetBdrElementFaceIndex(i)] = i;
    }
    for (int k = 0; k < sm.GetNBE(); k++)
    {
-      int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrFace(k)]];
+      int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrElementFaceIndex(k)]];
       if (pbeid != -1)
       {
          int attr = pm.GetBdrElement(pbeid)->GetAttribute();
@@ -424,14 +424,14 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
       for (int ib = 0; ib < meshes[i]->GetNBE(); ib++)
       {
          if (meshes[i]->GetBdrAttribute(ib) != generated_battr) continue;
-         int parent_face_i = (*parent_face_map[i])[meshes[i]->GetBdrFace(ib)];
+         int parent_face_i = (*parent_face_map[i])[meshes[i]->GetBdrElementFaceIndex(ib)];
 
          // Loop over each subdomain, each boundary element, to find the match.
          for (int j = i+1; j < numSub; j++)
          {
             for (int jb = 0; jb < meshes[j]->GetNBE(); jb++)
             {
-               int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrFace(jb)];
+               int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrElementFaceIndex(jb)];
                if (parent_face_i != parent_face_j) continue;
 
                assert(meshes[j]->GetBdrAttribute(jb) == generated_battr);

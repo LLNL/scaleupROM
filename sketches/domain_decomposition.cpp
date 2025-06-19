@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
     for (int m = 0; m < 1; m++){
       printf("Mesh %d\n", m);
       for (int i = 0; i < meshes[m]->GetNBE(); i++) {
-        int fn = meshes[m]->GetBdrFace(i);
+        int fn = meshes[m]->GetBdrElementFaceIndex(i);
         printf("Boundary Element %d : Face %d\n", i, fn);
       }
       // for (int i = 0; i < meshes[m]->GetNBE(); i++) {
@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
       //   printf("Boundary element %d - Adjacent element %d\n", i, elem_id);
       //   printf("Face index: %d, face orientation : %d\n", face_info / 64, face_info % 64);
       //
-      //   int fn = meshes[m]->GetBdrFace(i);
+      //   int fn = meshes[m]->GetBdrElementFaceIndex(i);
       //   int face_inf[2];
       //   meshes[m]->GetFaceInfos(fn, &face_inf[0], &face_inf[1]);
       //   printf("From faces_info - Face index: %d, face orientation : %d\n", face_inf[0] / 64, face_inf[0] % 64);

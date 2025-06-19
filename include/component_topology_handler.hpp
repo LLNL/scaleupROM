@@ -156,6 +156,8 @@ public:
    virtual void TransferToGlobal(Array<GridFunction*> &us, Array<GridFunction*> &global_u, const int &num_var)
    { mfem_error("ComponentTopologyHandler does not yet support global grid function/mesh!\n"); }
 
+   std::map<DofTag, Array<int>> SplitDofsByBoundary(FiniteElementSpace &fes);
+
 protected:
    // Get vertex orientation of face2 (from mesh2) with respect to face1 (mesh1).
    int GetOrientation(BlockMesh *comp1, const Element::Type &be_type, const Array<int> &vtx1, const Array<int> &vtx2);

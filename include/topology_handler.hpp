@@ -53,11 +53,14 @@ struct TopologyData {
 
 struct DofTag
 {
-   Array<int> battr;
+   const Array<int> battr;
 
    DofTag(const Array<int> &battrs)
       : battr(battrs)
-   { battr.Sort(); }
+   {
+      if (!battr.IsSorted())
+         mfem_error("DofTag: boundary attributes must be sorted beforehand!\n");
+   }
 
    bool operator==(const DofTag &dtag) const
    {
