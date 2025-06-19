@@ -358,29 +358,30 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
    int print_level = config.GetOption<int>("solver/print_level", 0);
    scale_output = config.GetOption<bool>("solver/scale_output_FOM", false);
    bool scale_input = config.GetOption<bool>("solver/scale_input_FOM", false);
+   bool rand_perturb = config.GetOption<bool>("solver/rand_perturb", false);
 
-   /* if (scale_output == true)
-   {scale_input = true;} */
+   if (scale_output == true)
+   {scale_input = true;}
 
    fnorm = RHS->Norml2();
    std::string mode = config.GetOption<std::string>("main/mode", "run_example");
    if (mode == "sample_generation"){
-   cout << "norm pre random is: " << fnorm << endl;
-   /* if (scale_input)
+   cout << "unmodified norm: " << fnorm << endl;
+   if (scale_input)
    {
       *RHS /= fnorm;
       cout<<"FOM input is scaled with norm: "<<fnorm<<", new norm is: "<<RHS->Norml2()<<endl;
-   }    */
-
-   // Temp to try completely random RHS
-   BlockVector noise(*RHS);
-   noise.Randomize();
-   fnorm = RHS->Norml2();
-   noise -= 0.5;
-   noise *= fnorm*0.1;
-   *RHS *= noise;
-   fnorm = RHS->Norml2();
-   cout << "norm post random is: " << fnorm << endl;
+   }  
+   else if (rand_perturb)
+   {
+      BlockVector noise(*RHS);
+      noise.Randomize();
+      noise -= 0.5;
+      noise *= fnorm*0.1;
+      *RHS *= noise;
+      cout<<"FOM input is scaled with multiplicative noise, new norm is: "<<RHS->Norml2()<<endl;
+   }
+   
    }
 
    // TODO: need to change when the actual parallelization is implemented.
@@ -449,12 +450,12 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
       delete solver;
    }
 
-   /* if (scale_output)
+   if (scale_output)
    {
       cout<<"FOM output is scaled with norm: "<<fnorm<<endl;
       *U *= fnorm;
       *RHS *= fnorm;
-   }    */
+   }
 
    if (std::isnan(U->Norml2()) || U->Norml2() > 1e16) // Check for NaN or divergent solutions
    {
