@@ -13,7 +13,7 @@ using namespace mfem;
 */
 
 UnsteadyNSSolver::UnsteadyNSSolver()
-   : SteadyNSSolver()
+   : SteadyNSSolver(), timer("UnsteadyNSSolver")
 {
    nonlinear_mode = true;
 
@@ -88,6 +88,8 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
    std::string restart_file, file_fmt;
    file_fmt = "%s/%s_%08d.h5";
 
+   timer.Start("Solve/init");
+
    SetupInitialCondition(initial_step, time);
 
    int sample_interval = config.GetOption<int>("sample_generation/time-integration/sample_interval", 0);
@@ -99,10 +101,14 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
 
    SaveVisualization(0, time);
 
+   timer.Stop("Solve/init");
+
    double cfl = 0.0;
    for (int step = initial_step; step < nt; step++)
    {
       Step(time, step);
+
+      timer.Start("Solve/save_sol");
 
       cfl = ComputeCFL(dt);
       SanityCheck(step);
@@ -125,9 +131,17 @@ bool UnsteadyNSSolver::Solve(SampleGenerator *sample_generator)
       if (sample_generator && sample_interval &&
           ((step+1) > bootstrap) && (((step+1) % sample_interval) == 0))
          SaveSnapshots(sample_generator);
+
+      timer.Stop("Solve/save_sol");
    }
 
+   timer.Start("Solve/final");
+
    SortBySubdomains(*U_step, *U);
+
+   timer.Stop("Solve/final");
+
+   timer.Print("UnsteadyNSSolver::Solve", true);
 
    return converged;
 }
@@ -208,28 +222,52 @@ void UnsteadyNSSolver::SetupInitialCondition(int &initial_step, double &time)
 
 void UnsteadyNSSolver::Step(double &time, int step)
 {
+   timer.Start("Step/copy_u");
+
    /* set time for forcing/boundary. At this point, time remains at the previous timestep. */
    SetTime(time);
 
    /* copy velocity */
    u1 = U_stepview->GetBlock(0);
 
+   timer.Stop("Step/copy_u");
+   timer.Start("Step/advect_dom");
+
    /* evaluate nonlinear advection at previous time step */
    Hop->Mult(u1, Cu1);
+
+   timer.Stop("Step/advect_dom");
+   timer.Start("Step/advect_itf");
+
    nl_itf->InterfaceAddMult(u1, Cu1);
+
+   timer.Stop("Step/advect_itf");
+   timer.Start("Step/rhs_sort");
 
    /* Base right-hand side for boundary conditions and forcing */
    SortByVariables(*RHS, *RHS_step);
 
+   timer.Stop("Step/rhs_sort");
+   timer.Start("Step/add_advect");
+
    /* Add nonlinear convection */
    RHS_stepview->GetBlock(0).Add(-ab1, Cu1);
+
+   timer.Stop("Step/add_advect");
+   timer.Start("Step/add_udot");
 
    /* Add time derivative term */
    // TODO: extend for high order bdf schemes
    massMat->AddMult(u1, RHS_stepview->GetBlock(0), -bd1 / dt);
 
+   timer.Stop("Step/add_udot");
+   timer.Start("Step/solve_system");
+
    /* Solve for the next step */
    mumps->Mult(*RHS_step, *U_step);
+
+   timer.Stop("Step/solve_system");
+   timer.Start("Step/pres_scale");
 
    /* remove pressure scalar if all dirichlet bc */
    if (!pres_dbc)
@@ -238,6 +276,8 @@ void UnsteadyNSSolver::Step(double &time, int step)
 
       U_stepview->GetBlock(1) -= p_const;
    }
+
+   timer.Stop("Step/pres_scale");
 
    time += dt;
 }
@@ -431,6 +471,8 @@ void UnsteadyNSSolver::SolveROM()
 {
    assert(rom_handler->GetOrdering() == ROMOrderBy::VARIABLE);
 
+   timer.Start("SolveROM/init");
+
    int initial_step = 0;
    double time = 0.0;
 
@@ -482,30 +524,59 @@ void UnsteadyNSSolver::SolveROM()
       }
    }
 
+   timer.Stop("SolveROM/init");
+
    for (int step = initial_step; step < nt; step++)
    {
+      timer.Start("SolveROM/set_time");
+
       /* set time for forcing/boundary. At this point, time remains at the previous timestep. */
       SetTime(time);
+
+      timer.Stop("SolveROM/set_time");
+      timer.Start("SolveROM/copy_u");
 
       /* copy velocity */
       u1 = rsol_view->GetBlock(0);
 
+      timer.Stop("SolveROM/copy_u");
+      timer.Start("SolveROM/advect_dom");
+
       /* evaluate nonlinear advection at previous time step */
       Hop->Mult(u1, Cu1);
+
+      timer.Stop("SolveROM/advect_dom");
+      timer.Start("SolveROM/advect_itf");
+
       itf_eqp->InterfaceAddMult(u1, Cu1);
+
+      timer.Stop("SolveROM/advect_itf");
+      timer.Start("SolveROM/get_rhs");
 
       /* Base right-hand side for boundary conditions and forcing */
       reduced_rhs = *(rom_handler->GetReducedRHS());
 
+      timer.Stop("SolveROM/get_rhs");
+      timer.Start("SolveROM/add_advect");
+
       /* Add nonlinear convection */
       rrhs_view->GetBlock(0).Add(-ab1, Cu1);
+
+      timer.Stop("SolveROM/add_advect");
+      timer.Start("SolveROM/add_udot");
 
       /* Add time derivative term */
       // TODO: extend for high order bdf schemes
       rom_mass->AddMult(u1, rrhs_view->GetBlock(0), -bd1 / dt);
 
+      timer.Stop("SolveROM/add_udot");
+      timer.Start("SolveROM/solve_system");
+
       /* Solve for the next step */
       rom_handler->Solve(reduced_rhs, *reduced_sol);
+
+      timer.Stop("SolveROM/solve_system");
+      timer.Start("SolveROM/pres_scale");
 
       /* remove pressure scalar if all dirichlet bc */
       if (!pres_dbc)
@@ -515,10 +586,18 @@ void UnsteadyNSSolver::SolveROM()
          rsol_view->GetBlock(1).Add(-p_const, rom_ones);
       }
 
+      timer.Stop("SolveROM/pres_scale");
+
       time += dt;
    }
 
+   timer.Start("SolveROM/liftup");
+
    rom_handler->LiftUpGlobal(*reduced_sol, *U);
+
+   timer.Stop("SolveROM/liftup");
+
+   timer.Print("UnsteadyNSSolver::SolveROM", true);
 
    delete rsol_view;
    delete reduced_sol;
