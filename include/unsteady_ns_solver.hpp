@@ -16,6 +16,9 @@ class UnsteadyNSSolver : public SteadyNSSolver
 friend class ParameterizedProblem;
 friend class SteadyNSOperator;
 
+private:
+   mutable TimeProfiler timer;
+
 protected:
 
    // number of timesteps
@@ -66,6 +69,9 @@ protected:
    /* mass matrix operator for ROM */
    Array<int> rom_u_offsets;
    BlockMatrix *rom_mass = NULL;
+
+private:
+   double times[10];
 
 public:
    UnsteadyNSSolver();

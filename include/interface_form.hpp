@@ -16,6 +16,8 @@ namespace mfem
 class InterfaceForm
 {
 protected:
+   mutable TimeProfiler timer;
+
    int numSub = -1;
    int skip_zeros = 1;
 

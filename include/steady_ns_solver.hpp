@@ -8,6 +8,7 @@
 #include "stokes_solver.hpp"
 #include "rom_nonlinearform.hpp"
 #include "rom_interfaceform.hpp"
+#include "etc.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -17,6 +18,9 @@ using namespace mfem;
 // Ultimately, we should implement InterfaceForm to pass, not the MultiBlockSolver itself.
 class SteadyNSOperator : public Operator
 {
+private:
+   mutable TimeProfiler timer;
+
 protected:
    bool direct_solve;
 
@@ -99,6 +103,9 @@ public:
 
 class SteadyNSEQPROM : public SteadyNSROM
 {
+private:
+   mutable TimeProfiler timer;
+
 protected:
    Array<ROMNonlinearForm *> hs; // not owned by SteadyNSEQPROM.
    ROMInterfaceForm *itf = NULL; // not owned by SteadyNSEQPROM.
@@ -188,6 +195,8 @@ public:
    virtual void SaveROMNlinElems(const std::string &input_prefix) override;
    virtual void LoadROMNlinElems(const std::string &input_prefix) override;
    virtual void AssembleROMNlinOper() override;
+
+   void SaveEQPCoords(const std::string &filename) override;
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);

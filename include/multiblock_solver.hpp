@@ -260,6 +260,8 @@ public:
    void ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error);
    void CompareSolution(BlockVector &test_U, Vector &error);
 
+   virtual void SaveEQPCoords(const std::string &filename) {}
+
 protected:
    virtual void AssembleROMMat(BlockMatrix &romMat);
 };

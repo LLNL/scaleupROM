@@ -175,13 +175,17 @@ void ROMHandlerBase::ParseSupremizerInput(Array<int> &num_ref_supreme, Array<int
    num_supreme.SetSize(numSub);
 
    YAML::Node basis_list = config.FindNode("basis/tags");
+   const int nsup_default = config.GetOption<int>("basis/number_of_supremizer", -1);
 
    BasisTag basis_tag;
    for (int b = 0; b < num_rom_comp; b++)
    {
       basis_tag = GetBasisTagForComponent(b, topol_handler, fom_var_names[1]);
 
-      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_supremizer", num_ref_basis[b * num_var + 1], basis_list);
+      // By default the same number of pressure basis.
+      const int nsup0 = (nsup_default > 0) ? nsup_default : num_ref_basis[b * num_var + 1];
+
+      num_ref_supreme[b] = config.LookUpFromDict("name", basis_tag.print(), "number_of_supremizer", nsup0, basis_list);
    }
 
    for (int m = 0; m < numSub; m++)
@@ -634,12 +638,13 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
    bool use_restart = config.GetOption<bool>("solver/use_restart", false);
+   double amp = config.GetOption<double>("solver/initial_random_perturbation", 1.0e-5);
    if (use_restart)
       ProjectGlobalToDomainBasis(U, reduced_sol);
    else
    {
       for (int k = 0; k < reduced_sol->Size(); k++)
-         (*reduced_sol)(k) = 1.0e-1 * UniformRandom();
+         (*reduced_sol)(k) = amp * UniformRandom();
    }
 
    int maxIter = config.GetOption<int>("solver/max_iter", 100);

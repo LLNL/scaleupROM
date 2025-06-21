@@ -16,9 +16,11 @@ namespace mfem
 
 class ROMNonlinearForm : public NonlinearForm
 {
+// private:
+//    static const int Nt = 6;
+//    mutable StopWatch *jac_timers[Nt];
 private:
-   static const int Nt = 6;
-   mutable StopWatch *jac_timers[Nt];
+   mutable TimeProfiler timer;
 
 protected:
    /// ROM basis for projection.
@@ -230,6 +232,8 @@ public:
 
        The state @a x must be a true-dof vector. */
    virtual Operator &GetGradient(const Vector &x) const;
+
+   void SaveDomainEQPCoords(const int k, hid_t file_id, const std::string &dsetname);
 
 private:
    void PrecomputeDomainEQPSample(const IntegrationRule &ir, const DenseMatrix &basis, EQPSample &eqp_sample);

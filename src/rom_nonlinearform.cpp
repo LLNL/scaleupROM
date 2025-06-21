@@ -12,7 +12,7 @@ namespace mfem
 {
 
 ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, const bool reference_)
-   : NonlinearForm(f), reference(reference_)
+   : NonlinearForm(f), reference(reference_), timer("ROMNonlinearForm")
 {
    height = width = num_basis;
 
@@ -21,8 +21,6 @@ ROMNonlinearForm::ROMNonlinearForm(const int num_basis, FiniteElementSpace *f, c
    else if (nnls_str == "linf")     nnls_criterion = CAROM::NNLS_termination::LINF;
    else
       mfem_error("ROMNonlinearForm: unknown NNLS criterion!\n");
-
-   for (int k = 0; k < Nt; k++) jac_timers[k] = new StopWatch;
 }
 
 ROMNonlinearForm::~ROMNonlinearForm()
@@ -43,23 +41,14 @@ ROMNonlinearForm::~ROMNonlinearForm()
       DeletePointers(fnfi_sample);
       DeletePointers(bfnfi_sample);
    }
-
-   printf("%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\n",
-   "init", "sample-load", "elem-load", "assem-grad", "others", "sum", "total");
-   double sum = 0.0;
-   for (int k = 0; k < Nt-1; k++)
-   {
-      printf("%.3E\t", jac_timers[k]->RealTime());
-      sum += jac_timers[k]->RealTime();
-   }
-   printf("%.3E\t", sum);
-   printf("%.3E\n", jac_timers[Nt-1]->RealTime());
-
-   for (int k = 0; k < Nt; k++) delete jac_timers[k];
 }
 
 void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 {
+   timer.Start("Mult");
+
+   timer.Start("Mult/init");
+
    assert(x.Size() == width);
    assert(y.Size() == height);
 
@@ -103,28 +92,42 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
    // py = 0.0;
    y = 0.0;
 
+   timer.Stop("Mult/init");
+
    if (dnfi.Size())
    {
       for (int k = 0; k < dnfi.Size(); k++)
       {
+         timer.Start("Mult/dnfi-init");
+
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
          EQPElement *eqp_elem = dnfi_sample[k];
          assert(eqp_elem);
 
+         timer.Stop("Mult/dnfi-init");
+
          int prev_el = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
+            timer.Start("Mult/dnfi-elem-init");
+
             EQPSample *sample = eqp_elem->GetSample(i);
             int el = sample->info.el;
             T = fes->GetElementTransformation(el);
 
+            timer.Stop("Mult/dnfi-elem-init");
+
             if (precompute)
             {
+               timer.Start("Mult/dnfi-fast-eqp");
                dnfi[k]->AddAssembleVector_Fast(*sample, *T, x, y);
+               timer.Stop("Mult/dnfi-fast-eqp");
                continue;
             }
+
+            timer.Start("Mult/dnfi-slow-eqp");
 
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
             if (el != prev_el)
@@ -141,6 +144,8 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
             if (doftrans) { doftrans->TransformDual(el_y); }
 
             AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+
+            timer.Stop("Mult/dnfi-slow-eqp");
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
@@ -153,25 +158,37 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
       for (int k = 0; k < fnfi.Size(); k++)
       {
+         timer.Start("Mult/fnfi-init");
+
          const IntegrationRule *ir = fnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
          EQPElement *eqp_elem = fnfi_sample[k];
          assert(eqp_elem);
 
+         timer.Stop("Mult/fnfi-init");
+
          int prev_face = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
+            timer.Start("Mult/fnfi-elem-init");
+
             EQPSample *sample = eqp_elem->GetSample(i);
 
             int face = sample->info.el;
             tr = mesh->GetInteriorFaceTransformations(face);
 
+            timer.Stop("Mult/fnfi-elem-init");
+
             if (precompute)
             {
+               timer.Start("Mult/fnfi-fast-eqp");
                fnfi[k]->AddAssembleVector_Fast(*sample, *tr, x, y);
+               timer.Stop("Mult/fnfi-fast-eqp");
                continue;
             }
+
+            timer.Start("Mult/fnfi-slow-eqp");
 
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
@@ -200,6 +217,8 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
             fnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->info.qw, el_x, el_y);
 
             AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+
+            timer.Stop("Mult/fnfi-slow-eqp");
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < fnfi.Size(); k++)
    }  // if (fnfi.Size())
@@ -232,15 +251,21 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
       for (int k = 0; k < bfnfi.Size(); k++)
       {
+         timer.Start("Mult/bfnfi-init");
+
          const IntegrationRule *ir = bfnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
          EQPElement *eqp_elem = bfnfi_sample[k];
          assert(eqp_elem);
 
+         timer.Stop("Mult/bfnfi-init");
+
          int prev_be = -1;
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
+            timer.Start("Mult/bfnfi-elem-init");
+
             EQPSample *sample = eqp_elem->GetSample(i);
             int be = sample->info.el;
             const int bdr_attr = mesh->GetBdrAttribute(be);
@@ -256,11 +281,17 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
 
             tr = mesh->GetBdrFaceTransformations (be);
 
+            timer.Stop("Mult/bfnfi-elem-init");
+
             if (precompute)
             {
+               timer.Start("Mult/bfnfi-fast-eqp");
                bfnfi[k]->AddAssembleVector_Fast(*sample, *tr, x, y);
+               timer.Stop("Mult/bfnfi-fast-eqp");
                continue;
             }
+
+            timer.Start("Mult/bfnfi-slow-eqp");
 
             const IntegrationPoint &ip = ir->IntPoint(sample->info.qp);
 
@@ -290,6 +321,8 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
             bfnfi[k]->AssembleQuadratureVector(*fe1, *fe2, *tr, ip, sample->info.qw, el_x, el_y);
 
             AddMultTransposeSubMatrix(*basis, vdofs, el_y, y);
+
+            timer.Stop("Mult/bfnfi-slow-eqp");
          }  // for (int i = 0; i < sample_info->Size(); i++, sample++)
       }  // for (int k = 0; k < bfnfi.Size(); k++)
    }  // if (bfnfi.Size())
@@ -308,13 +341,14 @@ void ROMNonlinearForm::Mult(const Vector &x, Vector &y) const
    //    // y(ess_tdof_list[i]) = x(ess_tdof_list[i]);
    // }
    // // In parallel, the result is in 'py' which is an alias for 'aux2'.
+   timer.Stop("Mult");
 }
 
 Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 {
-   jac_timers[5]->Start();
+   timer.Start("GetGradient");
 
-   jac_timers[0]->Start();
+   timer.Start("Grad/init");
    assert(x.Size() == width);
    // if (ext)
    // {
@@ -356,13 +390,13 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
    {
       *Grad = 0.0;
    }
-   jac_timers[0]->Stop();
+   timer.Stop("Grad/init");
 
    if (dnfi.Size())
    {
       for (int k = 0; k < dnfi.Size(); k++)
       {
-         jac_timers[1]->Start();
+         timer.Start("Grad/sample-load");
          const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
          assert(ir); // we enforce all integrators to set the IntegrationRule a priori.
 
@@ -370,19 +404,20 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
          assert(eqp_elem);
 
          int prev_el = -1;
-         jac_timers[1]->Stop();
+         timer.Stop("Grad/sample-load");
          for (int i = 0; i < eqp_elem->Size(); i++)
          {
-            jac_timers[2]->Start();
+            timer.Start("Grad/elem-load");
             EQPSample *sample = eqp_elem->GetSample(i);
             int el = sample->info.el;
             T = fes->GetElementTransformation(el);
-            jac_timers[2]->Stop();
+            timer.Stop("Grad/elem-load");
 
-            jac_timers[3]->Start();
+            timer.Start("Grad/assem-grad");
             if (precompute)
             {
                dnfi[k]->AddAssembleGrad_Fast(*sample, *T, x, *Grad);
+               timer.Stop("Grad/assem-grad");
                continue;
             }
 
@@ -403,12 +438,12 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
             AddSubMatrixRtAP(*basis, vdofs, elmat, *basis, vdofs, *Grad);
             // Grad->AddSubMatrix(rom_vdofs, rom_vdofs, quadmat, skip_zeros);
 
-            jac_timers[3]->Stop();
+            timer.Stop("Grad/assem-grad");
          }  // for (int i = 0; i < el_samples->Size(); i++)
       }  // for (int k = 0; k < dnfi.Size(); k++)
    }  // if (dnfi.Size())
 
-   jac_timers[4]->Start();
+   timer.Start("Grad/other-integ");
    if (fnfi.Size())
    {
       FaceElementTransformations *tr = NULL;
@@ -566,8 +601,8 @@ Operator& ROMNonlinearForm::GetGradient(const Vector &x) const
 
    DenseMatrix *mGrad = Grad;
    
-   jac_timers[4]->Stop();
-   jac_timers[5]->Stop();
+   timer.Stop("Grad/other-integ");
+   timer.Stop("GetGradient");
    // TODO(kevin): will need to consider how we should address this case.
    //              do we really need prolongation when we lift up from ROM?
    //              we might need a similar operation on the ROM basis DenseMatrix.
@@ -853,7 +888,7 @@ void ROMNonlinearForm::TrainEQPForIntegrator(
          samples.Append({.el = i / nqe, .qp = i % nqe, .qw = eqpSol_global(i)});
       }
    }
-   printf("Size of sampled qp: %d\n", samples.Size());
+   printf("Size of sampled qp: %d/%d\n", samples.Size(), eqpSol_global.dim());
    if (nnz != samples.Size())
       printf("Sample quadrature points with weight < 1.0e-12 are neglected.\n");
 }
@@ -1481,6 +1516,49 @@ void ROMNonlinearForm::PrecomputeBdrFaceEQPSample(
    assert(T->Elem2No < 0);
 
    PrecomputeFaceEQPSample(ir, basis, T, eqp_sample);
+}
+
+void ROMNonlinearForm::SaveDomainEQPCoords(const int k, hid_t file_id, const std::string &dsetname)
+{
+   if (!dnfi.Size())
+      return;
+
+   assert((k >= 0) && (k < dnfi.Size()));
+
+   const IntegrationRule *ir = dnfi[k]->GetIntegrationRule();
+   EQPElement *eqp_elem = dnfi_sample[k];
+   assert(ir);
+   assert(eqp_elem);
+
+   DenseMatrix eqp_coords(eqp_elem->Size(), 3);
+
+   EQPSample *eqp_sample;
+   for (int i = 0; i < eqp_elem->Size(); i++)
+   {
+      eqp_sample = eqp_elem->GetSample(i);
+      const int el = eqp_sample->info.el;
+      const FiniteElement *fe = fes->GetFE(el);
+      ElementTransformation *T = fes->GetElementTransformation(el);
+      const IntegrationPoint &ip = ir->IntPoint(eqp_sample->info.qp);
+
+      double x[3];
+      Vector transip(x, 3);
+      T->Transform(ip, transip);
+
+      eqp_coords.SetRow(i, transip);
+   }  // for (int i = 0; i < eqp_elem->Size(); i++)
+
+   assert(file_id >= 0);
+   hid_t grp_id;
+   herr_t errf;
+
+   grp_id = H5Gcreate(file_id, dsetname.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+   assert(grp_id >= 0);
+
+   hdf5_utils::WriteDataset(grp_id, "coords", eqp_coords);
+
+   errf = H5Gclose(grp_id);
+   assert(errf >= 0);
 }
 
 }
