@@ -24,7 +24,8 @@ SteadyNSOperator::SteadyNSOperator(
    Array<int> &u_offsets_, const bool direct_solve_)
    : Operator(linearOp_->Height(), linearOp_->Width()), linearOp(linearOp_), hs(hs_), nl_itf(nl_itf_),
      u_offsets(u_offsets_), direct_solve(direct_solve_),
-     M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0)))
+     M(&(linearOp_->GetBlock(0, 0))), Bt(&(linearOp_->GetBlock(0, 1))), B(&(linearOp_->GetBlock(1, 0))),
+     timer("SteadyNSOperator")
 {
    vblock_offsets.SetSize(3);
    vblock_offsets[0] = 0;
@@ -61,19 +62,34 @@ SteadyNSOperator::~SteadyNSOperator()
 
 void SteadyNSOperator::Mult(const Vector &x, Vector &y) const
 {
+   timer.Start("Mult");
+
    assert(linearOp);
    x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
    y_u.MakeRef(y, 0, u_offsets.Last());
 
    y = 0.0;
 
+   timer.Start("Mult/nlin_domain");
    Hop->Mult(x_u, y_u);
-   if (nl_itf) nl_itf->InterfaceAddMult(x_u, y_u);
+   timer.Stop("Mult/nlin_domain");
+   if (nl_itf)
+   {
+      timer.Start("Mult/itf");
+      nl_itf->InterfaceAddMult(x_u, y_u);
+      timer.Stop("Mult/itf");
+   }
+   timer.Start("Mult/lin");
    linearOp->AddMult(x, y);
+   timer.Stop("Mult/lin");
+
+   timer.Stop("Mult");
 }
 
 Operator& SteadyNSOperator::GetGradient(const Vector &x) const
 {
+   timer.Start("GetGradient");
+
    // NonlinearForm owns the gradient operator.
    // DeletePointers(hs_mats);
    delete hs_jac;
@@ -82,6 +98,7 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    delete mono_jac;
    delete jac_hypre;
 
+   timer.Start("GetGradient/nlin-jac");
    hs_jac = new BlockMatrix(u_offsets);
    for (int i = 0; i < hs.Size(); i++)
       for (int j = 0; j < hs.Size(); j++)
@@ -97,9 +114,12 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
             hs_mats(i, j) = new SparseMatrix(u_offsets[i+1] - u_offsets[i], u_offsets[j+1] - u_offsets[j]);
          }
       }
+   timer.Stop("GetGradient/nlin-jac");
 
+   timer.Start("GetGradient/itf-jac");
    x_u.MakeRef(const_cast<Vector &>(x), 0, u_offsets.Last());
    if (nl_itf) nl_itf->InterfaceGetGradient(x_u, hs_mats);
+   timer.Stop("GetGradient/itf-jac");
 
    for (int i = 0; i < hs.Size(); i++)
       for (int j = 0; j < hs.Size(); j++)
@@ -108,9 +128,11 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
          hs_jac->SetBlock(i, j, hs_mats(i, j));
       }
 
+   timer.Start("GetGradient/lin-jac");
    SparseMatrix *hs_jac_mono = hs_jac->CreateMonolithic();
    uu_mono = Add(*M, *hs_jac_mono);
    delete hs_jac_mono;
+   timer.Stop("GetGradient/lin-jac");
 
    assert(B && Bt);
 
@@ -123,10 +145,14 @@ Operator& SteadyNSOperator::GetGradient(const Vector &x) const
    if (direct_solve)
    {
       jac_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, mono_jac);
+      timer.Stop("GetGradient");
       return *jac_hypre;
    }  
    else
+   {
+      timer.Stop("GetGradient");
       return *mono_jac;
+   }
 }
 
 /*
@@ -222,7 +248,8 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
 SteadyNSEQPROM::SteadyNSEQPROM(
    ROMHandlerBase *rom_handler, Array<ROMNonlinearForm *> &hs_,
    ROMInterfaceForm *itf_, const bool direct_solve_)
-   : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_), itf(itf_)
+   : SteadyNSROM(hs_.Size(), rom_handler, direct_solve_), hs(hs_), itf(itf_),
+     timer("SteadyNSEQPROM")
 {
    if (!separate_variable)
    {
@@ -246,9 +273,14 @@ SteadyNSEQPROM::SteadyNSEQPROM(
 
 void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
 {
-   y = 0.0;
-   linearOp->Mult(x, y);
+   timer.Start("Mult");
 
+   y = 0.0;
+   timer.Start("Mult/lin");
+   linearOp->Mult(x, y);
+   timer.Stop("Mult/lin");
+
+   timer.Start("Mult/nlin");
    for (int m = 0; m < numSub; m++)
    {
       int midx = midxs[m];
@@ -257,23 +289,39 @@ void SteadyNSEQPROM::Mult(const Vector &x, Vector &y) const
 
       hs[m]->AddMult(x_comp, y_comp);
    }
+   timer.Stop("Mult/nlin");
 
-   if (!itf) return;
+   if (!itf)
+   {
+      timer.Stop("Mult");
+      return;
+   }
 
    GetVel(x, x_u);
    y_u = 0.0;
+
+   timer.Start("Mult/itf");
    itf->InterfaceAddMult(x_u, y_u);
+   timer.Stop("Mult/itf");
+
    AddVel(y_u, y);
+
+   timer.Stop("Mult");
 }
 
 Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
 {
+   timer.Start("GetGradient");
+
    delete jac_mono;
    delete jac_hypre;
+   timer.Start("GetGradient/lin");
    jac_mono = new SparseMatrix(*linearOp);
+   timer.Stop("GetGradient/lin");
 
    if (itf)
    {
+      timer.Start("GetGradient/itf");
       BlockMatrix jac(block_offsets);
       jac.owns_blocks = true;
    
@@ -288,6 +336,7 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
          }
 
       GetVel(x, x_u);
+
       itf->InterfaceGetGradient(x_u, mats);
 
       MatrixBlocks u_mats(mats);
@@ -298,8 +347,10 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
       (*jac_mono) += *tmp;
       
       delete tmp;
+      timer.Stop("GetGradient/itf");
    }
 
+   timer.Start("GetGradient/nlin");
    DenseMatrix *jac_comp;
    for (int m = 0; m < numSub; m++)
    {
@@ -310,7 +361,10 @@ Operator& SteadyNSEQPROM::GetGradient(const Vector &x) const
       jac_comp = dynamic_cast<DenseMatrix *>(&hs[m]->GetGradient(x_comp));
       jac_mono->AddSubMatrix(*block_idxs[m], *block_idxs[m], *jac_comp);
    }
+   timer.Stop("GetGradient/nlin");
    jac_mono->Finalize();
+
+   timer.Stop("GetGradient");
    
    if (direct_solve)
    {
@@ -424,6 +478,7 @@ SteadyNSSolver::~SteadyNSSolver()
       else if (rom_handler->GetNonlinearHandling() == NonlinearHandling::EQP)
       {
          DeletePointers(comp_eqps);
+         DeletePointers(subdomain_eqps);
          delete itf_eqp;
       }
    }
@@ -625,7 +680,7 @@ bool SteadyNSSolver::Solve(SampleGenerator *sample_generator)
    else
    {
       for (int k = 0; k < sol_byvar.Size(); k++)
-         sol_byvar(k) = UniformRandom();
+         sol_byvar(k) = 1.0e-5 * UniformRandom();
    }
 
    SteadyNSOperator oper(systemOp, hs, nl_itf, u_offsets, direct_solve);
@@ -1032,6 +1087,8 @@ void SteadyNSSolver::AllocateROMEQPElems()
    itf_eqp->UpdateBlockOffsets();
 
    itf_eqp->SetPrecomputeMode(precompute);
+printf("precompute: %d\n", precompute);
+printf("itf_eqp PrecomputeMode: %d\n", itf_eqp->PrecomputeMode());
 }
 
 void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
@@ -1059,6 +1116,8 @@ void SteadyNSSolver::TrainROMEQPElems(SampleGenerator *sample_generator)
    }
 
    if (oper_type != OperType::LF) return;
+
+   eqp_tol = config.GetOption<double>("model_reduction/eqp/interface/relative_tolerance", eqp_tol);
 
    /* EQP NNLS for interface ROM, for each reference port */
    for (int p = 0; p < topol_handler->GetNumRefPorts(); p++)
@@ -1182,7 +1241,7 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
    int num_comp;
    hdf5_utils::ReadAttribute(grp_id, "number_of_components", num_comp);
    assert(num_comp >= topol_handler->GetNumComponents());
-   assert(comp_eqps.Size() == num_comp);
+   assert(comp_eqps.Size() == topol_handler->GetNumComponents());
 
    std::string dset_name;
    for (int c = 0; c < topol_handler->GetNumComponents(); c++)
@@ -1220,7 +1279,10 @@ void SteadyNSSolver::LoadEQPElems(const std::string &filename)
       itf_eqp->LoadEQPForIntegrator(0, file_id, "interface_integ0");
 
       if (itf_eqp->PrecomputeMode())
+{
+printf("\n\nI AM PRECOMPUTING!!\n\n");
          itf_eqp->PrecomputeCoefficients();
+}
    }
 
    errf = H5Fclose(file_id);
@@ -1360,4 +1422,53 @@ DenseTensor* SteadyNSSolver::GetReducedTensor(DenseMatrix *basis, FiniteElementS
    }  // for (int i = 0; i < num_basis_c; i++)
 
    return tensor;
+}
+
+void SteadyNSSolver::SaveEQPCoords(const std::string &filename)
+{
+   assert(topol_mode == TopologyHandlerMode::COMPONENT);
+
+   /*
+      TODO(kevin): this is a boilerplate for parallel POD/EQP training.
+      Full parallelization will save EQ points/weights in a parallel way.
+   */
+   if (rank == 0)
+   {
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      hid_t grp_id;
+
+      grp_id = H5Gcreate(file_id, "components", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(grp_id >= 0);
+
+      const int num_comp = topol_handler->GetNumComponents();
+      assert(comp_eqps.Size() == num_comp);
+
+      hdf5_utils::WriteAttribute(grp_id, "number_of_components", num_comp);
+
+      std::string dset_name;
+      for (int c = 0; c < num_comp; c++)
+      {
+         assert(comp_eqps[c]);
+         dset_name = topol_handler->GetComponentName(c);
+
+         comp_eqps[c]->SaveDomainEQPCoords(0, grp_id, dset_name + "_integ0");
+         if (oper_type == OperType::LF)
+         {
+            assert(!full_dg);
+               // comp_eqps[c]->SaveEQPForIntegrator(IntegratorType::INTERIORFACE, 0, grp_id, dset_name + "_integ1");
+         }  // if (oper_type == OperType::LF)
+      }  // for (int c = 0; c < num_comp; c++)
+
+      errf = H5Gclose(grp_id);
+      assert(errf >= 0);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
+   }
+   MPI_Barrier(MPI_COMM_WORLD);
+   return;
 }
