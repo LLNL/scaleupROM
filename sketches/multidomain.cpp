@@ -93,18 +93,21 @@ int main(int argc, char *argv[])
    // interface attribute starts after the parent mesh boundary attributes.
    int if_attr = mesh.bdr_attributes.Max() + 1;
    Array<InterfaceInfo> interface_infos(0);
+
+   // NOTE(kevin): MFEM v4.6 SubMesh uses this for generated boundary attributes.
+   const int generated_battr = mesh.bdr_attributes.Max() + 1;
    
    for (int i = 0; i < numSub; i++) {
       // printf("Submesh %d\n", i);
       for (int ib = 0; ib < submeshes[i]->GetNBE(); ib++) {
-         if (submeshes[i]->GetBdrAttribute(ib) != SubMesh::GENERATED_ATTRIBUTE) continue;
+         if (submeshes[i]->GetBdrAttribute(ib) != generated_battr) continue;
 
-         int parent_face_i = (*parent_face_map_2d[i])[submeshes[i]->GetBdrFace(ib)];
+         int parent_face_i = (*parent_face_map_2d[i])[submeshes[i]->GetBdrElementFaceIndex(ib)];
          for (int j = i+1; j < numSub; j++) {
             for (int jb = 0; jb < submeshes[j]->GetNBE(); jb++) {
-               int parent_face_j = (*parent_face_map_2d[j])[submeshes[j]->GetBdrFace(jb)];
+               int parent_face_j = (*parent_face_map_2d[j])[submeshes[j]->GetBdrElementFaceIndex(jb)];
                if (parent_face_i == parent_face_j) {
-                  MFEM_ASSERT(submeshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE,
+                  MFEM_ASSERT(submeshes[j]->GetBdrAttribute(jb) == generated_battr,
                               "This interface element has been already set!");
                   if (interface_attributes[i][j] <= 0) {
                      interface_attributes[i][j] = if_attr;
@@ -169,15 +172,15 @@ int main(int argc, char *argv[])
          int interface_attr = submeshes[i]->GetBdrAttribute(ib);
          if (interface_attr <= mesh.bdr_attributes.Max()) continue;
 
-         int parent_face_i = (*parent_face_map_2d[i])[submeshes[i]->GetBdrFace(ib)];
+         int parent_face_i = (*parent_face_map_2d[i])[submeshes[i]->GetBdrElementFaceIndex(ib)];
          
          for (int j = 0; j < numSub; j++) {
             if (i == j) continue;
             for (int jb = 0; jb < submeshes[j]->GetNBE(); jb++) {
-               int parent_face_j = (*parent_face_map_2d[j])[submeshes[j]->GetBdrFace(jb)];
+               int parent_face_j = (*parent_face_map_2d[j])[submeshes[j]->GetBdrElementFaceIndex(jb)];
                if (parent_face_i == parent_face_j) {
                   printf("(BE %d, face %d) - parent face %d, attr %d - Submesh %d (BE %d, face %d)\n",
-                         ib, submeshes[i]->GetBdrFace(ib), parent_face_i, interface_attr, j, jb, submeshes[j]->GetBdrFace(jb));
+                         ib, submeshes[i]->GetBdrElementFaceIndex(ib), parent_face_i, interface_attr, j, jb, submeshes[j]->GetBdrElementFaceIndex(jb));
                }
             }
          }
@@ -247,6 +250,9 @@ void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face
    if (parent_face_map == NULL)
       parent_face_map = new Array<int>(BuildFaceMap2D(pm, sm));
 
+   // NOTE(kevin): MFEM v4.6 SubMesh uses this for generated boundary attributes.
+   const int generated_battr = pm.bdr_attributes.Max() + 1;
+
    // Setting boundary element attribute of submesh for 2D.
    // This does not support 2D.
    // Array<int> parent_face_to_be = mesh.GetFaceToBdrElMap();
@@ -254,10 +260,10 @@ void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face
    parent_face_to_be = -1;
    for (int i = 0; i < pm.GetNBE(); i++)
    {
-      parent_face_to_be[pm.GetBdrElementEdgeIndex(i)] = i;
+      parent_face_to_be[pm.GetBdrElementFaceIndex(i)] = i;
    }
    for (int k = 0; k < sm.GetNBE(); k++) {
-      int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrFace(k)]];
+      int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrElementFaceIndex(k)]];
       if (pbeid != -1)
       {
          int attr = pm.GetBdrElement(pbeid)->GetAttribute();
@@ -268,7 +274,7 @@ void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face
          // This case happens when a domain is extracted, but the root parent
          // mesh didn't have a boundary element on the surface that defined
          // it's boundary. It still creates a valid mesh, so we allow it.
-         sm.GetBdrElement(k)->SetAttribute(SubMesh::GENERATED_ATTRIBUTE);
+         sm.GetBdrElement(k)->SetAttribute(generated_battr);
       }
    }
 
