@@ -33,6 +33,7 @@ protected:
    HYPRE_BigInt sys_glob_size;
    HYPRE_BigInt sys_row_starts[2];
    HypreParMatrix *globalMat_hypre = NULL;
+   HypreParMatrix *systemOp_hypre = NULL;
    MUMPSSolver *mumps = NULL;
 
    // operators
@@ -102,6 +103,19 @@ public:
 
 protected:
    virtual void SetMUMPSSolver();
+   void SetupMUMPSSolverSerial();
+   void SetupMUMPSSolverParallel();
+
+   void CreateHypreParMatrix();
+   void SetGlobalOffsets();
+
+   // Data for HypreParMatrix construction
+   Array<int> global_offsets;
+   Array<int> global_var_offsets;
+   SparseMatrix *hdiag = NULL;
+   SparseMatrix *hoffd = NULL;
+   Array<HYPRE_BigInt> cmap;
+
 };
 
 #endif

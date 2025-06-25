@@ -127,7 +127,7 @@ void ROMHandlerBase::ParseInputs()
       /* parse the dimension of basis */
       int midx = -1;
       int vidx = (separate_variable) ? b % num_var : 0;
-      for (int m = 0; m < numSub; m++)
+      for (int m = 0; m < numSubLoc; m++)
          if (topol_handler->GetMeshType(m) == (separate_variable ? b / num_var : b))
          {
             midx = m;
@@ -135,7 +135,7 @@ void ROMHandlerBase::ParseInputs()
          }
       assert(midx >= 0);
 
-      int idx = (separate_variable) ? midx * num_var + vidx : midx;
+      const int idx = (separate_variable) ? midx * num_var + vidx : midx;
       if (separate_variable)
          dim_ref_basis[b] = fom_var_offsets[idx + 1] - fom_var_offsets[idx];
       else
@@ -544,6 +544,8 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 
    if (linsol_type == SolverType::DIRECT)
    {
+      if (topol_handler->GetRank() == 0)
+	cout << "MFEMROMHandler::Solve direct, size " << rhs.Size() << endl;
       assert(mumps);
       mumps->SetPrintLevel(print_level);
       mumps->Mult(rhs, sol);
@@ -618,6 +620,7 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 
 void MFEMROMHandler::Solve(BlockVector* U)
 {
+   // TODO: reduced_rhs and reduced_sol are still global size!
    assert(U->NumBlocks() == num_rom_blocks_local);
    assert(reduced_rhs);
 

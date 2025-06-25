@@ -167,6 +167,8 @@ void TopologyHandler::PrintInterfaceInfo(const int k)
    }
 }
 
+//#define PARTITION2D
+
 void TopologyHandler::LoadBalance()
 {
   // TODO: balance the number of DOFs per rank, rather than the number of subdomains.
@@ -176,7 +178,46 @@ void TopologyHandler::LoadBalance()
   subdomain_rank.SetSize(numSub);
   allNumSub.SetSize(nprocs);
 
+#ifdef PARTITION2D
+  const int ns1 = sqrt(numSub);
+  MFEM_VERIFY(ns1 * ns1 == numSub, "");
+  MFEM_VERIFY(nloc * nprocs == numSub, "");
+
+  const int np1 = sqrt(nprocs);
+  MFEM_VERIFY(np1 * np1 == nprocs, "");
+
+  const int nloc1 = ns1 / np1;
+  MFEM_VERIFY(np1 * nloc1 == ns1, "");
+  MFEM_VERIFY(nloc1 * nloc1 == nloc, "");
+#endif
+
   int os = 0;
+#ifdef PARTITION2D
+  for (int l=0; l<np1; ++l)
+    for (int k=0; k<np1; ++k)
+      {
+	const int j = k + (l * np1);
+	const int ns = nloc; // Number of subdomains for rank j
+	allNumSub[j] = ns;
+
+	if (j == rank)
+	  {
+	    local_subs.SetSize(ns);
+	    for (int i=0; i<ns; ++i)
+	      {
+		local_subs[i] = os + i;
+		g2l_sub[os + i] = i;
+	      }
+
+	    numSubLoc = ns;
+	  }
+
+	for (int i=0; i<ns; ++i)
+	  subdomain_rank[os + i] = j;
+
+	os += ns;
+      }
+#else
   for (int j=0; j<nprocs; ++j)
     {
       const int ns = j < ne ? nloc + 1 : nloc; // Number of subdomains for rank j
@@ -199,6 +240,7 @@ void TopologyHandler::LoadBalance()
 
       os += ns;
     }
+#endif
 }
 
 void TopologyHandler::GetAllNumSub(Array<int> &ns)

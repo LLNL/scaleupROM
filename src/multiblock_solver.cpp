@@ -756,10 +756,17 @@ void MultiBlockSolver::ComputeRelativeError(Array<GridFunction *> fom_sols, Arra
 
    for (int v = 0; v < num_var; v++)
    {
-      norm[v] = sqrt(norm[v]);
-      error[v] = sqrt(error[v]);
+      double sum = 0.0;
+      MPI_Allreduce(&norm[v], &sum, 1, MPI_DOUBLE, MPI_SUM, topol_handler->GetComm());
+      norm[v] = sqrt(sum);
+
+      sum = 0.0;
+      MPI_Allreduce(&error[v], &sum, 1, MPI_DOUBLE, MPI_SUM, topol_handler->GetComm());
+      error[v] = sqrt(sum);
+
+      if (rank == 0) printf("Variable %d global absolute error: %.5E\n", v, error[v]);
       error[v] /= norm[v];
-      printf("Variable %d relative error: %.5E\n", v, error[v]);
+      if (rank == 0) printf("Variable %d global relative error: %.5E\n", v, error[v]);
    }
 }
 
