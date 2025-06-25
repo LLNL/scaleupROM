@@ -303,15 +303,86 @@ void LinElastSolver::AssembleInterfaceMatrices()
    a_itf->AssembleInterfaceMatrices(mats);
 }
 
+void LinElastSolver::SolveROM()
+{
+   // View vector for U.
+   BlockVector *U_domain = NULL;
+   if (separate_variable_basis)
+      U_domain = new BlockVector(U->GetData(), var_offsets); 
+   else
+      U_domain = new BlockVector(U->GetData(), domain_offsets);
+   
+   rom_handler->Solve(U_domain);
+   /* if (scale_output)
+   {
+      cout<<"previous norm is: "<<U->Norml2()<<endl;
+      *U *= fnorm;
+      *RHS *= fnorm;
+      cout<<"ROM output is scaled with norm: "<<fnorm<<", new norm is: "<<U->Norml2()<<endl;
+   }    */
+}
+
+void LinElastSolver::ProjectRHSOnReducedBasis()
+{
+   scale_output = config.GetOption<bool>("solver/scale_output_ROM", false);
+   fnorm = RHS->Norml2();
+   /* if (scale_output)
+   {
+      *RHS /= fnorm;
+      cout<<"ROM input is scaled with norm: "<<fnorm<<", new norm is: "<<RHS->Norml2()<<endl;
+
+   }   */
+   // View vector for RHS.
+   BlockVector *RHS_domain = NULL;
+   if (separate_variable_basis)
+      RHS_domain = new BlockVector(RHS->GetData(), var_offsets); 
+   else
+      RHS_domain = new BlockVector(RHS->GetData(), domain_offsets);
+      
+   rom_handler->ProjectRHSOnReducedBasis(RHS_domain);
+
+   delete RHS_domain;
+}
+
 bool LinElastSolver::Solve(SampleGenerator *sample_generator)
 {
    // If using direct solver, returns always true.
    bool converged = true;
 
+ cout<<"lambda is: "<<lambda_c[0]->constant<<endl;
+ cout<<"mu is: "<<mu_c[0]->constant<<endl;
+
    int maxIter = config.GetOption<int>("solver/max_iter", 10000);
    double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);
+   scale_output = config.GetOption<bool>("solver/scale_output_FOM", false);
+   bool scale_input = config.GetOption<bool>("solver/scale_input_FOM", false);
+   bool rand_perturb = config.GetOption<bool>("solver/rand_perturb", false);
+
+   if (scale_output == true)
+   {scale_input = true;}
+
+   fnorm = RHS->Norml2();
+   std::string mode = config.GetOption<std::string>("main/mode", "run_example");
+   if (mode == "sample_generation"){
+   cout << "unmodified norm: " << fnorm << endl;
+   if (scale_input)
+   {
+      *RHS /= fnorm;
+      cout<<"FOM input is scaled with norm: "<<fnorm<<", new norm is: "<<RHS->Norml2()<<endl;
+   }  
+   else if (rand_perturb)
+   {
+      BlockVector noise(*RHS);
+      noise.Randomize();
+      noise -= 0.5;
+      noise *= fnorm*0.1;
+      *RHS *= noise;
+      cout<<"FOM input is scaled with multiplicative noise, new norm is: "<<RHS->Norml2()<<endl;
+   }
+   
+   }
 
    // TODO: need to change when the actual parallelization is implemented.
    cout << "direct_solve is: " << direct_solve << endl;
@@ -377,6 +448,24 @@ bool LinElastSolver::Solve(SampleGenerator *sample_generator)
             delete globalPrec;
       }
       delete solver;
+   }
+
+   if (scale_output)
+   {
+      cout<<"FOM output is scaled with norm: "<<fnorm<<endl;
+      *U *= fnorm;
+      *RHS *= fnorm;
+   }
+
+   if (std::isnan(U->Norml2()) || U->Norml2() > 1e16) // Check for NaN or divergent solutions
+   {
+      cout<<"FOUND NAN"<<endl;
+      cout<<"Norm: "<<U->Norml2()<<endl;
+      converged = false;
+   }
+   else
+   {
+      cout<<"Norm: "<<U->Norml2()<<endl;
    }
 
    /* save solution if sample generator is provided */
@@ -453,12 +542,18 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    mu_c = NULL;
 
    Vector _x(1);
+   double _t = 0.0;
 
    for (size_t i = 0; i < numSub; i++)
    {
-      lambda_c[i] = new FunctionCoefficient(problem->general_scalar_ptr[0]);
+      double lambda_i = (problem->general_scalar_ptr[0])(_x,_t);
+      lambda = lambda_i;
+      lambda_c[i] = new ConstantCoefficient(lambda_i);
 
-      mu_c[i] = new FunctionCoefficient(problem->general_scalar_ptr[1]);
+      double mu_i = (problem->general_scalar_ptr[1])(_x,_t);
+      mu = mu_i;
+      mu_c[i] = new ConstantCoefficient(mu_i);
+ 
    }
 
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators

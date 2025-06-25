@@ -1,0 +1,350 @@
+main:
+  mode: single_run
+  use_rom: true
+  solver: linelast
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "config/linelast.3dcw_train0.h5"
+    components:
+      - name: "3dcw_joint"
+        file: "meshes/3dcw_joint.mesh"
+      - name: "3dcw_beamH"
+        file: "meshes/3dcw_beamH.mesh"
+      - name: "3dcw_beamV"
+        file: "meshes/3dcw_beamV.mesh"
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: paraview_output
+
+parameterized_problem:
+  name: linelast_cwtrain
+
+single_run:
+  linelast_cwtrain:
+    lambda: 384615384615.3846
+    mu: 76923076923.07692
+    lx: 1.0
+    ly: 1.0
+    lz: 1.0
+    rx: 0.0
+    ry: 0.0
+    rz: 1.0
+    dx: 0.0
+    dy: 0.0
+    dz: 0.0
+    ux: 0.0
+    uy: 0.0
+    uz: 0.0
+    bx: 0.0
+    by: 0.0
+    bz: 0.0
+    l_ux: 0.0
+    l_uy: 0.0
+    l_uz: 0.0
+    r_fx: 0.0
+    r_fy: 0.0
+    r_fz: -500.0
+    u_fx: 0.0
+    u_fy: 0.0
+    u_fz: 0.0
+    d_fx: 0.0
+    d_fy: 0.0
+    d_fz: 0.0
+    b_fx: 0.0
+    b_fy: 0.0
+    b_fz: 0.0
+    xu_amp: 0.0
+    xf_amp: 0.0
+    yu_amp: 0.0
+    yf_amp: 0.0
+    zu_amp: 0.0
+    zf_amp: 0.0
+    bxf_amp: 0.0
+    byf_amp: 0.0
+    bzf_amp: 0.0
+    xu_freq: 0.0
+    xf_freq: 0.0
+    yu_freq: 0.0
+    yf_freq: 0.0
+    zu_freq: 0.0
+    zf_freq: 0.0
+    bxf_freq: 0.0
+    byf_freq: 0.0
+    bzf_freq: 0.0
+    xu_offset: 0.0
+    xf_offset: 0.0
+    yu_offset: 0.0
+    yf_offset: 0.0
+    zu_offset: 0.0
+    zf_offset: 0.0
+    bxf_offset: 0.0
+    byf_offset: 0.0
+    bzf_offset: 0.0
+
+sample_generation:
+  maximum_number_of_snapshots: 70000
+  component_sampling: false
+  type: random
+  random_sample_generator:
+    number_of_samples: 5
+  file_path:
+    prefix: "linelast_cwtrain"
+  parameters:
+    - key: single_run/linelast_cwtrain/rx
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/ry
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/rz
+      type: double
+      minimum: 1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/lx
+      type: double
+      minimum: 1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/ly
+      type: double
+      minimum: 1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/lz
+      type: double
+      minimum: 1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain/dx
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/dy
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/dz
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/ux
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/uy
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/uz
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/l_ux
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/l_uy
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/l_uz
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/r_fx
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/r_fy
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/r_fz
+      type: double
+      minimum: -500.0
+      maximum: -500.0
+    - key: single_run/linelast_cwtrain/u_fx
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/u_fy
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/u_fz
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/d_fx
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/d_fy
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/d_fz
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/b_fx
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/b_fy
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/b_fz
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/xu_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/yu_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/zu_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/xf_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/yf_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/zf_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/bxf_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/byf_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/bzf_amp
+      type: double
+      minimum: -0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/xu_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/yu_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/zu_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/xf_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/yf_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/zf_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/bxf_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/byf_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/bzf_freq
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/xu_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/yu_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/zu_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/xf_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/yf_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/zf_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/bxf_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/byf_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+    - key: single_run/linelast_cwtrain/bzf_offset
+      type: double
+      minimum: 0.0
+      maximum: 0.0
+
+basis:
+  prefix: "linelast_cwtrain"
+  number_of_basis: 5
+  tags:
+    - name: "3dcw_joint"
+      number_of_basis: 9
+    - name: "3dcw_beamH"
+      number_of_basis: 6
+    - name: "3dcw_beamV"
+      number_of_basis: 6
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  subdomain_training: universal
+  linear_solver_type: direct
+  save_operator:
+    level: component
+    prefix: "linelast_cw.rom_elem"
+  compare_solution:
+    enabled: true

@@ -40,8 +40,8 @@ protected:
    Array<BilinearForm *> as;
 
    // Lame constants for each subdomain, global boundary attribute ordering
-   Array<Coefficient *> lambda_c;
-   Array<Coefficient *> mu_c;
+   Array<ConstantCoefficient *> lambda_c;
+   Array<ConstantCoefficient *> mu_c;
    Array<VectorCoefficient *> bdr_coeffs;
    Array<VectorCoefficient *> rhs_coeffs;
 
@@ -55,6 +55,10 @@ protected:
 
    // Initial positions
    VectorCoefficient *init_x = NULL;
+
+   // For unitizing load vector
+   bool scale_output = false;
+   double fnorm;
 
 public:
    LinElastSolver();
@@ -82,6 +86,8 @@ public:
    virtual void AssembleInterfaceMatrices();
 
    bool Solve(SampleGenerator *sample_generator = NULL) override;
+   virtual void SolveROM() override;
+   virtual void ProjectRHSOnReducedBasis() override;
 
    virtual void SetupBCVariables() override;
    virtual void SetupIC(std::function<void(const Vector &, double, Vector &)> F);

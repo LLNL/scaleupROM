@@ -658,6 +658,7 @@ void MultiBlockSolver::SaveSnapshots(SampleGenerator *sample_generator)
    BlockVector *U_snapshots = PrepareSnapshots(basis_tags);
 
    Array<int> col_idxs;
+
    sample_generator->SaveSnapshot(U_snapshots, basis_tags, col_idxs);
    sample_generator->SaveSnapshotPorts(topol_handler, col_idxs);
 
