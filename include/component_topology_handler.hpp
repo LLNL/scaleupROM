@@ -165,7 +165,6 @@ protected:
    void ReadComponentsFromFile(const std::string filename);
    // Read reference port list and names. not the actual port data.
    void ReadPortsFromFile(const std::string filename);
-   void ReadPortNeighborsFromFile(const std::string filename);
    YAML::Node* ReadPortDict(hid_t grp_id, const std::string& port_name);
    // Read boundary attribute map between components and global.
    bool ReadBoundariesFromFile(const std::string filename);
@@ -187,6 +186,7 @@ protected:
 private:
    Mesh* CreateMesh(int global_subdomain) const;
    void SetupPortNeighborMeshes(const std::string &global_config);
+   void SetupBoundaryAttributes();
 };
 
 #endif

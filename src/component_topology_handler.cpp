@@ -54,6 +54,7 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    // translate/rotate during assembly.
    SetupMeshes();
 
+   ReadPortsFromFile(global_config);
    SetupPortNeighborMeshes(global_config);
 
    bool success = ReadBoundariesFromFile(global_config);
@@ -64,7 +65,7 @@ ComponentTopologyHandler::ComponentTopologyHandler()
       if (!success)
          mfem_error("ComponentTopologyHandler: failed to read boundary! specify it either in global or boundary config file.\n");
    }
-   ReadPortsFromFile(global_config);
+   SetupBoundaryAttributes();
 
    if (num_ref_ports > 0)
       SetupReferencePorts();
@@ -264,48 +265,6 @@ void ComponentTopologyHandler::ReadComponentsFromFile(const std::string filename
    assert(errf >= 0);
 }
 
-void ComponentTopologyHandler::ReadPortNeighborsFromFile(const std::string filename)
-{
-   hid_t file_id;
-   hid_t grp_id;
-   herr_t errf = 0;
-   file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-   assert(file_id >= 0);
-
-   // TODO: this is copied from ReadPortsFromFile. Refactor so it is not repeated?
-    {  // Port list.
-      grp_id = H5Gopen2(file_id, "ports", H5P_DEFAULT);
-      assert(grp_id >= 0);
-
-      hdf5_utils::ReadAttribute(grp_id, "number_of_references", num_ref_ports);
-      // Global interface port data.
-      Array2D<int> tmp;
-      if (num_ref_ports == 0) // no ports needed or used.
-         num_ports = 0;
-      else
-      {
-         hdf5_utils::ReadDataset(grp_id, "interface", tmp);
-         num_ports = tmp.NumRows();
-      }
-
-      port_infos.SetSize(num_ports);
-      port_types.SetSize(num_ports);
-
-      for (int p = 0; p < num_ports; p++)
-      {
-         const int *p_data = tmp.GetRow(p);
-         port_infos[p].Mesh1 = p_data[0];
-         port_infos[p].Mesh2 = p_data[1];
-         port_infos[p].Attr1 = p_data[2];
-         port_infos[p].Attr2 = p_data[3];
-         port_types[p] = p_data[4];
-      }
-
-      errf = H5Gclose(grp_id);
-      assert(errf >= 0);
-   }
-}
-
 void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
 {
    hid_t file_id;
@@ -362,7 +321,10 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
+}
 
+void ComponentTopologyHandler::SetupBoundaryAttributes()
+{
    // set up global bdr attributes.
    // Port attribute will be setup with a value that does not overlap with any component boundary attribute.
    int attr_offset = 0;
@@ -671,7 +633,6 @@ void ComponentTopologyHandler::SetupMeshes()
 
 void ComponentTopologyHandler::SetupPortNeighborMeshes(const std::string &global_config)
 {
-  ReadPortNeighborsFromFile(global_config);
   FindPortNeighborSubdomains();
 
   for (auto neighbor : subNeighbors)

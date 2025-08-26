@@ -317,7 +317,7 @@ void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
       AddToBlockMatrix(midx, midx, *comp_mat, romMat);
 
       // boundary matrices of each component.
-      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(mm); //??
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(mm);
 
       for (int b = 0; b < bdr_c2g->Size(); b++)
       {
