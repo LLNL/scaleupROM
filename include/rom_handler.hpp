@@ -239,7 +239,7 @@ protected:
 
    SparseMatrix *hdiag = NULL;
    SparseMatrix *hoffd = NULL;
-   Array<HYPRE_BigInt> cmap;
+   HYPRE_BigInt *cmap = NULL;
 
    // variables needed for direct solve
    HYPRE_BigInt sys_glob_size;

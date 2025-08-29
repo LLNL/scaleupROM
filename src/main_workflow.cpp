@@ -698,7 +698,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    test->SaveSolution();
    test->SaveVisualization();
    
-   //delete test; // TODO: memory bug!
+   delete test;
    delete problem;
 
    // return the maximum error over all variables.

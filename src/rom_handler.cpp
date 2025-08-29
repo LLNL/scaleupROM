@@ -1105,7 +1105,7 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
 
   const int num_offd_cols = offd_cols.size();
   MFEM_VERIFY(num_offd_cols == offd_size, "");
-  cmap.SetSize(num_offd_cols);
+  cmap = new HYPRE_BigInt[num_offd_cols];
   std::map<int, int> cmap_inv;
 
   int cnt = 0;
@@ -1155,11 +1155,10 @@ void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int 
     }
   else
     {
-
       // constructor with 8+1 arguments
       romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, gsize, gsize,
-					starts.GetData(), starts.GetData(), hdiag, hoffd, cmap.GetData(), true);
-
+					starts.GetData(), starts.GetData(),
+					hdiag, hoffd, cmap, true);
       romMat_hypre->SetOwnerFlags(romMat_hypre->OwnsDiag(), romMat_hypre->OwnsOffd(), 1);
     }
 
