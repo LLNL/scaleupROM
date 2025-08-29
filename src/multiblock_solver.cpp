@@ -299,7 +299,7 @@ void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(rom_elems);
 
-   const int ossub = rank * numSubLoc; // TODO: this is wrong in general. Get this correctly!
+   const int ossub = topol_handler->GlobalSubdomainIndex(0); // Offset for first local subdomain
 
    // component domain matrix.
    for (int mm = 0; mm < numSubLoc; mm++)
