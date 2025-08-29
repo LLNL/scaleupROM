@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generates input meshes for the Stokes flow example
+# Generates input meshes for the Poisson example
 # Note: assumes this is run from the build/examples/poisson_parallel directory
 comp_script="../../../utils/python/box_comp_config.py"
 if [[ ! -f ${comp_script} ]]; then

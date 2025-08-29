@@ -3,5 +3,6 @@
 # SPDX-License-Identifier: MIT
 
 add_subdirectory(poisson)
+add_subdirectory(poisson_parallel)
 add_subdirectory(linelast)
 add_subdirectory(stokes)

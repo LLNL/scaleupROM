@@ -363,7 +363,7 @@ MFEMROMHandler::~MFEMROMHandler()
    delete romMat;
    delete romMat_mono;
    delete romMat_hypre;
-   //delete mumps; // TODO: memory bug!
+   delete mumps;
 }
 
 void MFEMROMHandler::LoadReducedBasis()
