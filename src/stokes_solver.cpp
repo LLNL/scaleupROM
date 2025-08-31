@@ -663,7 +663,7 @@ void StokesSolver::CreateHypreParMatrix()
   hdiag->Finalize();
   hoffd->Finalize();
 
-  cmap.SetSize(num_offd_cols);
+  cmap = new HYPRE_BigInt[num_offd_cols];
   std::map<int, int> cmap_inv;
 
   int cnt = 0;
@@ -700,7 +700,7 @@ void StokesSolver::CreateHypreParMatrix()
   // constructor with 8+1 arguments
   systemOp_hypre = new HypreParMatrix(MPI_COMM_WORLD, gsize, gsize,
 				      starts.GetData(), starts.GetData(),
-				      hdiag, hoffd, cmap.GetData(), true);
+				      hdiag, hoffd, cmap, true);
 
   systemOp_hypre->SetOwnerFlags(systemOp_hypre->OwnsDiag(), systemOp_hypre->OwnsOffd(), 1);
 }

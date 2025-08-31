@@ -114,7 +114,7 @@ protected:
    Array<int> global_offsets;
    SparseMatrix *hdiag = NULL;
    SparseMatrix *hoffd = NULL;
-   Array<HYPRE_BigInt> cmap;
+   HYPRE_BigInt *cmap = NULL;
 
    // operators
    Array<LinearForm *> fs, gs;
