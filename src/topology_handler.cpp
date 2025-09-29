@@ -355,6 +355,7 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
 
    /* for SubMeshTopologyHandler, each subdomain corresponds to a unique component. */
    num_comp = numSub;
+   numSubLoc = numSub;
 
    /* inidividual subdomains are unique */
    mesh_types.SetSize(numSub);
