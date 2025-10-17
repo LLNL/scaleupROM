@@ -146,6 +146,10 @@ public:
    virtual Array<InterfaceInfo>* const GetRefInterfaceInfos(const int &k) { return ref_interfaces[k]; }
    virtual Array<int>* GetBdrAttrComponentToGlobalMap(const int &m) { return bdr_c2g[m]; }
 
+   int LocalSubdomainIndex(int global_subdomain) override;
+   int GlobalSubdomainIndex(int local_subdomain) override;
+   int GlobalSubdomainRank(int global_subdomain) override;
+
    // return component indexes for a reference port (ComponentTopologyHandler only)
    virtual void GetComponentPair(const int &ref_port_idx, int &comp1, int &comp2);
    virtual void GetRefPortInfo(const int &ref_port_idx, int &comp1, int &comp2, int &attr1, int &attr2);

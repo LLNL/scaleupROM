@@ -154,10 +154,12 @@ public:
    virtual void PrintInterfaceInfo(const int k = -1);
 
    MPI_Comm GetComm() { return comm; }
-   int LocalSubdomainIndex(int global_subdomain);
-   int GlobalSubdomainIndex(int local_subdomain);
    int GetRank() const { return rank; }
-   int GlobalSubdomainRank(int global_subdomain);
+
+   virtual int LocalSubdomainIndex(int global_subdomain) { return global_subdomain; }
+   virtual int GlobalSubdomainIndex(int local_subdomain) { return local_subdomain; }
+   virtual int GlobalSubdomainRank(int global_subdomain) { return 0; }
+
    void FindPortNeighborSubdomains();
    void GetAllNumSub(Array<int> &ns);
    void GetNeighbors(Array<int> &neighbors);

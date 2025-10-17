@@ -248,26 +248,6 @@ void TopologyHandler::GetAllNumSub(Array<int> &ns)
   ns = allNumSub;
 }
 
-int TopologyHandler::GlobalSubdomainRank(int global_subdomain)
-{
-  return subdomain_rank[global_subdomain];
-}
-
-int TopologyHandler::LocalSubdomainIndex(int global_subdomain)
-{
-  if (g2l_sub.count(global_subdomain))
-    return g2l_sub.at(global_subdomain);
-  if (nghb2loc.count(global_subdomain))
-    return nghb2loc.at(global_subdomain);
-
-  return -1;
-}
-
-int TopologyHandler::GlobalSubdomainIndex(int local_subdomain)
-{
-  return local_subs[local_subdomain];
-}
-
 void TopologyHandler::FindPortNeighborSubdomains()
 {
   MFEM_VERIFY(port_infos.Size() == num_ports, "");

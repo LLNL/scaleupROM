@@ -1046,3 +1046,23 @@ bool ComponentTopologyHandler::ComponentBdrAttrCheck(Mesh *comp)
 
    return success;
 }
+
+int ComponentTopologyHandler::GlobalSubdomainRank(int global_subdomain)
+{
+  return subdomain_rank[global_subdomain];
+}
+
+int ComponentTopologyHandler::LocalSubdomainIndex(int global_subdomain)
+{
+  if (g2l_sub.count(global_subdomain))
+    return g2l_sub.at(global_subdomain);
+  if (nghb2loc.count(global_subdomain))
+    return nghb2loc.at(global_subdomain);
+
+  return -1;
+}
+
+int ComponentTopologyHandler::GlobalSubdomainIndex(int local_subdomain)
+{
+  return local_subs[local_subdomain];
+}
