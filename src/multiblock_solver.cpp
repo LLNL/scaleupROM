@@ -285,13 +285,18 @@ void MultiBlockSolver::AssembleROMMat()
    AssembleROMMat(*romMat);
 
    romMat->Finalize();
-   rom_handler->SetRomMat(romMat);
-   rom_handler->CreateHypreParMatrix(romMat, rank, nproc);
+   const bool hypreAssemble = !rom_handler->SeparateVariable(); // TODO: more general workflow
+   rom_handler->SetRomMat(romMat, !hypreAssemble);
 
-   localBlocks = rom_handler->GetLocalBlocks(); // TODO: get this for FOM without depending on ROM?
-   rom_handler->GetLocalNumBlocks(localNumBlocks); // TODO: get this for FOM without depending on ROM?
+   if (hypreAssemble)
+     {
+       rom_handler->CreateHypreParMatrix(romMat, rank, nproc);
 
-   topol_handler->GetNeighbors(neighbors);
+       localBlocks = rom_handler->GetLocalBlocks(); // TODO: get this for FOM without depending on ROM?
+       rom_handler->GetLocalNumBlocks(localNumBlocks); // TODO: get this for FOM without depending on ROM?
+
+       topol_handler->GetNeighbors(neighbors);
+     }
 }
 
 void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)

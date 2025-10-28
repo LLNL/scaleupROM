@@ -476,7 +476,11 @@ void MFEMROMHandler::ProjectToDomainBasis(const int &i, const Vector &vec, Vecto
 
 void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVector*& rom_vec)
 {
-   assert(vec->NumBlocks() == num_rom_blocks_local);
+   if (separate_variable)
+     assert(vec->NumBlocks() == num_rom_blocks);
+   else
+     assert(vec->NumBlocks() == num_rom_blocks_local);
+
    // reset rom_vec if initiated a priori.
    if (rom_vec) delete rom_vec;
 
@@ -523,7 +527,10 @@ void MFEMROMHandler::LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, 
 void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
 {
    assert(rom_vec.NumBlocks() == num_rom_blocks);
-   assert(vec.NumBlocks() == num_rom_blocks_local);
+   if (separate_variable)
+     assert(vec.NumBlocks() == num_rom_blocks);
+   else
+     assert(vec.NumBlocks() == num_rom_blocks_local);
 
    int m, v, fom_idx;
    for (int i = localBlocks[0]; i < localBlocks[1]; ++i)
@@ -630,32 +637,40 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 void MFEMROMHandler::Solve(BlockVector* U)
 {
    // TODO: reduced_rhs and reduced_sol are still global size!
-   assert(U->NumBlocks() == num_rom_blocks_local);
+   if (separate_variable)
+     assert(U->NumBlocks() == num_rom_blocks);
+   else
+     assert(U->NumBlocks() == num_rom_blocks_local);
    assert(reduced_rhs);
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);  // TODO: distribute this in parallel.
    (*reduced_sol) = 0.0;
 
-   Vector reduced_sol_hypre(reduced_rhs_hypre.Size());
+   if (reduced_rhs_hypre.Size() > 0)
+     {
+       Vector reduced_sol_hypre(reduced_rhs_hypre.Size());
 
-   // TODO: eliminate global RHS vector in parallel.
-   for (int i=0; i<reduced_rhs_hypre.Size(); ++i)
-    {
-      reduced_rhs_hypre[i] = (*reduced_rhs)[hypre_start + i];
-    }
+       // TODO: eliminate global RHS vector in parallel.
+       for (int i=0; i<reduced_rhs_hypre.Size(); ++i)
+	 {
+	   reduced_rhs_hypre[i] = (*reduced_rhs)[hypre_start + i];
+	 }
 
-   Solve(reduced_rhs_hypre, reduced_sol_hypre);
+       Solve(reduced_rhs_hypre, reduced_sol_hypre);
 
-   // Gather local solutions into global solution vector.
-   // TODO: keep this distributed in the parallel case.
-   CAROM::Vector globalSol(reduced_sol_hypre.GetData(), reduced_sol_hypre.Size(), true);
-   globalSol.gather();
+       // Gather local solutions into global solution vector.
+       // TODO: keep this distributed in the parallel case.
+       CAROM::Vector globalSol(reduced_sol_hypre.GetData(), reduced_sol_hypre.Size(), true);
+       globalSol.gather();
 
-   MFEM_VERIFY(globalSol.dim() == reduced_sol->Size(), "");
+       MFEM_VERIFY(globalSol.dim() == reduced_sol->Size(), "");
 
-   for (int i=0; i<reduced_sol->Size(); ++i)
-     (*reduced_sol)[i] = globalSol(i);
+       for (int i=0; i<reduced_sol->Size(); ++i)
+	 (*reduced_sol)[i] = globalSol(i);
+     }
+   else
+     Solve(*reduced_rhs, *reduced_sol);
 
    // 23. reconstruct FOM state
    // TODO: distribute this in the parallel case.
@@ -1317,10 +1332,15 @@ void MFEMROMHandler::SetupDirectSolver()
    if ((linsol_type != MFEMROMHandler::SolverType::DIRECT))
       return;
 
-   assert(romMat_mono);
-   delete romMat_hypre, mumps;
-   romMat_hypre = NULL;
-   mumps = NULL;
+   // TODO: need to change when the actual parallelization is implemented.
+   sys_glob_size = romMat_mono->NumRows();
+   sys_row_starts[0] = 0;
+   sys_row_starts[1] = romMat_mono->NumRows();
+   romMat_hypre = new HypreParMatrix(MPI_COMM_SELF, sys_glob_size, sys_row_starts, romMat_mono);
+
+   mumps = new MUMPSSolver(MPI_COMM_SELF);
+   mumps->SetMatrixSymType(mat_type);
+   mumps->SetOperator(*romMat_hypre);
 }
 
 void MFEMROMHandler::AppendReferenceBasis(const int &idx, const DenseMatrix &mat)
