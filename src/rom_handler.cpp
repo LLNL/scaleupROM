@@ -86,6 +86,7 @@ void ROMHandlerBase::ParseInputs()
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
 
    num_rom_blocks = numSub;
+   num_rom_blocks_local = num_rom_blocks;
    num_rom_ref_blocks = topol_handler->GetNumComponents();
 
    num_rom_comp = num_rom_ref_blocks;
@@ -601,7 +602,11 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 
       if (prec_str != "none")
          solver->SetPreconditioner(*M);
-      solver->SetOperator(*romMat_hypre);
+
+      if (romMat_hypre)
+	solver->SetOperator(*romMat_hypre);
+      else
+	solver->SetOperator(*K);
 
       solver->SetAbsTol(atol);
       solver->SetRelTol(rtol);
