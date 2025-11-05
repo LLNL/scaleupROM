@@ -285,7 +285,7 @@ void MultiBlockSolver::AssembleROMMat()
    AssembleROMMat(*romMat);
 
    romMat->Finalize();
-   const bool hypreAssemble = !rom_handler->SeparateVariable(); // TODO: more general workflow
+   const bool hypreAssemble = rom_handler->HypreAssemble();
    rom_handler->SetRomMat(romMat, !hypreAssemble);
 
    if (hypreAssemble)

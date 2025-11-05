@@ -94,6 +94,8 @@ protected:
    bool basis_loaded;
    bool operator_loaded;
 
+   bool hypre_assemble = false;
+
    // MPI partitioning data
    Array<int> localSizes;
    Array<int> localNumBlocks;
@@ -154,6 +156,8 @@ public:
    const ROMOrderBy GetOrdering() { return ordering; }
    const int GetBlockIndex(const int m, const int v=-1);
    void GetDomainAndVariableIndex(const int &rom_block_index, int &m, int &v);
+
+   bool HypreAssemble() const { return hypre_assemble; }
 
    std::array<int,2> GetLocalBlocks() { return localBlocks; }
    void GetLocalNumBlocks(Array<int> &lnb) { lnb = localNumBlocks; }
@@ -237,6 +241,7 @@ protected:
    BlockMatrix *romMat = NULL;
    SparseMatrix *romMat_mono = NULL;
 
+   // hypre matrix data
    SparseMatrix *hdiag = NULL;
    SparseMatrix *hoffd = NULL;
    HYPRE_BigInt *cmap = NULL;

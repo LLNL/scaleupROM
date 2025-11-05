@@ -345,6 +345,9 @@ MFEMROMHandler::MFEMROMHandler(
    {
       mfem_error("Unknown ROM linear solver type!\n");
    }
+
+   std::string hypre_matrix_str = config.GetOption<std::string>("model_reduction/hypre_matrix", "no");
+   if (hypre_matrix_str == "yes") hypre_assemble = true;
    
    if (linsol_type == MFEMROMHandler::SolverType::DIRECT)
    {
