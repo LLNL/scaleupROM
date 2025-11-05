@@ -555,7 +555,6 @@ void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
    double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
    int print_level = config.GetOption<int>("solver/print_level", 0);   
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
-   prec_str = "none"; // TODO: remove!
 
    if (linsol_type == SolverType::DIRECT)
    {

@@ -54,7 +54,6 @@ WORKDIR $LIB_DIR
 RUN sudo git clone https://github.com/LLNL/libROM.git
 WORKDIR ./libROM/build
 # libROM is using the MFEM without MUMPS right now.
-
 RUN sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_MFEM=OFF -DMFEM_USE_GSLIB=${MFEM_USE_GSLIB}
 RUN sudo make -j 16
 

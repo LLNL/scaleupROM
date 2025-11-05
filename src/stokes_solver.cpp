@@ -716,7 +716,6 @@ void StokesSolver::SetupMUMPSSolver(bool set_oper, const MUMPSSolver::MatType ma
   if (set_oper) mumps->SetOperator(*systemOp_hypre);
 }
 
-// TODO: no need to make a function for this? Just put it in SetupMUMPSSolver?
 void StokesSolver::SetupMUMPSSolverParallel()
 {
   mumps = new MUMPSSolver(MPI_COMM_WORLD);
