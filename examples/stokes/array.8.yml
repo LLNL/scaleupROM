@@ -101,6 +101,7 @@ model_reduction:
   rom_handler_type: mfem
   linear_solver_type: direct
   linear_system_type: spd
+  hypre_matrix: yes
 # This is the input for saving ROM matrix/rhs system.
   save_linear_system:
     enabled: true
