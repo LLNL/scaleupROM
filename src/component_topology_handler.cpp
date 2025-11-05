@@ -23,6 +23,7 @@ ComponentTopologyHandler::ComponentTopologyHandler()
    std::string global_config = config.GetRequiredOption<std::string>("mesh/component-wise/global_config");
    ReadComponentsFromFile(global_config);
 
+   // TODO: limit this to the components on this MPI process.
    SetupComponents();
 
    // Assume all components have the same spatial dimension.
@@ -47,8 +48,14 @@ ComponentTopologyHandler::ComponentTopologyHandler()
       }
    }
 
-   // Do we really need to copy all meshes?
+   LoadBalance();
+
+   // TODO: instead of copying all meshes, just construct one of each type and
+   // translate/rotate during assembly.
    SetupMeshes();
+
+   ReadPortsFromFile(global_config);
+   SetupPortNeighborMeshes(global_config);
 
    bool success = ReadBoundariesFromFile(global_config);
    if (!success)
@@ -58,7 +65,7 @@ ComponentTopologyHandler::ComponentTopologyHandler()
       if (!success)
          mfem_error("ComponentTopologyHandler: failed to read boundary! specify it either in global or boundary config file.\n");
    }
-   ReadPortsFromFile(global_config);
+   SetupBoundaryAttributes();
 
    if (num_ref_ports > 0)
       SetupReferencePorts();
@@ -314,7 +321,10 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
 
    errf = H5Fclose(file_id);
    assert(errf >= 0);
+}
 
+void ComponentTopologyHandler::SetupBoundaryAttributes()
+{
    // set up global bdr attributes.
    // Port attribute will be setup with a value that does not overlap with any component boundary attribute.
    int attr_offset = 0;
@@ -339,8 +349,12 @@ void ComponentTopologyHandler::ReadPortsFromFile(const std::string filename)
       idx1 = components[c1]->bdr_attributes.Find(port_infos[p].Attr1);
       idx2 = components[c2]->bdr_attributes.Find(port_infos[p].Attr2);
       assert((idx1 >= 0) && (idx2 >= 0));
-      (*bdr_c2g[port_infos[p].Mesh1])[idx1] = attr_offset;
-      (*bdr_c2g[port_infos[p].Mesh2])[idx2] = attr_offset;
+
+      const int lm1 = LocalSubdomainIndex(port_infos[p].Mesh1);
+      const int lm2 = LocalSubdomainIndex(port_infos[p].Mesh2);
+      if (lm1 >= 0) (*bdr_c2g[lm1])[idx1] = attr_offset;
+      if (lm2 >= 0) (*bdr_c2g[lm2])[idx2] = attr_offset;
+
       // interface attributes are not included in the global boundary attributes.
 
       attr_offset += 1;
@@ -413,8 +427,8 @@ bool ComponentTopologyHandler::ReadBoundariesFromFile(const std::string filename
          int c_idx = components[c]->bdr_attributes.Find(b_data[2]);
          assert(c_idx >= 0);
 
-         (*bdr_c2g[m])[c_idx] = b_data[0];
-
+	 const int lm = LocalSubdomainIndex(m);
+	 if (lm >= 0) (*bdr_c2g[lm])[c_idx] = b_data[0];
          int idx = bdr_attributes.Find(b_data[0]);
          if (idx < 0) bdr_attributes.Append(b_data[0]);
       }
@@ -575,47 +589,70 @@ void ComponentTopologyHandler::WritePortDataToFile(const PortData &port,
    return;
 }
 
+Mesh* ComponentTopologyHandler::CreateMesh(int global_subdomain) const
+{
+  Mesh *mesh = new Mesh(*components[mesh_types[global_subdomain]]);
+
+  for (int d = 0; d < 3; d++)
+    {
+      mesh_config::trans[d] = mesh_configs[global_subdomain].trans[d];
+      mesh_config::rotate[d] = mesh_configs[global_subdomain].rotate[d];
+    }
+  mesh->Transform(*tf_ptr);
+
+  return mesh;
+}
+
 void ComponentTopologyHandler::SetupMeshes()
 {
-   assert(numSub > 0);
+   assert(numSub > 0 && numSubLoc > 0);
    assert(mesh_types.Size() == numSub);
    assert(mesh_configs.Size() == numSub);
 
-   meshes.SetSize(numSub);
+   meshes.SetSize(numSubLoc);
    meshes = NULL;
 
-   for (int m = 0; m < numSub; m++)
+   for (int i = 0; i < numSubLoc; i++)
    {
-      meshes[m] = new Mesh(*components[mesh_types[m]]);
-
-      for (int d = 0; d < 3; d++)
-      {
-         mesh_config::trans[d] = mesh_configs[m].trans[d];
-         mesh_config::rotate[d] = mesh_configs[m].rotate[d];
-      }
-      meshes[m]->Transform(*tf_ptr);
+      const int m = local_subs[i];
+      meshes[i] = CreateMesh(m);
    }
 
-   for (int m = 0; m < numSub; m++) assert(meshes[m] != NULL);
+   for (int m = 0; m < numSubLoc; m++) assert(meshes[m] != NULL);
 
    // Set up boundary attribute map from component to global.
    // Only the initialization.
-   bdr_c2g.SetSize(numSub);
+   bdr_c2g.SetSize(numSubLoc);
    bdr_attributes.SetSize(0);
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < numSubLoc; m++)
    {
       bdr_c2g[m] = new Array<int>(meshes[m]->bdr_attributes.Size());
       *bdr_c2g[m] = -1;
    }
 }
 
+void ComponentTopologyHandler::SetupPortNeighborMeshes(const std::string &global_config)
+{
+  FindPortNeighborSubdomains();
+
+  for (auto neighbor : subNeighbors)
+    {
+      const int m = meshes.Size();
+      nghb2loc[neighbor] = m;
+      local_subs.Append(neighbor);
+      meshes.Append(CreateMesh(neighbor));
+      bdr_c2g.Append(new Array<int>(meshes[m]->bdr_attributes.Size()));
+      *bdr_c2g[m] = -1;
+    }
+}
+
 void ComponentTopologyHandler::SetupBdrAttributes()
 {
-   assert(meshes.Size() == numSub);
+   assert(meshes.Size() >= numSubLoc);
 
-   for (int m = 0; m < numSub; m++)
+   for (int m = 0; m < meshes.Size(); m++)
    {
-      int c = mesh_types[m];
+      int c = mesh_types[local_subs[m]];
       Mesh *comp = components[c];
 
       // std::unordered_map<int,int> *c2g_map = bdr_c2g[m];
@@ -1008,4 +1045,24 @@ bool ComponentTopologyHandler::ComponentBdrAttrCheck(Mesh *comp)
    }
 
    return success;
+}
+
+int ComponentTopologyHandler::GlobalSubdomainRank(int global_subdomain)
+{
+  return subdomain_rank[global_subdomain];
+}
+
+int ComponentTopologyHandler::LocalSubdomainIndex(int global_subdomain)
+{
+  if (g2l_sub.count(global_subdomain))
+    return g2l_sub.at(global_subdomain);
+  if (nghb2loc.count(global_subdomain))
+    return nghb2loc.at(global_subdomain);
+
+  return -1;
+}
+
+int ComponentTopologyHandler::GlobalSubdomainIndex(int local_subdomain)
+{
+  return local_subs[local_subdomain];
 }

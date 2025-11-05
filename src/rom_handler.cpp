@@ -38,6 +38,7 @@ ROMHandlerBase::ROMHandlerBase(
    const std::vector<std::string> &var_names, const bool separate_variable_basis)
    : topol_handler(input_topol),
      numSub(input_topol->GetNumSubdomains()),
+     numSubLoc(input_topol->GetNumLocalSubdomains()),
      fom_var_names(var_names),
      fom_var_offsets(input_var_offsets),
      basis_tags(0),
@@ -47,8 +48,8 @@ ROMHandlerBase::ROMHandlerBase(
 {
    num_var = fom_var_names.size();
 
-   fom_num_vdofs.SetSize(numSub);
-   for (int m = 0, idx = 0; m < numSub; m++)
+   fom_num_vdofs.SetSize(numSubLoc);
+   for (int m = 0, idx = 0; m < numSubLoc; m++)
    {
       fom_num_vdofs[m] = 0;
       for (int v = 0; v < num_var; v++, idx++)
@@ -85,6 +86,7 @@ void ROMHandlerBase::ParseInputs()
       operator_prefix = config.GetRequiredOption<std::string>("model_reduction/save_operator/prefix");
 
    num_rom_blocks = numSub;
+   num_rom_blocks_local = num_rom_blocks;
    num_rom_ref_blocks = topol_handler->GetNumComponents();
 
    num_rom_comp = num_rom_ref_blocks;
@@ -126,7 +128,7 @@ void ROMHandlerBase::ParseInputs()
       /* parse the dimension of basis */
       int midx = -1;
       int vidx = (separate_variable) ? b % num_var : 0;
-      for (int m = 0; m < numSub; m++)
+      for (int m = 0; m < numSubLoc; m++)
          if (topol_handler->GetMeshType(m) == (separate_variable ? b / num_var : b))
          {
             midx = m;
@@ -134,7 +136,7 @@ void ROMHandlerBase::ParseInputs()
          }
       assert(midx >= 0);
 
-      int idx = (separate_variable) ? midx * num_var + vidx : midx;
+      const int idx = (separate_variable) ? midx * num_var + vidx : midx;
       if (separate_variable)
          dim_ref_basis[b] = fom_var_offsets[idx + 1] - fom_var_offsets[idx];
       else
@@ -257,11 +259,10 @@ void ROMHandlerBase::LoadReducedBasis()
          Once fully parallelized, each process will load only local part of the basis.
       */
       {
-         int local_dim = CAROM::split_dimension(dim_ref_basis[k], MPI_COMM_WORLD);
-         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k].print(), CAROM::Database::formats::HDF5_MPIO, local_dim);
+         int local_dim = dim_ref_basis[k];
+         basis_reader = new CAROM::BasisReader(basis_name + basis_tags[k].print() + ".000000", CAROM::Database::formats::HDF5, local_dim, MPI_COMM_NULL);
 
          carom_ref_basis[k] = new CAROM::Matrix(*basis_reader->getSpatialBasis(num_ref_basis[k]));
-         carom_ref_basis[k]->gather();
       }
       numRowRB = carom_ref_basis[k]->numRows();
       numColumnRB = carom_ref_basis[k]->numColumns();
@@ -344,6 +345,9 @@ MFEMROMHandler::MFEMROMHandler(
    {
       mfem_error("Unknown ROM linear solver type!\n");
    }
+
+   std::string hypre_matrix_str = config.GetOption<std::string>("model_reduction/hypre_matrix", "no");
+   if (hypre_matrix_str == "yes") hypre_assemble = true;
    
    if (linsol_type == MFEMROMHandler::SolverType::DIRECT)
    {
@@ -475,17 +479,23 @@ void MFEMROMHandler::ProjectToDomainBasis(const int &i, const Vector &vec, Vecto
 
 void MFEMROMHandler::ProjectGlobalToDomainBasis(const BlockVector* vec, BlockVector*& rom_vec)
 {
-   assert(vec->NumBlocks() == num_rom_blocks);
+   if (separate_variable)
+     assert(vec->NumBlocks() == num_rom_blocks);
+   else
+     assert(vec->NumBlocks() == num_rom_blocks_local);
+
    // reset rom_vec if initiated a priori.
    if (rom_vec) delete rom_vec;
 
+   // TODO: distribute this!
    rom_vec = new BlockVector(rom_block_offsets);
 
    int m, v, fom_idx;
-   for (int i = 0; i < num_rom_blocks; i++)
+   for (int i = localBlocks[0]; i < localBlocks[1]; ++i)
    {
       GetDomainAndVariableIndex(i, m, v);
-      fom_idx = (separate_variable)? v + m * num_var : m;
+      const int mloc = topol_handler->LocalSubdomainIndex(m);
+      fom_idx = (separate_variable)? v + mloc * num_var : mloc;
       
       ProjectToDomainBasis(i, vec->GetBlock(fom_idx), rom_vec->GetBlock(i));
    }
@@ -520,19 +530,23 @@ void MFEMROMHandler::LiftUpFromDomainBasis(const int &i, const Vector &rom_vec, 
 void MFEMROMHandler::LiftUpGlobal(const BlockVector &rom_vec, BlockVector &vec)
 {
    assert(rom_vec.NumBlocks() == num_rom_blocks);
-   assert(vec.NumBlocks() == num_rom_blocks);
+   if (separate_variable)
+     assert(vec.NumBlocks() == num_rom_blocks);
+   else
+     assert(vec.NumBlocks() == num_rom_blocks_local);
 
    int m, v, fom_idx;
-   for (int i = 0; i < num_rom_blocks; i++)
+   for (int i = localBlocks[0]; i < localBlocks[1]; ++i)
    {
       GetDomainAndVariableIndex(i, m, v);
-      fom_idx = (separate_variable)? v + m * num_var : m;
+      const int mloc = topol_handler->LocalSubdomainIndex(m);
+      fom_idx = (separate_variable)? v + mloc * num_var : mloc;
 
       LiftUpFromDomainBasis(i, rom_vec.GetBlock(i), vec.GetBlock(fom_idx));
    }
 }
 
-void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
+void MFEMROMHandler::Solve(Vector &rhs, Vector &sol)
 {
    assert(operator_loaded);
 
@@ -544,6 +558,8 @@ void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
 
    if (linsol_type == SolverType::DIRECT)
    {
+      if (topol_handler->GetRank() == 0)
+	cout << "MFEMROMHandler::Solve direct, size " << rhs.Size() << endl;
       assert(mumps);
       mumps->SetPrintLevel(print_level);
       mumps->Mult(rhs, sol);
@@ -562,7 +578,7 @@ void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
          // TODO: need to change when the actual parallelization is implemented.
          HYPRE_BigInt glob_size = rom_block_offsets.Last();
          HYPRE_BigInt row_starts[2] = {0, rom_block_offsets.Last()};
-         parRomMat = new HypreParMatrix(MPI_COMM_SELF, glob_size, row_starts, romMat_mono);
+         parRomMat = new HypreParMatrix(MPI_COMM_WORLD, glob_size, row_starts, romMat_mono);
          K = parRomMat;
       }
       else if ((prec_str == "gs") || (prec_str == "none"))
@@ -595,8 +611,12 @@ void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
 
       if (prec_str != "none")
          solver->SetPreconditioner(*M);
-      solver->SetOperator(*K);
-      
+
+      if (romMat_hypre)
+	solver->SetOperator(*romMat_hypre);
+      else
+	solver->SetOperator(*K);
+
       solver->SetAbsTol(atol);
       solver->SetRelTol(rtol);
       solver->SetMaxIter(maxIter);
@@ -618,16 +638,44 @@ void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
 
 void MFEMROMHandler::Solve(BlockVector* U)
 {
-   assert(U->NumBlocks() == num_rom_blocks);
+   // TODO: reduced_rhs and reduced_sol are still global size!
+   if (separate_variable)
+     assert(U->NumBlocks() == num_rom_blocks);
+   else
+     assert(U->NumBlocks() == num_rom_blocks_local);
    assert(reduced_rhs);
 
    printf("Solve ROM.\n");
-   reduced_sol = new BlockVector(rom_block_offsets);
+   reduced_sol = new BlockVector(rom_block_offsets);  // TODO: distribute this in parallel.
    (*reduced_sol) = 0.0;
 
-   Solve(*reduced_rhs, *reduced_sol);
+   if (reduced_rhs_hypre.Size() > 0)
+     {
+       Vector reduced_sol_hypre(reduced_rhs_hypre.Size());
+
+       // TODO: eliminate global RHS vector in parallel.
+       for (int i=0; i<reduced_rhs_hypre.Size(); ++i)
+	 {
+	   reduced_rhs_hypre[i] = (*reduced_rhs)[hypre_start + i];
+	 }
+
+       Solve(reduced_rhs_hypre, reduced_sol_hypre);
+
+       // Gather local solutions into global solution vector.
+       // TODO: keep this distributed in the parallel case.
+       CAROM::Vector globalSol(reduced_sol_hypre.GetData(), reduced_sol_hypre.Size(), true);
+       globalSol.gather();
+
+       MFEM_VERIFY(globalSol.dim() == reduced_sol->Size(), "");
+
+       for (int i=0; i<reduced_sol->Size(); ++i)
+	 (*reduced_sol)[i] = globalSol(i);
+     }
+   else
+     Solve(*reduced_rhs, *reduced_sol);
 
    // 23. reconstruct FOM state
+   // TODO: distribute this in the parallel case.
    LiftUpGlobal(*reduced_sol, *U);
 }
 
@@ -662,7 +710,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    Solver *J_solver = NULL;
    if (linsol_type == SolverType::DIRECT)
    {
-      mumps = new MUMPSSolver(MPI_COMM_SELF);
+      mumps = new MUMPSSolver(MPI_COMM_WORLD);
       mumps->SetMatrixSymType(mat_type);
       mumps->SetPrintLevel(jac_print_level);
       J_solver = mumps;
@@ -916,6 +964,241 @@ void MFEMROMHandler::LoadOperatorFromFile(const std::string filename)
    assert(errf >= 0);
 }
 
+// TODO: should this be in the base class ROMHandlerBase?
+void MFEMROMHandler::LoadBalanceROMBlocks(int rank, int nproc)
+{
+  MFEM_VERIFY(num_rom_blocks + 1 == rom_block_offsets.Size(), "");
+  MFEM_VERIFY(num_rom_blocks >= nproc, "");
+
+  const int gsize = rom_block_offsets[num_rom_blocks];
+
+  const int bp = num_rom_blocks / nproc;  // Number of blocks per rank
+  const int ne = num_rom_blocks - (bp * nproc);  // Number of ranks needing an extra block
+
+  localSizes.SetSize(nproc);
+  localSizes = 0;
+
+  localNumBlocks.SetSize(nproc);
+  localNumBlocks = 0;
+
+  localBlocks[0] = 0;
+
+  int sum = 0;
+  int bsum = 0;
+  for (int j=0, i=0; j<nproc; ++j)
+    {
+      const int nb = j < ne ? bp + 1 : bp;  // Number of blocks for rank j
+      localNumBlocks[j] = nb;
+      for (int b=0; b<nb; ++b)
+	{
+	  const int bsize = rom_block_offsets[i + 1] - rom_block_offsets[i];
+	  localSizes[j] += bsize;
+	  sum += bsize;
+	  i++;
+	}
+
+      bsum += nb;
+
+      if (j == rank)
+	localBlocks[1] = bsum;
+      else if (j == rank - 1)
+	localBlocks[0] = bsum;
+    }
+
+  MFEM_VERIFY(sum == gsize && bsum == num_rom_blocks, "");
+
+}
+
+void MFEMROMHandler::CreateHypreParMatrix(BlockMatrix *input_mat, int rank, int nproc)
+{
+  const HYPRE_BigInt gsize = rom_block_offsets[num_rom_blocks];
+
+  Array<int> boffset(nproc+1);
+
+  Array<HYPRE_BigInt> offset(nproc+1);
+  boffset[0] = 0;
+  offset[0] = 0;
+  for (int i=1; i<=nproc; ++i)
+    {
+      offset[i] = offset[i - 1] + localSizes[i - 1];
+      boffset[i] = boffset[i - 1] + localNumBlocks[i - 1];
+    }
+
+  const int loc0 = offset[rank];
+  const int loc1 = offset[rank] + localSizes[rank];
+
+  std::set<int> offd_blocks;
+  std::set<int> offd_cols;
+
+  const int nblocks = localNumBlocks[rank];
+  num_rom_blocks_local = nblocks;
+
+  for (int b=0; b<nblocks; ++b)
+    {
+      // TODO: eliminate global blocks (just assemble local blocks).
+      const int gb = boffset[rank] + b; // Global block index
+      for (int j=0; j<num_rom_blocks; ++j)
+	{
+	  if (boffset[rank] <= j && j < boffset[rank] + nblocks)
+	    continue;
+
+	  // TODO: store sparse blocks, instead of looping over all blocks to check for nonzeros
+	  if (!input_mat->IsZeroBlock(gb, j))
+	    {
+	      offd_blocks.insert(j);
+	    }
+	}
+    }
+
+  int offd_size = 0;
+  for (auto b : offd_blocks)
+    {
+      const int bsize_j = rom_block_offsets[b + 1] - rom_block_offsets[b];
+      offd_size += bsize_j;
+    }
+
+  // The following construction of a HypreParMatrix, by using a SparseMatrix
+  // for diag and offd, follows the example of
+  // ParFiniteElementSpace::ParallelDerefinementMatrix
+  hdiag = new SparseMatrix(localSizes[rank], localSizes[rank]);
+  SparseMatrix &diag = *hdiag;
+  hoffd = new SparseMatrix(localSizes[rank], gsize);
+  SparseMatrix &offd = *hoffd;
+
+  // Set diag and offd
+
+  int localOffset = 0;
+  for (int b=0; b<nblocks; ++b)
+    {
+      // TODO: eliminate global blocks (just assemble local blocks).
+      const int gb = boffset[rank] + b; // Global block index
+
+      const int bsize = rom_block_offsets[gb + 1] - rom_block_offsets[gb];
+      Array<int> rows(bsize);
+      for (int i=0; i<bsize; ++i)
+	{
+	  rows[i] = localOffset + i;
+	}
+
+      localOffset += bsize;
+
+      for (int j=0; j<num_rom_blocks; ++j)
+	{
+	  // TODO: store sparse blocks, instead of looping over all blocks to check for nonzeros
+	  if (!input_mat->IsZeroBlock(gb, j))
+	    {
+	      const SparseMatrix &block = input_mat->GetBlock(gb, j);
+	      // TODO: this conversion to DenseMatrix is inefficient. If ROM blocks are always
+	      // dense, can we just store them as DenseMatrix instances in the first place?
+
+	      DenseMatrix *db = block.ToDenseMatrix();
+
+	      const bool diagBlock = boffset[rank] <= j && j < boffset[rank] + nblocks;
+
+	      const int bsize_j = rom_block_offsets[j + 1] - rom_block_offsets[j];
+	      Array<int> cols(bsize_j);
+	      for (int i=0; i<bsize_j; ++i)
+		{
+		  cols[i] = rom_block_offsets[j] + i;
+
+		  // TODO: simplify
+		  MFEM_VERIFY((cols[i] < loc0 || cols[i] >= loc1) == !diagBlock, "");
+
+		  if (cols[i] < loc0 || cols[i] >= loc1)  // Off-diagonal
+		    {
+		      offd_cols.insert(cols[i]);
+		    }
+
+		  if (diagBlock)
+		    cols[i] -= loc0;
+		}
+
+	      if (diagBlock)
+		{
+		  // Diagonal block
+		  MFEM_VERIFY(bsize_j == bsize, "");
+		  diag.AddSubMatrix(rows, cols, *db);
+		}
+	      else
+		{
+		  // Off-diagonal block
+		  offd.AddSubMatrix(rows, cols, *db);
+		}
+
+	      delete db;
+	    }
+	}
+    }
+
+  const int num_offd_cols = offd_cols.size();
+  MFEM_VERIFY(num_offd_cols == offd_size, "");
+  cmap = new HYPRE_BigInt[num_offd_cols];
+  std::map<int, int> cmap_inv;
+
+  int cnt = 0;
+  for (auto col : offd_cols)
+    {
+      cmap[cnt] = col;
+      cmap_inv[col] = cnt;
+
+      cnt++;
+    }
+
+  MFEM_VERIFY(cnt == num_offd_cols, "");
+
+  diag.Finalize();
+  offd.Finalize();
+
+  if (num_offd_cols > 0)
+    {
+      // Map column indices in offd
+      int *offI = offd.GetI();
+      int *offJ = offd.GetJ();
+
+      const int ne = offI[localSizes[rank]];  // Total number of entries in offd
+
+      for (int i=0; i<ne; ++i)
+	{
+	  const int c = cmap_inv[offJ[i]];
+	  offJ[i] = c;
+	}
+
+      offd.SortColumnIndices();
+    }
+
+  offd.SetWidth(offd_size);
+
+  Array<HYPRE_BigInt> starts(2);
+  starts[0] = offset[rank];
+  starts[1] = offset[rank + 1];
+
+  MFEM_VERIFY(HYPRE_AssumedPartitionCheck(), "");
+
+  if (nproc == 1) // Serial case
+    {
+      // constructor with 4 arguments, v1
+      romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, gsize,
+					starts.GetData(), &diag);
+    }
+  else
+    {
+      // constructor with 8+1 arguments
+      romMat_hypre = new HypreParMatrix(MPI_COMM_WORLD, gsize, gsize,
+					starts.GetData(), starts.GetData(),
+					hdiag, hoffd, cmap, true);
+      romMat_hypre->SetOwnerFlags(romMat_hypre->OwnsDiag(), romMat_hypre->OwnsOffd(), 1);
+    }
+
+  hypre_start = starts[0];
+
+  reduced_rhs_hypre.SetSize(starts[1] - starts[0]);
+
+  delete mumps;
+  mumps = new MUMPSSolver(MPI_COMM_WORLD);
+  mumps->SetMatrixSymType(mat_type);
+  mumps->SetOperator(*romMat_hypre);
+}
+
 void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat, const bool init_direct_solver)
 {
    if (romMat != input_mat)
@@ -934,6 +1217,8 @@ void MFEMROMHandler::SetRomMat(BlockMatrix *input_mat, const bool init_direct_so
 
 void MFEMROMHandler::SaveRomSystem(const std::string &input_prefix, const std::string type)
 {
+   if (topol_handler->GetRank() != 0) return; // Only the root process writes files.
+
    if (!romMat_mono)
    {
       assert(romMat);
@@ -1017,19 +1302,19 @@ IterativeSolver* MFEMROMHandler::SetIterativeSolver(const MFEMROMHandler::Solver
    {
       case (SolverType::CG):
       {
-         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_SELF);
-         else                    solver = new CGSolver();
+         if (prec_type == "amg") solver = new CGSolver(MPI_COMM_WORLD);
+         else                    solver = new CGSolver(MPI_COMM_WORLD);
          break;
       }
       case (SolverType::MINRES):
       {
-         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_SELF);
+         if (prec_type == "amg") solver = new MINRESSolver(MPI_COMM_WORLD);
          else                    solver = new MINRESSolver();
          break;
       }
       case (SolverType::GMRES):
       {
-         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_SELF);
+         if (prec_type == "amg") solver = new GMRESSolver(MPI_COMM_WORLD);
          else                    solver = new GMRESSolver();
          break;
       }
@@ -1048,9 +1333,6 @@ void MFEMROMHandler::SetupDirectSolver()
    // If nonlinear mode, Jacobian will keep changing within Solve, thus no need of initial LU factorization.
    if ((linsol_type != MFEMROMHandler::SolverType::DIRECT))
       return;
-
-   assert(romMat_mono);
-   delete romMat_hypre, mumps;
 
    // TODO: need to change when the actual parallelization is implemented.
    sys_glob_size = romMat_mono->NumRows();

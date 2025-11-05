@@ -31,6 +31,10 @@ const TopologyHandlerMode SetTopologyHandlerMode()
 TopologyHandler::TopologyHandler(const TopologyHandlerMode &input_type)
    : type(input_type)
 {
+   comm = MPI_COMM_WORLD;
+   MPI_Comm_size(comm, &nprocs);
+   MPI_Comm_rank(comm, &rank);
+
    std::string dd_mode_str = config.GetOption<std::string>("domain-decomposition/type", "interior_penalty");
    if (dd_mode_str == "interior_penalty")
    {
@@ -163,6 +167,125 @@ void TopologyHandler::PrintInterfaceInfo(const int k)
    }
 }
 
+//#define PARTITION2D
+
+void TopologyHandler::LoadBalance()
+{
+  // TODO: balance the number of DOFs per rank, rather than the number of subdomains.
+  const int nloc = numSub / nprocs; // Number of subdomains per rank (may be low due to integer division)
+  const int ne = numSub - (nloc * nprocs); // Number of ranks assigned an extra subdomain
+
+  subdomain_rank.SetSize(numSub);
+  allNumSub.SetSize(nprocs);
+
+#ifdef PARTITION2D
+  const int ns1 = sqrt(numSub);
+  MFEM_VERIFY(ns1 * ns1 == numSub, "");
+  MFEM_VERIFY(nloc * nprocs == numSub, "");
+
+  const int np1 = sqrt(nprocs);
+  MFEM_VERIFY(np1 * np1 == nprocs, "");
+
+  const int nloc1 = ns1 / np1;
+  MFEM_VERIFY(np1 * nloc1 == ns1, "");
+  MFEM_VERIFY(nloc1 * nloc1 == nloc, "");
+#endif
+
+  int os = 0;
+#ifdef PARTITION2D
+  for (int l=0; l<np1; ++l)
+    for (int k=0; k<np1; ++k)
+      {
+	const int j = k + (l * np1);
+	const int ns = nloc; // Number of subdomains for rank j
+	allNumSub[j] = ns;
+
+	if (j == rank)
+	  {
+	    local_subs.SetSize(ns);
+	    for (int i=0; i<ns; ++i)
+	      {
+		local_subs[i] = os + i;
+		g2l_sub[os + i] = i;
+	      }
+
+	    numSubLoc = ns;
+	  }
+
+	for (int i=0; i<ns; ++i)
+	  subdomain_rank[os + i] = j;
+
+	os += ns;
+      }
+#else
+  for (int j=0; j<nprocs; ++j)
+    {
+      const int ns = j < ne ? nloc + 1 : nloc; // Number of subdomains for rank j
+      allNumSub[j] = ns;
+
+      if (j == rank)
+	{
+	  local_subs.SetSize(ns);
+	  for (int i=0; i<ns; ++i)
+	    {
+	      local_subs[i] = os + i;
+	      g2l_sub[os + i] = i;
+	    }
+
+	  numSubLoc = ns;
+	}
+
+      for (int i=0; i<ns; ++i)
+	subdomain_rank[os + i] = j;
+
+      os += ns;
+    }
+#endif
+}
+
+void TopologyHandler::GetAllNumSub(Array<int> &ns)
+{
+  ns = allNumSub;
+}
+
+void TopologyHandler::FindPortNeighborSubdomains()
+{
+  MFEM_VERIFY(port_infos.Size() == num_ports, "");
+
+  subNeighbors.clear();
+  for (auto pi : port_infos)
+    {
+      std::array<int, 2> meshIndex = {pi.Mesh1, pi.Mesh2};
+      bool localPort = false;
+      for (auto m : meshIndex)
+	{
+	  if (LocalSubdomainIndex(m) >= 0) // if subdomain is local
+	    localPort = true;
+	}
+
+      if (!localPort) continue;
+
+      for (auto m : meshIndex)
+	{
+	  if (LocalSubdomainIndex(m) == -1)
+	    subNeighbors.insert(m);
+	}
+    }
+}
+
+void TopologyHandler::GetNeighbors(Array<int> &neighbors)
+{
+  neighbors.SetSize(subNeighbors.size());
+
+  int cnt = 0;
+  for (auto n : subNeighbors)
+    {
+      neighbors[cnt++] = n;
+    }
+
+  MFEM_VERIFY(cnt == neighbors.Size(), "");
+}
+
 /*
    SubMeshTopologyHandler
 */
@@ -212,6 +335,7 @@ SubMeshTopologyHandler::SubMeshTopologyHandler(Mesh* pmesh_)
 
    /* for SubMeshTopologyHandler, each subdomain corresponds to a unique component. */
    num_comp = numSub;
+   numSubLoc = numSub;
 
    /* inidividual subdomains are unique */
    mesh_types.SetSize(numSub);

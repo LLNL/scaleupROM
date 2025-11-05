@@ -44,10 +44,17 @@ protected:
    Mesh *pmesh = NULL;  // parent mesh. only available from SubMeshTopologyHandler.
    Array<Mesh*> meshes;
 
-   // Informations received from Topology Handler.
+   // Information received from Topology Handler.
    int numSub;   // number of subdomains.
+   int numSubLoc;   // number of local subdomains.
+   int numSubStored;   // number of subdomains stored on this MPI rank.
    int dim;      // Spatial dimension.
    Array<int> global_bdr_attributes;   // boundary attributes of global system.
+
+   // MPI partitioning data
+   Array<int> localNumBlocks;
+   std::array<int,2> localBlocks;
+   Array<int> neighbors;
 
    // Solution dimension, by default -1 (scalar).
    int udim = -1;       // vector dimension of the entire solution variable

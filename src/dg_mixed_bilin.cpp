@@ -118,7 +118,7 @@ void MixedBilinearFormDGExtension::Assemble(int skip_zeros)
             break;
          }
          Array<int> &bdr_marker = *boundary_face_integs_marker[k];
-         MFEM_ASSERT(bdr_marker.Size() == bdr_attr_marker.Size(),
+         MFEM_ASSERT(bdr_marker.Size() >= bdr_attr_marker.Size(),
                      "invalid boundary marker for boundary trace face"
                      "integrator #" << k << ", counting from zero");
          for (int i = 0; i < bdr_attr_marker.Size(); i++)

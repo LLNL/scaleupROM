@@ -405,7 +405,7 @@ void SampleGenerator::CollectSnapshotsByBasis(const std::string &basis_prefix,
    CAROM::BasisGenerator *basis_generator = snapshot_generators[index];
 
    for (int s = 0; s < file_list.size(); s++)
-      basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5_MPIO);
+     basis_generator->loadSamples(file_list[s], "snapshot", 1e9, CAROM::Database::formats::HDF5_MPIO);
 }
 
 void SampleGenerator::CollectSnapshotsByPort(

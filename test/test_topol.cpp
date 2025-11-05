@@ -109,8 +109,11 @@ TEST(PortReadWrite_test, Test_topol)
 
 int main(int argc, char* argv[])
 {
+   MPI_Init(&argc, &argv);
    ::testing::InitGoogleTest(&argc, argv);
-   return RUN_ALL_TESTS();
+   int result = RUN_ALL_TESTS();
+   MPI_Finalize();
+   return result;
 }
 
 void CompareWithSubMesh()
