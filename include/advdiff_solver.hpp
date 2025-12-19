@@ -6,7 +6,7 @@
 #define SCALEUPROM_ADVDIFF_SOLVER_HPP
 
 #include "poisson_solver.hpp"
-#include "stokes_solver.hpp"
+#include "steady_ns_solver.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -26,7 +26,8 @@ protected:
    /*
       flow solver to obtain the prescribed velocity field. both StokesSolver / SteadyNSSolver can be used.
    */
-   StokesSolver *stokes_solver = NULL;
+   std::string flow_solver_type = "";
+   StokesSolver *flow_solver = NULL;
    bool load_flow = false;
    bool save_flow = false;
    std::string flow_file = "";

@@ -25,15 +25,17 @@ AdvDiffSolver::AdvDiffSolver()
    load_flow = config.GetOption<bool>("adv-diff/load_flow", false);
    if (save_flow || load_flow)
       flow_file = config.GetRequiredOption<std::string>("adv-diff/flow_file");
+
+   flow_solver_type = config.GetOption<std::string>("adv-diff/flow_solver_type", "stokes");
 }
 
 AdvDiffSolver::~AdvDiffSolver()
 {
    DeletePointers(flow_coeffs);
-   if (!stokes_solver) DeletePointers(flow_visual);
+   if (!flow_solver) DeletePointers(flow_visual);
    DeletePointers(global_flow_visual);
    delete global_flow_fes;
-   delete stokes_solver;
+   delete flow_solver;
 }
 
 void AdvDiffSolver::BuildDomainOperators()
@@ -188,8 +190,8 @@ void AdvDiffSolver::SaveVisualization()
    flow_visual.SetSize(numSub);
    flow_visual = NULL;
 
-   const int stokes_numvar = (stokes_solver) ? stokes_solver->GetNumVar() : 0;
-   if (!stokes_solver)
+   const int stokes_numvar = (flow_solver) ? flow_solver->GetNumVar() : 0;
+   if (!flow_solver)
    {
       flow_fes.SetSize(numSub);
       for (int m = 0; m < numSub; m++)
@@ -201,8 +203,8 @@ void AdvDiffSolver::SaveVisualization()
 
    for (int m = 0; m < numSub; m++)
    {
-      if (stokes_solver)
-         flow_visual[m] = stokes_solver->GetGridFunction(m * stokes_numvar);
+      if (flow_solver)
+         flow_visual[m] = flow_solver->GetGridFunction(m * stokes_numvar);
       else
       {
          assert(flow_coeffs[m]);
@@ -240,38 +242,42 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
    assert(flow_problem);
    mfem_warning("AdvDiffSolver: Obtaining flow field. This may take a while depending on the domain size.\n");
 
-   stokes_solver = new StokesSolver;
-   stokes_solver->InitVariables();
-   if (use_rom) stokes_solver->InitROMHandler();
-   stokes_solver->SetSolutionSaveMode(save_flow);
+   if (flow_solver_type == "stokes")
+      flow_solver = new StokesSolver;
+   else if (flow_solver_type == "steady-ns")
+      flow_solver = new SteadyNSSolver;
+
+   flow_solver->InitVariables();
+   if (use_rom) flow_solver->InitROMHandler();
+   flow_solver->SetSolutionSaveMode(save_flow);
 
    bool flow_loaded = false;
    if (load_flow && FileExists(flow_file))
    {
-      stokes_solver->LoadSolution(flow_file);
+      flow_solver->LoadSolution(flow_file);
       flow_loaded = true;
    }
    else
    {
-      stokes_solver->SetParameterizedProblem(flow_problem);
+      flow_solver->SetParameterizedProblem(flow_problem);
       // currently only support FOM.
-      stokes_solver->BuildOperators();
-      stokes_solver->SetupBCOperators();
-      stokes_solver->Assemble();
-      stokes_solver->Solve();
+      flow_solver->BuildOperators();
+      flow_solver->SetupBCOperators();
+      flow_solver->Assemble();
+      flow_solver->Solve();
    }
 
    if (save_flow && (!flow_loaded))
-      stokes_solver->SaveSolution(flow_file);
+      flow_solver->SaveSolution(flow_file);
 
    DeletePointers(flow_coeffs);
-   const int stokes_numvar = stokes_solver->GetNumVar();
+   const int stokes_numvar = flow_solver->GetNumVar();
    for (int m = 0; m < numSub; m++)
-      flow_coeffs[m] = new VectorGridFunctionCoefficient(stokes_solver->GetGridFunction(m * stokes_numvar));
+      flow_coeffs[m] = new VectorGridFunctionCoefficient(flow_solver->GetGridFunction(m * stokes_numvar));
 
    /*
       VectorGridFunctionCoefficient does not own the grid function,
       and it requires the grid function for its lifetime.
-      Thus stokes_solver will be deleted at ~AdvDiffSolver().
+      Thus flow_solver will be deleted at ~AdvDiffSolver().
    */
 }
