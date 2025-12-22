@@ -173,11 +173,12 @@ void AdvDiffSolver::SetFlowAtSubdomain(std::function<void(const Vector &, double
 
 bool AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
+   bool success = true;
    if (!function_factory::advdiff_problem::analytic_flow)
-      GetFlowField(function_factory::advdiff_problem::flow_problem);
+      success = GetFlowField(function_factory::advdiff_problem::flow_problem);
 
-   PoissonSolver::SetParameterizedProblem(problem);
-   return true;
+   success = success && (PoissonSolver::SetParameterizedProblem(problem));
+   return success;
 }
 
 void AdvDiffSolver::SaveVisualization()
@@ -238,7 +239,7 @@ void AdvDiffSolver::SetMUMPSSolver()
    mumps->SetOperator(*globalMat_hypre);
 }
 
-void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
+bool AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
 {
    assert(flow_problem);
    mfem_warning("AdvDiffSolver: Obtaining flow field. This may take a while depending on the domain size.\n");
@@ -267,7 +268,7 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
       flow_solver->BuildOperators();
       flow_solver->SetupBCOperators();
       flow_solver->Assemble();
-      flow_solver->Solve();
+      flow_loaded = flow_solver->Solve();
    }
 
    if (save_flow && (!flow_loaded))
@@ -283,4 +284,6 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
       and it requires the grid function for its lifetime.
       Thus flow_solver will be deleted at ~AdvDiffSolver().
    */
+
+   return flow_loaded;
 }

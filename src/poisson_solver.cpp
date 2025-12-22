@@ -582,6 +582,7 @@ bool PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->scalar_rhs_ptr));
    else
       AddRHSFunction(0.0);
+   // PoissonSolver does not fail in SetParameterizedProblem.
    return true;
 }
 

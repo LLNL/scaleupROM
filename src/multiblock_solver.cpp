@@ -502,6 +502,7 @@ bool MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
       bdr_type[b] = problem->bdr_type[idx];
    }
+   // MultiBlockSolver does not fail in SetParameterizedProblem.
    return true;
 }
 

@@ -432,7 +432,7 @@ void BuildROM(MPI_Comm comm)
 
    // The ROM operator will be built based on the parameter specified for single-run.
    problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
+   assert(test->SetParameterizedProblem(problem));
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
@@ -509,7 +509,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
 
    problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
+   assert(test->SetParameterizedProblem(problem));
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildRHSOperators();
@@ -726,7 +726,7 @@ void PrintEQPCoords(MPI_Comm comm)
    StopWatch solveTimer;
 
    problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
+   assert(test->SetParameterizedProblem(problem));
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildRHSOperators();

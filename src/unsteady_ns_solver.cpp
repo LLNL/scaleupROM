@@ -313,6 +313,7 @@ bool UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       u_ic = new VectorConstantCoefficient(zero_vel);
       p_ic = new VectorConstantCoefficient(zero_pres);
+      // UnsteadyNSSolver does not fail in SetParameterizedProblem.
       return true;
    }
 
@@ -325,6 +326,7 @@ bool UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       p_ic = new VectorFunctionCoefficient(1, problem->ic_ptr[1]);
    else
       p_ic = new VectorConstantCoefficient(zero_pres);
+   // UnsteadyNSSolver does not fail in SetParameterizedProblem.
    return true;
 }
 

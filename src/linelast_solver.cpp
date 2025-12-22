@@ -483,6 +483,7 @@ bool LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       SetupIC(*(problem->general_vector_ptr[0]));
    }
+   // LinElastSolver does not fail in SetParameterizedProblem.
    return true;
 }
 

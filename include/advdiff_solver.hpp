@@ -61,7 +61,7 @@ protected:
    void SetMUMPSSolver() override;
 
 private:
-   void GetFlowField(ParameterizedProblem *flow_problem);
+   bool GetFlowField(ParameterizedProblem *flow_problem);
 };
 
 #endif
