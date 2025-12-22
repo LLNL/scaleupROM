@@ -171,12 +171,13 @@ void AdvDiffSolver::SetFlowAtSubdomain(std::function<void(const Vector &, double
       flow_coeffs[m] = new VectorFunctionCoefficient(dim, F);
 }
 
-void AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool AdvDiffSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    if (!function_factory::advdiff_problem::analytic_flow)
       GetFlowField(function_factory::advdiff_problem::flow_problem);
 
    PoissonSolver::SetParameterizedProblem(problem);
+   return true;
 }
 
 void AdvDiffSolver::SaveVisualization()

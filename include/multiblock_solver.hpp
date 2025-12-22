@@ -254,7 +254,7 @@ public:
    virtual void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes, var_names); }
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem);
+   virtual bool SetParameterizedProblem(ParameterizedProblem *problem);
 
    void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
    void ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error);

@@ -440,7 +440,7 @@ void LinElastSolver::SetupDomainBCOperators()
    }
 }
 
-void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
@@ -483,6 +483,7 @@ void LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       SetupIC(*(problem->general_vector_ptr[0]));
    }
+   return true;
 }
 
 void LinElastSolver::ProjectOperatorOnReducedBasis()

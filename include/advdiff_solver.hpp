@@ -53,7 +53,7 @@ public:
 
    void SetFlowAtSubdomain(std::function<void(const Vector &, double, Vector &)> F, const int m=-1);
 
-   void SetParameterizedProblem(ParameterizedProblem *problem) override;
+   bool SetParameterizedProblem(ParameterizedProblem *problem) override;
 
    void SaveVisualization() override;
 

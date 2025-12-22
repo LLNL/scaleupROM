@@ -197,7 +197,7 @@ public:
 
    void SanityCheckOnCoeffs();
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
+   virtual bool SetParameterizedProblem(ParameterizedProblem *problem) override;
 
    // to ensure incompressibility for the problems with all velocity dirichlet bc.
    void SetComplementaryFlux(const Array<bool> nz_dbcs);

@@ -547,7 +547,7 @@ void PoissonSolver::SanityCheckOnCoeffs()
       MFEM_WARNING("All bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
 }
 
-void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
@@ -582,6 +582,7 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->scalar_rhs_ptr));
    else
       AddRHSFunction(0.0);
+   return true;
 }
 
 void PoissonSolver::SetMUMPSSolver()

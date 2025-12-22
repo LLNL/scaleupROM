@@ -1079,7 +1079,7 @@ void StokesSolver::SanityCheckOnCoeffs()
       MFEM_WARNING("All velocity bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
 }
 
-void StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);

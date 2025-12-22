@@ -93,7 +93,7 @@ public:
    using MultiBlockSolver::SaveVisualization;
    void SaveVisualization(const int step, const double time) override;
 
-   void SetParameterizedProblem(ParameterizedProblem *problem) override;
+   bool SetParameterizedProblem(ParameterizedProblem *problem) override;
 
    BlockVector* PrepareSnapshots(std::vector<BasisTag> &basis_tags) override;
 

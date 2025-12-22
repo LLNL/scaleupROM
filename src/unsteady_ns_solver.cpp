@@ -290,7 +290,7 @@ void UnsteadyNSSolver::SaveVisualization(const int step, const double time)
    MultiBlockSolver::SaveVisualization(step, time);
 }
 
-void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    SteadyNSSolver::SetParameterizedProblem(problem);
 
@@ -313,7 +313,7 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       u_ic = new VectorConstantCoefficient(zero_vel);
       p_ic = new VectorConstantCoefficient(zero_pres);
-      return;
+      return true;
    }
 
    if (problem->ic_ptr[0])
@@ -325,6 +325,7 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       p_ic = new VectorFunctionCoefficient(1, problem->ic_ptr[1]);
    else
       p_ic = new VectorConstantCoefficient(zero_pres);
+   return true;
 }
 
 BlockVector* UnsteadyNSSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tags)

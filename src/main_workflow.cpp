@@ -165,7 +165,12 @@ void GenerateSamples(MPI_Comm comm)
          test->InitROMHandler();
 
       problem->SetSingleRun();
-      test->SetParameterizedProblem(problem);
+      bool param_set = test->SetParameterizedProblem(problem);
+      if (!param_set)
+      {
+         sample_generator->SetSampleParams(s);
+         param_set = test->SetParameterizedProblem(problem);
+      }
 
       int file_idx = s + sample_generator->GetFileOffset();
       const std::string visual_path = sample_generator->GetSamplePath(file_idx, test->GetVisualizationPrefix());

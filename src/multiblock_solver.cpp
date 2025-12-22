@@ -492,7 +492,7 @@ void MultiBlockSolver::SaveVisualization(const int step, const double time)
    SaveVisualization();
 }
 
-void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    assert(bdr_type.Size() == global_bdr_attributes.Size());
    for (int b = 0; b < global_bdr_attributes.Size(); b++)
@@ -502,6 +502,7 @@ void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
       bdr_type[b] = problem->bdr_type[idx];
    }
+   return true;
 }
 
 void MultiBlockSolver::SaveSolution(std::string filename)
