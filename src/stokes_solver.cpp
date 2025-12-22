@@ -1143,6 +1143,9 @@ bool StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       }
       SetComplementaryFlux(nz_dbcs);
    }
+
+   // StokesSolver does not fail at SetParameterizedProblem.
+   return true;
 }
 
 BlockMatrix* StokesSolver::FormBlockMatrix(
