@@ -13,6 +13,7 @@ using namespace mfem;
 // void trans(const Vector &x, Vector &p);
 static int    order_ = 3;
 static bool    force_nc_ = false;
+static int    ser_ref_levels = 0;
 
 int main(int argc, char *argv[])
 {
@@ -26,6 +27,8 @@ int main(int argc, char *argv[])
                   "Order (polynomial degree) of the mesh elements.");
    args.AddOption(&force_nc_, "-fnc", "--force-non-conforming", "-nfnc", "--noforce-non-conforming",
                   "Sets whether to force the output mesh to be nonconforming. Default behavior is no enforcing.");
+   args.AddOption(&ser_ref_levels, "-rs", "--refine-serial",
+                  "Number of times to refine the mesh uniformly in serial.");
 
    args.Parse();
    if (!args.Good())
@@ -36,6 +39,12 @@ int main(int argc, char *argv[])
    args.PrintOptions(cout);
 
    Mesh mesh(meshFileString);
+
+   // Refine the mesh if desired
+   for (int lev = 0; lev < ser_ref_levels; lev++)
+   {
+      mesh.UniformRefinement();
+   }
 
    // Promote to high order mesh
    if (order_ >1)

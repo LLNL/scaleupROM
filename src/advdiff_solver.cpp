@@ -246,6 +246,8 @@ void AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
       flow_solver = new StokesSolver;
    else if (flow_solver_type == "steady-ns")
       flow_solver = new SteadyNSSolver;
+   else
+      mfem_error("AdvDiffSolver::GetFlowField - Unknown flow solver type!\n");
 
    flow_solver->InitVariables();
    if (use_rom) flow_solver->InitROMHandler();
