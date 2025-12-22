@@ -168,6 +168,8 @@ void GenerateSamples(MPI_Comm comm)
       bool param_set = test->SetParameterizedProblem(problem);
       if (!param_set)
       {
+         if (sample_generator->GetType() != SampleGeneratorType::RANDOM)
+            mfem_error("GenerateSamples failed at SetParameterizedProblem, and parameter values are fixed!\n");
          sample_generator->SetSampleParams(s);
          param_set = test->SetParameterizedProblem(problem);
       }
