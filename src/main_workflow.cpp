@@ -170,7 +170,15 @@ void GenerateSamples(MPI_Comm comm)
       {
          if (sample_generator->GetType() != SampleGeneratorType::RANDOM)
             mfem_error("GenerateSamples failed at SetParameterizedProblem, and parameter values are fixed!\n");
+         delete test;
+         
          sample_generator->SetSampleParams(s);
+         test = InitSolver();
+         test->InitVariables();
+         if (test->UseRom())
+            test->InitROMHandler();
+
+         problem->SetSingleRun();
          param_set = test->SetParameterizedProblem(problem);
       }
 
