@@ -536,10 +536,10 @@ void MFEMROMHandler::Solve(BlockVector &rhs, BlockVector &sol)
 {
    assert(operator_loaded);
 
-   int maxIter = config.GetOption<int>("solver/max_iter", 10000);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-15);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-15);
-   int print_level = config.GetOption<int>("solver/print_level", 0);   
+   int maxIter = config.GetOption<int>("rom_solver/max_iter", 10000);
+   double rtol = config.GetOption<double>("rom_solver/relative_tolerance", 1.e-15);
+   double atol = config.GetOption<double>("rom_solver/absolute_tolerance", 1.e-15);
+   int print_level = config.GetOption<int>("rom_solver/print_level", 0);   
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
 
    if (linsol_type == SolverType::DIRECT)
@@ -637,8 +637,8 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
 
    printf("Solve ROM.\n");
    reduced_sol = new BlockVector(rom_block_offsets);
-   bool use_restart = config.GetOption<bool>("solver/use_restart", false);
-   double amp = config.GetOption<double>("solver/initial_random_perturbation", 1.0e-5);
+   bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
+   double amp = config.GetOption<double>("rom_solver/initial_random_perturbation", 1.0e-5);
    if (use_restart)
       ProjectGlobalToDomainBasis(U, reduced_sol);
    else
@@ -647,15 +647,15 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
          (*reduced_sol)(k) = amp * UniformRandom();
    }
 
-   int maxIter = config.GetOption<int>("solver/max_iter", 100);
-   double rtol = config.GetOption<double>("solver/relative_tolerance", 1.e-10);
-   double atol = config.GetOption<double>("solver/absolute_tolerance", 1.e-10);
-   int print_level = config.GetOption<int>("solver/print_level", 0);   
+   int maxIter = config.GetOption<int>("rom_solver/max_iter", 100);
+   double rtol = config.GetOption<double>("rom_solver/relative_tolerance", 1.e-10);
+   double atol = config.GetOption<double>("rom_solver/absolute_tolerance", 1.e-10);
+   int print_level = config.GetOption<int>("rom_solver/print_level", 0);   
 
-   int jac_maxIter = config.GetOption<int>("solver/jacobian/max_iter", 10000);
-   double jac_rtol = config.GetOption<double>("solver/jacobian/relative_tolerance", 1.e-10);
-   double jac_atol = config.GetOption<double>("solver/jacobian/absolute_tolerance", 1.e-10);
-   int jac_print_level = config.GetOption<int>("solver/jacobian/print_level", -1);
+   int jac_maxIter = config.GetOption<int>("rom_solver/jacobian/max_iter", 10000);
+   double jac_rtol = config.GetOption<double>("rom_solver/jacobian/relative_tolerance", 1.e-10);
+   double jac_atol = config.GetOption<double>("rom_solver/jacobian/absolute_tolerance", 1.e-10);
+   int jac_print_level = config.GetOption<int>("rom_solver/jacobian/print_level", -1);
    std::string prec_str = config.GetOption<std::string>("model_reduction/preconditioner", "none");
    if (prec_str != "none") assert(prec);
 
