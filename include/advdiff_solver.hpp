@@ -27,6 +27,7 @@ protected:
       flow solver to obtain the prescribed velocity field. both StokesSolver / SteadyNSSolver can be used.
    */
    std::string flow_solver_type = "";
+   int flow_solver_order = -1;
    StokesSolver *flow_solver = NULL;
    bool load_flow = false;
    bool save_flow = false;

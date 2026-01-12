@@ -26,7 +26,8 @@ AdvDiffSolver::AdvDiffSolver()
    if (save_flow || load_flow)
       flow_file = config.GetRequiredOption<std::string>("adv-diff/flow_file");
 
-   flow_solver_type = config.GetOption<std::string>("adv-diff/flow_solver_type", "stokes");
+   flow_solver_type = config.GetOption<std::string>("adv-diff/flow_solver/type", "stokes");
+   flow_solver_order = config.GetOption<int>("adv-diff/flow_solver/order", order);
 }
 
 AdvDiffSolver::~AdvDiffSolver()
@@ -244,12 +245,20 @@ bool AdvDiffSolver::GetFlowField(ParameterizedProblem *flow_problem)
    assert(flow_problem);
    mfem_warning("AdvDiffSolver: Obtaining flow field. This may take a while depending on the domain size.\n");
 
+   // Temporarily change order option just for flow solver setup.
+   if (flow_solver_order != order)
+      config.SetOption<int>("discretization/order", flow_solver_order);
+
    if (flow_solver_type == "stokes")
       flow_solver = new StokesSolver;
    else if (flow_solver_type == "steady-ns")
       flow_solver = new SteadyNSSolver;
    else
       mfem_error("AdvDiffSolver::GetFlowField - Unknown flow solver type!\n");
+
+   // Bring back the original value for order option.
+   if (flow_solver_order != order)
+      config.SetOption<int>("discretization/order", order);
 
    flow_solver->InitVariables();
    if (use_rom) flow_solver->InitROMHandler();
