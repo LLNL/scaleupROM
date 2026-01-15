@@ -1009,3 +1009,264 @@ bool ComponentTopologyHandler::ComponentBdrAttrCheck(Mesh *comp)
 
    return success;
 }
+
+ComponentTopologyHandler::ComponentTopologyHandler(
+    ComponentTopologyHandler* global, const int i0, const int j0,
+    const int N, const int M)
+    : TopologyHandler(TopologyHandlerMode::COMPONENT),
+    verbose(global->verbose), write_ports(false), vtx_gap_thrs(global->vtx_gap_thrs),
+    tf_ptr(global->tf_ptr), inv_tf_ptr(global->inv_tf_ptr)
+{
+   // assert N from the N x N array
+   assert(N * N == numSub);
+
+   // Validate input parameters
+   assert(i0 >= 0 && j0 >= 0);
+   assert(i0 + M <= N && j0 + M <= N);
+
+   // Set up mesh arrays for the M x M subset
+   int new_numSub = M * M;
+   numSub = new_numSub;
+
+   // Copy basic topology information
+   dim = global->dim;
+   dd_mode = global->dd_mode;
+   num_comp = global->num_comp;
+   comp_names = global->comp_names;
+
+   // Copy components (reference meshes)
+   components.SetSize(num_comp);
+   for (int c = 0; c < num_comp; c++)
+      components[c] = new BlockMesh(*global->components[c]);
+
+   sub_composition.SetSize(new_numSub);
+   sub_composition = 0;
+   mesh_types.SetSize(new_numSub);
+   mesh_comp_idx.SetSize(new_numSub);
+   mesh_configs.SetSize(new_numSub);
+   meshes.SetSize(new_numSub);
+   bdr_c2g.SetSize(new_numSub);
+
+   Array<int> comp_included(global->num_comp);
+   comp_included = 0;
+
+   // Map from subset mesh index to original mesh index
+   Array<int> orig_to_subset(global->numSub);
+   orig_to_subset = -1;
+   Array<int> subset_to_orig(new_numSub);
+   subset_to_orig = -1;
+
+   // Copy meshes and configurations for the subset
+   for (int mi = 0; mi < M; mi++)
+   {
+      for (int mj = 0; mj < M; mj++)
+      {
+         int subset_idx = mi * M + mj;
+         int orig_idx = (i0 + mi) * N + (j0 + mj);
+
+         subset_to_orig[subset_idx] = orig_idx;
+         orig_to_subset[orig_idx] = subset_idx;
+
+         // Track which components are actually used
+         int orig_comp_type = global->mesh_types[orig_idx];
+         comp_included[orig_comp_type] = 1;
+
+         // Copy mesh type (will be remapped later)
+         mesh_types[subset_idx] = orig_comp_type;
+
+         // Copy mesh configuration
+         for (int d = 0; d < 3; d++)
+         {
+            mesh_configs[subset_idx].trans[d] = global->mesh_configs[orig_idx].trans[d];
+            mesh_configs[subset_idx].rotate[d] = global->mesh_configs[orig_idx].rotate[d];
+         }
+
+         // Copy the mesh (as-is, no transformation needed since it's already transformed)
+         meshes[subset_idx] = new Mesh(*global->meshes[orig_idx]);
+
+         // Copy boundary attribute mapping for this mesh
+         bdr_c2g[subset_idx] = new Array<int>(*global->bdr_c2g[orig_idx]);
+      }
+   }
+
+   // Now update num_comp, components, comp_names based on actually used components
+   Array<int> old_to_new_comp(global->num_comp);
+   old_to_new_comp = -1;
+   num_comp = 0;
+
+   for (int c = 0; c < global->num_comp; c++)
+   {
+      if (comp_included[c])
+      {
+         old_to_new_comp[c] = num_comp;
+         num_comp++;
+      }
+   }
+
+   // Resize and populate the component arrays
+   components.SetSize(num_comp);
+   comp_names.resize(num_comp);
+   comp_name2idx.clear();
+
+   for (int c = 0; c < global->num_comp; c++)
+   {
+      if (comp_included[c])
+      {
+         int new_c = old_to_new_comp[c];
+         components[new_c] = new BlockMesh(*global->components[c]);
+         comp_names[new_c] = global->comp_names[c];
+         comp_name2idx[comp_names[new_c]] = new_c;
+      }
+   }
+
+   // Remap mesh_types to new component indices
+   for (int m = 0; m < new_numSub; m++)
+   {
+      mesh_types[m] = old_to_new_comp[mesh_types[m]];
+   }
+
+   // Calculate sub_composition and mesh_comp_idx based on new component indices
+   sub_composition = 0;
+   for (int m = 0; m < new_numSub; m++)
+   {
+      int comp_type = mesh_types[m];
+      mesh_comp_idx[m] = sub_composition[comp_type];
+      sub_composition[comp_type] += 1;
+   }
+
+   // Determine which ports are internal (both meshes in subset)
+   // and which are external (at least one mesh outside subset)
+   Array<int> port_included(global->num_ports);
+   port_included = 0;
+
+   Array<PortInfo> new_port_infos(0);
+   Array<int> new_port_types(0);
+   Array<int> ref_port_included(global->num_ref_ports);
+   ref_port_included = 0;
+
+   // Process each port to determine if it's internal or external
+   for (int p = 0; p < global->num_ports; p++)
+   {
+      int mesh1 = global->port_infos[p].Mesh1;
+      int mesh2 = global->port_infos[p].Mesh2;
+      int attr1 = global->port_infos[p].Attr1;
+      int attr2 = global->port_infos[p].Attr2;
+      int port_attr = global->port_infos[p].PortAttr;
+      int port_type = global->port_types[p];
+
+      // Check if both meshes are in the subset
+      bool mesh1_in_subset = (orig_to_subset[mesh1] >= 0);
+      bool mesh2_in_subset = (orig_to_subset[mesh2] >= 0);
+
+      if (mesh1_in_subset && mesh2_in_subset)
+      {
+         // Internal port - include it
+         port_included[p] = 1;
+         ref_port_included[port_type] = 1;
+
+         int new_mesh1 = orig_to_subset[mesh1];
+         int new_mesh2 = orig_to_subset[mesh2];
+
+         // Add to new port infos with updated mesh indices
+         PortInfo new_info = global->port_infos[p];
+         new_info.Mesh1 = new_mesh1;
+         new_info.Mesh2 = new_mesh2;
+         new_port_infos.Append(new_info);
+         new_port_types.Append(port_type);  // Still using old port_type index, will remap later
+      }
+      else
+      {
+         // External port - exclude it
+         // The boundary attributes of meshes facing outside become global boundary
+         port_included[p] = 0;
+      }
+   }
+
+   // Create mapping from old to new ref_port indices
+   Array<int> old_to_new_refport(global->num_ref_ports);
+   old_to_new_refport = -1;
+   num_ref_ports = 0;
+
+   for (int rp = 0; rp < global->num_ref_ports; rp++)
+   {
+      if (ref_port_included[rp])
+      {
+         old_to_new_refport[rp] = num_ref_ports;
+         num_ref_ports++;
+      }
+   }
+
+   // Resize and populate the reference port arrays
+   ref_ports.SetSize(num_ref_ports);
+   port_names.resize(num_ref_ports);
+   port_dicts.SetSize(num_ref_ports);
+   ref_interfaces.SetSize(num_ref_ports);
+   port_name2idx.clear();
+
+   for (int rp = 0; rp < global->num_ref_ports; rp++)
+   {
+      if (ref_port_included[rp])
+      {
+         int new_rp = old_to_new_refport[rp];
+         
+         // Copy PortData and update component indices
+         ref_ports[new_rp] = new PortData(*global->ref_ports[rp]);
+         ref_ports[new_rp]->Component1 = old_to_new_comp[global->ref_ports[rp]->Component1];
+         ref_ports[new_rp]->Component2 = old_to_new_comp[global->ref_ports[rp]->Component2];
+         
+         // Copy port name
+         port_names[new_rp] = global->port_names[rp];
+         port_name2idx[port_names[new_rp]] = new_rp;
+         
+         // Copy port dictionary
+         port_dicts[new_rp] = new YAML::Node(*global->port_dicts[rp]);
+         
+         // Copy reference interface
+         ref_interfaces[new_rp] = new Array<InterfaceInfo>(*global->ref_interfaces[rp]);
+      }
+   }
+
+   // Remap port_types in new_port_types to new reference port indices
+   for (int p = 0; p < new_port_types.Size(); p++)
+   {
+      new_port_types[p] = old_to_new_refport[new_port_types[p]];
+   }
+
+   // Assign the updated arrays
+   port_infos = new_port_infos;
+   port_types = new_port_types;
+   num_ports = port_infos.Size();
+
+   // Setup ports, as all reference port infos are updated.
+   SetupPorts();
+
+   // Update bdr_attributes based on actual boundary attributes in the subset
+   // Start by collecting all boundary attributes from bdr_c2g
+   std::set<int> bdr_attr_set;
+
+   for (int m = 0; m < new_numSub; m++)
+   {
+      for (int i = 0; i < bdr_c2g[m]->Size(); i++)
+      {
+         int attr = (*bdr_c2g[m])[i];
+         bdr_attr_set.insert(attr);
+      }
+   }
+
+   // Exclude port attributes (these are internal interfaces, not true boundaries)
+   for (int p = 0; p < port_infos.Size(); p++)
+   {
+      bdr_attr_set.erase(port_infos[p].PortAttr);
+   }
+
+   // Convert set to array
+   bdr_attributes.SetSize(bdr_attr_set.size());
+   int idx = 0;
+   for (std::set<int>::iterator it = bdr_attr_set.begin(); it != bdr_attr_set.end(); ++it)
+   {
+      bdr_attributes[idx] = *it;
+      idx++;
+   }
+
+   bdr_attributes.Sort();
+}

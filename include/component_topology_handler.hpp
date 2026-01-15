@@ -83,6 +83,13 @@ public:
 
       std::unordered_map<int,int> vtx2to1;             // vertex mapping from component 2 to component 1.
       Array2D<int> be_pairs;  // boundary element pairs between component 1 and 2.
+
+      PortData() {}
+
+      PortData(const PortData &input)
+         : Component1(input.Component1), Component2(input.Component2),
+           Attr1(input.Attr1), Attr2(input.Attr2), vtx2to1(input.vtx2to1),
+           be_pairs(input.be_pairs) {}
    };
 
 protected:
@@ -132,6 +139,14 @@ protected:
 
 public:
    ComponentTopologyHandler();
+
+   // Get a subset of the mesh array as a new ComponentTopologyHandler.
+   // Assumes meshes are arranged in an N x N square array.
+   // Extracts an M x M subset starting at (i0, j0).
+   // Internal ports within the subset are included.
+   // External ports connecting to meshes outside the subset are excluded.
+   // Boundary attributes of subset meshes facing outside are set as global boundary.
+   ComponentTopologyHandler(ComponentTopologyHandler* global, const int i0, const int j0, const int N, const int M);
 
    virtual ~ComponentTopologyHandler();
 
