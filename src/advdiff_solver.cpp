@@ -10,8 +10,8 @@
 using namespace std;
 using namespace mfem;
 
-AdvDiffSolver::AdvDiffSolver()
-   : PoissonSolver(), flow_visual(0), flow_fes(0), global_flow_visual(0)
+AdvDiffSolver::AdvDiffSolver(TopologyHandler *input_topol_handler)
+   : PoissonSolver(input_topol_handler), flow_visual(0), flow_fes(0), global_flow_visual(0)
 {
    // ConvectionIntegrator does not support L2 space.
    assert(!full_dg);

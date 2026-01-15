@@ -416,8 +416,8 @@ void SteadyNSEQPROM::AddVel(const Vector &y_u, Vector &y) const
    SteadyNSSolver
 */
 
-SteadyNSSolver::SteadyNSSolver()
-   : StokesSolver()
+SteadyNSSolver::SteadyNSSolver(TopologyHandler *input_topol_handler)
+   : StokesSolver(input_topol_handler)
 {
    nonlinear_mode = true;
 

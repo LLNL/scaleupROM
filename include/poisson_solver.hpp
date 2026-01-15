@@ -50,7 +50,7 @@ protected:
    double kappa = -1.0;
 
 public:
-   PoissonSolver();
+   PoissonSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~PoissonSolver();
 

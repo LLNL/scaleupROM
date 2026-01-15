@@ -10,7 +10,8 @@
 using namespace std;
 using namespace mfem;
 
-MultiBlockSolver::MultiBlockSolver()
+MultiBlockSolver::MultiBlockSolver(TopologyHandler *input_topol_handler)
+   : topol_handler(input_topol_handler)
 {
    /*
       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
@@ -22,24 +23,25 @@ MultiBlockSolver::MultiBlockSolver()
    ParseInputs();
 
    TopologyData topol_data;
-   switch (topol_mode)
-   {
-      case TopologyHandlerMode::SUBMESH:
+   if (topol_handler == NULL)
+      switch (topol_mode)
       {
-         topol_handler = new SubMeshTopologyHandler();
-         break;
+         case TopologyHandlerMode::SUBMESH:
+         {
+            topol_handler = new SubMeshTopologyHandler();
+            break;
+         }
+         case TopologyHandlerMode::COMPONENT:
+         {
+            topol_handler = new ComponentTopologyHandler();
+            break;
+         }
+         default:
+         {
+            mfem_error("Unknown topology handler mode!\n");
+            break;
+         }
       }
-      case TopologyHandlerMode::COMPONENT:
-      {
-         topol_handler = new ComponentTopologyHandler();
-         break;
-      }
-      default:
-      {
-         mfem_error("Unknown topology handler mode!\n");
-         break;
-      }
-   }
    topol_handler->ExportInfo(meshes, topol_data);
    
    // Receive topology info

@@ -116,7 +116,7 @@ protected:
    ROMLinearElement *rom_elems = NULL;
 
 public:
-   MultiBlockSolver();
+   MultiBlockSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~MultiBlockSolver();
 

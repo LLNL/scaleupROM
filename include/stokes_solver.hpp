@@ -134,7 +134,7 @@ protected:
    double kappa = -1.0;
 
 public:
-   StokesSolver();
+   StokesSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~StokesSolver();
 

@@ -41,7 +41,7 @@ protected:
    Array<GridFunction *> global_flow_visual;
 
 public:
-   AdvDiffSolver();
+   AdvDiffSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~AdvDiffSolver();
 

@@ -57,7 +57,7 @@ protected:
    VectorCoefficient *init_x = NULL;
 
 public:
-   LinElastSolver();
+   LinElastSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~LinElastSolver();
 

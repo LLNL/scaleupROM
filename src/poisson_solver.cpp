@@ -10,8 +10,8 @@
 using namespace std;
 using namespace mfem;
 
-PoissonSolver::PoissonSolver()
-   : MultiBlockSolver()
+PoissonSolver::PoissonSolver(TopologyHandler *input_topol_handler)
+   : MultiBlockSolver(input_topol_handler)
 {
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));

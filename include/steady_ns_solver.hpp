@@ -166,7 +166,7 @@ protected:
    NewtonSolver *newton_solver = NULL;
 
 public:
-   SteadyNSSolver();
+   SteadyNSSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~SteadyNSSolver();
 

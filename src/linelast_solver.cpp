@@ -10,8 +10,8 @@
 using namespace std;
 using namespace mfem;
 
-LinElastSolver::LinElastSolver()
-    : MultiBlockSolver()
+LinElastSolver::LinElastSolver(TopologyHandler *input_topol_handler)
+    : MultiBlockSolver(input_topol_handler)
 {
    alpha = config.GetOption<double>("discretization/interface/alpha", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));

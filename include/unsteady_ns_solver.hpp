@@ -74,7 +74,7 @@ private:
    double times[10];
 
 public:
-   UnsteadyNSSolver();
+   UnsteadyNSSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~UnsteadyNSSolver();
 

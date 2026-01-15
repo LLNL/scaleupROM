@@ -12,8 +12,8 @@ using namespace mfem;
    UnsteadyNSSolver
 */
 
-UnsteadyNSSolver::UnsteadyNSSolver()
-   : SteadyNSSolver(), timer("UnsteadyNSSolver")
+UnsteadyNSSolver::UnsteadyNSSolver(TopologyHandler *input_topol_handler)
+   : SteadyNSSolver(input_topol_handler), timer("UnsteadyNSSolver")
 {
    nonlinear_mode = true;
 

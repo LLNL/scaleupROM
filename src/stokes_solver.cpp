@@ -13,8 +13,8 @@
 using namespace std;
 using namespace mfem;
 
-StokesSolver::StokesSolver()
-   : MultiBlockSolver(), minus_one(-1.0)
+StokesSolver::StokesSolver(TopologyHandler *input_topol_handler)
+   : MultiBlockSolver(input_topol_handler), minus_one(-1.0)
 {
    nu = config.GetOption<double>("stokes/nu", 1.0);
    nu_coeff = new ConstantCoefficient(nu);
