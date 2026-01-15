@@ -53,6 +53,8 @@ protected:
    double lambda = 1.0;
    double mu = 1.0;
 
+   Vector zero;
+
    // Initial positions
    VectorCoefficient *init_x = NULL;
 
@@ -86,6 +88,7 @@ public:
    virtual void SetupBCVariables() override;
    virtual void SetupIC(std::function<void(const Vector &, double, Vector &)> F);
    virtual void AddBCFunction(std::function<void(const Vector &, double, Vector &)> F, const int battr = -1);
+   virtual void AddBCFunction(const Vector &F, const int battr = -1);
    virtual void AddRHSFunction(std::function<void(const Vector &, double, Vector &)> F);
    virtual bool BCExistsOnBdr(const int &global_battr_idx);
    virtual void SetupBCOperators();

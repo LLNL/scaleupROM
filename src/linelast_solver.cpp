@@ -40,6 +40,10 @@ LinElastSolver::LinElastSolver(TopologyHandler *input_topol_handler)
    {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
+
+   // For homogeneous Dirichlet condition
+   zero.SetSize(dim);
+   zero = 0.0;
 }
 
 LinElastSolver::~LinElastSolver()
@@ -178,6 +182,7 @@ void LinElastSolver::SetupRHSBCOperators()
 
          switch (bdr_type[b])
          {
+            case BoundaryType::ZERO:
             case BoundaryType::DIRICHLET:
                bs[m]->AddBdrFaceIntegrator(new DGElasticityDirichletLFIntegrator(
                   *bdr_coeffs[b], *lambda_c[m], *mu_c[m], alpha, kappa), *bdr_markers[b]);
@@ -406,6 +411,26 @@ void LinElastSolver::AddBCFunction(std::function<void(const Vector &, double, Ve
          bdr_coeffs[k] = new VectorFunctionCoefficient(dim, F);
 }
 
+void LinElastSolver::AddBCFunction(const Vector &F, const int battr)
+{
+   assert(bdr_coeffs.Size() > 0);
+
+   if (battr > 0)
+   {
+      int idx = global_bdr_attributes.Find(battr);
+      if (idx < 0)
+      {
+         std::string msg = "battr " + std::to_string(battr) + " is not in global boundary attributes. skipping this boundary condition.\n";
+         mfem_warning(msg.c_str());
+         return;
+      }
+      bdr_coeffs[idx] = new VectorConstantCoefficient(F);
+   }
+   else
+      for (int k = 0; k < bdr_coeffs.Size(); k++)
+         bdr_coeffs[k] = new VectorConstantCoefficient(F);
+}
+
 void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, double, Vector &)> F)
 {
    rhs_coeffs.Append(new VectorFunctionCoefficient(dim, F));
@@ -431,10 +456,13 @@ void LinElastSolver::SetupDomainBCOperators()
                continue;
             if (!BCExistsOnBdr(b))
                continue;
+            /* Neumann condition is implicitly enforced by weak form */
+            if (bdr_type[b] == BoundaryType::NEUMANN)
+               continue;
 
-            if (bdr_type[b] == BoundaryType::DIRICHLET)
-               as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
-                  *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
+            /* for DIRICHLET and ZERO */
+            as[m]->AddBdrFaceIntegrator(new DGElasticityIntegrator(
+               *(lambda_c[m]), *(mu_c[m]), alpha, kappa), *(bdr_markers[b]));
          }
       }
    }
@@ -464,13 +492,34 @@ bool LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    // Set BCs, the switch on BC type is done inside SetupRHSBCOperators
    for (int b = 0; b < problem->battr.Size(); b++)
    {
-      /* Dirichlet bc requires a function specified, even for zero. */
-      if (problem->bdr_type[b] == BoundaryType::DIRICHLET)
-         assert(problem->vector_bdr_ptr[b]);
-      
-      /* Neumann bc does not require a function specified for zero */
-      if (problem->vector_bdr_ptr[b])
-         AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+      switch (problem->bdr_type[b])
+      {
+         case BoundaryType::DIRICHLET:
+         { 
+            assert(problem->vector_bdr_ptr[b]);
+            AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+            break;
+         }
+         case BoundaryType::NEUMANN:
+         { 
+            if (problem->vector_bdr_ptr[b])
+               AddBCFunction(*(problem->vector_bdr_ptr[b]), problem->battr[b]);
+            break;
+         }
+         default:
+         case BoundaryType::ZERO:
+         { AddBCFunction(zero, problem->battr[b]); break; }
+      }
+   }
+
+   /* 
+      for all undefined boundary attributes,
+      set homogeneous Neumann condition.
+   */
+   for (int k = 0; k < bdr_type.Size(); k++)
+   {
+      if (bdr_type[k] == BoundaryType::NUM_BDR_TYPE)
+         bdr_type[k] = BoundaryType::NEUMANN;
    }
 
    // Set RHS
