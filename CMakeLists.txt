@@ -211,6 +211,7 @@ set(scaleupROMObj_SOURCES
 
   include/steady_ns_solver.hpp
   src/steady_ns_solver.cpp
+  src/steady_ns_solver_schwarz.cpp
 
   include/advdiff_solver.hpp
   src/advdiff_solver.cpp

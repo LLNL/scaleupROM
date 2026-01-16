@@ -198,6 +198,8 @@ public:
 
    void SaveEQPCoords(const std::string &filename) override;
 
+   void SchwarzROM(const int M, const int N, ParameterizedProblem *problem);
+
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
    
