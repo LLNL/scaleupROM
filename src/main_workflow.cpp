@@ -521,6 +521,8 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    problem->SetSingleRun();
    assert(test->SetParameterizedProblem(problem));
 
+   assert(test->IsBdrTypeDefined());
+
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildRHSOperators();
    test->SetupRHSBCOperators();

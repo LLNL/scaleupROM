@@ -204,6 +204,8 @@ bool PoissonSolver::BCExistsOnBdr(const int &global_battr_idx)
 
 void PoissonSolver::SetupBCOperators()
 {
+   assert(IsBdrTypeDefined());
+
    SetupRHSBCOperators();
 
    SetupDomainBCOperators();

@@ -303,6 +303,8 @@ bool StokesSolver::BCExistsOnBdr(const int &global_battr_idx)
 
 void StokesSolver::SetupBCOperators()
 {
+   assert(IsBdrTypeDefined());
+   
    SetupRHSBCOperators();
 
    SetupDomainBCOperators();

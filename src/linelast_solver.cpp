@@ -438,6 +438,7 @@ void LinElastSolver::AddRHSFunction(std::function<void(const Vector &, double, V
 
 void LinElastSolver::SetupBCOperators()
 {
+   assert(IsBdrTypeDefined());
    SetupRHSBCOperators();
    SetupDomainBCOperators();
 }

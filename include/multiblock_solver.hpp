@@ -262,6 +262,15 @@ public:
 
    virtual void SaveEQPCoords(const std::string &filename) {}
 
+   bool IsBdrTypeDefined()
+   {
+      for (int k = 0; k < bdr_type.Size(); k++)
+         if (bdr_type[k] == BoundaryType::NUM_BDR_TYPE)
+            return false;
+
+      return true;
+   }
+
 protected:
    virtual void AssembleROMMat(BlockMatrix &romMat);
 };

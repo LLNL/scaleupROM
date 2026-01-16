@@ -309,7 +309,12 @@ void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
       {
          int global_idx = global_bdr_attributes.Find((*bdr_c2g)[b]);
          if (global_idx < 0) continue;
-         if (!BCExistsOnBdr(global_idx)) continue;
+         /*
+            we do not depend on the existence of bc coefficients.
+            this is to support alternating Schwarz solver,
+            where internal boundaries would not have global bc coefficients.
+         */
+         // if (!BCExistsOnBdr(global_idx)) continue;
 
          /* we assume only Neumann condition would not add an operator. */
          if (bdr_type[global_idx] == BoundaryType::NEUMANN)
