@@ -216,6 +216,13 @@ private:
    double ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr, Coefficient &Q);
    void ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr,
                            VectorCoefficient &Q, Vector &result);
+
+   // Assumes meshes are arranged in an N x N square array.
+   // Extracts an M x M subset starting at (i0, j0).
+   // to ensure incompressibility for the subset domain with all velocity dirichlet bc.
+   void SetSubsetComplementaryFlux(const int N, const int M, const int i0, const int j0,
+                                   const Array<int> &subset_bdr_attributes,
+                                   const Array<BoundaryType> &subset_bdrtype);
 };
 
 #endif

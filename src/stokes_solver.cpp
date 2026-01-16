@@ -13,6 +13,28 @@
 using namespace std;
 using namespace mfem;
 
+namespace subset_flux
+{
+   double del_u;
+   Vector x0;
+
+   void dir(const Vector &x, Vector &y)
+   {
+      const int dim = x.Size();
+      y.SetSize(dim);
+      y = x;
+
+      assert(x0.Size() == dim);
+      y -= x0;
+   }
+
+   void flux(const Vector &x, Vector &y)
+   {
+      dir(x, y);
+      y *= del_u;
+   }
+}
+
 StokesSolver::StokesSolver(TopologyHandler *input_topol_handler)
    : MultiBlockSolver(input_topol_handler), minus_one(-1.0)
 {
@@ -304,7 +326,7 @@ bool StokesSolver::BCExistsOnBdr(const int &global_battr_idx)
 void StokesSolver::SetupBCOperators()
 {
    assert(IsBdrTypeDefined());
-   
+
    SetupRHSBCOperators();
 
    SetupDomainBCOperators();
@@ -1449,5 +1471,169 @@ void StokesSolver::ComputeBEIntegral(
       Tr.SetIntPoint (&ip);
       Qvec *= Tr.Weight() * ip.weight;
       result += Qvec;
+   }
+}
+
+void StokesSolver::SetSubsetComplementaryFlux(
+   const int N, const int M, const int i0, const int j0,
+   const Array<int> &subset_bdr_attributes,
+   const Array<BoundaryType> &subset_bdrtype
+)
+{
+   // assert N from the N x N array
+   assert(N * N == numSub);
+
+   // Validate input parameters
+   assert(i0 >= 0 && j0 >= 0);
+   assert(i0 + M <= N && j0 + M <= N);
+
+   FiniteElementSpace *ufesm = NULL;
+   ElementTransformation *eltrans = NULL;
+   VectorCoefficient *ud = NULL;
+   VectorCoefficient *usol = NULL;
+   Mesh *mesh = NULL;
+
+   // initializing complementary flux.
+   subset_flux::del_u = 0.0;
+
+   // Origin and direction function
+   Vector *x0 = &(subset_flux::x0);
+   x0->SetSize(dim);
+   (*x0) = 0.0;
+   VectorFunctionCoefficient dir_coeff(dim, subset_flux::dir);
+
+   // Determine the center of domain first.
+   Vector x1(dim), dx1(dim);
+   x1 = 0.0; dx1 = 0.0;
+   double area = 0.0;
+   ConstantCoefficient one(1.0);
+   for (int mi = 0; mi < M; mi++)
+   {
+      for (int mj = 0; mj < M; mj++)
+      {
+         int subset_idx = mi * M + mj;
+         int orig_idx = (i0 + mi) * N + (j0 + mj);
+
+         mesh = meshes[orig_idx];
+         ufesm = ufes[orig_idx];
+
+         for (int i = 0; i < ufesm -> GetNBE(); i++)
+         {
+            const int bdr_attr = mesh->GetBdrAttribute(i);
+            const int subset_idx = subset_bdr_attributes.Find(bdr_attr);
+            if (subset_idx < 0) { continue; }
+            if (subset_bdrtype[subset_idx] != BoundaryType::DIRICHLET) { continue; }
+
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            area += ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, one);
+            ComputeBEIntegral(*ufesm->GetBE(i), *eltrans, dir_coeff, dx1);
+            x1 += dx1;
+         }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+      }  // for (int mj = 0; mj < M; mj++)
+   }  // for (int mi = 0; mi < M; mi++)
+   x1 /= area;
+
+   // set the center of domain for direction function.
+   (*x0) = x1;
+
+   // Evaluate boundary flux \int u_d \dot n dA.
+   // If global boundary, evaluate from ud_coeffs.
+   // If internal subset boundary, evaluate from the solution.
+   // dirflux is evaluated only on internal boundary.
+   double bflux = 0.0, dirflux = 0.0;
+   for (int mi = 0; mi < M; mi++)
+   {
+      for (int mj = 0; mj < M; mj++)
+      {
+         int subset_idx = mi * M + mj;
+         int orig_idx = (i0 + mi) * N + (j0 + mj);
+
+         mesh = meshes[orig_idx];
+         ufesm = ufes[orig_idx];
+         usol = new VectorGridFunctionCoefficient(vels[orig_idx]);
+
+         for (int i = 0; i < ufesm -> GetNBE(); i++)
+         {
+            const int bdr_attr = mesh->GetBdrAttribute(i);
+            const int global_idx = global_bdr_attributes.Find(bdr_attr);
+            const int subset_idx = subset_bdr_attributes.Find(bdr_attr);
+            if ((global_idx < 0) && (subset_idx < 0)) continue;
+            if (subset_bdrtype[subset_idx] != BoundaryType::DIRICHLET) { continue; }
+
+            if ((global_idx >= 0) && (subset_idx >= 0))  // global boundary
+               ud = ud_coeffs[global_idx];
+            else if ((global_idx < 0) && (subset_idx >= 0)) // internal boundary
+               ud = usol;
+            else
+               mfem_error("StokesSolver::SetSubsetComplementaryFlux- subset is not properly created!\n");
+
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+
+            if ((global_idx < 0) && (subset_idx >= 0))
+               dirflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, dir_coeff);
+         }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+         
+         delete usol;
+      }  // for (int mj = 0; mj < M; mj++)
+   }  // for (int mi = 0; mi < M; mi++)
+   assert(dirflux > 0.0);
+
+   // Set the flux to ensure incompressibility.
+   subset_flux::del_u = bflux / dirflux;
+   VectorFunctionCoefficient subset_flux_coeff(dim, subset_flux::flux);
+   for (int mi = 0; mi < M; mi++)
+   {
+      for (int mj = 0; mj < M; mj++)
+      {
+         int subset_idx = mi * M + mj;
+         int orig_idx = (i0 + mi) * N + (j0 + mj);
+
+         GridFunction tmp(ufes[orig_idx]);
+         tmp.ProjectCoefficient(subset_flux_coeff);
+         (*vels[orig_idx]) -= tmp;
+      }
+   }
+
+   // Make sure the resulting flux is zero.
+   double threshold = 1.0e-12;
+   bflux = 0.0;
+   for (int mi = 0; mi < M; mi++)
+   {
+      for (int mj = 0; mj < M; mj++)
+      {
+         int subset_idx = mi * M + mj;
+         int orig_idx = (i0 + mi) * N + (j0 + mj);
+
+         mesh = meshes[orig_idx];
+         ufesm = ufes[orig_idx];
+         usol = new VectorGridFunctionCoefficient(vels[orig_idx]);
+
+         for (int i = 0; i < ufesm -> GetNBE(); i++)
+         {
+            const int bdr_attr = mesh->GetBdrAttribute(i);
+            const int global_idx = global_bdr_attributes.Find(bdr_attr);
+            const int subset_idx = subset_bdr_attributes.Find(bdr_attr);
+            if ((global_idx < 0) && (subset_idx < 0)) continue;
+            if (subset_bdrtype[subset_idx] != BoundaryType::DIRICHLET) { continue; }
+
+            if ((global_idx >= 0) && (subset_idx >= 0))  // global boundary
+               ud = ud_coeffs[global_idx];
+            else if ((global_idx < 0) && (subset_idx >= 0)) // internal boundary
+               ud = usol;
+            else
+               mfem_error("StokesSolver::SetSubsetComplementaryFlux- subset is not properly created!\n");
+
+            eltrans = ufesm -> GetBdrElementTransformation (i);
+            bflux += ComputeBEFlux(*ufesm->GetBE(i), *eltrans, *ud);
+         }  // for (int i = 0; i < ufesm -> GetNBE(); i++)
+
+         delete usol;
+      }  // for (int mj = 0; mj < M; mj++)
+   }  // for (int mi = 0; mi < M; mi++)
+   if (abs(bflux) > threshold)
+   {
+      printf("boundary flux: %.5E\n", bflux);
+      mfem_error("StokesSolver::SetSubsetComplementaryFlux- Current boundary setup cannot ensure incompressibility!\n");
    }
 }
