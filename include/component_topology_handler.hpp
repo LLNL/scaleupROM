@@ -146,7 +146,9 @@ public:
    // Internal ports within the subset are included.
    // External ports connecting to meshes outside the subset are excluded.
    // Boundary attributes of subset meshes facing outside are set as global boundary.
-   ComponentTopologyHandler(ComponentTopologyHandler* global, const int i0, const int j0, const int N, const int M);
+   // Stores subset mesh to original mesh mapping.
+   ComponentTopologyHandler(ComponentTopologyHandler* global, const int i0, const int j0,
+                            const int N, const int M, Array<int> &subset_to_orig);
 
    virtual ~ComponentTopologyHandler();
 

@@ -1012,7 +1012,7 @@ bool ComponentTopologyHandler::ComponentBdrAttrCheck(Mesh *comp)
 
 ComponentTopologyHandler::ComponentTopologyHandler(
     ComponentTopologyHandler* global, const int i0, const int j0,
-    const int N, const int M)
+    const int N, const int M, Array<int> &subset_to_orig)
     : TopologyHandler(TopologyHandlerMode::COMPONENT),
     verbose(global->verbose), write_ports(false), vtx_gap_thrs(global->vtx_gap_thrs),
     tf_ptr(global->tf_ptr), inv_tf_ptr(global->inv_tf_ptr)
@@ -1053,7 +1053,7 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    // Map from subset mesh index to original mesh index
    Array<int> orig_to_subset(global->numSub);
    orig_to_subset = -1;
-   Array<int> subset_to_orig(new_numSub);
+   subset_to_orig.SetSize(new_numSub);
    subset_to_orig = -1;
 
    // Copy meshes and configurations for the subset
