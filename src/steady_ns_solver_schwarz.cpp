@@ -105,7 +105,9 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
    // Assemble ROM operators for sub_solvers.
    for (int k = 0; k < Ns * Ns; k++)
    {
-      printf("=== Assembly of %d-th sub_solver ===\n", k+1);
+      sub_solvers[k]->InitROMHandler();
+
+      printf("\n=== Assembly of %d-th sub_solver ===\n\n", k+1);
       ROMHandlerBase *rom = sub_solvers[k]->GetROMHandler();
       sub_solvers[k]->LoadReducedBasis();
 
@@ -118,6 +120,7 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          mfem_error("SteadyNSSolver::SchwarzROM- SchwarzROM only supports component-level ROM building!\n");
 
       printf("Loading ROM projected elements.. ");
+      std::string filename = rom->GetOperatorPrefix() + ".h5";
       sub_solvers[k]->LoadROMLinElems(filename);
       printf("Done!\n");
 

@@ -1018,7 +1018,7 @@ ComponentTopologyHandler::ComponentTopologyHandler(
     tf_ptr(global->tf_ptr), inv_tf_ptr(global->inv_tf_ptr)
 {
    // assert N from the N x N array
-   assert(N * N == numSub);
+   assert(N * N == global->numSub);
 
    // Validate input parameters
    assert(i0 >= 0 && j0 >= 0);
