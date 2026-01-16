@@ -16,7 +16,8 @@
 using namespace std;
 using namespace mfem;
 
-void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *problem)
+void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *problem,
+                                const int maxIter, const double threshold)
 {
    assert(use_rom);
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
@@ -26,11 +27,14 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
    int Ns = N - M + 1;
    Array<ComponentTopologyHandler *> sub_topols(Ns * Ns); // will be owned by sub MultiBlockSolvers defined subsequently.
    Array<SteadyNSSolver *> sub_solvers(Ns * Ns);
+   Array<int> i0s(Ns * Ns), j0s(Ns * Ns);
    Array<Array<int> *> subset2orig(Ns * Ns);
    for (int i = 0; i < Ns; i++)
       for (int j = 0; j < Ns; j++)
       {
          int index = i * Ns + j;
+         i0s[index] = i;
+         j0s[index] = j;
          subset2orig[index] = new Array<int>;
          sub_topols[index] = new ComponentTopologyHandler(comp_topol, i, j, N, M, *subset2orig[index]);
          sub_solvers[index] = new SteadyNSSolver(sub_topols[index]);
@@ -102,6 +106,17 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
       }
    }
 
+   // Set up sub_solvers FOM RHS BC operators.
+   for (int k = 0; k < Ns * Ns; k++)
+   {
+      sub_solvers[k]->BuildRHSOperators();
+      sub_solvers[k]->SetupRHSBCOperators();
+      // Setup RHS BC operator for internal boundaries
+      sub_solvers[k]->SetupSubsetRHSBCOperators(internal_bdr_meshes[k],
+                                                internal_bdr_attr[k],
+                                                internal_bdr_funcs[k]);
+   }
+
    // Assemble ROM operators for sub_solvers.
    for (int k = 0; k < Ns * Ns; k++)
    {
@@ -131,7 +146,101 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
       sub_solvers[k]->LoadROMNlinElems(rom->GetOperatorPrefix());
       sub_solvers[k]->AssembleROMNlinOper();
    }
+
+   // Global solution initialization (tiny random perturbation)
+   for (int k = 0; k < U->Size(); k++)
+      (*U)[k] = 1.0e-5 * UniformRandom();
+
+   // Main Schwarz loop.
+   double error = 1.0;
+   for (int iter = 0; iter < maxIter; iter++)
+   {
+      // Sweep through sub-solvers.
+      for (int k = 0; k < Ns * Ns; k++)
+      {
+         // Adjust global solution to ensure divergence-free BC.
+         if (ensure_incomp[k])
+            SetSubsetComplementaryFlux(N, M, i0s[k], j0s[k],
+                                       sub_solvers[k]->global_bdr_attributes,
+                                       sub_solvers[k]->bdr_type);
+
+         // Assemble FOM-level RHS.
+         // All RHS BC operators are already defined,
+         // and linked to the adjusted global solution.
+         sub_solvers[k]->AssembleRHS();
+
+         printf("%d-th sub_solver: Projecting RHS to ROM.. ", k+1);
+         sub_solvers[k]->ProjectRHSOnReducedBasis();
+         printf("Done!\n");
+
+         // Solve for the subsolver
+         sub_solvers[k]->SolveROM();
+
+         // Compute relative error after iteration.
+         double error1 = 0.0;
+         int norm = 0.0;
+         for (int m = 0; m < sub_solvers[k]->numSub; m++)
+         {
+            double subdomain_error, subdomain_norm;
+
+            const int orig_idx = (*subset2orig[k])[m];
+            ComputeSubdomainErrorAndNorm(vels[orig_idx], sub_solvers[k]->vels[m],
+                                         subdomain_error, subdomain_norm);
+            norm += subdomain_norm * subdomain_norm;
+            error += subdomain_error * subdomain_error;
+         }
+         norm = sqrt(norm);
+         error1 = sqrt(error1);
+         error1 /= norm;
+         error = max(error, error1);
+
+         // Project subsolver solution to global solution.
+         for (int m = 0; m < sub_solvers[k]->numSub; m++)
+         {
+            const int orig_idx = (*subset2orig[k])[m];
+            (*vels[orig_idx]) = (*(sub_solvers[k]->vels[m]));
+         }
+      }  // for (int k = 0; k < Ns * Ns; k++)
+
+      // Exit the iterations if error is below threshold.
+      if (error <= threshold)
+      {
+         printf("SteadyNSSolver::SchwarzROM- Schwarz iteration converged. Iteration error: %.4e\n", error);
+         break;
+      }
+   }  // for (int iter = 0; iter < maxIter; iter++)
+
+   if (error > threshold)
+      mfem_error("SteadyNSSolver::SchwarzROM- Schwarz iteration failed to converge!\n");
    
    DeletePointers(sub_solvers);
    DeletePointers(subset2orig);
+}
+
+void SteadyNSSolver::SetupSubsetRHSBCOperators(
+   const Array<int> *bmeshes, const Array<int> *battrs,
+   const Array<VectorGridFunctionCoefficient *> *bfuncs)
+{
+   const int N = bmeshes->Size();
+   assert((battrs->Size() == N) && (bfuncs->Size() == N));
+
+   for (int k = 0; k < N; k++)
+   {
+      const int m = (*bmeshes)[k];
+      const int battr = (*battrs)[k];
+      VectorGridFunctionCoefficient *bfunc = (*bfuncs)[k];
+      const int bidx = meshes[m]->bdr_attributes.Find(battr);
+
+      assert(fs[m] && gs[m]);
+      assert(bidx >= 0);
+      assert(bdr_type[bidx] == BoundaryType::DIRICHLET);
+      assert(!BCExistsOnBdr(bidx)); // For internal boundary, global ud coefficient is not defined.
+
+      fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*bfunc, *nu_coeff, sigma, kappa), *bdr_markers[bidx]);
+
+      if (full_dg)
+         gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*bfunc), *bdr_markers[bidx]);
+      else
+         gs[m]->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(*bfunc), *bdr_markers[bidx]);
+   }
 }

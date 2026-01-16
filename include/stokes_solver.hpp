@@ -217,6 +217,7 @@ private:
    void ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr,
                            VectorCoefficient &Q, Vector &result);
 
+protected:
    // Assumes meshes are arranged in an N x N square array.
    // Extracts an M x M subset starting at (i0, j0).
    // to ensure incompressibility for the subset domain with all velocity dirichlet bc.

@@ -198,7 +198,8 @@ public:
 
    void SaveEQPCoords(const std::string &filename) override;
 
-   void SchwarzROM(const int M, const int N, ParameterizedProblem *problem);
+   void SchwarzROM(const int M, const int N, ParameterizedProblem *problem,
+                   const int maxIter, const double threshold=1e-15);
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
@@ -212,6 +213,10 @@ private:
    void SaveEQPElems(const std::string &filename);
    void LoadEQPElems(const std::string &filename);
    void AssembleROMEQPOper();
+
+protected:
+   void SetupSubsetRHSBCOperators(const Array<int> *meshes, const Array<int> *battrs,
+                                  const Array<VectorGridFunctionCoefficient *> *bfuncs);
 };
 
 #endif

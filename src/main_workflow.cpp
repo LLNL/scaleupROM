@@ -753,7 +753,9 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
 
    int M = config.GetRequiredOption<int>("schwarz/local_size");
    int N = config.GetRequiredOption<int>("schwarz/global_size");
-   test->SchwarzROM(M, N, problem);
+   int maxIter = config.GetRequiredOption<int>("schwarz/maximum_iteration");
+   double threshold = config.GetRequiredOption<double>("schwarz/threshold");
+   test->SchwarzROM(M, N, problem, maxIter, threshold);
 
 //    // TODO: there are skippable operations depending on rom/fom mode.
 //    test->BuildRHSOperators();
