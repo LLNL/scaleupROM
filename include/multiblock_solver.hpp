@@ -271,6 +271,8 @@ public:
       return true;
    }
 
+   void PrintConfiguration() const;
+
 protected:
    virtual void AssembleROMMat(BlockMatrix &romMat);
 };

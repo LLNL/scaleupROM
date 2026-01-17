@@ -783,3 +783,64 @@ void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
 
    DeletePointers(test_us);
 }
+
+void MultiBlockSolver::PrintConfiguration() const
+{
+   printf("\n\n======= Mesh/Boundary Configuration =======\n\n");
+
+   printf("--- Global Boundary Attributes ---\n");
+   assert(global_bdr_attributes.Size() == numBdr);
+   assert(bdr_type.Size() == numBdr);
+   for (int b = 0; b < numBdr; b++)
+   {
+      std::string type;
+      switch (bdr_type[b])
+      {
+         case BoundaryType::ZERO:
+         {
+            type = "ZERO";
+            break;
+         }
+         case BoundaryType::DIRICHLET:
+         {
+            type = "DIRICHLET";
+            break;
+         }
+         case BoundaryType::NEUMANN:
+         {
+            type = "NEUMANN";
+            break;
+         }
+         default:
+         {
+            type = "UNDEFINED";
+            break;
+         }
+      }
+      printf("Bdr Attr %d: %s\n", global_bdr_attributes[b], type.c_str());
+   }
+
+   printf("\n--- Mesh Boundary Attribute Mapping ---\n");
+   for (int m = 0; m < numSub; m++)
+   {
+      printf("\n------------------------------\n");
+      printf("            Mesh %d           \n", m);
+      printf("------------------------------\n");
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+      printf("Comp:\t");
+      for (int k = 0; k < bdr_c2g->Size(); k++)
+         printf("%d\t", k+1);
+      printf("\n");
+      printf("Glob:\t");
+      for (int k = 0; k < bdr_c2g->Size(); k++)
+         printf("%d\t", (*bdr_c2g)[k]);
+      printf("\n");
+   }
+   printf("\n");
+
+   printf("\n--- Port Info ---\n");
+   topol_handler->PrintPortInfo();
+
+   printf("\n\n===========================================\n\n");
+   return;
+}
