@@ -1155,15 +1155,12 @@ bool StokesSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       Array<bool> nz_dbcs(numBdr);
       nz_dbcs = true;
-      for (int b = 0; b < problem->battr.Size(); b++)
+      for (int b = 0; b < global_bdr_attributes.Size(); b++)
       {
-         if (problem->bdr_type[b] == BoundaryType::ZERO)
-         {
-            if (problem->battr[b] == -1)
-            { nz_dbcs = false; break; }
-            else
-               nz_dbcs[b] = false;
-         }
+         if (bdr_type[b] == BoundaryType::ZERO)
+            nz_dbcs[b] = false;
+         else
+            assert(bdr_type[b] == BoundaryType::DIRICHLET);
       }
       SetComplementaryFlux(nz_dbcs);
    }

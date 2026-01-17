@@ -793,30 +793,7 @@ void MultiBlockSolver::PrintConfiguration() const
    assert(bdr_type.Size() == numBdr);
    for (int b = 0; b < numBdr; b++)
    {
-      std::string type;
-      switch (bdr_type[b])
-      {
-         case BoundaryType::ZERO:
-         {
-            type = "ZERO";
-            break;
-         }
-         case BoundaryType::DIRICHLET:
-         {
-            type = "DIRICHLET";
-            break;
-         }
-         case BoundaryType::NEUMANN:
-         {
-            type = "NEUMANN";
-            break;
-         }
-         default:
-         {
-            type = "UNDEFINED";
-            break;
-         }
-      }
+      std::string type = PrintBoundaryType(bdr_type[b]);
       printf("Bdr Attr %d: %s\n", global_bdr_attributes[b], type.c_str());
    }
 

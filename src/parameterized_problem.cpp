@@ -424,6 +424,35 @@ void body_force(const Vector &x, double t, Vector &u)
 
 }  // namespace function_factory
 
+const std::string PrintBoundaryType(const BoundaryType bdr_type)
+{
+   std::string type;
+   switch (bdr_type)
+   {
+      case BoundaryType::ZERO:
+      {
+         type = "ZERO";
+         break;
+      }
+      case BoundaryType::DIRICHLET:
+      {
+         type = "DIRICHLET";
+         break;
+      }
+      case BoundaryType::NEUMANN:
+      {
+         type = "NEUMANN";
+         break;
+      }
+      default:
+      {
+         type = "UNDEFINED";
+         break;
+      }
+   }
+   return type;
+}
+
 ParameterizedProblem::ParameterizedProblem()
    : problem_name(config.GetRequiredOption<std::string>("parameterized_problem/name"))
 { 

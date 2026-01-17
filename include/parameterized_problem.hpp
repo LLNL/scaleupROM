@@ -218,6 +218,8 @@ enum class BoundaryType
    NUM_BDR_TYPE
 };
 
+const std::string PrintBoundaryType(const BoundaryType bdr_type);
+
 class ParameterizedProblem
 {
 friend class SampleGenerator;
