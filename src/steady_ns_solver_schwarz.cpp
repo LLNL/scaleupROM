@@ -6,10 +6,6 @@
 #include "component_topology_handler.hpp"
 #include "hyperreduction_integ.hpp"
 #include "nonlinear_integ.hpp"
-// #include "input_parser.hpp"
-// #include "hdf5_utils.hpp"
-// #include "linalg_utils.hpp"
-// #include "dg_bilinear.hpp"
 #include "dg_linear.hpp"
 #include "etc.hpp"
 
@@ -84,6 +80,7 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
       {
          // Internal boundary is Dirichlet BC without a function coefficient yet.
          bool dirichlet = (sub_solvers[k]->bdr_type[b] == BoundaryType::DIRICHLET);
+         dirichlet = dirichlet || (sub_solvers[k]->bdr_type[b] == BoundaryType::ZERO);
          bool no_func = (!sub_solvers[k]->ud_coeffs[b]);
          if (!(dirichlet && no_func))
             continue;
@@ -147,31 +144,54 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
       sub_solvers[k]->AssembleROMNlinOper();
    }
 
-   // Global solution initialization (tiny random perturbation)
-   for (int k = 0; k < U->Size(); k++)
-      (*U)[k] = 1.0e-5 * UniformRandom();
+   // Global solution initialization
+   // HACK: we assume the ud_coeff is the same for all non-zero Dirichlet condition.
+   for (int b = 0; b < global_bdr_attributes.Size(); b++)
+   {
+      if ((bdr_type[b] == BoundaryType::DIRICHLET) && ud_coeffs[b])
+      {
+         for (int m = 0; m < numSub; m++)
+            vels[m]->ProjectCoefficient(*ud_coeffs[b]);
+         break;
+      }
+   }
+   // for (int k = 0; k < U->Size(); k++)
+   //    (*U)[k] = 1.0e-5 * UniformRandom();
 
    // Main Schwarz loop.
-   double error = 1.0;
+   bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
+   double error = 0.0;
    for (int iter = 0; iter < maxIter; iter++)
    {
+      error = 0.0;
       // Sweep through sub-solvers.
       for (int k = 0; k < Ns * Ns; k++)
       {
+         // int k = sweep_index[s];
+         printf("Switched to %dth subsolver.\n", k+1);
+
          // Adjust global solution to ensure divergence-free BC.
          if (ensure_incomp[k])
             SetSubsetComplementaryFlux(N, M, i0s[k], j0s[k],
                                        sub_solvers[k]->global_bdr_attributes,
-                                       sub_solvers[k]->bdr_type);
+                                       sub_solvers[k]->bdr_type, problem);
+
+         // Project global solution to subsolver solution.
+         if (use_restart)
+         {
+            for (int m = 0; m < sub_solvers[k]->numSub; m++)
+            {
+               const int orig_idx = (*subset2orig[k])[m];
+               (*(sub_solvers[k]->vels[m])) = (*vels[orig_idx]);
+            }
+         }
 
          // Assemble FOM-level RHS.
          // All RHS BC operators are already defined,
          // and linked to the adjusted global solution.
          sub_solvers[k]->AssembleRHS();
 
-         printf("%d-th sub_solver: Projecting RHS to ROM.. ", k+1);
          sub_solvers[k]->ProjectRHSOnReducedBasis();
-         printf("Done!\n");
 
          // Solve for the subsolver
          sub_solvers[k]->SolveROM();
@@ -202,10 +222,11 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          }
       }  // for (int k = 0; k < Ns * Ns; k++)
 
+      printf("Iteration %d error: %.4e\n", iter+1, error);
       // Exit the iterations if error is below threshold.
       if (error <= threshold)
       {
-         printf("SteadyNSSolver::SchwarzROM- Schwarz iteration converged. Iteration error: %.4e\n", error);
+         printf("SteadyNSSolver::SchwarzROM- Schwarz iteration converged.\n");
          break;
       }
    }  // for (int iter = 0; iter < maxIter; iter++)
@@ -229,18 +250,19 @@ void SteadyNSSolver::SetupSubsetRHSBCOperators(
       const int m = (*bmeshes)[k];
       const int battr = (*battrs)[k];
       VectorGridFunctionCoefficient *bfunc = (*bfuncs)[k];
+      const int global_idx = global_bdr_attributes.Find(battr);
       const int bidx = meshes[m]->bdr_attributes.Find(battr);
 
       assert(fs[m] && gs[m]);
       assert(bidx >= 0);
-      assert(bdr_type[bidx] == BoundaryType::DIRICHLET);
-      assert(!BCExistsOnBdr(bidx)); // For internal boundary, global ud coefficient is not defined.
+      assert(bdr_type[global_idx] == BoundaryType::DIRICHLET);
+      assert(!BCExistsOnBdr(global_idx)); // For internal boundary, global ud coefficient is not defined.
 
-      fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*bfunc, *nu_coeff, sigma, kappa), *bdr_markers[bidx]);
+      fs[m]->AddBdrFaceIntegrator(new DGVectorDirichletLFIntegrator(*bfunc, *nu_coeff, sigma, kappa), *bdr_markers[global_idx]);
 
       if (full_dg)
-         gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*bfunc), *bdr_markers[bidx]);
+         gs[m]->AddBdrFaceIntegrator(new DGBoundaryNormalLFIntegrator(*bfunc), *bdr_markers[global_idx]);
       else
-         gs[m]->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(*bfunc), *bdr_markers[bidx]);
+         gs[m]->AddBoundaryIntegrator(new DGBoundaryNormalLFIntegrator(*bfunc), *bdr_markers[global_idx]);
    }
 }

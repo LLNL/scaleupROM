@@ -99,6 +99,8 @@ public:
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;
+
+   void SaveOperator(std::string filename);
 };
 
 class SteadyNSEQPROM : public SteadyNSROM

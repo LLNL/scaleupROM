@@ -17,6 +17,7 @@ namespace subset_flux
 {
    double del_u;
    Vector x0;
+   // Vector dir;
 
    void dir(const Vector &x, Vector &y)
    {
@@ -30,6 +31,7 @@ namespace subset_flux
 
    void flux(const Vector &x, Vector &y)
    {
+      // y = dir;
       dir(x, y);
       y *= del_u;
    }
@@ -1474,7 +1476,8 @@ void StokesSolver::ComputeBEIntegral(
 void StokesSolver::SetSubsetComplementaryFlux(
    const int N, const int M, const int i0, const int j0,
    const Array<int> &subset_bdr_attributes,
-   const Array<BoundaryType> &subset_bdrtype
+   const Array<BoundaryType> &subset_bdrtype,
+   const ParameterizedProblem *problem
 )
 {
    // assert N from the N x N array
@@ -1493,11 +1496,24 @@ void StokesSolver::SetSubsetComplementaryFlux(
    // initializing complementary flux.
    subset_flux::del_u = 0.0;
 
-   // Origin and direction function
-   Vector *x0 = &(subset_flux::x0);
-   x0->SetSize(dim);
-   (*x0) = 0.0;
+   // // Determine direction
+   // // HACK: We assume the first vector bdr ptr of the problem indicates non-zero Dirichlet condition.
+   // // HACK: We also assume the vector bdr ptr is constant in space.
+   // {
+   //    subset_flux::dir.SetSize(dim);
+
+   //    Vector xtmp(dim);
+   //    (problem->vector_bdr_ptr[0])(xtmp, 0.0, subset_flux::dir);
+
+   //    // Normalize
+   //    subset_flux::dir /= subset_flux::dir.Norml2();
+   // }
+
+   // direction function
+   subset_flux::x0.SetSize(dim);
+   subset_flux::x0 = 0.0;
    VectorFunctionCoefficient dir_coeff(dim, subset_flux::dir);
+   VectorFunctionCoefficient subset_flux_coeff(dim, subset_flux::flux);
 
    // Determine the center of domain first.
    Vector x1(dim), dx1(dim);
@@ -1531,7 +1547,7 @@ void StokesSolver::SetSubsetComplementaryFlux(
    x1 /= area;
 
    // set the center of domain for direction function.
-   (*x0) = x1;
+   subset_flux::x0 = x1;
 
    // Evaluate boundary flux \int u_d \dot n dA.
    // If global boundary, evaluate from ud_coeffs.
@@ -1574,11 +1590,11 @@ void StokesSolver::SetSubsetComplementaryFlux(
          delete usol;
       }  // for (int mj = 0; mj < M; mj++)
    }  // for (int mi = 0; mi < M; mi++)
+printf("bflux: %.5e\n", bflux);
    assert(dirflux > 0.0);
 
    // Set the flux to ensure incompressibility.
    subset_flux::del_u = bflux / dirflux;
-   VectorFunctionCoefficient subset_flux_coeff(dim, subset_flux::flux);
    for (int mi = 0; mi < M; mi++)
    {
       for (int mj = 0; mj < M; mj++)

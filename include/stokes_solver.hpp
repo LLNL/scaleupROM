@@ -223,7 +223,8 @@ protected:
    // to ensure incompressibility for the subset domain with all velocity dirichlet bc.
    void SetSubsetComplementaryFlux(const int N, const int M, const int i0, const int j0,
                                    const Array<int> &subset_bdr_attributes,
-                                   const Array<BoundaryType> &subset_bdrtype);
+                                   const Array<BoundaryType> &subset_bdrtype,
+                                   const ParameterizedProblem *problem);
 };
 
 #endif
