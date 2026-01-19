@@ -16,7 +16,7 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
                                 double &solve_time, int &num_solve, Array<double> &error_hist,
                                 const int maxIter, const double threshold,
                                 const int plateau_track, const double plateau_range,
-                                const bool use_restart)
+                                const bool use_restart, const double initial_tol)
 {
    assert(use_rom);
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
@@ -169,8 +169,17 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
    double error = 0.0;
    double max_error, min_error;
    Array<double> plateau_hist(0);
+   double tolerance = -1.0;
    for (int iter = 0; iter < maxIter; iter++)
    {
+      // For initial iteration, relax the tolerance for convergence.
+      if ((iter == 0) && (initial_tol > 0.0))
+      {
+         tolerance = config.GetOption<double>("rom_solver/relative_tolerance", 1.e-10);
+         config.SetOption<double>("rom_solver/relative_tolerance", initial_tol);
+         config.SetOption<double>("rom_solver/absolute_tolerance", initial_tol);
+      }
+
       error = 0.0;
       // Sweep through sub-solvers.
       for (int k = 0; k < Ns * Ns; k++)
@@ -250,6 +259,13 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          min_error = plateau_hist.Min();
          if ((max_error - min_error) < plateau_range * max_error)
             break;
+      }
+
+      // Recover the tolerance after the initial iteration.
+      if ((iter == 0) && (initial_tol > 0.0))
+      {
+         config.SetOption<double>("rom_solver/relative_tolerance", tolerance);
+         config.SetOption<double>("rom_solver/absolute_tolerance", tolerance);
       }
    }  // for (int iter = 0; iter < maxIter; iter++)
 

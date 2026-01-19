@@ -761,12 +761,13 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
    int plateau_track = config.GetOption<int>("schwarz/plateau_track", 3);
    double plateau_range = config.GetOption<double>("schwarz/plateau_range", 1e-1);
    bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
+   double initial_tol = config.GetOption<double>("schwarz/initial_tolerance", -1.0);
    // Schwarz ROM outputs
    int num_solve = -1;
    double rom_solve = -1.0;
    Array<double> error_hist(0);
    test->SchwarzROM(M, N, problem, rom_solve, num_solve, error_hist,
-                  maxIter, threshold, plateau_track, plateau_range, use_restart);
+                  maxIter, threshold, plateau_track, plateau_range, use_restart, initial_tol);
    printf("SchwarzROM solve time: %f seconds.\n", rom_solve);
    printf("SchwarzROM number of solve: %d.\n", num_solve);
 

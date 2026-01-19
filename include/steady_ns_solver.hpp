@@ -204,7 +204,7 @@ public:
                    double &solve_time, int &num_solve, Array<double> &error_hist,
                    const int maxIter, const double threshold=1e-15,
                    const int plateau_track=3, const double plateau_range=1e-1,
-                   const bool use_restart=false);
+                   const bool use_restart=false, const double initial_tol=-1.0);
 
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);

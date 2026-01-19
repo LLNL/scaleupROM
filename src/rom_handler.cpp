@@ -691,6 +691,9 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
       newton_solver.SetMaxIter(maxIter);
 
       newton_solver.Mult(*reduced_rhs, *reduced_sol);
+      bool converged = newton_solver.GetConverged();
+      if (!converged)
+         mfem_error("MFEMROMHandler::NonlinearSolve- Newton solver not converged!\n");
    }
    else if (nlin_solver == "cg")
    {
