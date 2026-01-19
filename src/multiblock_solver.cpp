@@ -502,6 +502,13 @@ void MultiBlockSolver::SaveVisualization(const int step, const double time)
 bool MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    assert(bdr_type.Size() == global_bdr_attributes.Size());
+   // Check if boundary type is set for all boundaries (battr == -1)
+   if ((problem->battr.Size() == 1) && (problem->battr[0] == -1))
+   {
+      bdr_type = problem->bdr_type[0];
+      return true;
+   }
+
    for (int b = 0; b < global_bdr_attributes.Size(); b++)
    {
       int idx = problem->battr.Find(global_bdr_attributes[b]);
