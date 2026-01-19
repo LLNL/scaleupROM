@@ -13,7 +13,9 @@ using namespace std;
 using namespace mfem;
 
 void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *problem,
-                                const int maxIter, const double threshold)
+                                const int maxIter, const double threshold,
+                                const int hist_track, const double plateau_range,
+                                const bool use_restart)
 {
    assert(use_rom);
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
@@ -159,8 +161,9 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
    //    (*U)[k] = 1.0e-5 * UniformRandom();
 
    // Main Schwarz loop.
-   bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
    double error = 0.0;
+   double max_error, min_error;
+   Array<double> error_hist(0);
    for (int iter = 0; iter < maxIter; iter++)
    {
       error = 0.0;
@@ -229,9 +232,21 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          printf("SteadyNSSolver::SchwarzROM- Schwarz iteration converged.\n");
          break;
       }
+
+      error_hist.Prepend(error);
+      if (error_hist.Size() > hist_track)
+      {
+         error_hist.DeleteLast();
+         max_error = error_hist.Max();
+         min_error = error_hist.Min();
+         if ((max_error - min_error) < plateau_range * max_error)
+            break;
+      }
    }  // for (int iter = 0; iter < maxIter; iter++)
 
-   if (error > threshold)
+   if ((max_error - min_error) < plateau_range * max_error)
+      printf("SteadyNSSolver::SchwarzROM- error is plateaued. Exiting the iterations.\n");
+   else if (error > threshold)
       mfem_error("SteadyNSSolver::SchwarzROM- Schwarz iteration failed to converge!\n");
    
    DeletePointers(sub_solvers);

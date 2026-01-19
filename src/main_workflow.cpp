@@ -745,6 +745,8 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
 
    StopWatch solveTimer;
    std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
+   const int num_var = test->GetNumVar();
+   Vector error(num_var);
 
    problem->SetSingleRun();
    assert(test->SetParameterizedProblem(problem));
@@ -755,175 +757,65 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
    int N = config.GetRequiredOption<int>("schwarz/global_size");
    int maxIter = config.GetRequiredOption<int>("schwarz/maximum_iteration");
    double threshold = config.GetRequiredOption<double>("schwarz/threshold");
-   test->SchwarzROM(M, N, problem, maxIter, threshold);
+   int hist_track = config.GetOption<int>("schwarz/history_track", 3);
+   double plateau_range = config.GetOption<double>("schwarz/plateau_range", 1e-1);
+   bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
+   test->SchwarzROM(M, N, problem, maxIter, threshold,
+                    hist_track, plateau_range, use_restart);
 
-//    // TODO: there are skippable operations depending on rom/fom mode.
-//    test->BuildRHSOperators();
-//    test->SetupRHSBCOperators();
-//    test->AssembleRHS();
+   bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
+   bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
+   if (compare_sol)
+   {
+      BlockVector *romU = test->GetSolutionCopy();
 
-//    const int num_var = test->GetNumVar();
-//    Vector rom_assemble(1), rom_solve(1), fom_assemble(1), fom_solve(1), error(num_var);
-//    rom_assemble = -1.0; rom_solve = -1.0;
-//    fom_assemble = -1.0; fom_solve = -1.0;
-//    error = -1.0;
+      if (load_sol)
+      {
+         printf("Comparing with the existing FOM solution.\n");
+         std::string fom_file = config.GetRequiredOption<std::string>("model_reduction/compare_solution/fom_solution_file");
+         test->LoadSolution(fom_file);
+      }
+      else
+      {
+         solveTimer.Clear();
+         solveTimer.Start();
+         test->BuildRHSOperators();
+         test->SetupRHSBCOperators();
+         test->AssembleRHS();
 
-//    ROMHandlerBase *rom = NULL;
-//    if (test->UseRom())
-//    {
-//       rom = test->GetROMHandler();
-//       test->LoadReducedBasis();
+         test->BuildDomainOperators();
+         test->SetupDomainBCOperators();
+         test->AssembleOperator();
+         solveTimer.Stop();
+         printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+         // fom_assemble = solveTimer.RealTime();
 
-//       if (test->IsNonlinear())
-//          test->AllocateROMNlinElems();
-//    }
+         solveTimer.Clear();
+         solveTimer.Start();
+         test->Solve();
+         solveTimer.Stop();
+         printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+         // fom_solve = solveTimer.RealTime();
+      }
 
-//    solveTimer.Start();
-//    if (test->UseRom())
-//    {
-//       printf("ROM with ");
-//       ROMBuildingLevel save_operator = rom->GetBuildingLevel();
-//       TopologyHandlerMode topol_mode = test->GetTopologyMode();
+      test->CompareSolution(*romU, error);
 
-//       if (topol_mode == TopologyHandlerMode::SUBMESH)
-//          printf("using SubMesh topology.\n");
-//       else if (topol_mode == TopologyHandlerMode::COMPONENT)
-//          printf("using Component-wise topology.\n");
-//       else
-//          mfem_error("Unknown TopologyHandler Mode!\n");
+      bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
+      if (save_reduced_sol)
+      {
+         ROMHandlerBase *rom = test->GetROMHandler();
+         rom->SaveReducedSolution("rom_reduced_sol.txt");
 
-//       std::string filename = rom->GetOperatorPrefix() + ".h5";
-//       if (save_operator == ROMBuildingLevel::COMPONENT)
-//       {
-//          if (topol_mode == TopologyHandlerMode::SUBMESH)
-//             mfem_error("Submesh does not support component rom building level!\n");
+         // use ROMHandler::reduced_rhs as a temporary variable.
+         rom->ProjectRHSOnReducedBasis(test->GetSolution());
+         rom->SaveReducedRHS("fom_reduced_sol.txt");
+      }
 
-//          printf("Loading ROM projected elements.. ");
-//          test->LoadROMLinElems(filename);
-//          printf("Done!\n");
+      // Recover the original ROM solution.
+      test->CopySolution(romU);
 
-//          printf("Assembling ROM linear matrix.. ");
-//          test->AssembleROMMat();
-//          printf("Done!\n");
-
-//          if (test->IsNonlinear())
-//          {
-//             test->LoadROMNlinElems(rom->GetOperatorPrefix());
-//             test->AssembleROMNlinOper();
-//          }
-//       }  // if (save_operator == ROMBuildingLevel::COMPONENT)
-//       else if (save_operator == ROMBuildingLevel::GLOBAL)
-//       {
-//          printf("Loading global operator file.. ");
-//          test->LoadROMOperatorFromFile(filename);
-//          printf("Done!\n");
-//       }  // if (save_operator == ROMBuildingLevel::GLOBAL)
-//       else if (save_operator == ROMBuildingLevel::NONE)
-//       {
-//          printf("Building operator file all the way from FOM.. ");
-//          test->BuildDomainOperators();
-//          test->SetupDomainBCOperators();
-//          test->AssembleOperator();
-//          test->ProjectOperatorOnReducedBasis();
-//          printf("Done!\n");
-//       }  // if (save_operator == ROMBuildingLevel::NONE)
-//       else
-//          mfem_error("SingleRun - Unknown ROMBuildingLevel!\n");
-
-//       printf("Projecting RHS to ROM.. ");
-//       test->ProjectRHSOnReducedBasis();
-//       printf("Done!\n");
-//    }  // if (test->UseRom())
-//    else
-//    {
-//       test->BuildDomainOperators();
-//       test->SetupDomainBCOperators();
-//       test->AssembleOperator();
-//    }  // not if (test->UseRom())
-//    solveTimer.Stop();
-//    printf("%s-assemble time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
-
-//    if (test->UseRom())
-//       rom_assemble = solveTimer.RealTime();
-//    else
-//       fom_assemble = solveTimer.RealTime();
-
-//    solveTimer.Clear();
-//    solveTimer.Start();
-//    if (test->UseRom())
-//    {
-//       test->SolveROM();
-//    }
-//    else
-//    {
-//       // TODO: move matrix assembly to here.
-//       test->Solve();
-//    }
-//    solveTimer.Stop();
-//    printf("%s-solve time: %f seconds.\n", solveType.c_str(), solveTimer.RealTime());
-
-//    if (test->UseRom())
-//       rom_solve = solveTimer.RealTime();
-//    else
-//       fom_solve = solveTimer.RealTime();
-
-//    /* save the ROM system for analysis/debug */
-//    bool save_rom = config.GetOption<bool>("model_reduction/save_linear_system/enabled", false);
-//    if (save_rom)
-//    {
-//       std::string rom_prefix = config.GetRequiredOption<std::string>("model_reduction/save_linear_system/prefix");
-//       rom->SaveRomSystem(rom_prefix);
-//    }
-
-//    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
-//    bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
-//    if (test->UseRom() && compare_sol)
-//    {
-//       BlockVector *romU = test->GetSolutionCopy();
-
-//       if (load_sol)
-//       {
-//          printf("Comparing with the existing FOM solution.\n");
-//          std::string fom_file = config.GetRequiredOption<std::string>("model_reduction/compare_solution/fom_solution_file");
-//          test->LoadSolution(fom_file);
-//       }
-//       else
-//       {
-//          solveTimer.Clear();
-//          solveTimer.Start();
-//          test->BuildDomainOperators();
-//          test->SetupDomainBCOperators();
-//          test->AssembleOperator();
-//          solveTimer.Stop();
-//          printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
-//          fom_assemble = solveTimer.RealTime();
-
-//          solveTimer.Clear();
-//          solveTimer.Start();
-//          test->Solve();
-//          solveTimer.Stop();
-//          printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
-//          fom_solve = solveTimer.RealTime();
-//       }
-
-//       test->CompareSolution(*romU, error);
-
-//       bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
-//       if (save_reduced_sol)
-//       {
-//          ROMHandlerBase *rom = test->GetROMHandler();
-//          rom->SaveReducedSolution("rom_reduced_sol.txt");
-
-//          // use ROMHandler::reduced_rhs as a temporary variable.
-//          rom->ProjectRHSOnReducedBasis(test->GetSolution());
-//          rom->SaveReducedRHS("fom_reduced_sol.txt");
-//       }
-
-//       // Recover the original ROM solution.
-//       test->CopySolution(romU);
-
-//       delete romU;
-//    }
+      delete romU;
+   }
 
 //    // save results to output file.
 //    if (output_file.length() > 0)
