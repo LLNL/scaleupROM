@@ -662,6 +662,7 @@ void MFEMROMHandler::NonlinearSolve(Operator &oper, BlockVector* U, Solver *prec
    Solver *J_solver = NULL;
    if (linsol_type == SolverType::DIRECT)
    {
+      if (mumps) delete mumps;
       mumps = new MUMPSSolver(MPI_COMM_SELF);
       mumps->SetMatrixSymType(mat_type);
       mumps->SetPrintLevel(jac_print_level);
