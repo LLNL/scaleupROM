@@ -753,18 +753,26 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
 
    assert(test->IsBdrTypeDefined());
 
+   // Schwarz ROM inputs
    int M = config.GetRequiredOption<int>("schwarz/local_size");
    int N = config.GetRequiredOption<int>("schwarz/global_size");
    int maxIter = config.GetRequiredOption<int>("schwarz/maximum_iteration");
    double threshold = config.GetRequiredOption<double>("schwarz/threshold");
-   int hist_track = config.GetOption<int>("schwarz/history_track", 3);
+   int plateau_track = config.GetOption<int>("schwarz/plateau_track", 3);
    double plateau_range = config.GetOption<double>("schwarz/plateau_range", 1e-1);
    bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
-   test->SchwarzROM(M, N, problem, maxIter, threshold,
-                    hist_track, plateau_range, use_restart);
+   // Schwarz ROM outputs
+   int num_solve = -1;
+   double rom_solve = -1.0;
+   Array<double> error_hist(0);
+   test->SchwarzROM(M, N, problem, rom_solve, num_solve, error_hist,
+                  maxIter, threshold, plateau_track, plateau_range, use_restart);
+   printf("SchwarzROM solve time: %f seconds.\n", rom_solve);
+   printf("SchwarzROM number of solve: %d.\n", num_solve);
 
    bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
    bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
+   double fom_solve = -1.0;
    if (compare_sol)
    {
       BlockVector *romU = test->GetSolutionCopy();
@@ -795,7 +803,7 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
          test->Solve();
          solveTimer.Stop();
          printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
-         // fom_solve = solveTimer.RealTime();
+         fom_solve = solveTimer.RealTime();
       }
 
       test->CompareSolution(*romU, error);
@@ -817,27 +825,34 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
       delete romU;
    }
 
-//    // save results to output file.
-//    if (output_file.length() > 0)
-//    {
-//       hid_t file_id;
-//       herr_t errf = 0;
-//       file_id = H5Fcreate(output_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-//       assert(file_id >= 0);
+   // save results to output file.
+   if (output_file.length() > 0)
+   {
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(output_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
 
-//       hdf5_utils::WriteDataset(file_id, "rom_assemble", rom_assemble);
-//       hdf5_utils::WriteDataset(file_id, "rom_solve", rom_solve);
-//       hdf5_utils::WriteDataset(file_id, "fom_assemble", fom_assemble);
-//       hdf5_utils::WriteDataset(file_id, "fom_solve", fom_solve);
-//       hdf5_utils::WriteDataset(file_id, "rel_error", error);
+      Array<int> num_solve_output(1);
+      num_solve_output = num_solve;
+      Vector rom_solve_output(1), fom_solve_output(1);
+      rom_solve_output = rom_solve;
+      fom_solve_output = fom_solve;
 
-//       errf = H5Fclose(file_id);
-//       assert(errf >= 0);
-//    }
+      hdf5_utils::WriteDataset(file_id, "rom_num_solve", num_solve_output);
+      hdf5_utils::WriteDataset(file_id, "rom_solve", rom_solve_output);
+      // hdf5_utils::WriteDataset(file_id, "fom_assemble", fom_assemble);
+      hdf5_utils::WriteDataset(file_id, "fom_solve", fom_solve_output);
+      hdf5_utils::WriteDataset(file_id, "rel_error", error);
+      hdf5_utils::WriteDataset(file_id, "error_hist", error_hist);
 
-//    // Save solution and visualization.
-//    test->SaveSolution();
-//    test->SaveVisualization();
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
+   }
+
+   // Save solution and visualization.
+   test->SaveSolution();
+   test->SaveVisualization();
    
    delete test;
    delete problem;

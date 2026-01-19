@@ -13,13 +13,17 @@ using namespace std;
 using namespace mfem;
 
 void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *problem,
+                                double &solve_time, int &num_solve, Array<double> &error_hist,
                                 const int maxIter, const double threshold,
-                                const int hist_track, const double plateau_range,
+                                const int plateau_track, const double plateau_range,
                                 const bool use_restart)
 {
    assert(use_rom);
    assert(topol_mode == TopologyHandlerMode::COMPONENT);
    assert(N * N == numSub);
+   StopWatch solveTimer;
+   solveTimer.Clear();
+   error_hist.DeleteAll();
    ComponentTopologyHandler *comp_topol = static_cast<ComponentTopologyHandler *>(topol_handler);
 
    int Ns = N - M + 1;
@@ -161,9 +165,10 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
    //    (*U)[k] = 1.0e-5 * UniformRandom();
 
    // Main Schwarz loop.
+   num_solve = 0;
    double error = 0.0;
    double max_error, min_error;
-   Array<double> error_hist(0);
+   Array<double> plateau_hist(0);
    for (int iter = 0; iter < maxIter; iter++)
    {
       error = 0.0;
@@ -197,7 +202,10 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          sub_solvers[k]->ProjectRHSOnReducedBasis();
 
          // Solve for the subsolver
+         solveTimer.Start();
          sub_solvers[k]->SolveROM();
+         solveTimer.Stop();
+         num_solve++;
 
          // Compute relative error after iteration.
          double error1 = 0.0;
@@ -207,15 +215,16 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
             double subdomain_error, subdomain_norm;
 
             const int orig_idx = (*subset2orig[k])[m];
-            ComputeSubdomainErrorAndNorm(vels[orig_idx], sub_solvers[k]->vels[m],
+            ComputeSubdomainErrorAndNorm(sub_solvers[k]->vels[m], vels[orig_idx],
                                          subdomain_error, subdomain_norm);
             norm += subdomain_norm * subdomain_norm;
-            error += subdomain_error * subdomain_error;
+            error1 += subdomain_error * subdomain_error;
          }
          norm = sqrt(norm);
          error1 = sqrt(error1);
          error1 /= norm;
          error = max(error, error1);
+         error_hist.Append(error1);
 
          // Project subsolver solution to global solution.
          for (int m = 0; m < sub_solvers[k]->numSub; m++)
@@ -233,16 +242,18 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          break;
       }
 
-      error_hist.Prepend(error);
-      if (error_hist.Size() > hist_track)
+      plateau_hist.Prepend(error);
+      if (plateau_hist.Size() > plateau_track)
       {
-         error_hist.DeleteLast();
-         max_error = error_hist.Max();
-         min_error = error_hist.Min();
+         plateau_hist.DeleteLast();
+         max_error = plateau_hist.Max();
+         min_error = plateau_hist.Min();
          if ((max_error - min_error) < plateau_range * max_error)
             break;
       }
    }  // for (int iter = 0; iter < maxIter; iter++)
+
+   solve_time = solveTimer.RealTime();
 
    if ((max_error - min_error) < plateau_range * max_error)
       printf("SteadyNSSolver::SchwarzROM- error is plateaued. Exiting the iterations.\n");
