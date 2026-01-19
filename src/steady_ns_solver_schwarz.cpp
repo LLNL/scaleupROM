@@ -218,7 +218,7 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
 
          // Compute relative error after iteration.
          double error1 = 0.0;
-         int norm = 0.0;
+         double norm = 0.0;
          for (int m = 0; m < sub_solvers[k]->numSub; m++)
          {
             double subdomain_error, subdomain_norm;
@@ -243,7 +243,7 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
          }
       }  // for (int k = 0; k < Ns * Ns; k++)
 
-      printf("Iteration %d error: %.4e\n", iter+1, error);
+      printf("\nIteration %d error: %.4e\n\n", iter+1, error);
       // Exit the iterations if error is below threshold.
       if (error <= threshold)
       {
