@@ -218,9 +218,13 @@ private:
                            VectorCoefficient &Q, Vector &result);
 
 protected:
-   // Assumes meshes are arranged in an N x N square array.
-   // Extracts an M x M subset starting at (i0, j0).
-   // to ensure incompressibility for the subset domain with all velocity dirichlet bc.
+   // For an M x M subset (starting at (i0, j0)) extracted from the assumed
+   // N x N square mesh array: when all subset boundary conditions are velocity
+   // Dirichlet, the prescribed velocity must satisfy the compatibility
+   // condition int_{dOmega} u . n dA = 0 for the incompressible Stokes problem
+   // to be well-posed. This routine computes the net flux from the prescribed
+   // BC and adds a complementary flux on the subset boundary to enforce that
+   // constraint.
    void SetSubsetComplementaryFlux(const int N, const int M, const int i0, const int j0,
                                    const Array<int> &subset_bdr_attributes,
                                    const Array<BoundaryType> &subset_bdrtype,

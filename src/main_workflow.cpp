@@ -180,6 +180,8 @@ void GenerateSamples(MPI_Comm comm)
 
          problem->SetSingleRun();
          param_set = test->SetParameterizedProblem(problem);
+         if (!param_set)
+            mfem_error("GenerateSamples failed at SetParameterizedProblem after retry!\n");
       }
 
       int file_idx = s + sample_generator->GetFileOffset();
@@ -721,7 +723,7 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
 }
 
 
-double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
+double SingleSchwarzRun(MPI_Comm comm, const std::string &output_file)
 {
    std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
    if (solver_type != "steady-ns")
@@ -754,14 +756,14 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
    assert(test->IsBdrTypeDefined());
 
    // Schwarz ROM inputs
-   int M = config.GetRequiredOption<int>("schwarz/local_size");
-   int N = config.GetRequiredOption<int>("schwarz/global_size");
-   int maxIter = config.GetRequiredOption<int>("schwarz/maximum_iteration");
-   double threshold = config.GetRequiredOption<double>("schwarz/threshold");
-   int plateau_track = config.GetOption<int>("schwarz/plateau_track", 3);
-   double plateau_range = config.GetOption<double>("schwarz/plateau_range", 1e-1);
-   bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
-   double initial_tol = config.GetOption<double>("schwarz/initial_tolerance", -1.0);
+   const int M = config.GetRequiredOption<int>("schwarz/local_size");
+   const int N = config.GetRequiredOption<int>("schwarz/global_size");
+   const int maxIter = config.GetRequiredOption<int>("schwarz/maximum_iteration");
+   const double threshold = config.GetRequiredOption<double>("schwarz/threshold");
+   const int plateau_track = config.GetOption<int>("schwarz/plateau_track", 3);
+   const double plateau_range = config.GetOption<double>("schwarz/plateau_range", 1e-1);
+   const bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
+   const double initial_tol = config.GetOption<double>("schwarz/initial_tolerance", -1.0);
    // Schwarz ROM outputs
    int num_solve = -1;
    double rom_solve = -1.0;
@@ -858,9 +860,10 @@ double SingleSchwarzRun(MPI_Comm comm, const std::string output_file)
    delete test;
    delete problem;
 
-   // return the maximum error over all variables.
-   // return error.Max();
-   return 0.;
+   // SingleSchwarzRun predicts velocity only; global pressure construction
+   // is not implemented yet, so error.Max() would be dominated by the
+   // (misleading) pressure error. Return the velocity error instead.
+   return error[0];
 }
 
 void PrintEQPCoords(MPI_Comm comm)

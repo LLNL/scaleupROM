@@ -53,8 +53,6 @@ protected:
    double lambda = 1.0;
    double mu = 1.0;
 
-   Vector zero;
-
    // Initial positions
    VectorCoefficient *init_x = NULL;
 

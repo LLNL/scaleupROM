@@ -17,7 +17,6 @@ namespace subset_flux
 {
    double del_u;
    Vector x0;
-   // Vector dir;
 
    void dir(const Vector &x, Vector &y)
    {
@@ -1609,7 +1608,7 @@ printf("bflux: %.5e\n", bflux);
    }
 
    // Make sure the resulting flux is zero.
-   double threshold = 1.0e-12;
+   constexpr double threshold = 1.0e-12;
    bflux = 0.0;
    for (int mi = 0; mi < M; mi++)
    {

@@ -144,8 +144,11 @@ public:
    // Assumes meshes are arranged in an N x N square array.
    // Extracts an M x M subset starting at (i0, j0).
    // Internal ports within the subset are included.
-   // External ports connecting to meshes outside the subset are excluded.
-   // Boundary attributes of subset meshes facing outside are set as global boundary.
+   // External ports connecting to meshes outside the subset are excluded;
+   // their port attributes (formerly interior to the global domain) are
+   // registered into bdr_attributes as new global boundary attributes of the subset mesh.
+   // Subset mesh boundaries that lay on the global boundary inherit the
+   // corresponding global boundary attributes.
    // Stores subset mesh to original mesh mapping.
    ComponentTopologyHandler(ComponentTopologyHandler* global, const int i0, const int j0,
                             const int N, const int M, Array<int> &subset_to_orig);

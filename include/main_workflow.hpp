@@ -33,7 +33,7 @@ void FindSnapshotFilesForBasis(const BasisTag &basis_tag, const std::string &def
 double SingleRun(MPI_Comm comm, const std::string output_file = "");
 
 // return relative error if comparing solution.
-double SingleSchwarzRun(MPI_Comm comm, const std::string output_file = "");
+double SingleSchwarzRun(MPI_Comm comm, const std::string &output_file = "");
 
 // Auxiliary function to print out EQP point coordinates
 void PrintEQPCoords(MPI_Comm comm);

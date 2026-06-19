@@ -40,10 +40,6 @@ LinElastSolver::LinElastSolver(TopologyHandler *input_topol_handler)
    {
       fes[m] = new FiniteElementSpace(meshes[m], fec[0], udim);
    }
-
-   // For homogeneous Dirichlet condition
-   zero.SetSize(dim);
-   zero = 0.0;
 }
 
 LinElastSolver::~LinElastSolver()
@@ -509,7 +505,12 @@ bool LinElastSolver::SetParameterizedProblem(ParameterizedProblem *problem)
          }
          default:
          case BoundaryType::ZERO:
-         { AddBCFunction(zero, problem->battr[b]); break; }
+         {
+            Vector zero(dim);
+            zero = 0.0;
+            AddBCFunction(zero, problem->battr[b]);
+            break;
+         }
       }
    }
 

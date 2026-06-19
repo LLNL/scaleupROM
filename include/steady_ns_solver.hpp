@@ -220,8 +220,8 @@ private:
    void AssembleROMEQPOper();
 
 protected:
-   void SetupSubsetRHSBCOperators(const Array<int> *meshes, const Array<int> *battrs,
-                                  const Array<VectorGridFunctionCoefficient *> *bfuncs);
+   void SetupSubsetRHSBCOperators(const Array<int> &meshes, const Array<int> &battrs,
+                                  const Array<VectorGridFunctionCoefficient *> &bfuncs);
 };
 
 #endif

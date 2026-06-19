@@ -115,9 +115,9 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
       sub_solvers[k]->BuildRHSOperators();
       sub_solvers[k]->SetupRHSBCOperators();
       // Setup RHS BC operator for internal boundaries
-      sub_solvers[k]->SetupSubsetRHSBCOperators(internal_bdr_meshes[k],
-                                                internal_bdr_attr[k],
-                                                internal_bdr_funcs[k]);
+      sub_solvers[k]->SetupSubsetRHSBCOperators(*internal_bdr_meshes[k],
+                                                *internal_bdr_attr[k],
+                                                *internal_bdr_funcs[k]);
    }
 
    // Assemble ROM operators for sub_solvers.
@@ -184,7 +184,6 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
       // Sweep through sub-solvers.
       for (int k = 0; k < Ns * Ns; k++)
       {
-         // int k = sweep_index[s];
          printf("Switched to %dth subsolver.\n", k+1);
 
          // Adjust global solution to ensure divergence-free BC.
@@ -281,17 +280,17 @@ void SteadyNSSolver::SchwarzROM(const int M, const int N, ParameterizedProblem *
 }
 
 void SteadyNSSolver::SetupSubsetRHSBCOperators(
-   const Array<int> *bmeshes, const Array<int> *battrs,
-   const Array<VectorGridFunctionCoefficient *> *bfuncs)
+   const Array<int> &bmeshes, const Array<int> &battrs,
+   const Array<VectorGridFunctionCoefficient *> &bfuncs)
 {
-   const int N = bmeshes->Size();
-   assert((battrs->Size() == N) && (bfuncs->Size() == N));
+   const int N = bmeshes.Size();
+   assert((battrs.Size() == N) && (bfuncs.Size() == N));
 
    for (int k = 0; k < N; k++)
    {
-      const int m = (*bmeshes)[k];
-      const int battr = (*battrs)[k];
-      VectorGridFunctionCoefficient *bfunc = (*bfuncs)[k];
+      const int m = bmeshes[k];
+      const int battr = battrs[k];
+      VectorGridFunctionCoefficient *bfunc = bfuncs[k];
       const int global_idx = global_bdr_attributes.Find(battr);
       const int bidx = meshes[m]->bdr_attributes.Find(battr);
 

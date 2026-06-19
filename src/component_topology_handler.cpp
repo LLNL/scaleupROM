@@ -1025,8 +1025,7 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    assert(i0 + M <= N && j0 + M <= N);
 
    // Set up mesh arrays for the M x M subset
-   int new_numSub = M * M;
-   numSub = new_numSub;
+   numSub = M * M;
 
    // Copy basic topology information
    dim = global->dim;
@@ -1034,18 +1033,13 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    num_comp = global->num_comp;
    comp_names = global->comp_names;
 
-   // Copy components (reference meshes)
-   components.SetSize(num_comp);
-   for (int c = 0; c < num_comp; c++)
-      components[c] = new BlockMesh(*global->components[c]);
-
-   sub_composition.SetSize(new_numSub);
+   sub_composition.SetSize(numSub);
    sub_composition = 0;
-   mesh_types.SetSize(new_numSub);
-   mesh_comp_idx.SetSize(new_numSub);
-   mesh_configs.SetSize(new_numSub);
-   meshes.SetSize(new_numSub);
-   bdr_c2g.SetSize(new_numSub);
+   mesh_types.SetSize(numSub);
+   mesh_comp_idx.SetSize(numSub);
+   mesh_configs.SetSize(numSub);
+   meshes.SetSize(numSub);
+   bdr_c2g.SetSize(numSub);
 
    Array<int> comp_included(global->num_comp);
    comp_included = 0;
@@ -1053,7 +1047,7 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    // Map from subset mesh index to original mesh index
    Array<int> orig_to_subset(global->numSub);
    orig_to_subset = -1;
-   subset_to_orig.SetSize(new_numSub);
+   subset_to_orig.SetSize(numSub);
    subset_to_orig = -1;
 
    // Copy meshes and configurations for the subset
@@ -1120,14 +1114,14 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    }
 
    // Remap mesh_types to new component indices
-   for (int m = 0; m < new_numSub; m++)
+   for (int m = 0; m < numSub; m++)
    {
       mesh_types[m] = old_to_new_comp[mesh_types[m]];
    }
 
    // Calculate sub_composition and mesh_comp_idx based on new component indices
    sub_composition = 0;
-   for (int m = 0; m < new_numSub; m++)
+   for (int m = 0; m < numSub; m++)
    {
       int comp_type = mesh_types[m];
       mesh_comp_idx[m] = sub_composition[comp_type];
@@ -1139,10 +1133,11 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    Array<int> port_included(global->num_ports);
    port_included = 0;
 
-   Array<PortInfo> new_port_infos(0);
-   Array<int> new_port_types(0);
    Array<int> ref_port_included(global->num_ref_ports);
    ref_port_included = 0;
+
+   port_infos.SetSize(0);
+   port_types.SetSize(0);
 
    // Process each port to determine if it's internal or external
    for (int p = 0; p < global->num_ports; p++)
@@ -1171,8 +1166,8 @@ ComponentTopologyHandler::ComponentTopologyHandler(
          PortInfo new_info = global->port_infos[p];
          new_info.Mesh1 = new_mesh1;
          new_info.Mesh2 = new_mesh2;
-         new_port_infos.Append(new_info);
-         new_port_types.Append(port_type);  // Still using old port_type index, will remap later
+         port_infos.Append(new_info);
+         port_types.Append(port_type);  // Still using old port_type index, will remap later
       }
       else
       {
@@ -1226,15 +1221,12 @@ ComponentTopologyHandler::ComponentTopologyHandler(
       }
    }
 
-   // Remap port_types in new_port_types to new reference port indices
-   for (int p = 0; p < new_port_types.Size(); p++)
+   // Remap port_types to new reference port indices
+   for (int p = 0; p < port_types.Size(); p++)
    {
-      new_port_types[p] = old_to_new_refport[new_port_types[p]];
+      port_types[p] = old_to_new_refport[port_types[p]];
    }
 
-   // Assign the updated arrays
-   port_infos = new_port_infos;
-   port_types = new_port_types;
    num_ports = port_infos.Size();
 
    // Setup ports, as all reference port infos are updated.
@@ -1244,7 +1236,7 @@ ComponentTopologyHandler::ComponentTopologyHandler(
    // Start by collecting all boundary attributes from bdr_c2g
    std::set<int> bdr_attr_set;
 
-   for (int m = 0; m < new_numSub; m++)
+   for (int m = 0; m < numSub; m++)
    {
       for (int i = 0; i < bdr_c2g[m]->Size(); i++)
       {
@@ -1259,7 +1251,7 @@ ComponentTopologyHandler::ComponentTopologyHandler(
       bdr_attr_set.erase(port_infos[p].PortAttr);
    }
 
-   // Convert set to array
+   // Convert set to array (std::set iterates in ascending order, so result is sorted)
    bdr_attributes.SetSize(bdr_attr_set.size());
    int idx = 0;
    for (std::set<int>::iterator it = bdr_attr_set.begin(); it != bdr_attr_set.end(); ++it)
@@ -1267,6 +1259,4 @@ ComponentTopologyHandler::ComponentTopologyHandler(
       bdr_attributes[idx] = *it;
       idx++;
    }
-
-   bdr_attributes.Sort();
 }
