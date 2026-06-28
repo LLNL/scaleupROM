@@ -57,6 +57,7 @@ protected:
    int max_num_snapshots = 100;
    bool save_sv = false;
    bool update_right_SV = false;
+   bool square_sv = true;
    const bool incremental = false;
    Array<CAROM::Options*> snapshot_options;
    Array<CAROM::BasisGenerator*> snapshot_generators;
