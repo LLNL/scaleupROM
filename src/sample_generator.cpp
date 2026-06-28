@@ -180,23 +180,24 @@ const std::string SampleGenerator::GetSamplePath(const int &idx, const std::stri
 void SampleGenerator::SaveSnapshot(BlockVector *U_snapshots, std::vector<BasisTag> &snapshot_basis_tags, Array<int> &col_idxs)
 {
    assert(U_snapshots->NumBlocks() == snapshot_basis_tags.size());
+
    col_idxs.SetSize(U_snapshots->NumBlocks());
 
    /* add snapshots according to their tags */
    for (int s = 0; s < snapshot_basis_tags.size(); s++)
    {
+
       /* if the tag was never seen before, create a new snapshot generator */
       if (!basis_tag2idx.count(snapshot_basis_tags[s]))
       {
          const int fom_vdofs = U_snapshots->BlockSize(s);
+
          AddSnapshotGenerator(fom_vdofs, GetSamplePrefix(), snapshot_basis_tags[s]);
       }
 
       /* add the snapshot into the corresponding snapshot generator */
       int index = basis_tag2idx[snapshot_basis_tags[s]];
       bool addSample = snapshot_generators[index]->takeSample(U_snapshots->GetBlock(s).GetData());
-      assert(addSample);
-
       /* save the column index in each snapshot matrix, for port data. */
       /* 0-based index */
       col_idxs[s] = snapshot_generators[index]->getNumSamples() - 1;
@@ -269,6 +270,7 @@ void SampleGenerator::AddSnapshotGenerator(const int &fom_vdofs, const std::stri
 
    snapshot_options.Append(new CAROM::Options(fom_vdofs, max_num_snapshots, 1, update_right_SV));
    snapshot_options.Last()->static_svd_preserve_snapshot = true;
+   snapshot_options.Last()->setSingularValueTol(1e-17);
    snapshot_generators.Append(new CAROM::BasisGenerator(*(snapshot_options.Last()), incremental, filename, CAROM::Database::formats::HDF5_MPIO));
 
    basis_tag2idx[basis_tag] = basis_tags.size();

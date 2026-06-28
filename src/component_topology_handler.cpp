@@ -134,6 +134,16 @@ void ComponentTopologyHandler::SetupComponents()
       ComponentBdrAttrCheck(components[idx]);
    }
 
+
+   for (size_t i = 0; i < num_comp; i++)
+   {
+      if (!(components[i]->GetNodalFESpace()))
+   {
+      int _order = 1;
+      components[i]->SetCurvature(_order, false)	;
+   }
+   }
+   
    // Check all component meshes have the same FECollection name.
    std::string name(components[0]->GetNodalFESpace()->FEColl()->Name());
    for (int c = 0; c < num_comp; c++)

@@ -1,0 +1,406 @@
+main:
+  mode: single_run
+  use_rom: true
+  solver: linelast
+
+mesh:
+  type: component-wise
+  component-wise:
+    global_config: "config/linelast.octet_truss_train0.h5"
+    components:
+      - name: "octet_truss_unitcell"
+        file: "meshes/octet_truss.mesh"
+  uniform_refinement: 0
+
+domain-decomposition:
+  type: interior_penalty
+
+solver:
+  direct_solve: true
+
+discretization:
+  order: 1
+  full-discrete-galerkin: true
+
+visualization:
+  enabled: false
+  unified_paraview: true
+  file_path:
+    prefix: octet_output
+
+parameterized_problem:
+  name: linelast_cwtrain3d
+
+single_run:
+  linelast_cwtrain3d:
+    lambda: 5.711538461538462
+    mu: 3.8076923076923075
+    lx: 0.5
+    ly: 0.5
+    lz: 0.5
+    rx: 0.0
+    ry: 0.0
+    rz: 0.5
+    dx: 0.0
+    dy: 0.0
+    dz: 0.0
+    ux: 0.0
+    uy: 0.0
+    uz: 0.0
+    ix: 0.0
+    iy: 0.0
+    iz: 0.0
+    ox: 0.0
+    oy: 0.0
+    oz: 0.0
+    bx: 0.0
+    by: 0.0
+    bz: 0.0
+    l_ux: 0.0
+    l_uy: 0.0
+    l_uz: 0.0
+    r_fx: 0.0
+    r_fy: 0.0
+    r_fz: -0.00500
+    u_fx: 0.0
+    u_fy: 0.0
+    u_fz: 0.0
+    d_fx: 0.0
+    d_fy: 0.0
+    d_fz: 0.0
+    i_fx: 0.0
+    i_fy: 0.0
+    i_fz: 0.0
+    o_fx: 0.0
+    o_fy: 0.0
+    o_fz: 0.0
+    b_fx: 0.0
+    b_fy: 0.0
+    b_fz: 0.0
+    xu_amp: 0.0
+    xf_amp: 0.0
+    yu_amp: 0.0
+    yf_amp: 0.0
+    zu_amp: 0.0
+    zf_amp: 0.0
+    bxf_amp: 0.0
+    byf_amp: 0.0
+    bzf_amp: 0.0
+    xu_freq: 0.0
+    xf_freq: 0.0
+    yu_freq: 0.0
+    yf_freq: 0.0
+    zu_freq: 0.0
+    zf_freq: 0.0
+    bxf_freq: 0.0
+    byf_freq: 0.0
+    bzf_freq: 0.0
+    xu_offset: 0.0
+    xf_offset: 0.0
+    yu_offset: 0.0
+    yf_offset: 0.0
+    zu_offset: 0.0
+    zf_offset: 0.0
+    bxf_offset: 0.0
+    byf_offset: 0.0
+    bzf_offset: 0.0
+
+sample_generation:
+  maximum_number_of_snapshots: 70000
+  component_sampling: true
+  type: random
+  random_sample_generator:
+    number_of_samples: 100
+  file_path:
+    prefix: "linelast_cwtrain3d"
+  parameters:
+    - key: single_run/linelast_cwtrain3d/rx
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/ry
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/rz
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/lx
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/ly
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/lz
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/dx
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/dy
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/dz
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/ux
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/uy
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/uz
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/ix
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/iy
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/iz
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/ox
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/oy
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/oz
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/l_ux
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/l_uy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/l_uz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/r_fx
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/r_fy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/r_fz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/u_fx
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/u_fy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/u_fz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/d_fx
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/d_fy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/d_fz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/i_fx
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/i_fy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/i_fz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/o_fx
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/o_fy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/o_fz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/b_fx
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/b_fy
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/b_fz
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/xu_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/yu_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/zu_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/xf_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/yf_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/zf_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/bxf_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/byf_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/bzf_amp
+      type: double
+      minimum: -1.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/xu_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/yu_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/zu_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/xf_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/yf_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/zf_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/bxf_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/byf_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/bzf_freq
+      type: double
+      minimum: 0.1
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/xu_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/yu_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/zu_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/xf_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/yf_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/zf_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/bxf_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/byf_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+    - key: single_run/linelast_cwtrain3d/bzf_offset
+      type: double
+      minimum: 0.0
+      maximum: 1.0
+
+basis:
+  prefix: "linelast_cwtrain3d"
+  number_of_basis: 16
+  tags:
+    - name: "octet_truss_unitcell"
+      number_of_basis: 16
+      snapshot_format:
+        minimum: 0
+        maximum: 3
+        format: "linelast_cwtrain_sample_octet_truss_snapshot%01d"
+  svd:
+    save_spectrum: true
+    update_right_sv: false
+  visualization:
+    enabled: false
+
+model_reduction:
+  rom_handler_type: mfem
+  subdomain_training: universal
+  linear_solver_type: direct
+  save_operator:
+    level: component
+    prefix: "linelast3d_cw.rom_elem"
+  compare_solution:
+    enabled: true

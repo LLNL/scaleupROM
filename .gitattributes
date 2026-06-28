@@ -1,0 +1,1 @@
+examples/linelast/meshes/octet_truss_hd.mesh filter=lfs diff=lfs merge=lfs -text

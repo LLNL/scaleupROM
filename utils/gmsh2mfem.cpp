@@ -36,21 +36,21 @@ int main(int argc, char *argv[])
    args.PrintOptions(cout);
 
    Mesh mesh(meshFileString);
-
+   int dim = mesh.SpaceDimension();
    // Promote to high order mesh
    if (order_ >1)
-      mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
-   
+      mesh.SetCurvature(order_, true, dim, Ordering::byVDIM);
+
    // Force mesh to be nonconforming
    if (force_nc_)
    {
       if (mesh.GetNodalFESpace())
       {
-         mesh.SetCurvature(mesh.GetNodalFESpace()->GetMaxElementOrder(), true, 2, Ordering::byVDIM);
+         mesh.SetCurvature(mesh.GetNodalFESpace()->GetMaxElementOrder(), true, dim, Ordering::byVDIM);
       }
       else
       {
-         mesh.SetCurvature(order_, true, 2, Ordering::byVDIM);
+         mesh.SetCurvature(order_, true, dim, Ordering::byVDIM);
       }
    }
    

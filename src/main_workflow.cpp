@@ -175,8 +175,9 @@ void GenerateSamples(MPI_Comm comm)
       test->BuildOperators();
       test->SetupBCOperators();
       test->Assemble();
-
+      
       bool converged = test->Solve(sample_generator);
+      cout<<"converged: "<<converged<<endl;
       if (!converged)
       {
          // If deterministic, terminate the sampling here.
@@ -190,7 +191,6 @@ void GenerateSamples(MPI_Comm comm)
             continue;
          }
       }
-         
       test->SaveSolution(sol_file);
       test->SaveVisualization();
 
