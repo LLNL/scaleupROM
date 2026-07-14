@@ -134,7 +134,7 @@ protected:
    double kappa = -1.0;
 
 public:
-   StokesSolver();
+   StokesSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~StokesSolver();
 
@@ -197,7 +197,7 @@ public:
 
    void SanityCheckOnCoeffs();
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem) override;
+   virtual bool SetParameterizedProblem(ParameterizedProblem *problem) override;
 
    // to ensure incompressibility for the problems with all velocity dirichlet bc.
    void SetComplementaryFlux(const Array<bool> nz_dbcs);
@@ -216,6 +216,19 @@ private:
    double ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr, Coefficient &Q);
    void ComputeBEIntegral(const FiniteElement &el, ElementTransformation &Tr,
                            VectorCoefficient &Q, Vector &result);
+
+protected:
+   // For an M x M subset (starting at (i0, j0)) extracted from the assumed
+   // N x N square mesh array: when all subset boundary conditions are velocity
+   // Dirichlet, the prescribed velocity must satisfy the compatibility
+   // condition int_{dOmega} u . n dA = 0 for the incompressible Stokes problem
+   // to be well-posed. This routine computes the net flux from the prescribed
+   // BC and adds a complementary flux on the subset boundary to enforce that
+   // constraint.
+   void SetSubsetComplementaryFlux(const int N, const int M, const int i0, const int j0,
+                                   const Array<int> &subset_bdr_attributes,
+                                   const Array<BoundaryType> &subset_bdrtype,
+                                   const ParameterizedProblem *problem);
 };
 
 #endif

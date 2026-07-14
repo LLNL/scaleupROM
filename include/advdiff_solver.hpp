@@ -6,7 +6,7 @@
 #define SCALEUPROM_ADVDIFF_SOLVER_HPP
 
 #include "poisson_solver.hpp"
-#include "stokes_solver.hpp"
+#include "steady_ns_solver.hpp"
 
 // By convention we only use mfem namespace as default, not CAROM.
 using namespace mfem;
@@ -26,7 +26,9 @@ protected:
    /*
       flow solver to obtain the prescribed velocity field. both StokesSolver / SteadyNSSolver can be used.
    */
-   StokesSolver *stokes_solver = NULL;
+   std::string flow_solver_type = "";
+   int flow_solver_order = -1;
+   StokesSolver *flow_solver = NULL;
    bool load_flow = false;
    bool save_flow = false;
    std::string flow_file = "";
@@ -39,7 +41,7 @@ protected:
    Array<GridFunction *> global_flow_visual;
 
 public:
-   AdvDiffSolver();
+   AdvDiffSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~AdvDiffSolver();
 
@@ -52,7 +54,7 @@ public:
 
    void SetFlowAtSubdomain(std::function<void(const Vector &, double, Vector &)> F, const int m=-1);
 
-   void SetParameterizedProblem(ParameterizedProblem *problem) override;
+   bool SetParameterizedProblem(ParameterizedProblem *problem) override;
 
    void SaveVisualization() override;
 
@@ -60,7 +62,7 @@ protected:
    void SetMUMPSSolver() override;
 
 private:
-   void GetFlowField(ParameterizedProblem *flow_problem);
+   bool GetFlowField(ParameterizedProblem *flow_problem);
 };
 
 #endif

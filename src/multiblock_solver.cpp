@@ -10,7 +10,8 @@
 using namespace std;
 using namespace mfem;
 
-MultiBlockSolver::MultiBlockSolver()
+MultiBlockSolver::MultiBlockSolver(TopologyHandler *input_topol_handler)
+   : topol_handler(input_topol_handler)
 {
    /*
       TODO(kevin): this is a boilerplate for parallel POD/EQP training.
@@ -22,24 +23,25 @@ MultiBlockSolver::MultiBlockSolver()
    ParseInputs();
 
    TopologyData topol_data;
-   switch (topol_mode)
-   {
-      case TopologyHandlerMode::SUBMESH:
+   if (topol_handler == NULL)
+      switch (topol_mode)
       {
-         topol_handler = new SubMeshTopologyHandler();
-         break;
+         case TopologyHandlerMode::SUBMESH:
+         {
+            topol_handler = new SubMeshTopologyHandler();
+            break;
+         }
+         case TopologyHandlerMode::COMPONENT:
+         {
+            topol_handler = new ComponentTopologyHandler();
+            break;
+         }
+         default:
+         {
+            mfem_error("Unknown topology handler mode!\n");
+            break;
+         }
       }
-      case TopologyHandlerMode::COMPONENT:
-      {
-         topol_handler = new ComponentTopologyHandler();
-         break;
-      }
-      default:
-      {
-         mfem_error("Unknown topology handler mode!\n");
-         break;
-      }
-   }
    topol_handler->ExportInfo(meshes, topol_data);
    
    // Receive topology info
@@ -307,9 +309,17 @@ void MultiBlockSolver::AssembleROMMat(BlockMatrix &romMat)
       {
          int global_idx = global_bdr_attributes.Find((*bdr_c2g)[b]);
          if (global_idx < 0) continue;
-         if (!BCExistsOnBdr(global_idx)) continue;
+         /*
+            The existence of a BC on each global boundary attribute is
+            now ensured by IsBdrTypeDefined.
+            We no longer depend on the existence of BC coefficients.
+            This is to support the alternating Schwarz solver,
+            where internal boundaries would not have global BC coefficients.
+            The code below is left commented for documentation purposes.
+         */
+         // if (!BCExistsOnBdr(global_idx)) continue;
 
-         /* we assume only Neumann condition would not add an operator. */
+         /* We assume only the Neumann condition does not add an operator. */
          if (bdr_type[global_idx] == BoundaryType::NEUMANN)
             continue;
 
@@ -492,9 +502,16 @@ void MultiBlockSolver::SaveVisualization(const int step, const double time)
    SaveVisualization();
 }
 
-void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    assert(bdr_type.Size() == global_bdr_attributes.Size());
+   // Check if boundary type is set for all boundaries (battr == -1)
+   if ((problem->battr.Size() == 1) && (problem->battr[0] == -1))
+   {
+      bdr_type = problem->bdr_type[0];
+      return true;
+   }
+
    for (int b = 0; b < global_bdr_attributes.Size(); b++)
    {
       int idx = problem->battr.Find(global_bdr_attributes[b]);
@@ -502,6 +519,8 @@ void MultiBlockSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 
       bdr_type[b] = problem->bdr_type[idx];
    }
+   // MultiBlockSolver does not fail in SetParameterizedProblem.
+   return true;
 }
 
 void MultiBlockSolver::SaveSolution(std::string filename)
@@ -773,4 +792,42 @@ void MultiBlockSolver::CompareSolution(BlockVector &test_U, Vector &error)
          subtract(*test_us[k], *us[k], *error_visual[k]);
 
    DeletePointers(test_us);
+}
+
+void MultiBlockSolver::PrintConfiguration() const
+{
+   printf("\n\n======= Mesh/Boundary Configuration =======\n\n");
+
+   printf("--- Global Boundary Attributes ---\n");
+   assert(global_bdr_attributes.Size() == numBdr);
+   assert(bdr_type.Size() == numBdr);
+   for (int b = 0; b < numBdr; b++)
+   {
+      std::string type = PrintBoundaryType(bdr_type[b]);
+      printf("Bdr Attr %d: %s\n", global_bdr_attributes[b], type.c_str());
+   }
+
+   printf("\n--- Mesh Boundary Attribute Mapping ---\n");
+   for (int m = 0; m < numSub; m++)
+   {
+      printf("\n------------------------------\n");
+      printf("            Mesh %d           \n", m);
+      printf("------------------------------\n");
+      Array<int> *bdr_c2g = topol_handler->GetBdrAttrComponentToGlobalMap(m);
+      printf("Comp:\t");
+      for (int k = 0; k < bdr_c2g->Size(); k++)
+         printf("%d\t", k+1);
+      printf("\n");
+      printf("Glob:\t");
+      for (int k = 0; k < bdr_c2g->Size(); k++)
+         printf("%d\t", (*bdr_c2g)[k]);
+      printf("\n");
+   }
+   printf("\n");
+
+   printf("\n--- Port Info ---\n");
+   topol_handler->PrintPortInfo();
+
+   printf("\n\n===========================================\n\n");
+   return;
 }

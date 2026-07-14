@@ -99,6 +99,8 @@ public:
 
    virtual void Mult(const Vector &x, Vector &y) const;
    virtual Operator &GetGradient(const Vector &x) const;
+
+   void SaveOperator(std::string filename);
 };
 
 class SteadyNSEQPROM : public SteadyNSROM
@@ -166,7 +168,7 @@ protected:
    NewtonSolver *newton_solver = NULL;
 
 public:
-   SteadyNSSolver();
+   SteadyNSSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~SteadyNSSolver();
 
@@ -198,6 +200,12 @@ public:
 
    void SaveEQPCoords(const std::string &filename) override;
 
+   void SchwarzROM(const int M, const int N, ParameterizedProblem *problem,
+                   double &solve_time, int &num_solve, Array<double> &error_hist,
+                   const int maxIter, const double threshold=1e-15,
+                   const int plateau_track=3, const double plateau_range=1e-1,
+                   const bool use_restart=false, const double initial_tol=-1.0);
+
 private:
    DenseTensor* GetReducedTensor(DenseMatrix *basis, FiniteElementSpace *fespace);
    
@@ -210,6 +218,10 @@ private:
    void SaveEQPElems(const std::string &filename);
    void LoadEQPElems(const std::string &filename);
    void AssembleROMEQPOper();
+
+protected:
+   void SetupSubsetRHSBCOperators(const Array<int> &meshes, const Array<int> &battrs,
+                                  const Array<VectorGridFunctionCoefficient *> &bfuncs);
 };
 
 #endif

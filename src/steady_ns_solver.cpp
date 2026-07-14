@@ -241,6 +241,28 @@ Operator& SteadyNSTensorROM::GetGradient(const Vector &x) const
       return *jac_mono;
 }
 
+void SteadyNSTensorROM::SaveOperator(std::string filename)
+{
+   hid_t file_id;
+   herr_t errf = 0;
+   file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+   assert(file_id >= 0);
+
+   DenseMatrix linOp;
+   linearOp->ToDenseMatrix(linOp);
+   hdf5_utils::WriteDataset(file_id, "linear_op", linOp);
+
+   for (int m = 0; m < numSub; m++)
+   {
+      std::string dsetname = "tensor" + std::to_string(m);
+      hdf5_utils::WriteDataset(file_id, dsetname.c_str(), *hs[m]);
+   }
+
+   errf = H5Fclose(file_id);
+   assert(errf >= 0);
+   return;
+}
+
 /*
    SteadyNSTensorROM
 */
@@ -416,8 +438,8 @@ void SteadyNSEQPROM::AddVel(const Vector &y_u, Vector &y) const
    SteadyNSSolver
 */
 
-SteadyNSSolver::SteadyNSSolver()
-   : StokesSolver()
+SteadyNSSolver::SteadyNSSolver(TopologyHandler *input_topol_handler)
+   : StokesSolver(input_topol_handler)
 {
    nonlinear_mode = true;
 

@@ -23,6 +23,13 @@ solver:
     relative_tolerance: 1.0e-15
     absolute_tolerance: 1.0e-15
 
+rom_solver:
+  relative_tolerance: 1.0e-15
+  absolute_tolerance: 1.0e-15
+  jacobian:
+    relative_tolerance: 1.0e-15
+    absolute_tolerance: 1.0e-15
+
 visualization:
   enabled: false
   unified_paraview: true

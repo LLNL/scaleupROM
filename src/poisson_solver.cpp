@@ -10,8 +10,8 @@
 using namespace std;
 using namespace mfem;
 
-PoissonSolver::PoissonSolver()
-   : MultiBlockSolver()
+PoissonSolver::PoissonSolver(TopologyHandler *input_topol_handler)
+   : MultiBlockSolver(input_topol_handler)
 {
    sigma = config.GetOption<double>("discretization/interface/sigma", -1.0);
    kappa = config.GetOption<double>("discretization/interface/kappa", (order + 1) * (order + 1));
@@ -204,6 +204,8 @@ bool PoissonSolver::BCExistsOnBdr(const int &global_battr_idx)
 
 void PoissonSolver::SetupBCOperators()
 {
+   assert(IsBdrTypeDefined());
+
    SetupRHSBCOperators();
 
    SetupDomainBCOperators();
@@ -547,7 +549,7 @@ void PoissonSolver::SanityCheckOnCoeffs()
       MFEM_WARNING("All bc coefficients are NULL, meaning there is no Dirichlet BC. Make sure to set bc coefficients before SetupBCOperator.\n");
 }
 
-void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    /* set up boundary types */
    MultiBlockSolver::SetParameterizedProblem(problem);
@@ -582,6 +584,8 @@ void PoissonSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       AddRHSFunction(*(problem->scalar_rhs_ptr));
    else
       AddRHSFunction(0.0);
+   // PoissonSolver does not fail in SetParameterizedProblem.
+   return true;
 }
 
 void PoissonSolver::SetMUMPSSolver()

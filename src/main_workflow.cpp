@@ -165,7 +165,24 @@ void GenerateSamples(MPI_Comm comm)
          test->InitROMHandler();
 
       problem->SetSingleRun();
-      test->SetParameterizedProblem(problem);
+      bool param_set = test->SetParameterizedProblem(problem);
+      if (!param_set)
+      {
+         if (sample_generator->GetType() != SampleGeneratorType::RANDOM)
+            mfem_error("GenerateSamples failed at SetParameterizedProblem, and parameter values are fixed!\n");
+         delete test;
+         
+         sample_generator->SetSampleParams(s);
+         test = InitSolver();
+         test->InitVariables();
+         if (test->UseRom())
+            test->InitROMHandler();
+
+         problem->SetSingleRun();
+         param_set = test->SetParameterizedProblem(problem);
+         if (!param_set)
+            mfem_error("GenerateSamples failed at SetParameterizedProblem after retry!\n");
+      }
 
       int file_idx = s + sample_generator->GetFileOffset();
       const std::string visual_path = sample_generator->GetSamplePath(file_idx, test->GetVisualizationPrefix());
@@ -427,7 +444,7 @@ void BuildROM(MPI_Comm comm)
 
    // The ROM operator will be built based on the parameter specified for single-run.
    problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
+   assert(test->SetParameterizedProblem(problem));
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildOperators();
@@ -504,7 +521,9 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
 
    problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
+   assert(test->SetParameterizedProblem(problem));
+
+   assert(test->IsBdrTypeDefined());
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildRHSOperators();
@@ -703,6 +722,150 @@ double SingleRun(MPI_Comm comm, const std::string output_file)
    return error.Max();
 }
 
+
+double SingleSchwarzRun(MPI_Comm comm, const std::string &output_file)
+{
+   std::string solver_type = config.GetRequiredOption<std::string>("main/solver");
+   if (solver_type != "steady-ns")
+      mfem_error("SingleSchwarzRun currently only supports steady Navier-Stokes solver!\n");
+
+   if (config.GetOption<bool>("single_run/choose_from_random_sample", false))
+   {
+      RandomSampleGenerator *generator = new RandomSampleGenerator(comm);
+      generator->SetParamSpaceSizes();
+      int idx = UniformRandom(0, generator->GetTotalSampleSize()-1);
+      // NOTE: this will change config.dict_
+      generator->SetSampleParams(idx);
+      delete generator;
+   }
+
+   ParameterizedProblem *problem = InitParameterizedProblem();
+   SteadyNSSolver *test = new SteadyNSSolver();
+   test->InitVariables();
+   if (test->UseRom()) test->InitROMHandler();
+   test->InitVisualization();
+
+   StopWatch solveTimer;
+   std::string solveType = (test->UseRom()) ? "ROM" : "FOM";
+   const int num_var = test->GetNumVar();
+   Vector error(num_var);
+
+   problem->SetSingleRun();
+   assert(test->SetParameterizedProblem(problem));
+
+   assert(test->IsBdrTypeDefined());
+
+   // Schwarz ROM inputs
+   const int M = config.GetRequiredOption<int>("schwarz/local_size");
+   const int N = config.GetRequiredOption<int>("schwarz/global_size");
+   const int maxIter = config.GetRequiredOption<int>("schwarz/maximum_iteration");
+   const double threshold = config.GetRequiredOption<double>("schwarz/threshold");
+   const int plateau_track = config.GetOption<int>("schwarz/plateau_track", 3);
+   const double plateau_range = config.GetOption<double>("schwarz/plateau_range", 1e-1);
+   const bool use_restart = config.GetOption<bool>("rom_solver/use_restart", false);
+   const double initial_tol = config.GetOption<double>("schwarz/initial_tolerance", -1.0);
+   // Schwarz ROM outputs
+   int num_solve = -1;
+   double rom_solve = -1.0;
+   Array<double> error_hist(0);
+   test->SchwarzROM(M, N, problem, rom_solve, num_solve, error_hist,
+                  maxIter, threshold, plateau_track, plateau_range, use_restart, initial_tol);
+   printf("SchwarzROM solve time: %f seconds.\n", rom_solve);
+   printf("SchwarzROM number of solve: %d.\n", num_solve);
+
+   bool compare_sol = config.GetOption<bool>("model_reduction/compare_solution/enabled", false);
+   bool load_sol = config.GetOption<bool>("model_reduction/compare_solution/load_solution", false);
+   double fom_solve = -1.0;
+   if (compare_sol)
+   {
+      BlockVector *romU = test->GetSolutionCopy();
+
+      if (load_sol)
+      {
+         printf("Comparing with the existing FOM solution.\n");
+         std::string fom_file = config.GetRequiredOption<std::string>("model_reduction/compare_solution/fom_solution_file");
+         test->LoadSolution(fom_file);
+      }
+      else
+      {
+         solveTimer.Clear();
+         solveTimer.Start();
+         test->BuildRHSOperators();
+         test->SetupRHSBCOperators();
+         test->AssembleRHS();
+
+         test->BuildDomainOperators();
+         test->SetupDomainBCOperators();
+         test->AssembleOperator();
+         solveTimer.Stop();
+         printf("FOM-assembly time: %f seconds.\n", solveTimer.RealTime());
+         // fom_assemble = solveTimer.RealTime();
+
+         solveTimer.Clear();
+         solveTimer.Start();
+         test->Solve();
+         solveTimer.Stop();
+         printf("FOM-solve time: %f seconds.\n", solveTimer.RealTime());
+         fom_solve = solveTimer.RealTime();
+      }
+
+      test->CompareSolution(*romU, error);
+
+      bool save_reduced_sol = config.GetOption<bool>("model_reduction/compare_solution/save_reduced_solution", false);
+      if (save_reduced_sol)
+      {
+         ROMHandlerBase *rom = test->GetROMHandler();
+         rom->SaveReducedSolution("rom_reduced_sol.txt");
+
+         // use ROMHandler::reduced_rhs as a temporary variable.
+         rom->ProjectRHSOnReducedBasis(test->GetSolution());
+         rom->SaveReducedRHS("fom_reduced_sol.txt");
+      }
+
+      // Recover the original ROM solution.
+      test->CopySolution(romU);
+
+      delete romU;
+   }
+
+   // save results to output file.
+   if (output_file.length() > 0)
+   {
+      hid_t file_id;
+      herr_t errf = 0;
+      file_id = H5Fcreate(output_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file_id >= 0);
+
+      Array<int> num_solve_output(1);
+      num_solve_output = num_solve;
+      Vector rom_solve_output(1), fom_solve_output(1);
+      rom_solve_output = rom_solve;
+      fom_solve_output = fom_solve;
+
+      hdf5_utils::WriteDataset(file_id, "rom_num_solve", num_solve_output);
+      hdf5_utils::WriteDataset(file_id, "rom_solve", rom_solve_output);
+      // hdf5_utils::WriteDataset(file_id, "fom_assemble", fom_assemble);
+      hdf5_utils::WriteDataset(file_id, "fom_solve", fom_solve_output);
+      hdf5_utils::WriteDataset(file_id, "rel_error", error);
+      hdf5_utils::WriteDataset(file_id, "error_hist", error_hist);
+
+      errf = H5Fclose(file_id);
+      assert(errf >= 0);
+   }
+
+   // Save solution and visualization.
+   test->SaveSolution();
+   test->SaveVisualization();
+   
+   delete test;
+   delete problem;
+
+   // SingleSchwarzRun predicts velocity only; global pressure construction
+   // is not implemented yet, so error.Max() would be dominated by the
+   // (misleading) pressure error. Return the velocity error instead.
+   return error[0];
+}
+
 void PrintEQPCoords(MPI_Comm comm)
 {
    ParameterizedProblem *problem = InitParameterizedProblem();
@@ -721,7 +884,7 @@ void PrintEQPCoords(MPI_Comm comm)
    StopWatch solveTimer;
 
    problem->SetSingleRun();
-   test->SetParameterizedProblem(problem);
+   assert(test->SetParameterizedProblem(problem));
 
    // TODO: there are skippable operations depending on rom/fom mode.
    test->BuildRHSOperators();

@@ -116,7 +116,7 @@ protected:
    ROMLinearElement *rom_elems = NULL;
 
 public:
-   MultiBlockSolver();
+   MultiBlockSolver(TopologyHandler *input_topol_handler=NULL);
 
    virtual ~MultiBlockSolver();
 
@@ -254,13 +254,24 @@ public:
    virtual void SaveBasisVisualization()
    { rom_handler->SaveBasisVisualization(fes, var_names); }
 
-   virtual void SetParameterizedProblem(ParameterizedProblem *problem);
+   virtual bool SetParameterizedProblem(ParameterizedProblem *problem);
 
    void ComputeSubdomainErrorAndNorm(GridFunction *fom_sol, GridFunction *rom_sol, double &error, double &norm);
    void ComputeRelativeError(Array<GridFunction *> fom_sols, Array<GridFunction *> rom_sols, Vector &error);
    void CompareSolution(BlockVector &test_U, Vector &error);
 
    virtual void SaveEQPCoords(const std::string &filename) {}
+
+   bool IsBdrTypeDefined()
+   {
+      for (int k = 0; k < bdr_type.Size(); k++)
+         if (bdr_type[k] == BoundaryType::NUM_BDR_TYPE)
+            return false;
+
+      return true;
+   }
+
+   void PrintConfiguration() const;
 
 protected:
    virtual void AssembleROMMat(BlockMatrix &romMat);

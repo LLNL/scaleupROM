@@ -12,8 +12,8 @@ using namespace mfem;
    UnsteadyNSSolver
 */
 
-UnsteadyNSSolver::UnsteadyNSSolver()
-   : SteadyNSSolver(), timer("UnsteadyNSSolver")
+UnsteadyNSSolver::UnsteadyNSSolver(TopologyHandler *input_topol_handler)
+   : SteadyNSSolver(input_topol_handler), timer("UnsteadyNSSolver")
 {
    nonlinear_mode = true;
 
@@ -290,7 +290,7 @@ void UnsteadyNSSolver::SaveVisualization(const int step, const double time)
    MultiBlockSolver::SaveVisualization(step, time);
 }
 
-void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
+bool UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
 {
    SteadyNSSolver::SetParameterizedProblem(problem);
 
@@ -313,7 +313,8 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
    {
       u_ic = new VectorConstantCoefficient(zero_vel);
       p_ic = new VectorConstantCoefficient(zero_pres);
-      return;
+      // UnsteadyNSSolver does not fail in SetParameterizedProblem.
+      return true;
    }
 
    if (problem->ic_ptr[0])
@@ -325,6 +326,8 @@ void UnsteadyNSSolver::SetParameterizedProblem(ParameterizedProblem *problem)
       p_ic = new VectorFunctionCoefficient(1, problem->ic_ptr[1]);
    else
       p_ic = new VectorConstantCoefficient(zero_pres);
+   // UnsteadyNSSolver does not fail in SetParameterizedProblem.
+   return true;
 }
 
 BlockVector* UnsteadyNSSolver::PrepareSnapshots(std::vector<BasisTag> &basis_tags)
