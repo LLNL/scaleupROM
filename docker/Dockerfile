@@ -29,8 +29,11 @@ WORKDIR /usr/lib
 RUN arch=$(uname -m) && sudo ln -s /usr/lib/${arch}-linux-gnu/libscalapack-openmpi.so.2.1.0 ./
 
 # re-install mfem with mumps, with cmake
+WORKDIR $LIB_DIR
+RUN sudo rm -rf mfem_parallel
+RUN sudo git clone https://github.com/mfem/mfem.git mfem_parallel
 WORKDIR $LIB_DIR/mfem
-RUN sudo git checkout v4.6
+RUN sudo git checkout v4.8
 WORKDIR $LIB_DIR/mfem/build
 RUN sudo -E cmake .. -DBUILD_SHARED_LIBS=YES -DMFEM_USE_MPI=YES -DMFEM_USE_GSLIB=${MG} -DMFEM_USE_METIS=YES -DMFEM_USE_METIS_5=YES -DMFEM_USE_MUMPS=YES -DGSLIB_DIR="$LIB_DIR/gslib/build" -DMUMPS_DIR="$LIB_DIR/mumps/build/local"
 RUN sudo -E make -j 16

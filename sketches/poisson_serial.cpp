@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
    //     printf("Boundary element %d - Adjacent element %d\n", i, elem_id);
    //     printf("Face index: %d, face orientation : %d\n", face_info / 64, face_info % 64);
    //
-   //     int fn = mesh.GetBdrFace(i);
+   //     int fn = mesh.GetBdrElementFaceIndex(i);
    //     int face_inf[2];
    //     mesh.GetFaceInfos(fn, &face_inf[0], &face_inf[1]);
    //     printf("From faces_info - Face index: %d, face orientation : %d\n", face_inf[0] / 64, face_inf[0] % 64);
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
      cout << "Number of unknowns in each subdomain: " << total_num_dofs << endl;
 
      for (int i = 0; i < meshes[0]->GetNBE(); i++) {
-       int fn = meshes[0]->GetBdrFace(i);
+       int fn = meshes[0]->GetBdrElementFaceIndex(i);
        int bdrAttr = meshes[0]->GetBdrAttribute(i);
 
        int elem_id, face_info;

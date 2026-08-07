@@ -50,6 +50,56 @@ TopologyHandler::TopologyHandler(const TopologyHandlerMode &input_type)
    }
 }
 
+std::map<DofTag, Array<int>> TopologyHandler::SplitBoundaryDofs(
+   Mesh* const mesh, const FiniteElementSpace *fes) const
+{
+   std::map<DofTag, Array<int>> battr2dofs;
+
+   // get max boundary attribute.
+   int max_battr = -1;
+   for (int i = 0; i < fes->GetNBE(); i++)
+      max_battr = max(max_battr, mesh->GetBdrAttribute(i));
+
+   // 2d array to store boundary attributes that each dof belongs to.
+   Array2D<int> dof_battr(fes->GetVSize(), max_battr);
+   dof_battr = 0;
+
+   Array<int> vdofs;
+   FaceElementTransformations *tr;
+   for (int i = 0; i < fes->GetNBE(); i++)
+   {
+      const int bdr_attr = mesh->GetBdrAttribute(i);
+
+      tr = mesh->GetBdrFaceTransformations(i);
+      if (tr != NULL)
+      {
+         fes->GetElementVDofs(tr->Elem1No, vdofs);
+         for (int k = 0 ; k < vdofs.Size(); k++)
+            dof_battr(vdofs[k], bdr_attr-1) = 1;
+      }
+   }
+
+   for (int k = 0; k < fes->GetVSize(); k++)
+   {
+      Array<int> battrs(0);
+      for (int d = 0; d < max_battr; d++)
+      {
+         if (dof_battr(k, d) > 0)
+         // boundary attribute starts from 1.
+            battrs.Append(d+1);
+      }
+      battrs.Sort();
+
+      DofTag pdtag(battrs);
+      if (!battr2dofs.count(pdtag))
+         battr2dofs[pdtag] = Array<int>(0);
+
+      battr2dofs[pdtag].Append(k);
+   }
+
+   return battr2dofs;
+}
+
 void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const InterfaceInfo *if_info,
                                                    FaceElementTransformations* &tr1,
                                                    FaceElementTransformations* &tr2)
@@ -63,7 +113,7 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
 
    // Correcting the local face1 transformation if orientation needs correction.
    int faceInf1, faceInf2;
-   int face1 = m1->GetBdrFace(if_info->BE1);
+   int face1 = m1->GetBdrElementFaceIndex(if_info->BE1);
    m1->GetFaceInfos(face1, &faceInf1, &faceInf2);
    if (faceInf1 != if_info->Inf1)
    {
@@ -80,7 +130,7 @@ void TopologyHandler::GetInterfaceTransformations(Mesh *m1, Mesh *m2, const Inte
    }
 
    // Correcting the local face1 transformation if orientation needs correction.
-   int face2 = m2->GetBdrFace(if_info->BE2);
+   int face2 = m2->GetBdrElementFaceIndex(if_info->BE2);
    m2->GetFaceInfos(face2, &faceInf2, &faceInf1);
    if (faceInf2 != if_info->Inf2)
    {
@@ -332,11 +382,11 @@ void SubMeshTopologyHandler::BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm,
    parent_face_to_be = -1;
    for (int i = 0; i < pm.GetNBE(); i++)
    {
-      parent_face_to_be[pm.GetBdrElementEdgeIndex(i)] = i;
+      parent_face_to_be[pm.GetBdrElementFaceIndex(i)] = i;
    }
    for (int k = 0; k < sm.GetNBE(); k++)
    {
-      int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrFace(k)]];
+      int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrElementFaceIndex(k)]];
       if (pbeid != -1)
       {
          int attr = pm.GetBdrElement(pbeid)->GetAttribute();
@@ -374,14 +424,14 @@ void SubMeshTopologyHandler::BuildInterfaceInfos()
       for (int ib = 0; ib < meshes[i]->GetNBE(); ib++)
       {
          if (meshes[i]->GetBdrAttribute(ib) != generated_battr) continue;
-         int parent_face_i = (*parent_face_map[i])[meshes[i]->GetBdrFace(ib)];
+         int parent_face_i = (*parent_face_map[i])[meshes[i]->GetBdrElementFaceIndex(ib)];
 
          // Loop over each subdomain, each boundary element, to find the match.
          for (int j = i+1; j < numSub; j++)
          {
             for (int jb = 0; jb < meshes[j]->GetNBE(); jb++)
             {
-               int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrFace(jb)];
+               int parent_face_j = (*parent_face_map[j])[meshes[j]->GetBdrElementFaceIndex(jb)];
                if (parent_face_i != parent_face_j) continue;
 
                assert(meshes[j]->GetBdrAttribute(jb) == generated_battr);

@@ -110,6 +110,71 @@ void ComponentTopologyHandler::ExportInfo(Array<Mesh*> &mesh_ptrs, TopologyData 
    topol_data.global_bdr_attributes = &bdr_attributes;
 }
 
+std::map<DofTag, Array<int>> ComponentTopologyHandler::SplitDofsByBoundary(FiniteElementSpace &fes)
+{
+   Mesh *mesh = fes.GetMesh();
+
+   /* Get max boundary attributes. */
+   int max_battr = -1;
+   for (int i = 0; i < fes.GetNBE(); i++)
+      max_battr = max(max_battr, mesh->GetBdrAttribute(i));
+
+   /*
+      Table that stores boundary attributes each dof belongs to.
+      Size of (number of vdofs x max_battr).
+   */
+   Array2D<bool> dof_battr(fes.GetVSize(), max_battr);
+   dof_battr = false;
+
+   /*
+      Loop over boundary elements,
+      Log all dofs that belong to the boundary element.
+   */
+   Array<int> vdofs;
+   FaceElementTransformations *tr;
+   for (int i = 0; i < fes.GetNBE(); i++)
+   {
+      const int bdr_attr = mesh->GetBdrAttribute(i);
+
+      fes.GetBdrElementVDofs(i, vdofs);
+
+      tr = mesh->GetBdrFaceTransformations(i);
+      if (tr != NULL)
+      {
+         fes.GetElementVDofs(tr->Elem1No, vdofs);
+         for (int k = 0 ; k < vdofs.Size(); k++)
+            dof_battr(vdofs[k], bdr_attr-1) = true;
+      }
+   }
+
+   /*
+      Sort out dofs by same boundary elements.
+      Dofs can belong to multiple boundary elements,
+      representing edge, face, or vertex.
+   */
+   std::map<DofTag, Array<int>> dof_dict;
+   for (int k = 0; k < fes.GetVSize(); k++)
+   {
+      Array<int> battrs(0);
+      for (int d = 0; d < max_battr; d++)
+      {
+         if (dof_battr(k, d))
+            battrs.Append(d+1);
+      }
+      battrs.Sort();
+
+      /* Creat DofTag if it does not exist */
+      DofTag dtag(battrs);
+      if (!dof_dict.count(dtag))
+         dof_dict[dtag] = Array<int>(0);
+
+      /* Append dof to the corresponding DofTag */
+      dof_dict[dtag].Append(k);
+   }
+
+   return dof_dict;
+}
+
 void ComponentTopologyHandler::SetupComponents()
 {
    assert(num_comp > 0);
@@ -660,8 +725,8 @@ void ComponentTopologyHandler::SetupReferenceInterfaces()
          tmp.BE2 = pair[1];
 
          // use the face index from each component mesh.
-         int f1 = comp1->GetBdrFace(tmp.BE1);
-         int f2 = comp2->GetBdrFace(tmp.BE2);
+         int f1 = comp1->GetBdrElementFaceIndex(tmp.BE1);
+         int f2 = comp2->GetBdrElementFaceIndex(tmp.BE2);
          int Inf1, Inf2, dump;
          comp1->GetFaceInfos(f1, &Inf1, &dump);
          comp2->GetFaceInfos(f2, &Inf2, &dump);

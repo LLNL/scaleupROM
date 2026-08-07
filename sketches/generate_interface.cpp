@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
          for (int be = 0; be < meshes[m]->GetNBE(); be++)
          {
             int battr = meshes[m]->GetBdrAttribute(be);
-            int face = meshes[m]->GetBdrFace(be);
+            int face = meshes[m]->GetBdrElementFaceIndex(be);
             Array<int> vtx;
             // comp.GetFaceVertices(face, vtx);
             meshes[m]->GetBdrElementVertices(be, vtx);
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
       for (int be = 0; be < comp.GetNBE(); be++)
       {
          int battr = comp.GetBdrAttribute(be);
-         int face = comp.GetBdrFace(be);
+         int face = comp.GetBdrElementFaceIndex(be);
          Array<int> vtx;
          // comp.GetFaceVertices(face, vtx);
          comp.GetBdrElementVertices(be, vtx);
@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
       // These will be stored in a 'interface pair' file, with the comp/battr pair above.
       Array<std::map<int,int>*> vtx_2to1(n_interface_pairs);
       // Array<std::map<int,int>*> be_2to1(n_interface_pairs);
-      Array<Array<std::pair<int,int>>*> be_pairs(n_interface_pairs);
+      // Array<Array<std::pair<int,int>>*> be_pairs(n_interface_pairs);
       for (int k = 0; k < n_interface_pairs; k++)
       {
          int bidx1 = comp.bdr_attributes.Find(if_battr1[k]);
@@ -177,18 +177,18 @@ int main(int argc, char *argv[])
          assert(bdr_vtx[bidx1]->Size() == bdr_vtx[bidx2]->Size());
 
          vtx_2to1[k] = new std::map<int,int>;
-         be_pairs[k] = new Array<std::pair<int,int>>(0);
+         // be_pairs[k] = new Array<std::pair<int,int>>(0);
       }
 
       (*vtx_2to1[0])[1] = 3;
       (*vtx_2to1[0])[0] = 2;
       // (*be_pairs[0])[0] = 1;
-      be_pairs[0]->Append({1, 0});
+      // be_pairs[0]->Append({1, 0});
 
       (*vtx_2to1[1])[0] = 1;
       (*vtx_2to1[1])[2] = 3;
       // (*be_pairs[0])[2] = 3;
-      be_pairs[1]->Append({3, 2});
+      // be_pairs[1]->Append({3, 2});
 
       // These are the informations that will be stored in the 'global topology' file.
       Array<int> global_comps(topol_data.numSub);
@@ -252,8 +252,8 @@ int main(int argc, char *argv[])
       //          tmp.BE2 = (*be_pair)[be].second;
 
       //          // use the face index from each component mesh.
-      //          int f1 = meshes[tmp.Mesh1]->GetBdrFace(tmp.BE1);
-      //          int f2 = meshes[tmp.Mesh2]->GetBdrFace(tmp.BE2);
+      //          int f1 = meshes[tmp.Mesh1]->GetBdrElementFaceIndex(tmp.BE1);
+      //          int f2 = meshes[tmp.Mesh2]->GetBdrElementFaceIndex(tmp.BE2);
       //          int Inf1, Inf2, dump;
       //          meshes[tmp.Mesh1]->GetFaceInfos(f1, &Inf1, &dump);
       //          meshes[tmp.Mesh2]->GetFaceInfos(f2, &Inf2, &dump);

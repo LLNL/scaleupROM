@@ -257,20 +257,23 @@ int main(int argc, char *argv[])
     Array2D<int> interface_attributes(numSub, numSub);
     interface_attributes = -1;
 
+    // NOTE(kevin): MFEM v4.6 SubMesh uses this for generated boundary attributes.
+    const int generated_battr = mesh.bdr_attributes.Max() + 1;
+
     // interface attribute starts after the parent mesh boundary attributes.
     Array<InterfaceInfo> interface_infos(0);
     int if_attr = mesh.bdr_attributes.Max() + 1;
     for (int i = 0; i < numSub; i++) {
         // printf("Submesh %d\n", i);
         for (int ib = 0; ib < meshes[i]->GetNBE(); ib++) {
-          if (meshes[i]->GetBdrAttribute(ib) != SubMesh::GENERATED_ATTRIBUTE) continue;
+          if (meshes[i]->GetBdrAttribute(ib) != generated_battr) continue;
 
-          int parent_face_i = (*parent_face_map_2d[i])[meshes[i]->GetBdrFace(ib)];
+          int parent_face_i = (*parent_face_map_2d[i])[meshes[i]->GetBdrElementFaceIndex(ib)];
           for (int j = i+1; j < numSub; j++) {
               for (int jb = 0; jb < meshes[j]->GetNBE(); jb++) {
-                int parent_face_j = (*parent_face_map_2d[j])[meshes[j]->GetBdrFace(jb)];
+                int parent_face_j = (*parent_face_map_2d[j])[meshes[j]->GetBdrElementFaceIndex(jb)];
                 if (parent_face_i == parent_face_j) {
-                    MFEM_ASSERT(meshes[j]->GetBdrAttribute(jb) == SubMesh::GENERATED_ATTRIBUTE,
+                    MFEM_ASSERT(meshes[j]->GetBdrAttribute(jb) == generated_battr,
                                 "This interface element has been already set!");
                     if (interface_attributes[i][j] <= 0) {
                       interface_attributes[i][j] = if_attr;
@@ -323,16 +326,16 @@ int main(int argc, char *argv[])
           int interface_attr = meshes[i]->GetBdrAttribute(ib);
           if (interface_attr <= mesh.bdr_attributes.Max()) continue;
 
-          int parent_face_i = (*parent_face_map_2d[i])[meshes[i]->GetBdrFace(ib)];
+          int parent_face_i = (*parent_face_map_2d[i])[meshes[i]->GetBdrElementFaceIndex(ib)];
           
           for (int j = 0; j < numSub; j++) {
               if (i == j) continue;
               for (int jb = 0; jb < meshes[j]->GetNBE(); jb++) {
-                int parent_face_j = (*parent_face_map_2d[j])[meshes[j]->GetBdrFace(jb)];
+                int parent_face_j = (*parent_face_map_2d[j])[meshes[j]->GetBdrElementFaceIndex(jb)];
                 if (parent_face_i == parent_face_j) {
                   interface_parent.Append(parent_face_i);
                   printf("(BE %d, face %d) - parent face %d, attr %d - Submesh %d (BE %d, face %d)\n",
-                        ib, meshes[i]->GetBdrFace(ib), parent_face_i, interface_attr, j, jb, meshes[j]->GetBdrFace(jb));
+                        ib, meshes[i]->GetBdrElementFaceIndex(ib), parent_face_i, interface_attr, j, jb, meshes[j]->GetBdrElementFaceIndex(jb));
                 }
               }
           }
@@ -353,7 +356,7 @@ int main(int argc, char *argv[])
     cout << "Number of unknowns in each subdomain: " << total_num_dofs << endl;
 
     for (int i = 0; i < meshes[0]->GetNBE(); i++) {
-      int fn = meshes[0]->GetBdrFace(i);
+      int fn = meshes[0]->GetBdrElementFaceIndex(i);
       int bdrAttr = meshes[0]->GetBdrAttribute(i);
 
       int elem_id, face_info;
@@ -578,7 +581,7 @@ int main(int argc, char *argv[])
       // Correcting the local face transformation if orientation needs correction.
       {
         int faceInf1, faceInf2;
-        int face1 = mesh1->GetBdrFace(interface_infos[bn].BE1);
+        int face1 = mesh1->GetBdrElementFaceIndex(interface_infos[bn].BE1);
         mesh1->GetFaceInfos(face1, &faceInf1, &faceInf2);
         if (faceInf1 != interface_infos[bn].Inf1)
         {
@@ -594,7 +597,7 @@ int main(int argc, char *argv[])
                                             (*tr1).Loc1.Transf, interface_infos[bn].Inf1);
         }
 
-        int face2 = mesh2->GetBdrFace(interface_infos[bn].BE2);
+        int face2 = mesh2->GetBdrElementFaceIndex(interface_infos[bn].BE2);
         mesh2->GetFaceInfos(face2, &faceInf2, &faceInf1);
         if (faceInf2 != interface_infos[bn].Inf2)
         {
@@ -618,8 +621,8 @@ int main(int argc, char *argv[])
         printf("tr2\t%d\t%d\n", tr2->Elem1No, tr2->Elem2No);
         printf("\n");
 
-        int face1 = mesh1->GetBdrFace(interface_infos[bn].BE1);
-        int face2 = mesh2->GetBdrFace(interface_infos[bn].BE2);
+        int face1 = mesh1->GetBdrElementFaceIndex(interface_infos[bn].BE1);
+        int face2 = mesh2->GetBdrElementFaceIndex(interface_infos[bn].BE2);
 
         printf("mesh1 face info\n");
 
@@ -875,6 +878,9 @@ void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face
   if (parent_face_map == NULL)
     parent_face_map = new Array<int>(BuildFaceMap2D(pm, sm));
 
+  // NOTE(kevin): MFEM v4.6 SubMesh uses this for generated boundary attributes.
+  const int generated_battr = pm.bdr_attributes.Max() + 1;
+
   // Setting boundary element attribute of submesh for 2D.
   // This does not support 2D.
   // Array<int> parent_face_to_be = mesh.GetFaceToBdrElMap();
@@ -882,10 +888,10 @@ void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face
   parent_face_to_be = -1;
   for (int i = 0; i < pm.GetNBE(); i++)
   {
-    parent_face_to_be[pm.GetBdrElementEdgeIndex(i)] = i;
+    parent_face_to_be[pm.GetBdrElementFaceIndex(i)] = i;
   }
   for (int k = 0; k < sm.GetNBE(); k++) {
-    int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrFace(k)]];
+    int pbeid = parent_face_to_be[(*parent_face_map)[sm.GetBdrElementFaceIndex(k)]];
     if (pbeid != -1)
     {
       int attr = pm.GetBdrElement(pbeid)->GetAttribute();
@@ -896,7 +902,7 @@ void BuildSubMeshBoundary2D(const Mesh& pm, SubMesh& sm, Array<int> *parent_face
       // This case happens when a domain is extracted, but the root parent
       // mesh didn't have a boundary element on the surface that defined
       // it's boundary. It still creates a valid mesh, so we allow it.
-      sm.GetBdrElement(k)->SetAttribute(SubMesh::GENERATED_ATTRIBUTE);
+      sm.GetBdrElement(k)->SetAttribute(generated_battr);
     }
   }
 
