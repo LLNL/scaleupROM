@@ -7,7 +7,7 @@
 #SBATCH --mem=2G
 #SBATCH --time=24:00:00
 #SBATCH --partition=pbatch
-#SBATCH --account=sosu
+#SBATCH --account=genddfem
 #SBATCH --output=logs/%x-%A_%a.out
 
 # shellcheck source=jobs/common.bash

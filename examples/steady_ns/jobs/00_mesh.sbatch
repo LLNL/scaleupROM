@@ -6,7 +6,7 @@
 #SBATCH --mem=2G
 #SBATCH --time=00:30:00
 #SBATCH --partition=pbatch
-#SBATCH --account=sosu
+#SBATCH --account=genddfem
 #SBATCH --output=logs/%x-%j.out
 
 set -euo pipefail
